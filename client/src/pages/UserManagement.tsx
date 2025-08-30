@@ -11,7 +11,7 @@ import { Badge } from '@/components/ui/badge';
 import { Alert, AlertDescription } from '@/components/ui/alert';
 import { Switch } from '@/components/ui/switch';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
-import { UserPlus, Edit, Trash2, Shield, Users, CheckCircle, XCircle, AlertCircle } from 'lucide-react';
+import { UserPlus, Edit, Trash2, Shield, Users, CheckCircle, XCircle, AlertCircle, Key } from 'lucide-react';
 import { apiRequest } from '@/lib/queryClient';
 
 interface User {
@@ -42,6 +42,8 @@ export default function UserManagement() {
   const queryClient = useQueryClient();
   const [isCreateDialogOpen, setIsCreateDialogOpen] = useState(false);
   const [editingUser, setEditingUser] = useState<User | null>(null);
+  const [passwordChangeUser, setPasswordChangeUser] = useState<User | null>(null);
+  const [newPassword, setNewPassword] = useState('');
   const [createForm, setCreateForm] = useState<CreateUserData>({
     username: '',
     password: '',
@@ -115,6 +117,19 @@ export default function UserManagement() {
     },
   });
 
+  // Change password mutation
+  const changePasswordMutation = useMutation({
+    mutationFn: async ({ userId, password }: { userId: string; password: string }) => {
+      const response = await apiRequest('PUT', `/api/users/${userId}/password`, { password });
+      return await response.json();
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['/api/users'] });
+      setPasswordChangeUser(null);
+      setNewPassword('');
+    },
+  });
+
   const handleCreateUser = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!createForm.username.trim() || !createForm.password.trim()) {
@@ -132,6 +147,12 @@ export default function UserManagement() {
     if (confirm(`Are you sure you want to delete user "${username}"? This action cannot be undone.`)) {
       await deleteUserMutation.mutateAsync(userId);
     }
+  };
+
+  const handleChangePassword = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!passwordChangeUser || !newPassword) return;
+    await changePasswordMutation.mutateAsync({ userId: passwordChangeUser.id, password: newPassword });
   };
 
   const getRoleBadgeColor = (role: string) => {
@@ -387,6 +408,14 @@ export default function UserManagement() {
                         >
                           <Edit className="h-3 w-3" />
                         </Button>
+                        <Button
+                          variant="outline"
+                          size="sm"
+                          onClick={() => setPasswordChangeUser(u)}
+                          data-testid={`button-change-password-${u.username}`}
+                        >
+                          <Key className="h-3 w-3" />
+                        </Button>
                         {u.id !== user?.id && (
                           <Button
                             variant="outline"
@@ -496,6 +525,60 @@ export default function UserManagement() {
                 {updateUserMutation.isPending ? 'Updating...' : 'Update User'}
               </Button>
             </DialogFooter>
+          </DialogContent>
+        </Dialog>
+      )}
+
+      {/* Change Password Dialog */}
+      {passwordChangeUser && (
+        <Dialog open={!!passwordChangeUser} onOpenChange={() => setPasswordChangeUser(null)}>
+          <DialogContent className="sm:max-w-md">
+            <form onSubmit={handleChangePassword}>
+              <DialogHeader>
+                <DialogTitle>Change Password: @{passwordChangeUser.username}</DialogTitle>
+                <DialogDescription>
+                  Set a new password for this user. The user will need to use this new password to login.
+                </DialogDescription>
+              </DialogHeader>
+              <div className="space-y-4 py-4">
+                <div className="space-y-2">
+                  <Label htmlFor="newPassword">New Password *</Label>
+                  <Input
+                    id="newPassword"
+                    type="password"
+                    value={newPassword}
+                    onChange={(e) => setNewPassword(e.target.value)}
+                    placeholder="Enter new password"
+                    required
+                    minLength={6}
+                    data-testid="input-new-password"
+                  />
+                  <p className="text-sm text-gray-500">
+                    Password must be at least 6 characters long
+                  </p>
+                </div>
+              </div>
+              <DialogFooter>
+                <Button
+                  type="button"
+                  variant="outline"
+                  onClick={() => {
+                    setPasswordChangeUser(null);
+                    setNewPassword('');
+                  }}
+                  disabled={changePasswordMutation.isPending}
+                >
+                  Cancel
+                </Button>
+                <Button
+                  type="submit"
+                  disabled={changePasswordMutation.isPending || !newPassword || newPassword.length < 6}
+                  data-testid="button-confirm-change-password"
+                >
+                  {changePasswordMutation.isPending ? 'Changing...' : 'Change Password'}
+                </Button>
+              </DialogFooter>
+            </form>
           </DialogContent>
         </Dialog>
       )}
