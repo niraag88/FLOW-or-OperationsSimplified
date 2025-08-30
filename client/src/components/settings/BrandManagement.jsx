@@ -29,7 +29,7 @@ const initialFormData = {
   contact_person: "",
   contact_email: "",
   contact_phone: "",
-  is_active: true,
+  isActive: true,
   sort_order: 0
 };
 
@@ -233,11 +233,11 @@ export default function BrandManagement() {
                         </TableCell>
                         <TableCell>
                           <span className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium ${
-                            brand.is_active 
+                            brand.isActive 
                               ? 'bg-green-100 text-green-800' 
                               : 'bg-red-100 text-red-800'
                           }`}>
-                            {brand.is_active ? 'Active' : 'Inactive'}
+                            {brand.isActive ? 'Active' : 'Inactive'}
                           </span>
                         </TableCell>
                         <TableCell>
@@ -274,11 +274,11 @@ export default function BrandManagement() {
                         <div className="min-w-0 flex-1 pr-2">
                           <h3 className="font-semibold text-gray-900 truncate">{brand.name}</h3>
                           <span className={`inline-flex items-center px-2 py-1 rounded-full text-xs font-medium mt-1 ${
-                            brand.is_active 
+                            brand.isActive 
                               ? 'bg-green-100 text-green-800' 
                               : 'bg-red-100 text-red-800'
                           }`}>
-                            {brand.is_active ? 'Active' : 'Inactive'}
+                            {brand.isActive ? 'Active' : 'Inactive'}
                           </span>
                         </div>
                         <div className="flex gap-2 flex-shrink-0">
@@ -440,11 +440,11 @@ export default function BrandManagement() {
 
                 <div className="flex items-center space-x-2">
                   <Switch
-                    id="is_active"
-                    checked={formData.is_active}
-                    onCheckedChange={(checked) => handleInputChange('is_active', checked)}
+                    id="isActive"
+                    checked={formData.isActive}
+                    onCheckedChange={(checked) => handleInputChange('isActive', checked)}
                   />
-                  <Label htmlFor="is_active">Active</Label>
+                  <Label htmlFor="isActive">Active</Label>
                 </div>
 
                 {/* Action Buttons - Mobile Optimized */}
