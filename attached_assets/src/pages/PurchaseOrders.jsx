@@ -1,0 +1,169 @@
+
+import React, { useState, useEffect } from "react";
+import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { Plus, Search } from "lucide-react";
+import { PurchaseOrder } from "@/api/entities";
+import { GoodsReceipt } from "@/api/entities";
+import { Product } from "@/api/entities"; // Added Product import
+import POList from "../components/purchase-orders/POList";
+import POForm from "../components/purchase-orders/POForm";
+import GoodsReceiptsTab from "../components/purchase-orders/GoodsReceiptsTab"; // Changed import
+import POFilters from "../components/purchase-orders/POFilters";
+
+export default function PurchaseOrders() {
+  const [purchaseOrders, setPurchaseOrders] = useState([]);
+  const [goodsReceipts, setGoodsReceipts] = useState([]);
+  const [products, setProducts] = useState([]); // Added products state
+  const [loading, setLoading] = useState(true);
+  const [searchTerm, setSearchTerm] = useState("");
+  const [activeTab, setActiveTab] = useState("purchase-orders");
+  const [showPOForm, setShowPOForm] = useState(false);
+  const [editingPO, setEditingPO] = useState(null);
+  const [filters, setFilters] = useState({
+    status: "all",
+    supplier: "all",
+    dateRange: "all"
+  });
+  const [refreshTrigger, setRefreshTrigger] = useState(0);
+
+  useEffect(() => {
+    loadData();
+  }, [refreshTrigger]);
+
+  const loadData = async () => {
+    setLoading(true);
+    try {
+      const [posData, grnsData, productsData] = await Promise.all([ // Added productsData
+        PurchaseOrder.list('-updated_date'),
+        GoodsReceipt.list('-updated_date'),
+        Product.list() // Load all products
+      ]);
+
+      setPurchaseOrders(posData);
+      setGoodsReceipts(grnsData);
+      setProducts(productsData); // Set products
+    } catch (error) {
+      console.error("Error loading purchase orders data:", error);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const handleRefresh = () => {
+    setRefreshTrigger(prev => prev + 1);
+  };
+
+  const handleNewPO = () => {
+    setEditingPO(null);
+    setShowPOForm(true);
+  };
+
+  const handleEditPO = (po) => {
+    setEditingPO(po);
+    setShowPOForm(true);
+  };
+
+  const handleClosePOForm = () => {
+    setShowPOForm(false);
+    setEditingPO(null);
+  };
+
+  const canEdit = true;
+  const currentUser = { role: 'Admin', email: 'admin@opsuite.com' }; // Mock user
+
+  const filteredPOs = purchaseOrders.filter(po => {
+    const matchesSearch = po.po_number?.toLowerCase().includes(searchTerm.toLowerCase()) ||
+                         po.notes?.toLowerCase().includes(searchTerm.toLowerCase());
+    
+    const matchesStatus = filters.status === "all" || po.status === filters.status;
+    const matchesSupplier = filters.supplier === "all" || po.supplier_id === filters.supplier;
+    
+    return matchesSearch && matchesStatus && matchesSupplier;
+  });
+
+  const filteredGRNs = goodsReceipts.filter(grn =>
+    grn.grn_number?.toLowerCase().includes(searchTerm.toLowerCase()) ||
+    grn.delivery_note_ref?.toLowerCase().includes(searchTerm.toLowerCase())
+  );
+
+  return (
+    <div className="space-y-6">
+      {/* Header */}
+      <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
+        <div>
+          <h1 className="text-2xl font-bold text-gray-900">Purchase Orders</h1>
+          <p className="text-gray-600">Manage purchase orders and goods receipts</p>
+        </div>
+        
+        <div className="flex items-center gap-3">
+          {canEdit && (
+            <Button 
+              onClick={handleNewPO}
+              className="bg-emerald-600 hover:bg-emerald-700"
+            >
+              <Plus className="w-4 h-4 mr-2" />
+              New Purchase Order
+            </Button>
+          )}
+        </div>
+      </div>
+
+      {/* Search and Filters */}
+      <div className="flex flex-col sm:flex-row gap-4">
+        <div className="relative flex-1 max-w-md">
+          <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 w-4 h-4" />
+          <Input
+            placeholder="Search PO numbers, notes..."
+            value={searchTerm}
+            onChange={(e) => setSearchTerm(e.target.value)}
+            className="pl-10"
+          />
+        </div>
+        
+        <POFilters filters={filters} onFiltersChange={setFilters} />
+      </div>
+
+      {/* Tabs */}
+      <Tabs value={activeTab} onValueChange={setActiveTab} className="w-full">
+        <TabsList className="grid w-full max-w-md grid-cols-2">
+          <TabsTrigger value="purchase-orders">Purchase Orders</TabsTrigger>
+          <TabsTrigger value="goods-receipts">Goods Receipts</TabsTrigger>
+        </TabsList>
+
+        <TabsContent value="purchase-orders" className="mt-6">
+          <POList 
+            purchaseOrders={filteredPOs}
+            loading={loading}
+            canEdit={canEdit}
+            currentUser={currentUser}
+            onEdit={handleEditPO}
+            onRefresh={handleRefresh}
+          />
+        </TabsContent>
+
+        <TabsContent value="goods-receipts" className="mt-6">
+          <GoodsReceiptsTab 
+            purchaseOrders={purchaseOrders}
+            products={products}
+            goodsReceipts={filteredGRNs}
+            loading={loading}
+            canEdit={canEdit}
+            currentUser={currentUser}
+            onRefresh={handleRefresh}
+          />
+        </TabsContent>
+      </Tabs>
+
+      {/* PO Form Modal */}
+      <POForm
+        open={showPOForm}
+        onClose={handleClosePOForm}
+        editingPO={editingPO}
+        currentUser={currentUser}
+        onSuccess={handleRefresh}
+      />
+    </div>
+  );
+}

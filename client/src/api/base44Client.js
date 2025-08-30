@@ -4,5 +4,14 @@ export const base44 = {
   entities: new Proxy({}, { get(){ if(DEMO){ return {
     async list(){ return []; }, async create(){ return { id: Math.random().toString(36).slice(2) }; },
     async update(){ return true; }, async delete(){ return true; }, async getById(){ return null; }
-  }; } throw new Error("Base44 entity not available off-platform"); } })
+  }; } throw new Error("Base44 entity not available off-platform"); } }),
+  integrations: {
+    Core: {
+      InvokeLLM: async () => ({ success: true }),
+      SendEmail: async () => ({ success: true }),
+      UploadFile: async () => ({ success: true, url: '#' }),
+      GenerateImage: async () => ({ success: true, url: '#' }),
+      ExtractDataFromUploadedFile: async () => ({ success: true, data: {} })
+    }
+  }
 };

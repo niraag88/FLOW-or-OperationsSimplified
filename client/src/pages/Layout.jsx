@@ -1,0 +1,473 @@
+
+import React, { useState, useEffect } from "react";
+import { Link, useLocation } from "react-router-dom";
+import { createPageUrl } from "@/utils";
+import { 
+  LayoutDashboard, 
+  Package, 
+  ShoppingCart, 
+  Truck, 
+  FileText, 
+  BarChart3, 
+  Settings,
+  Bell,
+  User,
+  Menu,
+  X,
+  ClipboardList,
+  LogOut,
+  ChevronDown,
+  Building2,
+  Users2,
+  AlertCircle
+} from "lucide-react";
+import { Button } from "@/components/ui/button";
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuLabel,
+  DropdownMenuSeparator,
+  DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu";
+import { Badge } from "@/components/ui/badge";
+import GlobalSearch from "../components/GlobalSearch";
+
+const navigationItems = [
+  {
+    title: "Dashboard",
+    url: createPageUrl("Dashboard"),
+    icon: LayoutDashboard,
+    type: "single"
+  },
+  {
+    title: "Internal",
+    icon: Building2,
+    type: "dropdown",
+    items: [
+      {
+        title: "Inventory",
+        url: createPageUrl("Inventory"),
+        icon: Package,
+      },
+      {
+        title: "Purchase Orders",
+        url: createPageUrl("PurchaseOrders"),
+        icon: ShoppingCart,
+      },
+      {
+        title: "Reports",
+        url: createPageUrl("Reports"),
+        icon: BarChart3,
+      }
+    ]
+  },
+  {
+    title: "External",
+    icon: Users2,
+    type: "dropdown",
+    items: [
+      {
+        title: "Quotations",
+        url: createPageUrl("Quotations"),
+        icon: ClipboardList,
+      },
+      {
+        title: "Invoices",
+        url: createPageUrl("Invoices"),
+        icon: FileText,
+      },
+      {
+        title: "Delivery Orders",
+        url: createPageUrl("DeliveryOrders"),
+        icon: Truck,
+      }
+    ]
+  },
+  {
+    title: "Settings",
+    url: createPageUrl("Settings"),
+    icon: Settings,
+    type: "single"
+  },
+];
+
+const getIconForEntityType = (type) => {
+  switch (type) {
+    case 'Product': return <Package className="w-4 h-4 text-gray-500" />;
+    case 'PurchaseOrder': return <ShoppingCart className="w-4 h-4 text-gray-500" />;
+    case 'DeliveryOrder': return <Truck className="w-4 h-4 text-gray-500" />;
+    case 'Invoice': return <FileText className="w-4 h-4 text-gray-500" />;
+    case 'Quotation': return <ClipboardList className="w-4 h-4 text-gray-500" />;
+    case 'Customer': return <Users2 className="w-4 h-4 text-gray-500" />;
+    case 'Supplier': return <Building2 className="w-4 h-4 text-gray-500" />;
+    case 'StockCount': return <Package className="w-4 h-4 text-gray-500" />;
+    default: return <AlertCircle className="w-4 h-4 text-gray-500" />;
+  }
+};
+
+const getMockNotifications = () => [
+  {
+    id: '1',
+    entity_type: 'Product',
+    action: 'create',
+    user_email: 'admin@opsuite.com',
+    timestamp: new Date(Date.now() - 5 * 60 * 1000).toISOString(), // 5 minutes ago
+    changes: { created_product: { product_code: 'ABC123' } }
+  },
+  {
+    id: '2',
+    entity_type: 'PurchaseOrder',
+    action: 'status_change',
+    user_email: 'manager@opsuite.com',
+    timestamp: new Date(Date.now() - 15 * 60 * 1000).toISOString(), // 15 minutes ago
+    changes: { 
+      status: { from: 'draft', to: 'submitted' },
+      created_po: { po_number: 'PO-001' }
+    }
+  },
+  {
+    id: '3',
+    entity_type: 'Invoice',
+    action: 'create',
+    user_email: 'admin@opsuite.com',
+    timestamp: new Date(Date.now() - 30 * 60 * 1000).toISOString(), // 30 minutes ago
+    changes: { created_document: { invoice_number: 'INV-001' } }
+  }
+];
+
+const getNotificationDetails = (log) => {
+    let title = 'New Activity';
+    const doc = log.changes?.created_po || log.changes?.updated_po || log.changes?.created_document || log.changes?.document_data;
+
+    let docNumber;
+    if (doc) {
+      docNumber = doc.po_number || doc.invoice_number || doc.do_number || doc.quotation_number || doc.document_number;
+    }
+    
+    if (!docNumber && log.entity_type === 'Product') {
+        const product = log.changes?.created_product || log.changes?.updated_product || log.changes?.product;
+        docNumber = product?.product_code;
+    }
+
+    const entityName = log.entity_type.replace(/([A-Z])/g, ' $1').trim();
+
+    switch (log.action) {
+        case 'create':
+            title = `${entityName} ${docNumber ? `#${docNumber}` : ''} created`;
+            break;
+        case 'update':
+            title = `${entityName} ${docNumber ? `#${docNumber}` : ''} updated`;
+            break;
+        case 'delete':
+            title = `${entityName} ${docNumber ? `#${docNumber}` : ''} deleted`;
+            break;
+        case 'status_change':
+            title = `${entityName} ${docNumber ? `#${docNumber}` : ''} status changed to ${log.changes?.status?.to || 'updated'}`;
+            break;
+        default:
+            title = `${entityName} ${docNumber ? `#${docNumber}` : ''} ${log.action}`;
+    }
+
+    const timeAgo = getTimeAgo(new Date(log.timestamp));
+    const subtitle = `by ${log.user_email} • ${timeAgo}`;
+    
+    return { title, subtitle, icon: getIconForEntityType(log.entity_type) };
+};
+
+const getTimeAgo = (date) => {
+  const now = new Date();
+  const diffInMinutes = Math.floor((now - date) / (1000 * 60));
+  
+  if (diffInMinutes < 1) return 'just now';
+  if (diffInMinutes < 60) return `${diffInMinutes}m ago`;
+  
+  const diffInHours = Math.floor(diffInMinutes / 60);
+  if (diffInHours < 24) return `${diffInHours}h ago`;
+  
+  const diffInDays = Math.floor(diffInHours / 24);
+  return `${diffInDays}d ago`;
+};
+
+export default function Layout({ children, currentPageName }) {
+  const location = useLocation();
+  const [mobileMenuOpen, setMobileMenuOpen] = React.useState(false);
+  const [notifications, setNotifications] = useState([]);
+  const [notificationCount, setNotificationCount] = useState(0);
+
+  useEffect(() => {
+    // Use mock notifications for now since AuditLog entity is new
+    const mockNotifications = getMockNotifications();
+    setNotifications(mockNotifications);
+    setNotificationCount(mockNotifications.length);
+  }, []);
+
+  // Mock user for preview mode - no authentication needed
+  const currentUser = {
+    full_name: "Admin User",
+    email: "admin@opsuite.com",
+    role: "Admin",
+  };
+
+  // Don't wrap Print page
+  if (currentPageName === "Print") {
+    return <>{children}</>;
+  }
+
+  const isActiveItem = (item) => {
+    if (item.type === "single") {
+      return location.pathname.startsWith(item.url);
+    } else if (item.type === "dropdown") {
+      return item.items.some(subItem => location.pathname.startsWith(subItem.url));
+    }
+    return false;
+  };
+
+  const getCurrentPageTitle = () => {
+    for (const item of navigationItems) {
+      if (item.type === "single" && location.pathname.startsWith(item.url)) {
+        return item.title;
+      } else if (item.type === "dropdown") {
+        const subItem = item.items.find(sub => location.pathname.startsWith(sub.url));
+        if (subItem) {
+          return subItem.title;
+        }
+      }
+    }
+    return currentPageName || "Ops Suite";
+  };
+
+  const handleLogout = () => {
+    alert("Logout is disabled in preview mode.");
+  };
+
+  return (
+    <div className="min-h-screen bg-gray-50">
+      <header className="bg-slate-900 shadow-xl border-b border-slate-800">
+        <div className="px-3 sm:px-4 lg:px-8">
+          <div className="flex items-center justify-between h-16">
+            <div className="flex items-center gap-2 sm:gap-4 min-w-0">
+              <Button
+                variant="ghost"
+                size="sm"
+                className="lg:hidden text-gray-300 hover:text-white hover:bg-slate-800 p-2"
+                onClick={() => setMobileMenuOpen(!mobileMenuOpen)}
+              >
+                {mobileMenuOpen ? <X className="w-5 h-5" /> : <Menu className="w-5 h-5" />}
+              </Button>
+              
+              <div className="flex items-center gap-2 sm:gap-3 min-w-0">
+                <div className="w-6 h-6 sm:w-8 sm:h-8 bg-gradient-to-r from-emerald-500 to-emerald-600 rounded-lg flex items-center justify-center flex-shrink-0">
+                  <LayoutDashboard className="w-3 h-3 sm:w-5 sm:h-5 text-white" />
+                </div>
+                <div className="hidden sm:block min-w-0">
+                  <h1 className="text-lg sm:text-xl font-bold text-white tracking-tight truncate">Ops Suite</h1>
+                  <p className="text-xs text-gray-400 truncate">Business Operations</p>
+                </div>
+              </div>
+            </div>
+
+            {/* Desktop Navigation */}
+            <nav className="hidden lg:flex items-center space-x-1">
+              {navigationItems.map((item, index) => {
+                const isActive = isActiveItem(item);
+                
+                if (item.type === "single") {
+                  return (
+                    <Link
+                      key={item.title}
+                      to={item.url}
+                      className={`flex items-center gap-2 px-4 py-2 rounded-lg text-sm font-medium transition-all duration-200 ${
+                        isActive
+                          ? 'bg-emerald-500 text-white shadow-lg'
+                          : 'text-gray-300 hover:text-white hover:bg-slate-800'
+                      }`}
+                    >
+                      <item.icon className="w-4 h-4" />
+                      {item.title}
+                    </Link>
+                  );
+                } else if (item.type === "dropdown") {
+                  return (
+                    <DropdownMenu key={item.title}>
+                      <DropdownMenuTrigger asChild>
+                        <Button
+                          variant="ghost"
+                          className={`flex items-center gap-2 px-4 py-2 rounded-lg text-sm font-medium transition-all duration-200 ${
+                            isActive
+                              ? 'bg-emerald-500 text-white shadow-lg'
+                              : 'text-gray-300 hover:text-white hover:bg-slate-800'
+                          }`}
+                        >
+                          <item.icon className="w-4 h-4" />
+                          {item.title}
+                          <ChevronDown className="w-3 h-3" />
+                        </Button>
+                      </DropdownMenuTrigger>
+                      <DropdownMenuContent align="start" className="w-48">
+                        {item.items.map((subItem) => (
+                          <DropdownMenuItem key={subItem.title} asChild>
+                            <Link
+                              to={subItem.url}
+                              className="flex items-center gap-2 cursor-pointer"
+                            >
+                              <subItem.icon className="w-4 h-4" />
+                              {subItem.title}
+                            </Link>
+                          </DropdownMenuItem>
+                        ))}
+                      </DropdownMenuContent>
+                    </DropdownMenu>
+                  );
+                }
+                return null;
+              })}
+            </nav>
+
+            <div className="flex items-center gap-2 sm:gap-4 flex-shrink-0">
+              <div className="hidden md:block">
+                <GlobalSearch />
+              </div>
+
+              <DropdownMenu onOpenChange={(open) => { if(open) setNotificationCount(0); }}>
+                <DropdownMenuTrigger asChild>
+                  <Button variant="ghost" size="sm" className="text-gray-300 hover:text-white hover:bg-slate-800 relative p-2">
+                    <Bell className="w-4 h-4 sm:w-5 sm:h-5" />
+                    {notificationCount > 0 && (
+                      <Badge className="absolute -top-1 -right-1 w-4 h-4 sm:w-5 sm:h-5 p-0 flex items-center justify-center bg-amber-500 text-xs">
+                        {notificationCount}
+                      </Badge>
+                    )}
+                  </Button>
+                </DropdownMenuTrigger>
+                <DropdownMenuContent align="end" className="w-80">
+                  <DropdownMenuLabel>Recent Activity</DropdownMenuLabel>
+                  <DropdownMenuSeparator />
+                  {notifications.length > 0 ? (
+                    notifications.map(log => {
+                      const { title, subtitle, icon } = getNotificationDetails(log);
+                      return (
+                        <DropdownMenuItem key={log.id} className="flex items-start gap-3 p-3">
+                          <div className="mt-1">{icon}</div>
+                          <div className="min-w-0">
+                            <p className="text-sm font-medium truncate">{title}</p>
+                            <p className="text-xs text-gray-500">{subtitle}</p>
+                          </div>
+                        </DropdownMenuItem>
+                      );
+                    })
+                  ) : (
+                    <div className="p-4 text-center text-sm text-gray-500">
+                      No recent activity.
+                    </div>
+                  )}
+                </DropdownMenuContent>
+              </DropdownMenu>
+
+              <DropdownMenu>
+                <DropdownMenuTrigger asChild>
+                  <Button variant="ghost" size="sm" className="text-gray-300 hover:text-white hover:bg-slate-800 flex items-center gap-1 sm:gap-2 p-2">
+                    <User className="w-4 h-4 sm:w-5 sm:h-5" />
+                    <span className="hidden sm:inline text-sm truncate max-w-[100px]">
+                      {currentUser?.full_name}
+                    </span>
+                  </Button>
+                </DropdownMenuTrigger>
+                <DropdownMenuContent align="end" className="w-56">
+                  <div className="px-2 py-1.5">
+                    <p className="text-sm font-medium truncate">{currentUser?.full_name}</p>
+                    <p className="text-xs text-gray-500 truncate">{currentUser?.email}</p>
+                    <p className="text-xs text-gray-500 capitalize">Role: {currentUser?.role}</p>
+                  </div>
+                  <DropdownMenuSeparator />
+                  <DropdownMenuItem onClick={() => window.location.href = createPageUrl('Settings')}>
+                    <Settings className="w-4 h-4 mr-2" />
+                    Settings
+                  </DropdownMenuItem>
+                  <DropdownMenuSeparator />
+                  <DropdownMenuItem onClick={handleLogout} className="text-red-600 focus:text-red-600">
+                    <LogOut className="w-4 h-4 mr-2" />
+                    Sign Out (Preview Mode)
+                  </DropdownMenuItem>
+                </DropdownMenuContent>
+              </DropdownMenu>
+            </div>
+          </div>
+        </div>
+
+        {/* Mobile Navigation */}
+        {mobileMenuOpen && (
+          <div className="lg:hidden border-t border-slate-800 bg-slate-900">
+            <div className="px-3 sm:px-4 py-4 space-y-2 max-h-[70vh] overflow-y-auto">
+              <div className="mb-4 px-1">
+                <GlobalSearch />
+              </div>
+              
+              {navigationItems.map((item) => {
+                if (item.type === "single") {
+                  const isActive = location.pathname.startsWith(item.url);
+                  return (
+                    <Link
+                      key={item.title}
+                      to={item.url}
+                      onClick={() => setMobileMenuOpen(false)}
+                      className={`flex items-center gap-3 px-3 py-3 rounded-lg text-sm font-medium transition-all duration-200 ${
+                        isActive
+                          ? 'bg-emerald-500 text-white'
+                          : 'text-gray-300 hover:text-white hover:bg-slate-800'
+                      }`}
+                    >
+                      <item.icon className="w-5 h-5 flex-shrink-0" />
+                      <span className="truncate">{item.title}</span>
+                    </Link>
+                  );
+                } else if (item.type === "dropdown") {
+                  return (
+                    <div key={item.title} className="space-y-1">
+                      <div className="flex items-center gap-3 px-3 py-2 text-sm font-medium text-gray-400">
+                        <item.icon className="w-5 h-5 flex-shrink-0" />
+                        <span className="truncate">{item.title}</span>
+                      </div>
+                      {item.items.map((subItem) => {
+                        const isActive = location.pathname.startsWith(subItem.url);
+                        return (
+                          <Link
+                            key={subItem.title}
+                            to={subItem.url}
+                            onClick={() => setMobileMenuOpen(false)}
+                            className={`flex items-center gap-3 px-6 py-2 rounded-lg text-sm transition-all duration-200 ${
+                              isActive
+                                ? 'bg-emerald-500 text-white'
+                                : 'text-gray-300 hover:text-white hover:bg-slate-800'
+                            }`}
+                          >
+                            <subItem.icon className="w-4 h-4 flex-shrink-0" />
+                            <span className="truncate">{subItem.title}</span>
+                          </Link>
+                        );
+                      })}
+                    </div>
+                  );
+                }
+                return null;
+              })}
+            </div>
+          </div>
+        )}
+      </header>
+
+      <main className="flex-1">
+        <div className="bg-white shadow-sm border-b border-gray-200">
+          <div className="px-3 sm:px-4 lg:px-8 py-4">
+            <h2 className="text-xl sm:text-2xl font-bold text-gray-900 tracking-tight truncate">
+              {getCurrentPageTitle()}
+            </h2>
+          </div>
+        </div>
+        <div className="p-3 sm:p-4 lg:p-8">
+          {children}
+        </div>
+      </main>
+    </div>
+  );
+}

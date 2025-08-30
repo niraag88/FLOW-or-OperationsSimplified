@@ -16,4 +16,5 @@ export const StorageSettings= base44.entities.StorageSettings;
 export const StorageUsage   = base44.entities.StorageUsage;
 export const RecycleBin     = base44.entities.RecycleBin;
 export const AuditLog       = base44.entities.AuditLog;
+export const InventoryAudit = base44.entities.InventoryAudit;
 export const User = base44.auth;
