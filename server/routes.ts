@@ -252,6 +252,22 @@ const requireOpsToken = (req: Request, res: Response, next: NextFunction) => {
 };
 
 // Input validation functions
+// Validate PDF magic bytes
+const validatePdfMagicBytes = (fileBuffer: Buffer) => {
+  if (!fileBuffer || fileBuffer.length < 4) {
+    return { valid: false, error: 'Invalid file format. Only real PDF files are allowed.' };
+  }
+  
+  // Check for PDF signature "%PDF" at the beginning
+  const magicBytes = fileBuffer.slice(0, 4).toString('ascii');
+  if (magicBytes !== '%PDF') {
+    return { valid: false, error: 'Invalid file format. Only real PDF files are allowed.' };
+  }
+  
+  console.log('Validated real PDF');
+  return { valid: true };
+};
+
 const validateUploadInput = (key: string, contentType: string, fileSize?: number) => {
   // Validate key path
   if (!key.startsWith('invoices/') && !key.startsWith('delivery/')) {
@@ -880,6 +896,15 @@ export async function registerRoutes(app: Express): Promise<Server> {
         }
       }
 
+      // Validate PDF magic bytes
+      if (tokenData.contentType === 'application/pdf') {
+        const pdfValidation = validatePdfMagicBytes(fileData);
+        if (!pdfValidation.valid) {
+          signedTokens.delete(token);
+          return res.status(400).json({ error: pdfValidation.error });
+        }
+      }
+
       // Upload to Replit Object Storage
       const result = await objectStorageClient.uploadFromBytes(tokenData.key, fileData);
 
@@ -927,6 +952,12 @@ export async function registerRoutes(app: Express): Promise<Server> {
       // Validate actual file size matches header
       if (req.file.size !== fileSize) {
         return res.status(400).json({ error: 'File size mismatch' });
+      }
+
+      // Validate PDF magic bytes
+      const pdfValidation = validatePdfMagicBytes(req.file.buffer);
+      if (!pdfValidation.valid) {
+        return res.status(400).json({ error: pdfValidation.error });
       }
 
       // Upload to Replit Object Storage
