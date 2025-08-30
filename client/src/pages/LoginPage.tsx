@@ -126,13 +126,12 @@ export default function LoginPage() {
           </CardContent>
         </Card>
 
-        {/* Demo Credentials Info */}
+        {/* Admin Access Info */}
         <Card className="bg-blue-50 dark:bg-blue-900/20 border-blue-200 dark:border-blue-800">
           <CardContent className="pt-6">
             <div className="text-center text-sm text-blue-800 dark:text-blue-200">
-              <p className="font-medium mb-2">Default Admin Credentials:</p>
-              <p>Username: <code className="bg-blue-100 dark:bg-blue-800 px-1 py-0.5 rounded text-xs">admin</code></p>
-              <p>Password: <code className="bg-blue-100 dark:bg-blue-800 px-1 py-0.5 rounded text-xs">admin123</code></p>
+              <p className="font-medium mb-2">Admin Access</p>
+              <p>Use your administrator credentials to access the business operations system.</p>
             </div>
           </CardContent>
         </Card>

@@ -65,10 +65,36 @@ async function createAdmin() {
   try {
     console.log('🔐 Admin User Setup\n');
 
-    const username = await question('Username: ');
-    if (!username.trim()) {
-      console.error('Username cannot be empty');
-      process.exit(1);
+    // Check for environment variables first
+    const envUsername = process.env.ADMIN_USERNAME;
+    const envPassword = process.env.ADMIN_PASSWORD;
+
+    let username, password;
+
+    if (envUsername && envPassword) {
+      console.log('Using admin credentials from environment variables...');
+      username = envUsername;
+      password = envPassword;
+    } else {
+      console.log('Environment variables not found. Please enter admin credentials manually.\n');
+      
+      username = await question('Username: ');
+      if (!username.trim()) {
+        console.error('Username cannot be empty');
+        process.exit(1);
+      }
+
+      password = await questionHidden('Password: ');
+      if (!password.trim()) {
+        console.error('Password cannot be empty');
+        process.exit(1);
+      }
+
+      const confirmPassword = await questionHidden('Confirm Password: ');
+      if (password !== confirmPassword) {
+        console.error('Passwords do not match');
+        process.exit(1);
+      }
     }
 
     // Check if username already exists
@@ -78,21 +104,9 @@ async function createAdmin() {
       process.exit(1);
     }
 
-    const password = await questionHidden('Password: ');
-    if (!password.trim()) {
-      console.error('Password cannot be empty');
-      process.exit(1);
-    }
-
-    const confirmPassword = await questionHidden('Confirm Password: ');
-    if (password !== confirmPassword) {
-      console.error('Passwords do not match');
-      process.exit(1);
-    }
-
-    const firstName = await question('First Name (optional): ');
-    const lastName = await question('Last Name (optional): ');
-    const email = await question('Email (optional): ');
+    const firstName = envUsername ? 'System' : await question('First Name (optional): ');
+    const lastName = envUsername ? 'Administrator' : await question('Last Name (optional): ');
+    const email = envUsername ? '' : await question('Email (optional): ');
 
     // Hash password
     const hashedPassword = await bcrypt.hash(password, 12);
