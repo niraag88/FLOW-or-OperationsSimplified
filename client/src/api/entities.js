@@ -1,20 +1,116 @@
-import { base44 } from "./base44Client";
-export const Product        = base44.entities.Product;
-export const Supplier       = base44.entities.Supplier;
-export const Customer       = base44.entities.Customer;
-export const Brand          = base44.entities.Brand;
-export const PurchaseOrder  = base44.entities.PurchaseOrder;
-export const GoodsReceipt   = base44.entities.GoodsReceipt;
-export const DeliveryOrder  = base44.entities.DeliveryOrder;
-export const Invoice        = base44.entities.Invoice;
-export const Quotation      = base44.entities.Quotation;
-export const InventoryLot   = base44.entities.InventoryLot;
-export const StockCount     = base44.entities.StockCount;
-export const CompanySettings= base44.entities.CompanySettings;
-export const Books          = base44.entities.Books;
-export const StorageSettings= base44.entities.StorageSettings;
-export const StorageUsage   = base44.entities.StorageUsage;
-export const RecycleBin     = base44.entities.RecycleBin;
-export const AuditLog       = base44.entities.AuditLog;
-export const InventoryAudit = base44.entities.InventoryAudit;
-export const User = base44.auth;
+// Real API entity implementations
+class ApiEntity {
+  constructor(endpoint) {
+    this.endpoint = endpoint;
+  }
+
+  async list() {
+    const response = await fetch(`/api/${this.endpoint}`);
+    if (!response.ok) throw new Error(`Failed to fetch ${this.endpoint}`);
+    return await response.json();
+  }
+
+  async create(data) {
+    const response = await fetch(`/api/${this.endpoint}`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(data)
+    });
+    if (!response.ok) throw new Error(`Failed to create ${this.endpoint}`);
+    return await response.json();
+  }
+
+  async update(id, data) {
+    const response = await fetch(`/api/${this.endpoint}/${id}`, {
+      method: 'PUT',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(data)
+    });
+    if (!response.ok) throw new Error(`Failed to update ${this.endpoint}`);
+    return await response.json();
+  }
+
+  async delete(id) {
+    const response = await fetch(`/api/${this.endpoint}/${id}`, {
+      method: 'DELETE'
+    });
+    if (!response.ok) throw new Error(`Failed to delete ${this.endpoint}`);
+    return await response.json();
+  }
+
+  async getById(id) {
+    const response = await fetch(`/api/${this.endpoint}/${id}`);
+    if (!response.ok) {
+      if (response.status === 404) return null;
+      throw new Error(`Failed to fetch ${this.endpoint}`);
+    }
+    return await response.json();
+  }
+}
+
+// Fallback entity for endpoints that don't exist yet
+class FallbackEntity {
+  constructor(name) {
+    this.name = name;
+  }
+
+  async list() {
+    console.warn(`${this.name}.list() not implemented yet - returning empty array`);
+    return [];
+  }
+
+  async create(data) {
+    console.warn(`${this.name}.create() not implemented yet`);
+    return { id: Math.random().toString(36).slice(2), ...data };
+  }
+
+  async update(id, data) {
+    console.warn(`${this.name}.update() not implemented yet`);
+    return { id, ...data };
+  }
+
+  async delete(id) {
+    console.warn(`${this.name}.delete() not implemented yet`);
+    return { success: true };
+  }
+
+  async getById(id) {
+    console.warn(`${this.name}.getById() not implemented yet`);
+    return null;
+  }
+}
+
+// API-backed entities
+export const Product = new ApiEntity('products');
+export const Supplier = new ApiEntity('suppliers');
+export const Customer = new ApiEntity('customers');
+export const Brand = new ApiEntity('brands');
+export const PurchaseOrder = new ApiEntity('purchase-orders');
+export const Quotation = new ApiEntity('quotations');
+
+// Fallback entities for features not yet implemented
+export const GoodsReceipt = new FallbackEntity('GoodsReceipt');
+export const DeliveryOrder = new FallbackEntity('DeliveryOrder');
+export const Invoice = new FallbackEntity('Invoice');
+export const InventoryLot = new FallbackEntity('InventoryLot');
+export const StockCount = new FallbackEntity('StockCount');
+export const CompanySettings = new FallbackEntity('CompanySettings');
+export const Books = new FallbackEntity('Books');
+export const StorageSettings = new FallbackEntity('StorageSettings');
+export const StorageUsage = new FallbackEntity('StorageUsage');
+export const RecycleBin = new FallbackEntity('RecycleBin');
+export const AuditLog = new FallbackEntity('AuditLog');
+export const InventoryAudit = new FallbackEntity('InventoryAudit');
+
+// User auth entity
+export const User = {
+  async me() {
+    const response = await fetch('/api/auth/me');
+    if (!response.ok) {
+      if (response.status === 401) return null;
+      throw new Error('Failed to fetch user');
+    }
+    const data = await response.json();
+    return data.user;
+  }
+};

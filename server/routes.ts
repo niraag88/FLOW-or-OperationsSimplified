@@ -1,8 +1,10 @@
 import type { Express, Request, Response, NextFunction } from "express";
 import { createServer, type Server } from "http";
 import { storage } from "./storage";
+import { businessStorage } from "./businessStorage";
 import { Client } from '@replit/object-storage';
 import { invoices, deliveryOrders, auditLog, users, type InsertAuditLog, type InsertUser, type UpdateUser, type User } from "@shared/schema";
+import { insertBrandSchema, insertSupplierSchema, insertCustomerSchema, insertProductSchema, insertPurchaseOrderSchema, insertQuotationSchema } from "@shared/schema";
 import { db } from "./db";
 import { eq } from "drizzle-orm";
 import pkg from 'pg';
@@ -538,6 +540,244 @@ export async function registerRoutes(app: Express): Promise<Server> {
     } catch (error) {
       console.error('Error deleting user:', error);
       res.status(500).json({ error: 'Failed to delete user' });
+    }
+  });
+
+  // Business Entity Management Routes
+  
+  // Brand management routes
+  app.get('/api/brands', requireAuth(), async (req: AuthenticatedRequest, res) => {
+    try {
+      const brands = await businessStorage.getBrands();
+      res.json(brands);
+    } catch (error) {
+      console.error('Error fetching brands:', error);
+      res.status(500).json({ error: 'Failed to fetch brands' });
+    }
+  });
+
+  app.post('/api/brands', requireAuth(['Admin', 'Manager']), async (req: AuthenticatedRequest, res) => {
+    try {
+      const validatedData = insertBrandSchema.parse(req.body);
+      const brand = await businessStorage.createBrand(validatedData);
+      res.status(201).json(brand);
+    } catch (error) {
+      console.error('Error creating brand:', error);
+      res.status(500).json({ error: 'Failed to create brand' });
+    }
+  });
+
+  app.put('/api/brands/:id', requireAuth(['Admin', 'Manager']), async (req: AuthenticatedRequest, res) => {
+    try {
+      const brandId = parseInt(req.params.id);
+      const validatedData = insertBrandSchema.partial().parse(req.body);
+      const brand = await businessStorage.updateBrand(brandId, validatedData);
+      res.json(brand);
+    } catch (error) {
+      console.error('Error updating brand:', error);
+      res.status(500).json({ error: 'Failed to update brand' });
+    }
+  });
+
+  app.delete('/api/brands/:id', requireAuth(['Admin']), async (req: AuthenticatedRequest, res) => {
+    try {
+      const brandId = parseInt(req.params.id);
+      await businessStorage.deleteBrand(brandId);
+      res.json({ success: true });
+    } catch (error) {
+      console.error('Error deleting brand:', error);
+      res.status(500).json({ error: 'Failed to delete brand' });
+    }
+  });
+
+  // Supplier management routes
+  app.get('/api/suppliers', requireAuth(), async (req: AuthenticatedRequest, res) => {
+    try {
+      const suppliers = await businessStorage.getSuppliers();
+      res.json(suppliers);
+    } catch (error) {
+      console.error('Error fetching suppliers:', error);
+      res.status(500).json({ error: 'Failed to fetch suppliers' });
+    }
+  });
+
+  app.post('/api/suppliers', requireAuth(['Admin', 'Manager']), async (req: AuthenticatedRequest, res) => {
+    try {
+      const validatedData = insertSupplierSchema.parse(req.body);
+      const supplier = await businessStorage.createSupplier(validatedData);
+      res.status(201).json(supplier);
+    } catch (error) {
+      console.error('Error creating supplier:', error);
+      res.status(500).json({ error: 'Failed to create supplier' });
+    }
+  });
+
+  app.put('/api/suppliers/:id', requireAuth(['Admin', 'Manager']), async (req: AuthenticatedRequest, res) => {
+    try {
+      const supplierId = parseInt(req.params.id);
+      const validatedData = insertSupplierSchema.partial().parse(req.body);
+      const supplier = await businessStorage.updateSupplier(supplierId, validatedData);
+      res.json(supplier);
+    } catch (error) {
+      console.error('Error updating supplier:', error);
+      res.status(500).json({ error: 'Failed to update supplier' });
+    }
+  });
+
+  // Customer management routes
+  app.get('/api/customers', requireAuth(), async (req: AuthenticatedRequest, res) => {
+    try {
+      const customers = await businessStorage.getCustomers();
+      res.json(customers);
+    } catch (error) {
+      console.error('Error fetching customers:', error);
+      res.status(500).json({ error: 'Failed to fetch customers' });
+    }
+  });
+
+  app.post('/api/customers', requireAuth(['Admin', 'Manager']), async (req: AuthenticatedRequest, res) => {
+    try {
+      const validatedData = insertCustomerSchema.parse(req.body);
+      const customer = await businessStorage.createCustomer(validatedData);
+      res.status(201).json(customer);
+    } catch (error) {
+      console.error('Error creating customer:', error);
+      res.status(500).json({ error: 'Failed to create customer' });
+    }
+  });
+
+  app.put('/api/customers/:id', requireAuth(['Admin', 'Manager']), async (req: AuthenticatedRequest, res) => {
+    try {
+      const customerId = parseInt(req.params.id);
+      const validatedData = insertCustomerSchema.partial().parse(req.body);
+      const customer = await businessStorage.updateCustomer(customerId, validatedData);
+      res.json(customer);
+    } catch (error) {
+      console.error('Error updating customer:', error);
+      res.status(500).json({ error: 'Failed to update customer' });
+    }
+  });
+
+  // Product management routes
+  app.get('/api/products', requireAuth(), async (req: AuthenticatedRequest, res) => {
+    try {
+      const products = await businessStorage.getProducts();
+      res.json(products);
+    } catch (error) {
+      console.error('Error fetching products:', error);
+      res.status(500).json({ error: 'Failed to fetch products' });
+    }
+  });
+
+  app.post('/api/products', requireAuth(['Admin', 'Manager']), async (req: AuthenticatedRequest, res) => {
+    try {
+      const validatedData = insertProductSchema.parse(req.body);
+      const product = await businessStorage.createProduct(validatedData);
+      res.status(201).json(product);
+    } catch (error) {
+      console.error('Error creating product:', error);
+      res.status(500).json({ error: 'Failed to create product' });
+    }
+  });
+
+  app.put('/api/products/:id', requireAuth(['Admin', 'Manager']), async (req: AuthenticatedRequest, res) => {
+    try {
+      const productId = parseInt(req.params.id);
+      const validatedData = insertProductSchema.partial().parse(req.body);
+      const product = await businessStorage.updateProduct(productId, validatedData);
+      res.json(product);
+    } catch (error) {
+      console.error('Error updating product:', error);
+      res.status(500).json({ error: 'Failed to update product' });
+    }
+  });
+
+  // Purchase Order management routes
+  app.get('/api/purchase-orders', requireAuth(['Admin', 'Manager']), async (req: AuthenticatedRequest, res) => {
+    try {
+      const purchaseOrders = await businessStorage.getPurchaseOrders();
+      res.json(purchaseOrders);
+    } catch (error) {
+      console.error('Error fetching purchase orders:', error);
+      res.status(500).json({ error: 'Failed to fetch purchase orders' });
+    }
+  });
+
+  app.post('/api/purchase-orders', requireAuth(['Admin', 'Manager']), async (req: AuthenticatedRequest, res) => {
+    try {
+      const poNumber = await businessStorage.generatePoNumber();
+      const validatedData = insertPurchaseOrderSchema.parse({
+        ...req.body,
+        poNumber,
+        createdBy: req.user!.id
+      });
+      const purchaseOrder = await businessStorage.createPurchaseOrder(validatedData);
+      res.status(201).json(purchaseOrder);
+    } catch (error) {
+      console.error('Error creating purchase order:', error);
+      res.status(500).json({ error: 'Failed to create purchase order' });
+    }
+  });
+
+  // Quotation management routes
+  app.get('/api/quotations', requireAuth(), async (req: AuthenticatedRequest, res) => {
+    try {
+      const quotations = await businessStorage.getQuotations();
+      res.json(quotations);
+    } catch (error) {
+      console.error('Error fetching quotations:', error);
+      res.status(500).json({ error: 'Failed to fetch quotations' });
+    }
+  });
+
+  app.post('/api/quotations', requireAuth(['Admin', 'Manager']), async (req: AuthenticatedRequest, res) => {
+    try {
+      const quoteNumber = await businessStorage.generateQuoteNumber();
+      const validatedData = insertQuotationSchema.parse({
+        ...req.body,
+        quoteNumber,
+        createdBy: req.user!.id
+      });
+      const quotation = await businessStorage.createQuotation(validatedData);
+      res.status(201).json(quotation);
+    } catch (error) {
+      console.error('Error creating quotation:', error);
+      res.status(500).json({ error: 'Failed to create quotation' });
+    }
+  });
+
+  // Dashboard statistics
+  app.get('/api/dashboard/stats', requireAuth(), async (req: AuthenticatedRequest, res) => {
+    try {
+      const stats = await businessStorage.getDashboardStats();
+      res.json(stats);
+    } catch (error) {
+      console.error('Error fetching dashboard stats:', error);
+      res.status(500).json({ error: 'Failed to fetch dashboard stats' });
+    }
+  });
+
+  // Company settings
+  app.get('/api/company-settings', requireAuth(), async (req: AuthenticatedRequest, res) => {
+    try {
+      const settings = await businessStorage.getCompanySettings();
+      res.json(settings || {});
+    } catch (error) {
+      console.error('Error fetching company settings:', error);
+      res.status(500).json({ error: 'Failed to fetch company settings' });
+    }
+  });
+
+  app.put('/api/company-settings', requireAuth(['Admin']), async (req: AuthenticatedRequest, res) => {
+    try {
+      const settings = await businessStorage.updateCompanySettings({
+        ...req.body,
+        updatedBy: req.user!.id
+      });
+      res.json(settings);
+    } catch (error) {
+      console.error('Error updating company settings:', error);
+      res.status(500).json({ error: 'Failed to update company settings' });
     }
   });
 
