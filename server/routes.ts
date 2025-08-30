@@ -344,8 +344,48 @@ const requireAuth = (allowedRoles: Array<"Admin" | "Manager" | "Staff"> = ["Admi
   };
 };
 
+// Role-based authorization middleware
+const requireRole = (role: "Admin" | "Manager" | "Staff") => {
+  return async (req: AuthenticatedRequest, res: Response, next: NextFunction) => {
+    if (!req.session?.userId) {
+      return res.status(401).json({ error: 'Authentication required' });
+    }
+
+    try {
+      // Get user from database
+      const [user] = await db.select().from(users).where(eq(users.id, req.session.userId));
+      
+      if (!user) {
+        req.session.destroy(() => {});
+        return res.status(401).json({ error: 'User not found' });
+      }
+
+      if (!user.active) {
+        return res.status(403).json({ error: 'Account deactivated' });
+      }
+
+      // Admin always has access
+      if (user.role === 'Admin') {
+        req.user = user;
+        return next();
+      }
+
+      // Check specific role requirement
+      if (user.role !== role) {
+        return res.status(403).json({ error: 'Insufficient permissions' });
+      }
+
+      req.user = user;
+      next();
+    } catch (error) {
+      console.error('Role auth middleware error:', error);
+      return res.status(500).json({ error: 'Authentication error' });
+    }
+  };
+};
+
 export async function registerRoutes(app: Express): Promise<Server> {
-  // Session middleware setup
+  // Session middleware setup with hardened security
   app.use(session({
     store: sessionStore,
     secret: process.env.SESSION_SECRET || 'fallback-secret-change-in-production',
@@ -353,9 +393,10 @@ export async function registerRoutes(app: Express): Promise<Server> {
     saveUninitialized: false,
     rolling: true,
     cookie: {
-      secure: false, // Set to true in production with HTTPS
-      httpOnly: true,
-      maxAge: 24 * 60 * 60 * 1000, // 24 hours
+      secure: process.env.NODE_ENV === 'production', // Only send over HTTPS in production
+      httpOnly: true, // Prevent JavaScript access to cookies
+      sameSite: 'lax', // CSRF protection
+      maxAge: parseInt(process.env.SESSION_MAX_AGE || '3600000'), // Default 1 hour (configurable)
     }
   }));
   // Health check
@@ -422,8 +463,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
   // User Management (Admin only)
   
-  // GET /api/users - List all users
-  app.get('/api/users', requireAuth(['Admin']), async (req: AuthenticatedRequest, res) => {
+  // GET /api/users - List all users (Admin only)
+  app.get('/api/users', requireRole('Admin'), async (req: AuthenticatedRequest, res) => {
     try {
       const allUsers = await db.select({
         id: users.id,
@@ -446,7 +487,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   });
 
   // POST /api/users - Create new user (Admin only)
-  app.post('/api/users', requireAuth(['Admin']), async (req: AuthenticatedRequest, res) => {
+  app.post('/api/users', requireRole('Admin'), async (req: AuthenticatedRequest, res) => {
     try {
       const { username, password, role, firstName, lastName, email, active } = req.body;
       
@@ -494,7 +535,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   });
 
   // PUT /api/users/:id - Update user (Admin only)  
-  app.put('/api/users/:id', requireAuth(['Admin']), async (req: AuthenticatedRequest, res) => {
+  app.put('/api/users/:id', requireRole('Admin'), async (req: AuthenticatedRequest, res) => {
     try {
       const userId = req.params.id;
       const { role, firstName, lastName, email, active } = req.body;
@@ -534,7 +575,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   });
 
   // DELETE /api/users/:id - Delete user (Admin only)
-  app.delete('/api/users/:id', requireAuth(['Admin']), async (req: AuthenticatedRequest, res) => {
+  app.delete('/api/users/:id', requireRole('Admin'), async (req: AuthenticatedRequest, res) => {
     try {
       const userId = req.params.id;
 
@@ -595,7 +636,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  app.delete('/api/brands/:id', requireAuth(['Admin']), async (req: AuthenticatedRequest, res) => {
+  app.delete('/api/brands/:id', requireRole('Admin'), async (req: AuthenticatedRequest, res) => {
     try {
       const brandId = parseInt(req.params.id);
       await businessStorage.deleteBrand(brandId);
@@ -784,7 +825,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  app.put('/api/company-settings', requireAuth(['Admin']), async (req: AuthenticatedRequest, res) => {
+  app.put('/api/company-settings', requireRole('Admin'), async (req: AuthenticatedRequest, res) => {
     try {
       const settings = await businessStorage.updateCompanySettings({
         ...req.body,
@@ -1156,8 +1197,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
   });
 
   // DELETE /api/storage/object
-  // Delete an object
-  app.delete('/api/storage/object', requireAuth(['Admin']), async (req, res) => {
+  // Delete an object (Admin only)
+  app.delete('/api/storage/object', requireRole('Admin'), async (req, res) => {
     try {
       const { key } = req.query;
       

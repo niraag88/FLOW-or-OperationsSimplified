@@ -31,6 +31,11 @@ PGUSER=...
 DEFAULT_OBJECT_STORAGE_BUCKET_ID=replit-objstore-...
 PRIVATE_OBJECT_DIR=/replit-objstore-.../private
 PUBLIC_OBJECT_SEARCH_PATHS=/replit-objstore-.../public
+
+# Security Configuration
+SESSION_SECRET=your-secure-session-secret
+SESSION_MAX_AGE=3600000  # Session timeout in ms (default: 1 hour)
+NODE_ENV=production      # Enables secure cookies in production
 ```
 
 ## API Endpoints
@@ -165,6 +170,46 @@ Returns:
 
 ## Security Features
 
+### Hardened Session Cookies
+
+Session cookies are configured with enterprise-grade security:
+
+- **httpOnly: true** - Prevents JavaScript access to cookies, protecting against XSS attacks
+- **secure: true** - Cookies only sent over HTTPS in production (auto-detected by NODE_ENV)
+- **sameSite: 'lax'** - CSRF protection while maintaining usability
+- **Configurable maxAge** - Default 1 hour session timeout (set via `SESSION_MAX_AGE` environment variable)
+
+### Role-Based Access Control
+
+The system implements strict role-based authorization with three user levels:
+
+#### Admin
+- Full system access and can override any role restriction
+- User management (create, read, update, delete users)
+- System settings and configuration
+- Storage management and file deletion
+- All business operations
+
+#### Manager  
+- Business operations (products, suppliers, customers, purchase orders)
+- File uploads (limited to own files for Staff-level operations)
+- Read access to most data
+
+#### Staff
+- Limited business operations
+- File uploads (restricted to own files only)
+- Read access to assigned data
+
+### Authentication Middleware
+
+Two authentication middleware functions provide layered security:
+
+1. **requireAuth(roles[])** - Flexible multi-role authorization
+2. **requireRole(role)** - Strict single-role enforcement (Admin always passes)
+
+### File Upload Security
+
+- **Magic-byte Validation**: PDF uploads validated with actual file signature ("%PDF")
 - **Role-based Authentication**: All storage endpoints require authenticated sessions
   - **Admin**: Full access to all storage operations
   - **Staff/Manager**: Can upload files to their own invoices/delivery orders only
@@ -174,6 +219,7 @@ Returns:
 - **Strict Input Validation**: 
   - File paths must start with `invoices/` or `delivery/`
   - Only PDF files allowed (`application/pdf`)
+  - Magic-byte validation prevents malicious files disguised as PDFs
   - Maximum file size of 25 MB
   - Checksum validation when provided
 - **File Size Enforcement**: Real-time validation against declared file sizes
