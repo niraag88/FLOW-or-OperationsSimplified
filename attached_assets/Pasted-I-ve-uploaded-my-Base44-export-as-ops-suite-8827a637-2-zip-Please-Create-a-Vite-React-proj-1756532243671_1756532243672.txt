@@ -1,0 +1,89 @@
+I’ve uploaded my Base44 export as ops-suite-8827a637 (2).zip.
+Please:
+
+Create a Vite + React project, Tailwind enabled.
+
+Unzip app.zip into the project root and keep these files:
+
+package.json, vite.config.js, tailwind.config.js, postcss.config.js, index.html, /public, /src (if missing, create them).
+
+Ensure vite.config.js has @ alias → src:
+
+import { defineConfig } from "vite";
+import react from "@vitejs/plugin-react";
+import path from "path";
+export default defineConfig({
+  plugins: [react()],
+  resolve: { alias: { "@": path.resolve(__dirname, "src") } },
+  server: { host: "0.0.0.0", port: 3000 }
+});
+
+
+If tailwind.config.js or postcss.config.js are missing, create them:
+
+// tailwind.config.js
+export default { content: ["./index.html","./src/**/*.{js,jsx,ts,tsx}"], theme:{extend:{}}, plugins:[] };
+
+// postcss.config.js
+export default { plugins: { tailwindcss: {}, autoprefixer: {} } };
+
+
+And ensure src/index.css has:
+
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+
+Add a Base44 SDK shim so the UI compiles off-platform:
+
+src/api/base44Client.js
+
+export const DEMO = true; // UI-only mode on Replit
+export const base44 = {
+  auth: { async me(){ if(DEMO) return { email:"admin@local", role:"Admin", isOwner:true }; throw new Error("Base44 SDK not configured"); } },
+  entities: new Proxy({}, { get(){ if(DEMO){ return {
+    async list(){ return []; }, async create(){ return { id: Math.random().toString(36).slice(2) }; },
+    async update(){ return true; }, async delete(){ return true; }, async getById(){ return null; }
+  }; } throw new Error("Base44 entity not available off-platform"); } })
+};
+
+
+src/api/entities.js
+
+import { base44 } from "./base44Client";
+export const Product        = base44.entities.Product;
+export const Supplier       = base44.entities.Supplier;
+export const Customer       = base44.entities.Customer;
+export const Brand          = base44.entities.Brand;
+export const PurchaseOrder  = base44.entities.PurchaseOrder;
+export const GoodsReceipt   = base44.entities.GoodsReceipt;
+export const DeliveryOrder  = base44.entities.DeliveryOrder;
+export const Invoice        = base44.entities.Invoice;
+export const Quotation      = base44.entities.Quotation;
+export const InventoryLot   = base44.entities.InventoryLot;
+export const StockCount     = base44.entities.StockCount;
+export const CompanySettings= base44.entities.CompanySettings;
+export const Books          = base44.entities.Books;
+export const StorageSettings= base44.entities.StorageSettings;
+export const StorageUsage   = base44.entities.StorageUsage;
+export const RecycleBin     = base44.entities.RecycleBin;
+export const AuditLog       = base44.entities.AuditLog;
+export const User = base44.auth;
+
+
+Make sure package.json has:
+
+{ "type":"module", "scripts": { "dev":"vite", "build":"vite build", "preview":"vite preview --host 0.0.0.0 --port 3000" } }
+
+
+Install deps:
+
+npm i react react-dom react-router-dom date-fns recharts lucide-react classnames
+npm i -D vite @vitejs/plugin-react tailwindcss postcss autoprefixer
+
+
+Run npm run dev.
+If imports like @/components/... fail, double-check the alias.
+With the shim, lists will be empty and actions are no-ops, but the UI should load fully.
+Don’t wire any real backend yet—this is a faithful front-end recreation.
