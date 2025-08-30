@@ -99,9 +99,9 @@ async function createAdmin() {
 
     // Create admin user
     const result = await pool.query(`
-      INSERT INTO users (username, password, role, "firstName", "lastName", email, active)
+      INSERT INTO users (username, password, role, first_name, last_name, email, active)
       VALUES ($1, $2, $3, $4, $5, $6, $7)
-      RETURNING id, username, role, "firstName", "lastName", email, active, "createdAt"
+      RETURNING id, username, role, first_name, last_name, email, active, created_at
     `, [
       username,
       hashedPassword,
@@ -118,10 +118,10 @@ async function createAdmin() {
     console.log('User Details:');
     console.log(`  Username: ${adminUser.username}`);
     console.log(`  Role: ${adminUser.role}`);
-    console.log(`  Name: ${adminUser.firstName || ''} ${adminUser.lastName || ''}`.trim() || 'Not provided');
+    console.log(`  Name: ${adminUser.first_name || ''} ${adminUser.last_name || ''}`.trim() || 'Not provided');
     console.log(`  Email: ${adminUser.email || 'Not provided'}`);
     console.log(`  Active: ${adminUser.active}`);
-    console.log(`  Created: ${adminUser.createdAt}`);
+    console.log(`  Created: ${adminUser.created_at}`);
 
     console.log('\nYou can now log in to the system with these credentials.');
 
