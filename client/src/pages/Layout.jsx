@@ -2,6 +2,7 @@
 import React, { useState, useEffect } from "react";
 import { Link, useLocation } from "react-router-dom";
 import { createPageUrl } from "@/utils";
+import { useAuth } from "@/hooks/useAuth";
 import { 
   LayoutDashboard, 
   Package, 
@@ -86,9 +87,21 @@ const navigationItems = [
   },
   {
     title: "Settings",
-    url: createPageUrl("Settings"),
     icon: Settings,
-    type: "single"
+    type: "dropdown",
+    items: [
+      {
+        title: "General Settings",
+        url: createPageUrl("Settings"),
+        icon: Settings,
+      },
+      {
+        title: "User Management",
+        url: createPageUrl("UserManagement"),
+        icon: Users2,
+        adminOnly: true
+      }
+    ]
   },
 ];
 
@@ -191,6 +204,7 @@ const getTimeAgo = (date) => {
 
 export default function Layout({ children, currentPageName }) {
   const location = useLocation();
+  const { user, logout } = useAuth();
   const [mobileMenuOpen, setMobileMenuOpen] = React.useState(false);
   const [notifications, setNotifications] = useState([]);
   const [notificationCount, setNotificationCount] = useState(0);
@@ -202,12 +216,12 @@ export default function Layout({ children, currentPageName }) {
     setNotificationCount(mockNotifications.length);
   }, []);
 
-  // Mock user for preview mode - no authentication needed
-  const currentUser = {
-    full_name: "Admin User",
-    email: "admin@opsuite.com",
-    role: "Admin",
-  };
+  // Get current user from auth context
+  const currentUser = user ? {
+    full_name: [user.firstName, user.lastName].filter(Boolean).join(' ') || user.username,
+    email: user.email || '',
+    role: user.role,
+  } : null;
 
   // Don't wrap Print page
   if (currentPageName === "Print") {
@@ -237,8 +251,12 @@ export default function Layout({ children, currentPageName }) {
     return currentPageName || "Ops Suite";
   };
 
-  const handleLogout = () => {
-    alert("Logout is disabled in preview mode.");
+  const handleLogout = async () => {
+    try {
+      await logout();
+    } catch (error) {
+      console.error('Logout error:', error);
+    }
   };
 
   return (
@@ -305,7 +323,9 @@ export default function Layout({ children, currentPageName }) {
                         </Button>
                       </DropdownMenuTrigger>
                       <DropdownMenuContent align="start" className="w-48">
-                        {item.items.map((subItem) => (
+                        {item.items
+                          .filter(subItem => !subItem.adminOnly || currentUser?.role === 'Admin')
+                          .map((subItem) => (
                           <DropdownMenuItem key={subItem.title} asChild>
                             <Link
                               to={subItem.url}
@@ -387,7 +407,7 @@ export default function Layout({ children, currentPageName }) {
                   <DropdownMenuSeparator />
                   <DropdownMenuItem onClick={handleLogout} className="text-red-600 focus:text-red-600">
                     <LogOut className="w-4 h-4 mr-2" />
-                    Sign Out (Preview Mode)
+                    Sign Out
                   </DropdownMenuItem>
                 </DropdownMenuContent>
               </DropdownMenu>
@@ -428,7 +448,9 @@ export default function Layout({ children, currentPageName }) {
                         <item.icon className="w-5 h-5 flex-shrink-0" />
                         <span className="truncate">{item.title}</span>
                       </div>
-                      {item.items.map((subItem) => {
+                      {item.items
+                        .filter(subItem => !subItem.adminOnly || currentUser?.role === 'Admin')
+                        .map((subItem) => {
                         const isActive = location.pathname.startsWith(subItem.url);
                         return (
                           <Link

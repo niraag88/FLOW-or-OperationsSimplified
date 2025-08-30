@@ -7,14 +7,42 @@ export const users = pgTable("users", {
   id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
   username: text("username").notNull().unique(),
   password: text("password").notNull(),
+  role: text("role").$type<"Admin" | "Manager" | "Staff">().notNull().default("Staff"),
+  firstName: text("first_name"),
+  lastName: text("last_name"), 
+  email: text("email"),
+  active: boolean("active").notNull().default(true),
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+  lastLogin: timestamp("last_login"),
+  createdBy: varchar("created_by"), // Admin who created this user
 });
 
 export const insertUserSchema = createInsertSchema(users).pick({
   username: true,
   password: true,
+  role: true,
+  firstName: true,
+  lastName: true,
+  email: true,
+  active: true,
+}).extend({
+  role: z.enum(["Admin", "Manager", "Staff"]).default("Staff"),
+  active: z.boolean().default(true)
 });
 
+export const updateUserSchema = createInsertSchema(users).pick({
+  firstName: true,
+  lastName: true,
+  email: true,
+  role: true,
+  active: true,
+}).extend({
+  role: z.enum(["Admin", "Manager", "Staff"]),
+  active: z.boolean()
+}).partial();
+
 export type InsertUser = z.infer<typeof insertUserSchema>;
+export type UpdateUser = z.infer<typeof updateUserSchema>;
 export type User = typeof users.$inferSelect;
 
 // Invoices table

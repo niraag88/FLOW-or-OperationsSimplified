@@ -2,12 +2,15 @@ import type { Express, Request, Response, NextFunction } from "express";
 import { createServer, type Server } from "http";
 import { storage } from "./storage";
 import { Client } from '@replit/object-storage';
-import { invoices, deliveryOrders, auditLog, type InsertAuditLog } from "@shared/schema";
+import { invoices, deliveryOrders, auditLog, users, type InsertAuditLog, type InsertUser, type UpdateUser, type User } from "@shared/schema";
 import { db } from "./db";
 import { eq } from "drizzle-orm";
 import pkg from 'pg';
 import crypto from 'crypto';
 import multer from 'multer';
+import bcrypt from 'bcrypt';
+import session from 'express-session';
+import connectPg from 'connect-pg-simple';
 const { Pool } = pkg;
 
 // Initialize clients with the bucket ID from environment
@@ -217,32 +220,12 @@ async function generateDOPDF(deliveryOrder: any): Promise<string> {
 // Configure multer for handling file uploads
 const upload = multer({ storage: multer.memoryStorage() });
 
-// Authentication middleware
-interface AuthenticatedRequest extends Request {
-  user?: {
-    id: string;
-    role: 'Admin' | 'Staff' | 'Manager';
-  };
+// Session type declaration
+declare module 'express-session' {
+  interface SessionData {
+    userId: string;
+  }
 }
-
-const requireAuth = (allowedRoles: string[] = ['Admin']) => {
-  return (req: AuthenticatedRequest, res: Response, next: NextFunction) => {
-    // For now, mock authentication - replace with actual session checking
-    // TODO: Implement proper session-based authentication
-    const mockUser = { id: 'user123', role: 'Admin' as const };
-    req.user = mockUser;
-    
-    if (!req.user) {
-      return res.status(401).json({ error: 'Authentication required' });
-    }
-    
-    if (!allowedRoles.includes(req.user.role)) {
-      return res.status(403).json({ error: 'Insufficient permissions' });
-    }
-    
-    next();
-  };
-};
 
 // Operations token authentication middleware
 const requireOpsToken = (req: Request, res: Response, next: NextFunction) => {
@@ -287,10 +270,275 @@ const validateUploadInput = (key: string, contentType: string, fileSize?: number
   return { valid: true };
 };
 
+// Session configuration
+const PostgresSessionStore = connectPg(session);
+const sessionStore = new PostgresSessionStore({
+  pool,
+  createTableIfMissing: true,
+  tableName: 'sessions'
+});
+
+// Extended Request interface for authentication
+interface AuthenticatedRequest extends Request {
+  user?: User;
+}
+
+// Password hashing utilities
+async function hashPassword(password: string): Promise<string> {
+  const saltRounds = 12;
+  return await bcrypt.hash(password, saltRounds);
+}
+
+async function comparePassword(password: string, hash: string): Promise<boolean> {
+  return await bcrypt.compare(password, hash);
+}
+
+// Authentication middleware
+const requireAuth = (allowedRoles: Array<"Admin" | "Manager" | "Staff"> = ["Admin", "Manager", "Staff"]) => {
+  return async (req: AuthenticatedRequest, res: Response, next: NextFunction) => {
+    if (!req.session?.userId) {
+      return res.status(401).json({ error: 'Authentication required' });
+    }
+
+    try {
+      // Get user from database
+      const [user] = await db.select().from(users).where(eq(users.id, req.session.userId));
+      
+      if (!user) {
+        req.session.destroy(() => {});
+        return res.status(401).json({ error: 'User not found' });
+      }
+
+      if (!user.active) {
+        return res.status(403).json({ error: 'Account deactivated' });
+      }
+
+      if (!allowedRoles.includes(user.role)) {
+        return res.status(403).json({ error: 'Insufficient permissions' });
+      }
+
+      req.user = user;
+      next();
+    } catch (error) {
+      console.error('Auth middleware error:', error);
+      return res.status(500).json({ error: 'Authentication error' });
+    }
+  };
+};
+
 export async function registerRoutes(app: Express): Promise<Server> {
+  // Session middleware setup
+  app.use(session({
+    store: sessionStore,
+    secret: process.env.SESSION_SECRET || 'fallback-secret-change-in-production',
+    resave: false,
+    saveUninitialized: false,
+    rolling: true,
+    cookie: {
+      secure: false, // Set to true in production with HTTPS
+      httpOnly: true,
+      maxAge: 24 * 60 * 60 * 1000, // 24 hours
+    }
+  }));
   // Health check
   app.get('/api/health', (req, res) => {
     res.json({ status: 'ok', timestamp: new Date().toISOString() });
+  });
+
+  // Authentication endpoints
+  
+  // POST /api/auth/login
+  app.post('/api/auth/login', async (req: AuthenticatedRequest, res) => {
+    try {
+      const { username, password } = req.body;
+      
+      if (!username || !password) {
+        return res.status(400).json({ error: 'Username and password required' });
+      }
+
+      // Find user by username
+      const [user] = await db.select().from(users).where(eq(users.username, username));
+      
+      if (!user || !await comparePassword(password, user.password)) {
+        return res.status(401).json({ error: 'Invalid username or password' });
+      }
+
+      if (!user.active) {
+        return res.status(403).json({ error: 'Account deactivated' });
+      }
+
+      // Update last login
+      await db.update(users)
+        .set({ lastLogin: new Date() })
+        .where(eq(users.id, user.id));
+
+      // Create session
+      req.session.userId = user.id;
+
+      // Return user info (without password)
+      const { password: _, ...userInfo } = user;
+      res.json({ user: userInfo });
+
+    } catch (error) {
+      console.error('Login error:', error);
+      res.status(500).json({ error: 'Login failed' });
+    }
+  });
+
+  // POST /api/auth/logout
+  app.post('/api/auth/logout', (req: AuthenticatedRequest, res) => {
+    req.session.destroy((err) => {
+      if (err) {
+        console.error('Logout error:', err);
+        return res.status(500).json({ error: 'Logout failed' });
+      }
+      res.json({ success: true });
+    });
+  });
+
+  // GET /api/auth/me - Get current user
+  app.get('/api/auth/me', requireAuth(), async (req: AuthenticatedRequest, res) => {
+    const { password: _, ...userInfo } = req.user!;
+    res.json({ user: userInfo });
+  });
+
+  // User Management (Admin only)
+  
+  // GET /api/users - List all users
+  app.get('/api/users', requireAuth(['Admin']), async (req: AuthenticatedRequest, res) => {
+    try {
+      const allUsers = await db.select({
+        id: users.id,
+        username: users.username,
+        role: users.role,
+        firstName: users.firstName,
+        lastName: users.lastName,
+        email: users.email,
+        active: users.active,
+        createdAt: users.createdAt,
+        lastLogin: users.lastLogin,
+        createdBy: users.createdBy
+      }).from(users);
+      
+      res.json({ users: allUsers });
+    } catch (error) {
+      console.error('Error fetching users:', error);
+      res.status(500).json({ error: 'Failed to fetch users' });
+    }
+  });
+
+  // POST /api/users - Create new user (Admin only)
+  app.post('/api/users', requireAuth(['Admin']), async (req: AuthenticatedRequest, res) => {
+    try {
+      const { username, password, role, firstName, lastName, email, active } = req.body;
+      
+      if (!username || !password) {
+        return res.status(400).json({ error: 'Username and password required' });
+      }
+
+      // Check if username already exists
+      const [existingUser] = await db.select().from(users).where(eq(users.username, username));
+      if (existingUser) {
+        return res.status(400).json({ error: 'Username already exists' });
+      }
+
+      // Hash password
+      const hashedPassword = await hashPassword(password);
+
+      // Create user
+      const [newUser] = await db.insert(users).values({
+        username,
+        password: hashedPassword,
+        role: role || 'Staff',
+        firstName,
+        lastName,
+        email,
+        active: active !== undefined ? active : true,
+        createdBy: req.user!.id
+      }).returning({
+        id: users.id,
+        username: users.username,
+        role: users.role,
+        firstName: users.firstName,
+        lastName: users.lastName,
+        email: users.email,
+        active: users.active,
+        createdAt: users.createdAt,
+        createdBy: users.createdBy
+      });
+
+      res.status(201).json({ user: newUser });
+
+    } catch (error) {
+      console.error('Error creating user:', error);
+      res.status(500).json({ error: 'Failed to create user' });
+    }
+  });
+
+  // PUT /api/users/:id - Update user (Admin only)  
+  app.put('/api/users/:id', requireAuth(['Admin']), async (req: AuthenticatedRequest, res) => {
+    try {
+      const userId = req.params.id;
+      const { role, firstName, lastName, email, active } = req.body;
+
+      const [updatedUser] = await db.update(users)
+        .set({
+          ...(role !== undefined && { role }),
+          ...(firstName !== undefined && { firstName }),
+          ...(lastName !== undefined && { lastName }),
+          ...(email !== undefined && { email }),
+          ...(active !== undefined && { active })
+        })
+        .where(eq(users.id, userId))
+        .returning({
+          id: users.id,
+          username: users.username,
+          role: users.role,
+          firstName: users.firstName,
+          lastName: users.lastName,
+          email: users.email,
+          active: users.active,
+          createdAt: users.createdAt,
+          lastLogin: users.lastLogin,
+          createdBy: users.createdBy
+        });
+
+      if (!updatedUser) {
+        return res.status(404).json({ error: 'User not found' });
+      }
+
+      res.json({ user: updatedUser });
+
+    } catch (error) {
+      console.error('Error updating user:', error);
+      res.status(500).json({ error: 'Failed to update user' });
+    }
+  });
+
+  // DELETE /api/users/:id - Delete user (Admin only)
+  app.delete('/api/users/:id', requireAuth(['Admin']), async (req: AuthenticatedRequest, res) => {
+    try {
+      const userId = req.params.id;
+
+      // Don't allow deleting yourself
+      if (userId === req.user!.id) {
+        return res.status(400).json({ error: 'Cannot delete your own account' });
+      }
+
+      const [deletedUser] = await db.delete(users)
+        .where(eq(users.id, userId))
+        .returning({ id: users.id, username: users.username });
+
+      if (!deletedUser) {
+        return res.status(404).json({ error: 'User not found' });
+      }
+
+      res.json({ success: true, deletedUser });
+
+    } catch (error) {
+      console.error('Error deleting user:', error);
+      res.status(500).json({ error: 'Failed to delete user' });
+    }
   });
 
   // POST /api/storage/sign-upload
