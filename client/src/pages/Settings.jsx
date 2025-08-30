@@ -10,6 +10,7 @@ import BrandManagement from "../components/settings/BrandManagement";
 import CustomerManagement from "../components/settings/CustomerManagement";
 import BookClosingManager from "../components/settings/BookClosingManager";
 import StorageUsage from "../components/settings/StorageUsage";
+import SettingsStorage from "./SettingsStorage";
 import RecycleBin from "../components/settings/RecycleBin";
 
 export default function Settings() {
@@ -79,7 +80,7 @@ export default function Settings() {
         </TabsContent>
 
         <TabsContent value="storage" className="mt-4 sm:mt-6">
-          <StorageUsage />
+          <SettingsStorage />
         </TabsContent>
 
         <TabsContent value="recycle" className="mt-4 sm:mt-6">

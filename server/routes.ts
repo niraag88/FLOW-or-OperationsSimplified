@@ -526,6 +526,22 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  // GET /api/db/size
+  // Get database size in bytes
+  app.get('/api/db/size', requireAuth(['Admin']), async (req, res) => {
+    try {
+      const result = await pool.query(`
+        SELECT pg_database_size(current_database()) as bytes;
+      `);
+      
+      const bytes = parseInt(result.rows[0].bytes);
+      res.json({ bytes });
+    } catch (error) {
+      console.error('Error getting database size:', error);
+      res.status(500).json({ error: 'Failed to get database size' });
+    }
+  });
+
   // GET /api/storage/total-size
   // Get total size of all objects in the bucket
   app.get('/api/storage/total-size', requireAuth(['Admin']), async (req, res) => {
