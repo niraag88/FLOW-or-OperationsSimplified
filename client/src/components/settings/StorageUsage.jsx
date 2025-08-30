@@ -30,7 +30,7 @@ export default function StorageUsageComponent() {
   const [currentUsage, setCurrentUsage] = useState(null);
   const [historicalData, setHistoricalData] = useState([]);
   const [storageSettings, setStorageSettings] = useState({
-    storage_soft_quota_gb: 50,
+    storage_soft_quota_gb: 10, // Replit SQL Database limit
     warn_at_percent: 80,
     critical_at_percent: 90
   });
@@ -76,10 +76,11 @@ export default function StorageUsageComponent() {
   const generateMockCurrentUsage = () => ({
     scan_date: new Date().toISOString(),
     database_size_gb: 2.3,
-    file_storage_gb: 12.7,
-    total_storage_gb: 15.0,
-    usage_percent: 30,
-    quota_status: 'normal',
+    app_storage_gb: 5.2, // Replit App Storage
+    keyvalue_storage_mb: 12.5, // Replit Key-Value Store
+    total_storage_gb: 7.5,
+    usage_percent: 75, // 75% of 10GB limit
+    quota_status: 'warning', // Near Replit's 10GB limit
     table_breakdown: [
       { table_name: 'Invoice', size_mb: 450, row_count: 1250 },
       { table_name: 'Product', size_mb: 380, row_count: 2300 },
@@ -92,14 +93,19 @@ export default function StorageUsageComponent() {
       { table_name: 'Supplier', size_mb: 75, row_count: 95 },
       { table_name: 'User', size_mb: 45, row_count: 12 }
     ],
-    folder_breakdown: {
-      invoices: 4.2,
-      pos: 2.8,
-      dos: 2.1,
-      attachments: 1.9,
-      books: 0.8,
-      exports: 0.7,
-      other: 0.2
+    app_storage_breakdown: {
+      invoices: 1.8, // App Storage objects
+      pos: 1.2,
+      dos: 0.9,
+      attachments: 0.8,
+      books: 0.3,
+      exports: 0.2
+    },
+    keyvalue_breakdown: {
+      user_preferences: 2.1,
+      session_cache: 4.2,
+      app_config: 3.8,
+      temp_data: 2.4
     }
   });
 
@@ -110,9 +116,9 @@ export default function StorageUsageComponent() {
       const date = new Date(now.getFullYear(), now.getMonth() - i, 1);
       data.push({
         scan_date: date.toISOString(),
-        total_storage_gb: 8 + (11 - i) * 0.6 + Math.random() * 0.3,
+        total_storage_gb: 3 + (11 - i) * 0.4 + Math.random() * 0.2, // Within 10GB limit
         database_size_gb: 1.2 + (11 - i) * 0.1,
-        file_storage_gb: 6.8 + (11 - i) * 0.5 + Math.random() * 0.3
+        app_storage_gb: 1.8 + (11 - i) * 0.3 + Math.random() * 0.2
       });
     }
     return data;
@@ -124,7 +130,7 @@ export default function StorageUsageComponent() {
       if (settings.length > 0) {
         setStorageSettings(prev => ({
           ...prev,
-          storage_soft_quota_gb: settings[0].storage_soft_quota_gb || 50,
+          storage_soft_quota_gb: 10, // Fixed to Replit's limit
           warn_at_percent: settings[0].warn_at_percent || 80,
           critical_at_percent: settings[0].critical_at_percent || 90
         }));
@@ -295,32 +301,32 @@ export default function StorageUsageComponent() {
 
         <Card>
           <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-sm font-medium">File Storage</CardTitle>
+            <CardTitle className="text-sm font-medium">App Storage</CardTitle>
             <Folder className="h-4 w-4 text-muted-foreground" />
           </CardHeader>
           <CardContent>
-            <div className="text-2xl font-bold">{formatBytes(currentUsage?.file_storage_gb || 0)}</div>
+            <div className="text-2xl font-bold">{formatBytes(currentUsage?.app_storage_gb || 0)}</div>
             <p className="text-xs text-muted-foreground">
-              {((currentUsage?.file_storage_gb || 0) / storageSettings.storage_soft_quota_gb * 100).toFixed(1)}% of quota
+              Pay-per-use ($0.03/GiB/month)
             </p>
           </CardContent>
         </Card>
 
         <Card>
           <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-sm font-medium">Total Usage</CardTitle>
-            <div className={`p-1 rounded ${getStatusColor(currentUsage?.quota_status || 'normal')}`}>
-              {getStatusIcon(currentUsage?.quota_status || 'normal')}
+            <CardTitle className="text-sm font-medium">Key-Value Store</CardTitle>
+            <div className={`p-1 rounded ${getStatusColor(currentUsage?.keyvalue_storage_mb > 40 ? 'warning' : 'normal')}`}>
+              {getStatusIcon(currentUsage?.keyvalue_storage_mb > 40 ? 'warning' : 'normal')}
             </div>
           </CardHeader>
           <CardContent>
-            <div className="text-2xl font-bold">{formatBytes(currentUsage?.total_storage_gb || 0)}</div>
+            <div className="text-2xl font-bold">{currentUsage?.keyvalue_storage_mb || 0} MB</div>
             <Progress 
-              value={currentUsage?.usage_percent || 0} 
+              value={(currentUsage?.keyvalue_storage_mb || 0) / 50 * 100} 
               className="mt-2" 
             />
             <p className="text-xs text-muted-foreground mt-1">
-              {currentUsage?.usage_percent || 0}% of {storageSettings.storage_soft_quota_gb} GB quota
+              {((currentUsage?.keyvalue_storage_mb || 0) / 50 * 100).toFixed(1)}% of 50 MB limit
             </p>
           </CardContent>
         </Card>
@@ -346,7 +352,7 @@ export default function StorageUsageComponent() {
                 <YAxis tickFormatter={(value) => `${value}GB`} />
                 <Tooltip 
                   labelFormatter={(date) => format(new Date(date), 'MMM yyyy')}
-                  formatter={(value, name) => [`${value.toFixed(2)} GB`, name === 'total_storage_gb' ? 'Total' : name === 'database_size_gb' ? 'Database' : 'Files']}
+                  formatter={(value, name) => [`${value.toFixed(2)} GB`, name === 'total_storage_gb' ? 'Total' : name === 'database_size_gb' ? 'Database' : 'App Storage']}
                 />
                 <Line 
                   type="monotone" 
@@ -364,10 +370,10 @@ export default function StorageUsageComponent() {
                 />
                 <Line 
                   type="monotone" 
-                  dataKey="file_storage_gb" 
+                  dataKey="app_storage_gb" 
                   stroke="#ffc658" 
                   strokeWidth={2}
-                  name="Files"
+                  name="App Storage"
                 />
               </LineChart>
             </ResponsiveContainer>
@@ -412,29 +418,62 @@ export default function StorageUsageComponent() {
           </CardContent>
         </Card>
 
-        {/* File Storage Breakdown */}
+        {/* App Storage Breakdown */}
         <Card>
           <CardHeader>
             <CardTitle className="flex items-center gap-2">
               <Folder className="w-5 h-5" />
-              File Storage by Folder
+              App Storage by Type
             </CardTitle>
           </CardHeader>
           <CardContent>
             <div className="space-y-3">
-              {currentUsage?.folder_breakdown && Object.entries(currentUsage.folder_breakdown).map(([folder, size]) => (
-                <div key={folder} className="flex items-center justify-between">
+              {currentUsage?.app_storage_breakdown && Object.entries(currentUsage.app_storage_breakdown).map(([type, size]) => (
+                <div key={type} className="flex items-center justify-between">
                   <div className="flex items-center gap-2">
-                    <Folder className="w-4 h-4 text-gray-400" />
-                    <span className="capitalize">{folder}/</span>
+                    <Folder className="w-4 h-4 text-blue-400" />
+                    <span className="capitalize">{type} objects</span>
                   </div>
                   <div className="text-sm font-medium">{formatBytes(size)}</div>
                 </div>
               ))}
             </div>
+            <div className="mt-4 p-3 bg-blue-50 rounded-lg">
+              <p className="text-xs text-blue-600">
+                <strong>Cost:</strong> ~${((currentUsage?.app_storage_gb || 0) * 0.03).toFixed(2)}/month storage + transfer fees
+              </p>
+            </div>
           </CardContent>
         </Card>
       </div>
+
+      {/* Key-Value Store Breakdown */}
+      <Card>
+        <CardHeader>
+          <CardTitle className="flex items-center gap-2">
+            <Database className="w-5 h-5" />
+            Key-Value Store Usage
+          </CardTitle>
+        </CardHeader>
+        <CardContent>
+          <div className="space-y-3">
+            {currentUsage?.keyvalue_breakdown && Object.entries(currentUsage.keyvalue_breakdown).map(([key, size]) => (
+              <div key={key} className="flex items-center justify-between">
+                <div className="flex items-center gap-2">
+                  <Database className="w-4 h-4 text-green-400" />
+                  <span className="capitalize">{key.replace('_', ' ')}</span>
+                </div>
+                <div className="text-sm font-medium">{size.toFixed(1)} MB</div>
+              </div>
+            ))}
+          </div>
+          <div className="mt-4 p-3 bg-green-50 rounded-lg">
+            <p className="text-xs text-green-600">
+              <strong>Limit:</strong> 50 MiB total • 5,000 keys max • 1KB per key • 5 MiB per value
+            </p>
+          </div>
+        </CardContent>
+      </Card>
 
       {/* Storage Settings */}
       <Card>
@@ -447,17 +486,15 @@ export default function StorageUsageComponent() {
         <CardContent className="space-y-4">
           <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
             <div className="space-y-2">
-              <Label htmlFor="quota">Soft Quota (GB)</Label>
+              <Label htmlFor="quota">Database Quota (GB)</Label>
               <Input
                 id="quota"
                 type="number"
-                min="1"
-                value={storageSettings.storage_soft_quota_gb}
-                onChange={(e) => setStorageSettings(prev => ({
-                  ...prev,
-                  storage_soft_quota_gb: parseInt(e.target.value) || 50
-                }))}
+                value={10}
+                disabled
+                className="bg-gray-50"
               />
+              <p className="text-xs text-gray-500">Fixed limit for Replit SQL Database</p>
             </div>
             <div className="space-y-2">
               <Label htmlFor="warning">Warning at (%)</Label>
