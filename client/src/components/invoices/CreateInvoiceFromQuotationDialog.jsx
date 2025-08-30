@@ -48,7 +48,7 @@ export default function CreateInvoiceFromQuotationDialog({ open, onClose, onQuot
       console.log("Loaded customers:", customersData.length);
       console.log("Loaded submitted quotations:", quotationsData.length);
       
-      setCustomers(customersData.filter(c => c.is_active !== false));
+      setCustomers(customersData.filter(c => c.isActive !== false));
       setQuotations(quotationsData);
     } catch (error) {
       console.error("Error loading data:", error);

@@ -61,9 +61,9 @@ export default function QuotationForm({ open, onClose, editingQuotation, current
         Brand.list().catch(() => [])
       ]);
 
-      setCustomers(customersData.filter(c => c.is_active !== false));
+      setCustomers(customersData.filter(c => c.isActive !== false));
       setProducts(productsData);
-      setBrands(brandsData.filter(b => b.is_active !== false));
+      setBrands(brandsData.filter(b => b.isActive !== false));
 
       if (editingQuotation) {
         console.log("Loading existing quotation:", editingQuotation);

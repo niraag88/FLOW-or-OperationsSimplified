@@ -62,7 +62,7 @@ export default function CustomerForm({ open, onClose, editingCustomer, currentUs
     currency: "AED",
     credit_limit: 0,
     payment_terms: "",
-    is_active: true
+    isActive: true
   });
 
   useEffect(() => {
@@ -375,12 +375,12 @@ export default function CustomerForm({ open, onClose, editingCustomer, currentUs
 
             <div className="flex items-center space-x-2">
               <Switch
-                id="is_active"
-                checked={formData.is_active}
-                onCheckedChange={(checked) => setFormData(prev => ({ ...prev, is_active: checked }))}
+                id="isActive"
+                checked={formData.isActive}
+                onCheckedChange={(checked) => setFormData(prev => ({ ...prev, isActive: checked }))}
                 disabled={!isEditable}
               />
-              <Label htmlFor="is_active">Active Customer</Label>
+              <Label htmlFor="isActive">Active Customer</Label>
             </div>
           </div>
 

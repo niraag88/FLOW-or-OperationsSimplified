@@ -65,7 +65,7 @@ export default function CreateFromExistingDialog({ open, onClose, onDocumentSele
         DeliveryOrder.filter({ status: 'confirmed' }, '-updated_date'),
       ]);
       
-      setCustomers(customersData.filter(c => c.is_active !== false));
+      setCustomers(customersData.filter(c => c.isActive !== false));
       setQuotations(quotationsData);
 
       // Combine and de-duplicate DOs

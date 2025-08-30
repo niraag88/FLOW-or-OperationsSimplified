@@ -59,9 +59,9 @@ export default function DOForm({ open, onClose, editingDO, currentUser, onSucces
         Brand.list().catch(() => [])
       ]);
 
-      setCustomers(customersData.filter(c => c.is_active !== false));
+      setCustomers(customersData.filter(c => c.isActive !== false));
       setProducts(productsData);
-      setBrands(brandsData.filter(b => b.is_active !== false));
+      setBrands(brandsData.filter(b => b.isActive !== false));
 
       if (editingDO) {
         const customer = customersData.find(c => c.id === editingDO.customer_id);

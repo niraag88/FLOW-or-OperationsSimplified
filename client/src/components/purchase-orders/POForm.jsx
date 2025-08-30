@@ -59,7 +59,7 @@ export default function POForm({ open, onClose, editingPO, currentUser, onSucces
           CompanySettings.list()
         ]);
         
-        setBrands(brandsData.filter(b => b.is_active));
+        setBrands(brandsData.filter(b => b.isActive));
         setAllProducts(productsData);
 
         if (settingsList.length > 0) {
@@ -93,7 +93,7 @@ export default function POForm({ open, onClose, editingPO, currentUser, onSucces
   const loadBrands = async () => {
     try {
       const brandsData = await Brand.list('sort_order');
-      setBrands(brandsData.filter(b => b.is_active));
+      setBrands(brandsData.filter(b => b.isActive));
     } catch (error) {
       console.error("Error loading brands:", error);
     }

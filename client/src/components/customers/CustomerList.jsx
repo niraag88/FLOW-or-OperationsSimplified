@@ -118,8 +118,8 @@ export default function CustomerList({ customers, loading, canEdit, onEdit }) {
                     <Badge variant="outline">{customer.currency}</Badge>
                   </TableCell>
                   <TableCell>
-                    <Badge className={customer.is_active ? 'bg-green-100 text-green-800' : 'bg-gray-100 text-gray-800'}>
-                      {customer.is_active ? 'Active' : 'Inactive'}
+                    <Badge className={customer.isActive ? 'bg-green-100 text-green-800' : 'bg-gray-100 text-gray-800'}>
+                      {customer.isActive ? 'Active' : 'Inactive'}
                     </Badge>
                   </TableCell>
                   <TableCell>
@@ -152,8 +152,8 @@ export default function CustomerList({ customers, loading, canEdit, onEdit }) {
                   )}
                 </div>
                 <div className="flex flex-col gap-2">
-                  <Badge className={customer.is_active ? 'bg-green-100 text-green-800' : 'bg-gray-100 text-gray-800'}>
-                    {customer.is_active ? 'Active' : 'Inactive'}
+                  <Badge className={customer.isActive ? 'bg-green-100 text-green-800' : 'bg-gray-100 text-gray-800'}>
+                    {customer.isActive ? 'Active' : 'Inactive'}
                   </Badge>
                 </div>
               </div>

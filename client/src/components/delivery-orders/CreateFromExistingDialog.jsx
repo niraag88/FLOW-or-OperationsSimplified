@@ -63,7 +63,7 @@ export default function CreateFromExistingDialog({ open, onClose, onDocumentSele
         Invoice.filter({ status: 'submitted' }, '-updated_date') // Changed from 'sent' to 'submitted'
       ]);
       
-      setCustomers(customersData.filter(c => c.is_active !== false));
+      setCustomers(customersData.filter(c => c.isActive !== false));
       setQuotations(quotationsData);
       setInvoices(invoicesData);
     } catch (error) {

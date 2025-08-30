@@ -14,7 +14,7 @@ export default function StockOnHandReport({ products, lots, canExport }) {
 
   const stockData = useMemo(() => {
     const data = lots
-      .filter(lot => lot.is_active && lot.qty_on_hand > 0)
+      .filter(lot => lot.isActive && lot.qty_on_hand > 0)
       .map(lot => {
         const product = products.find(p => p.id === lot.product_id);
         if (!product) return null;

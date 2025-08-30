@@ -46,7 +46,7 @@ export default function AddProduct() {
           CompanySettings.list()
         ]);
         
-        setBrands(brandsData.filter(b => b.is_active)); // Fetch and filter active brands
+        setBrands(brandsData.filter(b => b.isActive)); // Fetch and filter active brands
         if (settingsList.length > 0) {
           setFxRate(settingsList[0].fx_gbp_to_aed || 4.85);
         }

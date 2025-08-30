@@ -61,9 +61,9 @@ export default function InvoiceForm({ open, onClose, editingInvoice, currentUser
           Product.list().catch(() => []),
           Brand.list().catch(() => [])
         ]);
-        setCustomers(customersData.filter(c => c.is_active !== false));
+        setCustomers(customersData.filter(c => c.isActive !== false));
         setProducts(productsData);
-        setBrands(brandsData.filter(b => b.is_active !== false));
+        setBrands(brandsData.filter(b => b.isActive !== false));
       } catch (error) {
         console.error("Error loading form data:", error);
         toast({ title: "Error", description: "Failed to load required data.", variant: "destructive" });

@@ -70,7 +70,7 @@ export default function QuickAddProduct({ onProductAdded, canAdd }) {
     const loadBrands = async () => {
       try {
         const brandsData = await Brand.list('sort_order');
-        setBrands(brandsData.filter(b => b.is_active)); // Filter active brands
+        setBrands(brandsData.filter(b => b.isActive)); // Filter active brands
       } catch (error) {
         console.error("Error loading brands:", error);
         toast({

@@ -30,7 +30,7 @@ export default function CustomerManagement() {
     address: "",
     type: "Local",
     trn_number: "",
-    is_active: true
+    isActive: true
   });
 
   useEffect(() => {
@@ -56,7 +56,7 @@ export default function CustomerManagement() {
       address: "",
       type: "Local",
       trn_number: "",
-      is_active: true
+      isActive: true
     });
     setEditingCustomer(null);
     setShowForm(false);
@@ -143,9 +143,9 @@ export default function CustomerManagement() {
 
   const handleToggleActive = async (customer) => {
     try {
-      await Customer.update(customer.id, { ...customer, is_active: !customer.is_active });
+      await Customer.update(customer.id, { ...customer, isActive: !customer.isActive });
       await logAuditAction("Customer", customer.id, "status_change", "admin@example.com", { 
-        status: { from: customer.is_active, to: !customer.is_active }
+        status: { from: customer.isActive, to: !customer.isActive }
       });
       loadCustomers();
     } catch (error) {
@@ -243,11 +243,11 @@ export default function CustomerManagement() {
 
               <div className="flex items-center space-x-2">
                 <Switch
-                  id="is_active"
-                  checked={formData.is_active}
-                  onCheckedChange={(value) => setFormData(prev => ({ ...prev, is_active: value }))}
+                  id="isActive"
+                  checked={formData.isActive}
+                  onCheckedChange={(value) => setFormData(prev => ({ ...prev, isActive: value }))}
                 />
-                <Label htmlFor="is_active">Active Customer</Label>
+                <Label htmlFor="isActive">Active Customer</Label>
               </div>
 
               <div className="flex justify-end gap-3">
@@ -297,12 +297,12 @@ export default function CustomerManagement() {
                     <TableCell>
                       <div className="flex items-center gap-2">
                         <Switch
-                          checked={customer.is_active}
+                          checked={customer.isActive}
                           onCheckedChange={() => handleToggleActive(customer)}
                           size="sm"
                         />
-                        <span className={customer.is_active ? 'text-green-600' : 'text-gray-400'}>
-                          {customer.is_active ? 'Active' : 'Inactive'}
+                        <span className={customer.isActive ? 'text-green-600' : 'text-gray-400'}>
+                          {customer.isActive ? 'Active' : 'Inactive'}
                         </span>
                       </div>
                     </TableCell>
