@@ -33,6 +33,187 @@ setInterval(() => {
   tokensToDelete.forEach(token => signedTokens.delete(token));
 }, 60 * 60 * 1000);
 
+// PDF generation helper functions
+async function generateInvoicePDF(invoice: any): Promise<string> {
+  const formatDate = (dateString: string | Date) => {
+    if (!dateString) return '';
+    const date = new Date(dateString);
+    return date.toLocaleDateString('en-GB');
+  };
+
+  return `
+    <!DOCTYPE html>
+    <html>
+    <head>
+      <meta charset="utf-8">
+      <title>Invoice ${invoice.invoiceNumber}</title>
+      <style>
+        body { font-family: Arial, sans-serif; margin: 0; padding: 20px; }
+        .header { display: flex; justify-content: space-between; margin-bottom: 30px; border-bottom: 2px solid #333; padding-bottom: 20px; }
+        .invoice-title { font-size: 32px; font-weight: bold; color: #333; }
+        .invoice-details { margin-top: 10px; }
+        .company-info { text-align: right; }
+        .section { margin-bottom: 20px; }
+        .grid { display: grid; grid-template-columns: 1fr 1fr; gap: 30px; }
+        .totals { text-align: right; margin-top: 20px; }
+        .total-line { margin: 5px 0; }
+        .final-total { font-size: 18px; font-weight: bold; border-top: 2px solid #333; padding-top: 10px; }
+        table { width: 100%; border-collapse: collapse; margin-top: 20px; }
+        th, td { border: 1px solid #ddd; padding: 12px; text-align: left; }
+        th { background-color: #f5f5f5; font-weight: bold; }
+        .text-right { text-align: right; }
+        .signature-section { margin-top: 50px; display: grid; grid-template-columns: 1fr 1fr; gap: 50px; }
+        .signature-box { text-align: center; border-top: 1px solid #333; padding-top: 10px; }
+      </style>
+    </head>
+    <body>
+      <div class="header">
+        <div>
+          <h1 class="invoice-title">TAX INVOICE</h1>
+          <div class="invoice-details">
+            <p>Invoice Number: <strong>${invoice.invoiceNumber}</strong></p>
+            <p>Invoice Date: <strong>${formatDate(invoice.createdAt)}</strong></p>
+          </div>
+        </div>
+        <div class="company-info">
+          <h2>Company Name</h2>
+          <p>Company Address</p>
+          <p>Tel: Company Phone</p>
+          <p>Email: company@email.com</p>
+        </div>
+      </div>
+
+      <div class="section grid">
+        <div>
+          <h3>Bill To:</h3>
+          <p><strong>${invoice.customerName}</strong></p>
+        </div>
+        <div>
+          <h3>Invoice Details:</h3>
+          <p>Status: ${invoice.status}</p>
+        </div>
+      </div>
+
+      <table>
+        <thead>
+          <tr>
+            <th>Description</th>
+            <th class="text-right">Amount</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr>
+            <td>Service/Product</td>
+            <td class="text-right">$${invoice.amount}</td>
+          </tr>
+        </tbody>
+      </table>
+
+      <div class="totals">
+        <div class="total-line final-total">Total: $${invoice.amount}</div>
+      </div>
+
+      <div class="signature-section">
+        <div class="signature-box">
+          <p>Authorized Signature</p>
+        </div>
+        <div class="signature-box">
+          <p>Customer Signature</p>
+        </div>
+      </div>
+    </body>
+    </html>
+  `;
+}
+
+async function generateDOPDF(deliveryOrder: any): Promise<string> {
+  const formatDate = (dateString: string | Date) => {
+    if (!dateString) return '';
+    const date = new Date(dateString);
+    return date.toLocaleDateString('en-GB');
+  };
+
+  return `
+    <!DOCTYPE html>
+    <html>
+    <head>
+      <meta charset="utf-8">
+      <title>Delivery Order ${deliveryOrder.orderNumber}</title>
+      <style>
+        body { font-family: Arial, sans-serif; margin: 0; padding: 20px; }
+        .header { display: flex; justify-content: space-between; margin-bottom: 30px; border-bottom: 2px solid #333; padding-bottom: 20px; }
+        .do-title { font-size: 32px; font-weight: bold; color: #333; }
+        .do-details { margin-top: 10px; }
+        .company-info { text-align: right; }
+        .section { margin-bottom: 20px; }
+        .grid { display: grid; grid-template-columns: 1fr 1fr; gap: 30px; }
+        table { width: 100%; border-collapse: collapse; margin-top: 20px; }
+        th, td { border: 1px solid #ddd; padding: 12px; text-align: left; }
+        th { background-color: #f5f5f5; font-weight: bold; }
+        .text-right { text-align: right; }
+        .signature-section { margin-top: 50px; display: grid; grid-template-columns: 1fr 1fr; gap: 50px; }
+        .signature-box { text-align: center; border-top: 1px solid #333; padding-top: 10px; }
+      </style>
+    </head>
+    <body>
+      <div class="header">
+        <div>
+          <h1 class="do-title">DELIVERY ORDER</h1>
+          <div class="do-details">
+            <p>DO Number: <strong>${deliveryOrder.orderNumber}</strong></p>
+            <p>Order Date: <strong>${formatDate(deliveryOrder.createdAt)}</strong></p>
+          </div>
+        </div>
+        <div class="company-info">
+          <h2>Company Name</h2>
+          <p>Company Address</p>
+          <p>Tel: Company Phone</p>
+          <p>Email: company@email.com</p>
+        </div>
+      </div>
+
+      <div class="section grid">
+        <div>
+          <h3>Deliver To:</h3>
+          <p><strong>${deliveryOrder.customerName}</strong></p>
+          <p>${deliveryOrder.deliveryAddress}</p>
+        </div>
+        <div>
+          <h3>Delivery Details:</h3>
+          <p>Status: ${deliveryOrder.status}</p>
+        </div>
+      </div>
+
+      <table>
+        <thead>
+          <tr>
+            <th>Description</th>
+            <th>Customer</th>
+            <th>Status</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr>
+            <td>Delivery Items</td>
+            <td>${deliveryOrder.customerName}</td>
+            <td>${deliveryOrder.status}</td>
+          </tr>
+        </tbody>
+      </table>
+
+      <div class="signature-section">
+        <div class="signature-box">
+          <p>Delivered By</p>
+        </div>
+        <div class="signature-box">
+          <p>Received By</p>
+        </div>
+      </div>
+    </body>
+    </html>
+  `;
+}
+
 // Configure multer for handling file uploads
 const upload = multer({ storage: multer.memoryStorage() });
 
@@ -604,6 +785,119 @@ export async function registerRoutes(app: Express): Promise<Server> {
         details: error?.message || 'Unknown error',
         timestamp: new Date().toISOString()
       });
+    }
+  });
+
+  // Configuration flag for persistent exports
+  const persistExports = false; // Keep code path available but disabled
+
+  // GET /api/export/invoice - Generate and stream invoice PDF
+  app.get('/api/export/invoice', requireAuth(), async (req, res) => {
+    try {
+      const { invoiceId } = req.query;
+      
+      if (!invoiceId) {
+        return res.status(400).json({ error: 'invoiceId parameter is required' });
+      }
+
+      // Get invoice data from database
+      const [invoice] = await db.select().from(invoices).where(eq(invoices.id, parseInt(invoiceId as string)));
+      
+      if (!invoice) {
+        return res.status(404).json({ error: 'Invoice not found' });
+      }
+
+      // Generate PDF using puppeteer
+      const puppeteer = await import('puppeteer');
+      const ReactDOMServer = await import('react-dom/server');
+      const React = await import('react');
+      
+      // Import the InvoiceTemplate (we'll need to create a server-side version)
+      const templateHtml = await generateInvoicePDF(invoice);
+      
+      const browser = await puppeteer.default.launch({
+        args: ['--no-sandbox', '--disable-setuid-sandbox'],
+        headless: true
+      });
+      
+      const page = await browser.newPage();
+      await page.setContent(templateHtml, { waitUntil: 'networkidle0' });
+      
+      const pdfBuffer = await page.pdf({
+        format: 'A4',
+        printBackground: true,
+        margin: { top: '1.2cm', right: '1.2cm', bottom: '1.2cm', left: '1.2cm' }
+      });
+      
+      await browser.close();
+
+      // Set headers for PDF streaming
+      res.set({
+        'Content-Type': 'application/pdf',
+        'Content-Disposition': `attachment; filename="invoice-${invoice.invoiceNumber}.pdf"`,
+        'Content-Length': pdfBuffer.length
+      });
+
+      // Stream the PDF bytes
+      res.send(pdfBuffer);
+      
+    } catch (error) {
+      console.error('Error exporting invoice:', error);
+      res.status(500).json({ error: 'Failed to export invoice' });
+    }
+  });
+
+  // GET /api/export/do - Generate and stream delivery order PDF
+  app.get('/api/export/do', requireAuth(), async (req, res) => {
+    try {
+      const { doId } = req.query;
+      
+      if (!doId) {
+        return res.status(400).json({ error: 'doId parameter is required' });
+      }
+
+      // Get delivery order data from database
+      const [deliveryOrder] = await db.select().from(deliveryOrders).where(eq(deliveryOrders.id, parseInt(doId as string)));
+      
+      if (!deliveryOrder) {
+        return res.status(404).json({ error: 'Delivery order not found' });
+      }
+
+      // Generate PDF using puppeteer
+      const puppeteer = await import('puppeteer');
+      
+      // Import the DOTemplate (we'll need to create a server-side version)
+      const templateHtml = await generateDOPDF(deliveryOrder);
+      
+      const browser = await puppeteer.default.launch({
+        args: ['--no-sandbox', '--disable-setuid-sandbox'],
+        headless: true
+      });
+      
+      const page = await browser.newPage();
+      await page.setContent(templateHtml, { waitUntil: 'networkidle0' });
+      
+      const pdfBuffer = await page.pdf({
+        format: 'A4',
+        printBackground: true,
+        margin: { top: '1.2cm', right: '1.2cm', bottom: '1.2cm', left: '1.2cm' }
+      });
+      
+      await browser.close();
+
+      // Set headers for PDF streaming
+      res.set({
+        'Content-Type': 'application/pdf',
+        'Content-Disposition': `attachment; filename="delivery-order-${deliveryOrder.orderNumber}.pdf"`,
+        'Content-Length': pdfBuffer.length
+      });
+
+      // Stream the PDF bytes
+      res.send(pdfBuffer);
+      
+    } catch (error) {
+      console.error('Error exporting delivery order:', error);
+      res.status(500).json({ error: 'Failed to export delivery order' });
     }
   });
 

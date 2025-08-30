@@ -122,8 +122,31 @@ export default function InvoiceActionsDropdown({ invoice, canEdit, onEdit, onRef
     exportToCsv(exportData, `Tax_Invoice_${invoice.invoice_number}`);
   };
 
-  const handleExportPDF = () => {
-    window.open(`/Print?type=invoice&id=${invoice.id}`, '_blank');
+  const handleExportPDF = async () => {
+    try {
+      // Use the new streaming PDF export endpoint
+      const downloadUrl = `/api/export/invoice?invoiceId=${invoice.id}`;
+      
+      // Create a temporary link to trigger download
+      const link = document.createElement('a');
+      link.href = downloadUrl;
+      link.download = `invoice-${invoice.invoice_number}.pdf`;
+      document.body.appendChild(link);
+      link.click();
+      document.body.removeChild(link);
+      
+      toast({
+        title: 'Export Started',
+        description: 'PDF export has been started and will download shortly.'
+      });
+    } catch (error) {
+      console.error('Error exporting PDF:', error);
+      toast({
+        title: 'Export Failed',
+        description: 'Failed to export PDF. Please try again.',
+        variant: 'destructive'
+      });
+    }
   };
 
   const handleDelete = async () => { // Removed 'reason' parameter

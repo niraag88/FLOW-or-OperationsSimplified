@@ -129,8 +129,31 @@ export default function DOActionsDropdown({ doOrder, canEdit, onEdit, onRefresh 
     exportToCsv(exportData, `Delivery_Order_${doOrder.do_number}`);
   };
 
-  const handleExportPDF = () => {
-    window.open(`/Print?type=do&id=${doOrder.id}`, '_blank');
+  const handleExportPDF = async () => {
+    try {
+      // Use the new streaming PDF export endpoint
+      const downloadUrl = `/api/export/do?doId=${doOrder.id}`;
+      
+      // Create a temporary link to trigger download
+      const link = document.createElement('a');
+      link.href = downloadUrl;
+      link.download = `delivery-order-${doOrder.do_number}.pdf`;
+      document.body.appendChild(link);
+      link.click();
+      document.body.removeChild(link);
+      
+      toast({
+        title: 'Export Started',
+        description: 'PDF export has been started and will download shortly.'
+      });
+    } catch (error) {
+      console.error('Error exporting PDF:', error);
+      toast({
+        title: 'Export Failed',
+        description: 'Failed to export PDF. Please try again.',
+        variant: 'destructive'
+      });
+    }
   };
 
   // Modified handleDelete function - no longer accepts a 'reason' parameter
