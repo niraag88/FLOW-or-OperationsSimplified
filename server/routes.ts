@@ -1,4 +1,4 @@
-import type { Express } from "express";
+import type { Express, Request, Response, NextFunction } from "express";
 import { createServer, type Server } from "http";
 import { storage } from "./storage";
 import { Client } from '@replit/object-storage';
@@ -16,20 +16,70 @@ const pool = new Pool({
 });
 
 // In-memory store for signed URL tokens (in production, use Redis or similar)
-const signedTokens = new Map<string, { key: string; expires: number; type: 'upload' | 'download' }>();
+const signedTokens = new Map<string, { key: string; expires: number; type: 'upload' | 'download'; contentType?: string; fileSize?: number; checksum?: string }>();
 
 // Cleanup expired tokens every hour
 setInterval(() => {
   const now = Date.now();
-  for (const [token, data] of signedTokens.entries()) {
+  const tokensToDelete: string[] = [];
+  signedTokens.forEach((data, token) => {
     if (data.expires < now) {
-      signedTokens.delete(token);
+      tokensToDelete.push(token);
     }
-  }
+  });
+  tokensToDelete.forEach(token => signedTokens.delete(token));
 }, 60 * 60 * 1000);
 
 // Configure multer for handling file uploads
 const upload = multer({ storage: multer.memoryStorage() });
+
+// Authentication middleware
+interface AuthenticatedRequest extends Request {
+  user?: {
+    id: string;
+    role: 'Admin' | 'Staff' | 'Manager';
+  };
+}
+
+const requireAuth = (allowedRoles: string[] = ['Admin']) => {
+  return (req: AuthenticatedRequest, res: Response, next: NextFunction) => {
+    // For now, mock authentication - replace with actual session checking
+    // TODO: Implement proper session-based authentication
+    const mockUser = { id: 'user123', role: 'Admin' as const };
+    req.user = mockUser;
+    
+    if (!req.user) {
+      return res.status(401).json({ error: 'Authentication required' });
+    }
+    
+    if (!allowedRoles.includes(req.user.role)) {
+      return res.status(403).json({ error: 'Insufficient permissions' });
+    }
+    
+    next();
+  };
+};
+
+// Input validation functions
+const validateUploadInput = (key: string, contentType: string, fileSize?: number) => {
+  // Validate key path
+  if (!key.startsWith('invoices/') && !key.startsWith('delivery/')) {
+    return { valid: false, error: 'Key must start with invoices/ or delivery/' };
+  }
+  
+  // Validate content type
+  if (contentType !== 'application/pdf') {
+    return { valid: false, error: 'Content type must be application/pdf' };
+  }
+  
+  // Validate file size (25 MB limit)
+  const maxSize = 25 * 1024 * 1024; // 25 MB
+  if (fileSize && fileSize > maxSize) {
+    return { valid: false, error: 'File size must be ≤ 25 MB' };
+  }
+  
+  return { valid: true };
+};
 
 export async function registerRoutes(app: Express): Promise<Server> {
   // Health check
@@ -39,23 +89,45 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
   // POST /api/storage/sign-upload
   // Generate a signed token for uploading files (since Replit doesn't support native signed URLs)
-  app.post('/api/storage/sign-upload', async (req, res) => {
+  app.post('/api/storage/sign-upload', requireAuth(['Admin', 'Staff', 'Manager']), async (req: AuthenticatedRequest, res) => {
     try {
-      const { key, contentType, checksum } = req.body;
+      const { key, contentType, checksum, fileSize } = req.body;
       
       if (!key) {
         return res.status(400).json({ error: 'Key is required' });
+      }
+      
+      if (!contentType) {
+        return res.status(400).json({ error: 'Content type is required' });
+      }
+      
+      // Validate input
+      const validation = validateUploadInput(key, contentType, fileSize);
+      if (!validation.valid) {
+        return res.status(400).json({ error: validation.error });
+      }
+      
+      // Additional role-based validation
+      if (req.user?.role !== 'Admin') {
+        // Staff/Manager can only upload to their own invoices/delivery orders
+        // This would need proper user ID checking in a real implementation
+        if (!key.includes(req.user?.id || '')) {
+          return res.status(403).json({ error: 'Can only upload to your own files' });
+        }
       }
 
       // Generate a secure token
       const token = crypto.randomBytes(32).toString('hex');
       const expires = Date.now() + (10 * 60 * 1000); // 10 minutes
 
-      // Store token with metadata
+      // Store token with metadata including validation info
       signedTokens.set(token, {
         key: key,
         expires: expires,
-        type: 'upload'
+        type: 'upload',
+        contentType: contentType,
+        fileSize: fileSize,
+        checksum: checksum
       });
 
       // Return upload URL that points to our proxy endpoint
@@ -97,6 +169,22 @@ export async function registerRoutes(app: Express): Promise<Server> {
         await new Promise((resolve) => req.on('end', resolve));
         fileData = Buffer.concat(chunks);
       }
+      
+      // Validate file size against token
+      if (tokenData.fileSize && fileData.length !== tokenData.fileSize) {
+        signedTokens.delete(token);
+        return res.status(400).json({ error: 'File size mismatch' });
+      }
+      
+      // Validate checksum if provided
+      if (tokenData.checksum) {
+        const crypto = require('crypto');
+        const hash = crypto.createHash('md5').update(fileData).digest('hex');
+        if (hash !== tokenData.checksum) {
+          signedTokens.delete(token);
+          return res.status(400).json({ error: 'Checksum mismatch' });
+        }
+      }
 
       // Upload to Replit Object Storage
       const result = await objectStorageClient.uploadFromBytes(tokenData.key, fileData);
@@ -113,7 +201,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
   // GET /api/storage/signed-get
   // Generate a signed token for downloading files
-  app.get('/api/storage/signed-get', async (req, res) => {
+  app.get('/api/storage/signed-get', requireAuth(['Admin']), async (req, res) => {
     try {
       const { key } = req.query;
       
@@ -157,9 +245,9 @@ export async function registerRoutes(app: Express): Promise<Server> {
         return res.status(401).json({ error: 'Invalid or expired download token' });
       }
 
-      // Stream file from Replit Object Storage
-      const stream = await objectStorageClient.downloadAsStream(tokenData.key);
-      if (!stream.ok) {
+      // Download file from Replit Object Storage as bytes and stream to response
+      const downloadResult = await objectStorageClient.downloadAsBytes(tokenData.key);
+      if (!downloadResult.ok) {
         return res.status(404).json({ error: 'Object not found' });
       }
 
@@ -169,8 +257,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
         'Content-Type': 'application/octet-stream'
       });
 
-      // Pipe the stream to response
-      stream.value.pipe(res);
+      // Send the file data
+      res.send(downloadResult.value);
     } catch (error) {
       console.error('Error downloading file:', error);
       res.status(500).json({ error: 'Failed to download file' });
@@ -179,7 +267,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
   // GET /api/storage/list-prefix
   // List objects with a given prefix
-  app.get('/api/storage/list-prefix', async (req, res) => {
+  app.get('/api/storage/list-prefix', requireAuth(['Admin']), async (req, res) => {
     try {
       const { prefix = '' } = req.query;
       
@@ -206,7 +294,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
   // GET /api/storage/total-size
   // Get total size of all objects in the bucket
-  app.get('/api/storage/total-size', async (req, res) => {
+  app.get('/api/storage/total-size', requireAuth(['Admin']), async (req, res) => {
     try {
       const result = await objectStorageClient.list();
       
@@ -251,7 +339,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
   // GET /api/storage/object-info
   // Get detailed information about a specific object
-  app.get('/api/storage/object-info', async (req, res) => {
+  app.get('/api/storage/object-info', requireAuth(['Admin']), async (req, res) => {
     try {
       const { key } = req.query;
       
@@ -278,7 +366,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
   // DELETE /api/storage/object
   // Delete an object
-  app.delete('/api/storage/object', async (req, res) => {
+  app.delete('/api/storage/object', requireAuth(['Admin']), async (req, res) => {
     try {
       const { key } = req.query;
       
