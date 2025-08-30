@@ -244,6 +244,28 @@ const requireAuth = (allowedRoles: string[] = ['Admin']) => {
   };
 };
 
+// Operations token authentication middleware
+const requireOpsToken = (req: Request, res: Response, next: NextFunction) => {
+  const authHeader = req.headers.authorization;
+  const expectedToken = process.env.OPS_TOKEN;
+  
+  if (!expectedToken) {
+    return res.status(500).json({ error: 'OPS_TOKEN not configured' });
+  }
+  
+  if (!authHeader || !authHeader.startsWith('Bearer ')) {
+    return res.status(401).json({ error: 'Authorization header required with Bearer token' });
+  }
+  
+  const token = authHeader.substring(7); // Remove 'Bearer ' prefix
+  
+  if (token !== expectedToken) {
+    return res.status(401).json({ error: 'Invalid operations token' });
+  }
+  
+  next();
+};
+
 // Input validation functions
 const validateUploadInput = (key: string, contentType: string, fileSize?: number) => {
   // Validate key path
@@ -758,51 +780,6 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  // Backup API route with OPS_TOKEN protection
-  app.post('/api/ops/run-backups', requireAuth(['Admin']), async (req, res) => {
-    try {
-      // Check OPS_TOKEN
-      const opsToken = req.headers['x-ops-token'] || req.body.opsToken;
-      if (!opsToken || opsToken !== process.env.OPS_TOKEN) {
-        return res.status(401).json({ error: 'Invalid or missing OPS_TOKEN' });
-      }
-
-      console.log('Starting manual backup operation...');
-
-      // Import backup functions dynamically
-      const { backupDatabase } = await import('../scripts/backup-db.js') as any;
-      const { backupManifest } = await import('../scripts/backup-manifest.js') as any;
-
-      // Run backups
-      const [dbResult, manifestResult] = await Promise.all([
-        backupDatabase(),
-        backupManifest()
-      ]);
-
-      const result = {
-        timestamp: new Date().toISOString(),
-        database: dbResult,
-        manifest: manifestResult,
-        success: dbResult.success && manifestResult.success
-      };
-
-      console.log('Backup operation completed:', result);
-
-      if (result.success) {
-        res.json(result);
-      } else {
-        res.status(500).json(result);
-      }
-
-    } catch (error: any) {
-      console.error('Backup operation failed:', error);
-      res.status(500).json({ 
-        error: 'Backup operation failed', 
-        details: error?.message || 'Unknown error',
-        timestamp: new Date().toISOString()
-      });
-    }
-  });
 
   // Configuration flag for persistent exports
   const persistExports = false; // Keep code path available but disabled
@@ -954,6 +931,64 @@ export async function registerRoutes(app: Express): Promise<Server> {
     } catch (error) {
       console.error('Error getting backup status:', error);
       res.status(500).json({ error: 'Failed to get backup status' });
+    }
+  });
+
+  // Operations endpoint for automated backups
+  // POST /api/ops/run-backups
+  // Run both database and manifest backups with Admin + OPS_TOKEN auth
+  app.post('/api/ops/run-backups', requireAuth(['Admin']), requireOpsToken, async (req: AuthenticatedRequest, res) => {
+    try {
+      console.log('Starting automated backup process...');
+      
+      // Import the backup functions
+      const { uploadBackup } = await import('../scripts/uploadBackup.js');
+      const { writeManifest } = await import('../scripts/writeManifest.js');
+      
+      // Run both backups in parallel
+      const [dbResult, manifestResult] = await Promise.all([
+        uploadBackup(),
+        writeManifest()
+      ]);
+      
+      // Check if both succeeded
+      const success = dbResult.success && manifestResult.success;
+      
+      const response = {
+        success,
+        timestamp: new Date().toISOString(),
+        dbBackup: {
+          success: dbResult.success,
+          filename: dbResult.filename,
+          storageKey: dbResult.storageKey,
+          error: dbResult.error
+        },
+        manifestBackup: {
+          success: manifestResult.success,
+          filename: manifestResult.filename,
+          storageKey: manifestResult.storageKey,
+          totalObjects: manifestResult.totalObjects,
+          totalSize: manifestResult.totalSize,
+          totals: manifestResult.totals,
+          error: manifestResult.error
+        }
+      };
+      
+      if (success) {
+        console.log('Automated backup completed successfully');
+        res.status(200).json(response);
+      } else {
+        console.error('Automated backup failed:', { dbResult, manifestResult });
+        res.status(500).json(response);
+      }
+      
+    } catch (error) {
+      console.error('Error running automated backups:', error);
+      res.status(500).json({ 
+        success: false, 
+        error: error instanceof Error ? error.message : 'Unknown error',
+        timestamp: new Date().toISOString()
+      });
     }
   });
 
