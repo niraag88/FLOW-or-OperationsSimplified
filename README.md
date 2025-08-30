@@ -115,6 +115,54 @@ Returns:
 }
 ```
 
+### Document Management
+
+#### Delete Invoice (Requires Auth: Admin only)
+```
+DELETE /api/invoices/:id
+```
+
+**Retention Policy Checks:**
+- ❌ 403 if `legal_hold = true`
+- ❌ 403 if `created_at + 5 years > now()`
+- ✅ Allowed after 5-year retention period expires
+
+#### Delete Delivery Order (Requires Auth: Admin only)  
+```
+DELETE /api/delivery-orders/:id
+```
+
+Same retention policy as invoices.
+
+### Backup Operations
+
+#### Trigger Manual Backup (Requires Auth: Admin + OPS_TOKEN)
+```
+POST /api/ops/run-backups
+X-OPS-Token: {your-ops-token}
+```
+
+#### Get Backup Status (Requires Auth: Admin only)
+```
+GET /api/ops/backup-status
+```
+
+Returns:
+```json
+{
+  "latestDbBackup": {
+    "filename": "db-20250830.sql.gz",
+    "size": 1024000,
+    "timestamp": "2025-08-30T02:00:00Z"
+  },
+  "latestManifestBackup": {
+    "filename": "manifest-20250830.json", 
+    "size": 2048,
+    "timestamp": "2025-08-30T02:01:00Z"
+  }
+}
+```
+
 ## Security Features
 
 - **Role-based Authentication**: All storage endpoints require authenticated sessions
@@ -130,6 +178,22 @@ Returns:
   - Checksum validation when provided
 - **File Size Enforcement**: Real-time validation against declared file sizes
 
+## Document Retention & Compliance
+
+**All invoice/DO scans retained for 5 years minimum. Backups run nightly at 02:00. Admin can trigger manually via /api/ops/run-backups.**
+
+### Retention Policy
+- **5-Year Minimum**: Invoice and delivery order documents cannot be deleted until 5 years after creation
+- **Legal Hold**: Documents under legal hold cannot be deleted regardless of age
+- **Admin Only**: Only Admin users can delete documents (after retention period expires)
+- **Audit Trail**: All deletions are logged with timestamp, actor, and affected files
+
+### Backup System
+- **Database Backups**: Automated pg_dump compressed and stored to `backups/db/`
+- **Object Manifest**: Daily inventory of all stored files in `backups/objects/`
+- **Manual Triggers**: Admin can trigger backups via API with OPS_TOKEN
+- **Status Monitoring**: Latest backup timestamps and sizes available in Settings
+
 ## Integration with Base44 Suite
 
 This server is designed to work with the Base44 operations management frontend, providing:
@@ -142,6 +206,8 @@ This server is designed to work with the Base44 operations management frontend, 
 2. **File Operations**: Secure file upload/download for documents, images, and other assets
 
 3. **Business Operations**: Backend support for customer management, project tracking, and financial data
+
+4. **Compliance Features**: 5-year retention policy, legal hold, and comprehensive audit logging
 
 ## Development
 

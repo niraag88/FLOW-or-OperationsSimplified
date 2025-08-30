@@ -2,6 +2,9 @@ import type { Express, Request, Response, NextFunction } from "express";
 import { createServer, type Server } from "http";
 import { storage } from "./storage";
 import { Client } from '@replit/object-storage';
+import { invoices, deliveryOrders, auditLog, type InsertAuditLog } from "@shared/schema";
+import { db } from "./db";
+import { eq } from "drizzle-orm";
 import pkg from 'pg';
 import crypto from 'crypto';
 import multer from 'multer';
@@ -384,6 +387,213 @@ export async function registerRoutes(app: Express): Promise<Server> {
     } catch (error) {
       console.error('Error deleting object:', error);
       res.status(500).json({ error: 'Failed to delete object' });
+    }
+  });
+
+  // Retention policy helpers
+  const checkRetentionPolicy = (createdAt: Date, legalHold: boolean) => {
+    if (legalHold) {
+      return { canDelete: false, error: 'Cannot delete: Record is under legal hold' };
+    }
+    
+    // 5-year retention policy
+    const fiveYearsLater = new Date(createdAt);
+    fiveYearsLater.setFullYear(fiveYearsLater.getFullYear() + 5);
+    
+    if (fiveYearsLater > new Date()) {
+      const retentionDate = fiveYearsLater.toISOString().split('T')[0];
+      return { 
+        canDelete: false, 
+        error: `Retention policy: cannot delete until ${retentionDate}` 
+      };
+    }
+    
+    return { canDelete: true };
+  };
+
+  const writeAuditLog = async (auditData: InsertAuditLog) => {
+    await db.insert(auditLog).values(auditData);
+  };
+
+  // DELETE /api/invoices/:id
+  // Delete an invoice with retention policy checks
+  app.delete('/api/invoices/:id', requireAuth(['Admin']), async (req: AuthenticatedRequest, res) => {
+    try {
+      const { id } = req.params;
+      const userId = req.user?.id || 'unknown';
+      
+      // Get the invoice
+      const [invoice] = await db.select().from(invoices).where(eq(invoices.id, parseInt(id)));
+      
+      if (!invoice) {
+        return res.status(404).json({ error: 'Invoice not found' });
+      }
+      
+      // Check retention policy
+      const retentionCheck = checkRetentionPolicy(invoice.createdAt, invoice.legalHold);
+      if (!retentionCheck.canDelete) {
+        return res.status(403).json({ error: retentionCheck.error });
+      }
+      
+      // Delete from storage if object exists
+      if (invoice.objectKey) {
+        try {
+          await objectStorageClient.delete(invoice.objectKey);
+        } catch (error) {
+          console.warn(`Failed to delete object ${invoice.objectKey}:`, error);
+        }
+      }
+      
+      // Delete from database
+      await db.delete(invoices).where(eq(invoices.id, parseInt(id)));
+      
+      // Write audit log
+      await writeAuditLog({
+        actor: userId,
+        targetId: id,
+        targetType: 'invoice',
+        objectKey: invoice.objectKey,
+        action: 'DELETE'
+      });
+      
+      res.json({ success: true, message: 'Invoice deleted successfully' });
+    } catch (error) {
+      console.error('Error deleting invoice:', error);
+      res.status(500).json({ error: 'Failed to delete invoice' });
+    }
+  });
+
+  // DELETE /api/delivery-orders/:id  
+  // Delete a delivery order with retention policy checks
+  app.delete('/api/delivery-orders/:id', requireAuth(['Admin']), async (req: AuthenticatedRequest, res) => {
+    try {
+      const { id } = req.params;
+      const userId = req.user?.id || 'unknown';
+      
+      // Get the delivery order
+      const [deliveryOrder] = await db.select().from(deliveryOrders).where(eq(deliveryOrders.id, parseInt(id)));
+      
+      if (!deliveryOrder) {
+        return res.status(404).json({ error: 'Delivery order not found' });
+      }
+      
+      // Check retention policy
+      const retentionCheck = checkRetentionPolicy(deliveryOrder.createdAt, deliveryOrder.legalHold);
+      if (!retentionCheck.canDelete) {
+        return res.status(403).json({ error: retentionCheck.error });
+      }
+      
+      // Delete from storage if object exists
+      if (deliveryOrder.objectKey) {
+        try {
+          await objectStorageClient.delete(deliveryOrder.objectKey);
+        } catch (error) {
+          console.warn(`Failed to delete object ${deliveryOrder.objectKey}:`, error);
+        }
+      }
+      
+      // Delete from database
+      await db.delete(deliveryOrders).where(eq(deliveryOrders.id, parseInt(id)));
+      
+      // Write audit log
+      await writeAuditLog({
+        actor: userId,
+        targetId: id,
+        targetType: 'delivery_order',
+        objectKey: deliveryOrder.objectKey,
+        action: 'DELETE'
+      });
+      
+      res.json({ success: true, message: 'Delivery order deleted successfully' });
+    } catch (error) {
+      console.error('Error deleting delivery order:', error);
+      res.status(500).json({ error: 'Failed to delete delivery order' });
+    }
+  });
+
+  // Backup API route with OPS_TOKEN protection
+  app.post('/api/ops/run-backups', requireAuth(['Admin']), async (req, res) => {
+    try {
+      // Check OPS_TOKEN
+      const opsToken = req.headers['x-ops-token'] || req.body.opsToken;
+      if (!opsToken || opsToken !== process.env.OPS_TOKEN) {
+        return res.status(401).json({ error: 'Invalid or missing OPS_TOKEN' });
+      }
+
+      console.log('Starting manual backup operation...');
+
+      // Import backup functions dynamically
+      const { backupDatabase } = await import('../scripts/backup-db.js') as any;
+      const { backupManifest } = await import('../scripts/backup-manifest.js') as any;
+
+      // Run backups
+      const [dbResult, manifestResult] = await Promise.all([
+        backupDatabase(),
+        backupManifest()
+      ]);
+
+      const result = {
+        timestamp: new Date().toISOString(),
+        database: dbResult,
+        manifest: manifestResult,
+        success: dbResult.success && manifestResult.success
+      };
+
+      console.log('Backup operation completed:', result);
+
+      if (result.success) {
+        res.json(result);
+      } else {
+        res.status(500).json(result);
+      }
+
+    } catch (error: any) {
+      console.error('Backup operation failed:', error);
+      res.status(500).json({ 
+        error: 'Backup operation failed', 
+        details: error?.message || 'Unknown error',
+        timestamp: new Date().toISOString()
+      });
+    }
+  });
+
+  // GET /api/ops/backup-status
+  // Get latest backup information
+  app.get('/api/ops/backup-status', requireAuth(['Admin']), async (req, res) => {
+    try {
+      // List backup files to get latest timestamps and sizes
+      const dbBackupsResult = await objectStorageClient.list({ prefix: 'backups/db/' });
+      const manifestBackupsResult = await objectStorageClient.list({ prefix: 'backups/objects/' });
+
+      let latestDbBackup = null;
+      let latestManifestBackup = null;
+
+      if (dbBackupsResult.ok && dbBackupsResult.value.length > 0) {
+        latestDbBackup = dbBackupsResult.value
+          .sort((a: any, b: any) => new Date(b.timeCreated || b.updated).getTime() - new Date(a.timeCreated || a.updated).getTime())[0];
+      }
+
+      if (manifestBackupsResult.ok && manifestBackupsResult.value.length > 0) {
+        latestManifestBackup = manifestBackupsResult.value
+          .sort((a: any, b: any) => new Date(b.timeCreated || b.updated).getTime() - new Date(a.timeCreated || a.updated).getTime())[0];
+      }
+
+      res.json({
+        latestDbBackup: latestDbBackup ? {
+          filename: (latestDbBackup as any).name,
+          size: (latestDbBackup as any).size || 0,
+          timestamp: (latestDbBackup as any).timeCreated || (latestDbBackup as any).updated
+        } : null,
+        latestManifestBackup: latestManifestBackup ? {
+          filename: (latestManifestBackup as any).name,
+          size: (latestManifestBackup as any).size || 0,
+          timestamp: (latestManifestBackup as any).timeCreated || (latestManifestBackup as any).updated
+        } : null
+      });
+
+    } catch (error) {
+      console.error('Error getting backup status:', error);
+      res.status(500).json({ error: 'Failed to get backup status' });
     }
   });
 
