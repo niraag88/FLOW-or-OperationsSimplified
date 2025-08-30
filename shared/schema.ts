@@ -25,6 +25,7 @@ export const invoices = pgTable("invoices", {
   amount: text("amount").notNull(),
   status: text("status").notNull().default("pending"),
   objectKey: text("object_key"), // Storage key for uploaded PDF
+  scanKey: text("scan_key"), // Storage key for PDF scan
   createdAt: timestamp("created_at").defaultNow().notNull(),
   legalHold: boolean("legal_hold").default(false).notNull(),
 });
@@ -37,6 +38,7 @@ export const deliveryOrders = pgTable("delivery_orders", {
   deliveryAddress: text("delivery_address").notNull(),
   status: text("status").notNull().default("pending"),
   objectKey: text("object_key"), // Storage key for uploaded PDF
+  scanKey: text("scan_key"), // Storage key for PDF scan
   createdAt: timestamp("created_at").defaultNow().notNull(),
   legalHold: boolean("legal_hold").default(false).notNull(),
 });
@@ -59,6 +61,7 @@ export const insertInvoiceSchema = createInsertSchema(invoices).pick({
   amount: true,
   status: true,
   objectKey: true,
+  scanKey: true,
 });
 
 export type InsertInvoice = z.infer<typeof insertInvoiceSchema>;
@@ -71,6 +74,7 @@ export const insertDeliveryOrderSchema = createInsertSchema(deliveryOrders).pick
   deliveryAddress: true,
   status: true,
   objectKey: true,
+  scanKey: true,
 });
 
 export type InsertDeliveryOrder = z.infer<typeof insertDeliveryOrderSchema>;

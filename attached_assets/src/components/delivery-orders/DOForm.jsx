@@ -18,6 +18,8 @@ import { Product } from "@/api/entities";
 import { Customer } from "@/api/entities";
 import { Brand } from "@/api/entities";
 import { Card } from "@/components/ui/card";
+import { ScanUploader } from "../ScanUploader";
+import { doPdfKey } from "@/lib/storageKeys";
 
 export default function DOForm({ open, onClose, editingDO, currentUser, onSuccess }) {
   const [loading, setLoading] = useState(false);
@@ -41,7 +43,8 @@ export default function DOForm({ open, onClose, editingDO, currentUser, onSucces
     total_amount: 0,
     remarks: "",
     attachments: [],
-    items: []
+    items: [],
+    scanKey: null
   });
 
   useEffect(() => {
@@ -453,6 +456,17 @@ export default function DOForm({ open, onClose, editingDO, currentUser, onSucces
               disabled={!isEditable}
               rows={3}
               placeholder="Add any additional remarks here..."
+            />
+          </div>
+
+          {/* PDF Scan Upload */}
+          <div className="space-y-2">
+            <Label>PDF Scan</Label>
+            <ScanUploader
+              value={formData.scanKey}
+              onChange={(scanKey) => handleInputChange('scanKey', scanKey)}
+              storageKey={doPdfKey(new Date(formData.order_date || new Date()).getFullYear(), formData.do_number || 'temp')}
+              disabled={!isEditable}
             />
           </div>
           

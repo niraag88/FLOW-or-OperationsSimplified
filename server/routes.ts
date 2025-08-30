@@ -202,9 +202,59 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  // POST /api/storage/upload-scan - Upload PDF scan with validation
+  app.post('/api/storage/upload-scan', requireAuth(), upload.single('file'), async (req, res) => {
+    try {
+      if (!req.file) {
+        return res.status(400).json({ error: 'No file provided' });
+      }
+
+      const storageKey = req.headers['x-storage-key'] as string;
+      const contentType = req.headers['x-content-type'] as string;
+      const fileSize = parseInt(req.headers['x-file-size'] as string);
+
+      // Validate headers
+      if (!storageKey || !contentType || !fileSize) {
+        return res.status(400).json({ error: 'Missing required headers' });
+      }
+
+      // Validate content type
+      if (contentType !== 'application/pdf') {
+        return res.status(400).json({ error: 'Only PDF files are allowed' });
+      }
+
+      // Validate file size (25MB max)
+      if (fileSize > 25 * 1024 * 1024) {
+        return res.status(400).json({ error: 'File size exceeds 25MB limit' });
+      }
+
+      // Validate storage key format
+      if (!storageKey.match(/^(invoices|delivery)\/\d{4}\/[^\/]+\.pdf$/)) {
+        return res.status(400).json({ error: 'Invalid storage key format' });
+      }
+
+      // Validate actual file size matches header
+      if (req.file.size !== fileSize) {
+        return res.status(400).json({ error: 'File size mismatch' });
+      }
+
+      // Upload to Replit Object Storage
+      const result = await objectStorageClient.uploadFromBytes(storageKey, req.file.buffer);
+
+      if (!result.ok) {
+        throw new Error(`Upload failed: ${result.error}`);
+      }
+
+      res.json({ success: true, key: storageKey });
+    } catch (error) {
+      console.error('Error uploading scan:', error);
+      res.status(500).json({ error: 'Failed to upload scan' });
+    }
+  });
+
   // GET /api/storage/signed-get
   // Generate a signed token for downloading files
-  app.get('/api/storage/signed-get', requireAuth(['Admin']), async (req, res) => {
+  app.get('/api/storage/signed-get', requireAuth(), async (req, res) => {
     try {
       const { key } = req.query;
       

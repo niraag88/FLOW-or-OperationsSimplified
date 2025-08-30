@@ -19,6 +19,8 @@ import { Customer } from "@/api/entities";
 import { Brand } from "@/api/entities";
 import { Card } from "@/components/ui/card";
 import { useToast } from "@/components/ui/use-toast";
+import { ScanUploader } from "../ScanUploader";
+import { invoicePdfKey } from "@/lib/storageKeys";
 
 const getInitialFormData = (invoiceNumber) => ({
   invoice_number: invoiceNumber || "",
@@ -38,7 +40,8 @@ const getInitialFormData = (invoiceNumber) => ({
   payment_reference: "",
   remarks: "",
   attachments: [],
-  items: []
+  items: [],
+  scanKey: null
 });
 
 
@@ -573,6 +576,17 @@ export default function InvoiceForm({ open, onClose, editingInvoice, currentUser
               disabled={!isCurrentlyEditable}
               rows={3}
               placeholder="Add any additional remarks here..."
+            />
+          </div>
+
+          {/* PDF Scan Upload */}
+          <div className="space-y-2">
+            <Label>PDF Scan</Label>
+            <ScanUploader
+              value={formData.scanKey}
+              onChange={(scanKey) => handleInputChange('scanKey', scanKey)}
+              storageKey={invoicePdfKey(new Date(formData.invoice_date || new Date()).getFullYear(), formData.invoice_number || 'temp')}
+              disabled={!isCurrentlyEditable}
             />
           </div>
           
