@@ -54,9 +54,9 @@ export default function AddStockCountDialog({ open, onClose, products, onSuccess
   };
 
   const filteredProducts = products.filter(product =>
-    product.product_code?.toLowerCase().includes(searchTerm.toLowerCase()) ||
-    product.brand_name?.toLowerCase().includes(searchTerm.toLowerCase()) ||
-    product.product_name?.toLowerCase().includes(searchTerm.toLowerCase())
+    product.sku?.toLowerCase().includes(searchTerm.toLowerCase()) ||
+    product.brandName?.toLowerCase().includes(searchTerm.toLowerCase()) ||
+    product.name?.toLowerCase().includes(searchTerm.toLowerCase())
   );
 
   const totalPages = Math.ceil(filteredProducts.length / itemsPerPage);
@@ -117,8 +117,8 @@ export default function AddStockCountDialog({ open, onClose, products, onSuccess
               <Table>
                 <TableHeader>
                   <TableRow>
-                    <TableHead className="w-32">Product Code</TableHead>
                     <TableHead>Brand</TableHead>
+                    <TableHead className="w-32">Product Code</TableHead>
                     <TableHead>Product Name</TableHead>
                     <TableHead className="w-24">Size</TableHead>
                     <TableHead className="w-32">Quantity</TableHead>
@@ -127,16 +127,16 @@ export default function AddStockCountDialog({ open, onClose, products, onSuccess
                 <TableBody>
                   {paginatedProducts.map((product) => (
                     <TableRow key={product.id}>
-                      <TableCell className="font-mono text-sm">{product.product_code}</TableCell>
-                      <TableCell className="text-sm">{product.brand_name}</TableCell>
-                      <TableCell className="text-sm">{product.product_name}</TableCell>
-                      <TableCell className="text-sm">{product.size || '-'}</TableCell>
+                      <TableCell className="text-sm">{product.brandName || '-'}</TableCell>
+                      <TableCell className="font-mono text-sm">{product.sku}</TableCell>
+                      <TableCell className="text-sm">{product.name}</TableCell>
+                      <TableCell className="text-sm">{product.description || '-'}</TableCell>
                       <TableCell>
                         <Input
                           type="number"
                           min="0"
                           max="9999"
-                          value={quantities[product.id] || ''}
+                          value={quantities[product.id] || 0}
                           onChange={(e) => handleQuantityChange(product.id, e.target.value)}
                           className="w-24"
                           placeholder="0"
@@ -154,17 +154,17 @@ export default function AddStockCountDialog({ open, onClose, products, onSuccess
                 <Card key={product.id} className="p-4">
                   <div className="space-y-3">
                     <div>
-                      <h3 className="font-semibold text-gray-900">{product.product_name}</h3>
-                      <p className="text-sm text-gray-600 font-mono">{product.product_code}</p>
+                      <h3 className="font-semibold text-gray-900">{product.name}</h3>
+                      <p className="text-sm text-gray-600 font-mono">{product.sku}</p>
                     </div>
                     <div className="grid grid-cols-2 gap-4 text-sm">
                       <div>
                         <p className="text-gray-500">Brand</p>
-                        <p className="font-medium">{product.brand_name}</p>
+                        <p className="font-medium">{product.brandName || '-'}</p>
                       </div>
                       <div>
                         <p className="text-gray-500">Size</p>
-                        <p className="font-medium">{product.size || '-'}</p>
+                        <p className="font-medium">{product.description || '-'}</p>
                       </div>
                     </div>
                     <div>
@@ -173,7 +173,7 @@ export default function AddStockCountDialog({ open, onClose, products, onSuccess
                         type="number"
                         min="0"
                         max="9999"
-                        value={quantities[product.id] || ''}
+                        value={quantities[product.id] || 0}
                         onChange={(e) => handleQuantityChange(product.id, e.target.value)}
                         className="w-24"
                         placeholder="0"
