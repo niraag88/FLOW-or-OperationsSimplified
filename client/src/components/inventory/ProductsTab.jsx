@@ -2,7 +2,8 @@ import React, { useState } from "react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Button } from "@/components/ui/button";
-import { Package, Trash2 } from "lucide-react";
+import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
+import { Package, Trash2, MoreHorizontal, Edit } from "lucide-react";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Product } from "@/api/entities";
 import { logAuditAction } from "../utils/auditLogger";
@@ -21,6 +22,11 @@ export default function ProductsTab({ products, loading, canEdit, canDelete, onR
   const handleDeleteClick = (product) => {
     setProductToDelete(product);
     setDialogOpen(true);
+  };
+
+  const handleModifyClick = (product) => {
+    // Navigate to edit product page or open edit modal
+    window.location.href = `/products/edit/${product.id}`;
   };
 
   const handleDeleteConfirm = async () => {
@@ -116,14 +122,30 @@ export default function ProductsTab({ products, loading, canEdit, canDelete, onR
                         <TableCell className="font-semibold">AED {product.unitPrice}</TableCell>
                         {actualCanDelete && (
                           <TableCell>
-                            <Button
-                              size="sm"
-                              variant="ghost"
-                              className="text-red-500 hover:text-red-600"
-                              onClick={() => handleDeleteClick(product)}
-                            >
-                              <Trash2 className="w-3 h-3" />
-                            </Button>
+                            <DropdownMenu>
+                              <DropdownMenuTrigger asChild>
+                                <Button
+                                  size="sm"
+                                  variant="ghost"
+                                  className="h-8 w-8 p-0"
+                                >
+                                  <MoreHorizontal className="h-4 w-4" />
+                                </Button>
+                              </DropdownMenuTrigger>
+                              <DropdownMenuContent align="end">
+                                <DropdownMenuItem onClick={() => handleModifyClick(product)}>
+                                  <Edit className="mr-2 h-4 w-4" />
+                                  Modify
+                                </DropdownMenuItem>
+                                <DropdownMenuItem 
+                                  onClick={() => handleDeleteClick(product)}
+                                  className="text-red-600"
+                                >
+                                  <Trash2 className="mr-2 h-4 w-4" />
+                                  Delete
+                                </DropdownMenuItem>
+                              </DropdownMenuContent>
+                            </DropdownMenu>
                           </TableCell>
                         )}
                       </TableRow>
