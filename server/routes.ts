@@ -1553,7 +1553,9 @@ export async function registerRoutes(app: Express): Promise<Server> {
       console.log('Starting automated backup process...');
       
       // Import the backup functions
+      // @ts-ignore - JavaScript modules without TypeScript declarations
       const { uploadBackup } = await import('../scripts/uploadBackup.js');
+      // @ts-ignore - JavaScript modules without TypeScript declarations  
       const { writeManifest } = await import('../scripts/writeManifest.js');
       
       // Run both backups in parallel
