@@ -15,15 +15,16 @@ import { Save, Plus, X, AlertTriangle } from "lucide-react";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 
 const initialFormData = {
-  brandId: "",
-  sku: "",
-  name: "",
-  description: "",
-  unitPrice: "",
-  costPrice: "",
-  category: "",
-  unit: "pcs",
-  stockQuantity: 0,
+  brand_id: "",
+  product_code: "",
+  product_name: "",
+  size: "",
+  purchase_price: "",
+  purchase_price_currency: "AED",
+  sale_price: "",
+  sale_price_currency: "AED",
+  qty_on_hand: 0,
+  reorder_level: 0,
 };
 
 export default function AddProduct() {
@@ -63,40 +64,40 @@ export default function AddProduct() {
     const newErrors = {};
 
     // Required fields
-    if (!formData.brandId) newErrors.brandId = "Brand is required";
-    if (!formData.sku) newErrors.sku = "SKU is required";
-    if (!formData.name) newErrors.name = "Product name is required";
-    if (formData.unitPrice === "" || formData.unitPrice === null) newErrors.unitPrice = "Unit price is required";
+    if (!formData.brand_id) newErrors.brand_id = "Brand is required";
+    if (!formData.product_code) newErrors.product_code = "Product code is required";
+    if (!formData.product_name) newErrors.product_name = "Product name is required";
+    if (formData.sale_price === "" || formData.sale_price === null) newErrors.sale_price = "Sale price is required";
 
     // SKU format
-    const skuRegex = /^[A-Za-z0-9]{1,50}$/;
-    if (formData.sku && !skuRegex.test(formData.sku)) {
-      newErrors.sku = "Up to 50 letters and numbers only";
+    const codeRegex = /^[A-Za-z0-9]{1,50}$/;
+    if (formData.product_code && !codeRegex.test(formData.product_code)) {
+      newErrors.product_code = "Up to 50 letters and numbers only";
     }
 
     // Price validation
-    if (formData.unitPrice && parseFloat(formData.unitPrice) < 0) {
-      newErrors.unitPrice = "Unit price must be positive";
+    if (formData.sale_price && parseFloat(formData.sale_price) < 0) {
+      newErrors.sale_price = "Sale price must be positive";
     }
     
-    if (formData.costPrice && parseFloat(formData.costPrice) < 0) {
-      newErrors.costPrice = "Cost price must be positive";
+    if (formData.purchase_price && parseFloat(formData.purchase_price) < 0) {
+      newErrors.purchase_price = "Purchase price must be positive";
     }
 
-    // Business logic: Unit price should be higher than cost price for profitability
-    if (formData.costPrice && formData.unitPrice) {
-      const costPrice = parseFloat(formData.costPrice);
-      const unitPrice = parseFloat(formData.unitPrice);
-      if (unitPrice <= costPrice) {
-        newErrors.unitPrice = "Unit price should be higher than cost price for profitability";
+    // Business logic: Sale price should be higher than purchase price for profitability
+    if (formData.purchase_price && formData.sale_price) {
+      const purchasePrice = parseFloat(formData.purchase_price);
+      const salePrice = parseFloat(formData.sale_price);
+      if (salePrice <= purchasePrice) {
+        newErrors.sale_price = "Sale price should be higher than purchase price for profitability";
       }
     }
     
-    // Check uniqueness of SKU
-    if (formData.sku && !newErrors.sku) {
-        const existing = await Product.filter({ sku: formData.sku });
+    // Check uniqueness of product code
+    if (formData.product_code && !newErrors.product_code) {
+        const existing = await Product.filter({ sku: formData.product_code });
         if (existing.length > 0) {
-            newErrors.sku = "This SKU already exists.";
+            newErrors.product_code = "This product code already exists.";
         }
     }
 
@@ -112,12 +113,16 @@ export default function AddProduct() {
     }
 
     try {
+      // Map your form fields to the database schema
       const productData = {
-        ...formData,
-        unitPrice: parseFloat(formData.unitPrice) || 0,
-        costPrice: parseFloat(formData.costPrice) || 0,
-        stockQuantity: parseInt(formData.stockQuantity) || 0,
-        brandId: parseInt(formData.brandId)
+        sku: formData.product_code.trim().toUpperCase(),
+        brandId: parseInt(formData.brand_id),
+        name: formData.product_name.trim(),
+        description: formData.size.trim() || null,
+        costPrice: parseFloat(formData.purchase_price) || 0,
+        unitPrice: parseFloat(formData.sale_price),
+        stockQuantity: parseInt(formData.qty_on_hand) || 0,
+        minStockLevel: parseInt(formData.reorder_level) || 0
       };
 
       const newProduct = await Product.create(productData);
@@ -132,7 +137,7 @@ export default function AddProduct() {
 
       if (mode === 'saveAndAdd') {
         setFormData(initialFormData);
-        document.getElementById('brandId').focus();
+        document.getElementById('brand_id').focus();
       } else {
         navigate(createPageUrl('Inventory'));
       }
@@ -151,7 +156,7 @@ export default function AddProduct() {
 
   const handleInputChange = (field, value) => {
     let processedValue = value;
-    if (field === 'sku') {
+    if (field === 'product_code') {
       processedValue = value.toUpperCase().replace(/[^A-Z0-9]/g, '');
     }
     setFormData(prev => ({ ...prev, [field]: processedValue }));
@@ -191,12 +196,12 @@ export default function AddProduct() {
 
       <div className="space-y-4">
         <div className="space-y-2">
-          <Label htmlFor="brandId">Brand *</Label>
+          <Label htmlFor="brand_id">Brand *</Label>
           <Select
-            value={formData.brandId}
-            onValueChange={(value) => handleInputChange('brandId', value)}
+            value={formData.brand_id}
+            onValueChange={(value) => handleInputChange('brand_id', value)}
           >
-            <SelectTrigger id="brandId" className={errors.brandId ? "border-red-500" : ""}>
+            <SelectTrigger id="brand_id" className={errors.brand_id ? "border-red-500" : ""}>
               <SelectValue placeholder="Select a brand" />
             </SelectTrigger>
             <SelectContent>
@@ -207,7 +212,7 @@ export default function AddProduct() {
               ))}
             </SelectContent>
           </Select>
-          {errors.brandId && <p className="text-sm text-red-500">{errors.brandId}</p>}
+          {errors.brand_id && <p className="text-sm text-red-500">{errors.brand_id}</p>}
           {brands.length === 0 && (
             <p className="text-sm text-amber-600">
               No brands available. Please add brands in Settings first.
@@ -216,70 +221,63 @@ export default function AddProduct() {
         </div>
 
         <div className="space-y-2">
-          <Label htmlFor="sku">SKU *</Label>
+          <Label htmlFor="product_code">Product Code *</Label>
           <Input
-            id="sku"
-            value={formData.sku}
-            onChange={(e) => handleInputChange('sku', e.target.value)}
+            id="product_code"
+            value={formData.product_code}
+            onChange={(e) => handleInputChange('product_code', e.target.value)}
             placeholder="e.g., LAPTOP001"
             maxLength={50}
-            className={errors.sku ? "border-red-500" : ""}
+            className={errors.product_code ? "border-red-500" : ""}
           />
           <p className="text-xs text-gray-500">Up to 50 characters, letters and numbers only. Will be auto-uppercased.</p>
-          {errors.sku && <p className="text-sm text-red-500">{errors.sku}</p>}
+          {errors.product_code && <p className="text-sm text-red-500">{errors.product_code}</p>}
         </div>
 
         <div className="space-y-2">
-          <Label htmlFor="name">Product Name *</Label>
+          <Label htmlFor="product_name">Product Name *</Label>
           <Input
-            id="name"
-            value={formData.name}
-            onChange={(e) => handleInputChange('name', e.target.value)}
+            id="product_name"
+            value={formData.product_name}
+            onChange={(e) => handleInputChange('product_name', e.target.value)}
             placeholder="e.g., MacBook Pro 16-inch"
-            className={errors.name ? "border-red-500" : ""}
+            className={errors.product_name ? "border-red-500" : ""}
           />
-          {errors.name && <p className="text-sm text-red-500">{errors.name}</p>}
+          {errors.product_name && <p className="text-sm text-red-500">{errors.product_name}</p>}
         </div>
 
         <div className="space-y-2">
-          <Label htmlFor="description">Description</Label>
+          <Label htmlFor="size">Size</Label>
           <Input
-            id="description"
-            value={formData.description}
-            onChange={(e) => handleInputChange('description', e.target.value)}
-            placeholder="Product description"
+            id="size"
+            value={formData.size}
+            onChange={(e) => handleInputChange('size', e.target.value)}
+            placeholder="e.g., 250ml, 1kg, 10 pcs"
           />
         </div>
 
         <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
           <div className="space-y-2">
-            <Label htmlFor="category">Category</Label>
+            <Label htmlFor="qty_on_hand">Qty on Hand</Label>
             <Input
-              id="category"
-              value={formData.category}
-              onChange={(e) => handleInputChange('category', e.target.value)}
-              placeholder="e.g., Electronics, Clothing"
+              id="qty_on_hand"
+              type="number"
+              min="0"
+              value={formData.qty_on_hand}
+              onChange={(e) => handleInputChange('qty_on_hand', e.target.value)}
+              placeholder="0"
             />
           </div>
           <div className="space-y-2">
-            <Label htmlFor="unit">Unit</Label>
-            <Select
-              value={formData.unit}
-              onValueChange={(value) => handleInputChange('unit', value)}
-            >
-              <SelectTrigger id="unit">
-                <SelectValue placeholder="Select unit" />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="pcs">Pieces</SelectItem>
-                <SelectItem value="kg">Kilograms</SelectItem>
-                <SelectItem value="g">Grams</SelectItem>
-                <SelectItem value="l">Liters</SelectItem>
-                <SelectItem value="ml">Milliliters</SelectItem>
-                <SelectItem value="m">Meters</SelectItem>
-                <SelectItem value="cm">Centimeters</SelectItem>
-              </SelectContent>
-            </Select>
+            <Label htmlFor="reorder_level">Reorder Level</Label>
+            <Input
+              id="reorder_level"
+              type="number"
+              min="0"
+              value={formData.reorder_level}
+              onChange={(e) => handleInputChange('reorder_level', e.target.value)}
+              placeholder="10"
+            />
           </div>
         </div>
 
@@ -287,76 +285,82 @@ export default function AddProduct() {
         <div className="border rounded-lg p-4 bg-gray-50/80">
           <h3 className="font-semibold text-gray-900 mb-3">Pricing Information</h3>
           
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-x-4 gap-y-6">
-            {/* Unit Price */}
+          <div className="grid grid-cols-1 gap-6">
+            {/* Purchase Price */}
             <div className="space-y-2">
-              <Label htmlFor="unitPrice">Unit Price *</Label>
-              <Input
-                id="unitPrice"
-                type="number"
-                step="0.01"
-                min="0"
-                value={formData.unitPrice}
-                onChange={(e) => handleInputChange('unitPrice', e.target.value)}
-                placeholder="0.00"
-                className={errors.unitPrice ? "border-red-500" : ""}
-              />
+              <Label>Purchase Price</Label>
+              <div className="flex items-center gap-2">
+                <Input
+                  type="number"
+                  step="0.01"
+                  min="0"
+                  value={formData.purchase_price}
+                  onChange={(e) => handleInputChange('purchase_price', e.target.value)}
+                  placeholder="0.00"
+                  className={errors.purchase_price ? "border-red-500" : ""}
+                />
+                <Select
+                  value={formData.purchase_price_currency}
+                  onValueChange={(value) => handleInputChange('purchase_price_currency', value)}
+                >
+                  <SelectTrigger className="w-20">
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="AED">AED</SelectItem>
+                    <SelectItem value="GBP">GBP</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
+              <p className="text-xs text-gray-500">Cost price per unit</p>
+              {errors.purchase_price && <p className="text-xs text-red-500">{errors.purchase_price}</p>}
+            </div>
+
+            {/* Sale Price */}
+            <div className="space-y-2">
+              <Label>Sale Price *</Label>
+              <div className="flex items-center gap-2">
+                <Input
+                  type="number"
+                  step="0.01"
+                  min="0"
+                  value={formData.sale_price}
+                  onChange={(e) => handleInputChange('sale_price', e.target.value)}
+                  placeholder="0.00"
+                  className={errors.sale_price ? "border-red-500" : ""}
+                />
+                <Select
+                  value={formData.sale_price_currency}
+                  onValueChange={(value) => handleInputChange('sale_price_currency', value)}
+                >
+                  <SelectTrigger className="w-20">
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="AED">AED</SelectItem>
+                    <SelectItem value="GBP">GBP</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
               <p className="text-xs text-gray-500">Selling price per unit</p>
-              {errors.unitPrice && <p className="text-sm text-red-500">{errors.unitPrice}</p>}
+              {errors.sale_price && <p className="text-xs text-red-500">{errors.sale_price}</p>}
             </div>
 
-            {/* Cost Price */}
-            <div className="space-y-2">
-              <Label htmlFor="costPrice">Cost Price</Label>
-              <Input
-                id="costPrice"
-                type="number"
-                step="0.01"
-                min="0"
-                value={formData.costPrice}
-                onChange={(e) => handleInputChange('costPrice', e.target.value)}
-                placeholder="0.00"
-                className={errors.costPrice ? "border-red-500" : ""}
-              />
-              <p className="text-xs text-gray-500">Purchase cost per unit</p>
-              {errors.costPrice && <p className="text-sm text-red-500">{errors.costPrice}</p>}
-            </div>
-
-          </div>
-
-          {/* Stock Information */}
-          <div className="mt-4">
-            <h4 className="font-medium text-gray-900 mb-3">Stock Information</h4>
-            <div className="space-y-2">
-              <Label htmlFor="stockQuantity">Initial Stock Quantity</Label>
-              <Input
-                id="stockQuantity"
-                type="number"
-                min="0"
-                value={formData.stockQuantity}
-                onChange={(e) => handleInputChange('stockQuantity', e.target.value)}
-                placeholder="0"
-              />
-              <p className="text-xs text-gray-500">Current available quantity in stock</p>
-            </div>
-          </div>
-
-          {/* Profit Margin Display */}
-          {formData.unitPrice && formData.costPrice && (
-            <div className="mt-4">
+            {/* Profit Margin Display */}
+            {formData.purchase_price && formData.sale_price && parseFloat(formData.purchase_price) > 0 && formData.purchase_price_currency === formData.sale_price_currency && (
               <div className="p-3 bg-emerald-50 rounded-md">
                 <div className="flex items-center justify-between">
                   <span className="text-sm font-medium text-emerald-800">Profit Margin</span>
                   <span className="text-lg font-bold text-emerald-600">
-                    {(((parseFloat(formData.unitPrice) - parseFloat(formData.costPrice)) / parseFloat(formData.unitPrice)) * 100).toFixed(1)}%
+                    {(((parseFloat(formData.sale_price) - parseFloat(formData.purchase_price)) / parseFloat(formData.purchase_price)) * 100).toFixed(1)}%
                   </span>
                 </div>
                 <p className="text-xs text-emerald-600 mt-1">
-                  Est. Profit: {(parseFloat(formData.unitPrice) - parseFloat(formData.costPrice)).toFixed(2)}
+                  Est. Profit: {(parseFloat(formData.sale_price) - parseFloat(formData.purchase_price)).toFixed(2)} {formData.sale_price_currency}
                 </p>
               </div>
-            </div>
-          )}
+            )}
+          </div>
         </div>
       </div>
       
