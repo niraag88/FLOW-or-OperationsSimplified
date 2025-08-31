@@ -47,31 +47,41 @@ export default function LoginPage() {
   };
 
   return (
-    <div className="min-h-screen bg-gray-50 dark:bg-gray-900 flex items-center justify-center py-12 px-4 sm:px-6 lg:px-8">
-      <div className="max-w-md w-full space-y-8">
+    <div className="min-h-screen relative flex items-center justify-center py-12 px-4 sm:px-6 lg:px-8 overflow-hidden">
+      {/* Animated gradient background */}
+      <div className="absolute inset-0 bg-gradient-to-br from-purple-400 via-pink-500 to-red-500 opacity-90"></div>
+      <div className="absolute inset-0 bg-gradient-to-tl from-blue-400 via-purple-500 to-pink-500 opacity-80 animate-pulse"></div>
+      <div className="absolute inset-0 bg-gradient-to-r from-cyan-400 via-blue-500 to-purple-600 opacity-70 animate-pulse" style={{animationDelay: '1s'}}></div>
+      
+      {/* Floating orbs */}
+      <div className="absolute top-20 left-20 w-32 h-32 bg-gradient-to-r from-yellow-400 to-orange-500 rounded-full opacity-60 animate-bounce" style={{animationDelay: '0.5s'}}></div>
+      <div className="absolute bottom-32 right-24 w-24 h-24 bg-gradient-to-r from-green-400 to-blue-500 rounded-full opacity-50 animate-bounce" style={{animationDelay: '1.5s'}}></div>
+      <div className="absolute top-1/2 left-10 w-16 h-16 bg-gradient-to-r from-pink-400 to-purple-500 rounded-full opacity-40 animate-bounce" style={{animationDelay: '2s'}}></div>
+      
+      <div className="max-w-md w-full space-y-8 relative z-10">
         {/* Header */}
         <div className="text-center">
-          <div className="mx-auto h-12 w-12 bg-blue-600 rounded-full flex items-center justify-center mb-4">
-            <Shield className="h-6 w-6 text-white" />
+          <div className="mx-auto h-16 w-16 bg-gradient-to-br from-yellow-400 via-pink-500 to-purple-600 rounded-full flex items-center justify-center mb-4 shadow-2xl animate-pulse">
+            <Shield className="h-8 w-8 text-white drop-shadow-lg" />
           </div>
-          <h2 className="text-3xl font-bold text-gray-900 dark:text-white">
+          <h2 className="text-4xl font-bold bg-gradient-to-r from-white via-yellow-100 to-white bg-clip-text text-transparent drop-shadow-lg">
             Operations Management
           </h2>
-          <p className="mt-2 text-sm text-gray-600 dark:text-gray-400">
+          <p className="mt-2 text-lg text-white/90 drop-shadow-md font-medium">
             Sign in to access the system
           </p>
         </div>
 
         {/* Login Form */}
-        <Card className="w-full">
-          <CardHeader>
-            <CardTitle className="text-center">Sign In</CardTitle>
-            <CardDescription className="text-center">
+        <Card className="w-full backdrop-blur-lg bg-white/20 border-white/30 shadow-2xl">
+          <CardHeader className="text-center">
+            <CardTitle className="text-2xl bg-gradient-to-r from-white to-yellow-100 bg-clip-text text-transparent font-bold">Sign In</CardTitle>
+            <CardDescription className="text-white/80 font-medium">
               Enter your credentials to access your account
             </CardDescription>
           </CardHeader>
           <CardContent>
-            <form onSubmit={handleSubmit} className="space-y-4">
+            <form onSubmit={handleSubmit} className="space-y-6">
               {error && (
                 <Alert variant="destructive">
                   <AlertCircle className="h-4 w-4" />
@@ -79,8 +89,8 @@ export default function LoginPage() {
                 </Alert>
               )}
 
-              <div className="space-y-2">
-                <Label htmlFor="username">Username</Label>
+              <div className="space-y-3">
+                <Label htmlFor="username" className="text-white/90 font-semibold">Username</Label>
                 <Input
                   id="username"
                   name="username"
@@ -90,11 +100,12 @@ export default function LoginPage() {
                   onChange={handleInputChange}
                   disabled={isLoading}
                   data-testid="input-username"
+                  className="bg-white/20 border-white/30 text-white placeholder:text-white/60 backdrop-blur-sm focus:bg-white/30 focus:border-white/50"
                 />
               </div>
 
-              <div className="space-y-2">
-                <Label htmlFor="password">Password</Label>
+              <div className="space-y-3">
+                <Label htmlFor="password" className="text-white/90 font-semibold">Password</Label>
                 <Input
                   id="password"
                   name="password"
@@ -104,12 +115,13 @@ export default function LoginPage() {
                   onChange={handleInputChange}
                   disabled={isLoading}
                   data-testid="input-password"
+                  className="bg-white/20 border-white/30 text-white placeholder:text-white/60 backdrop-blur-sm focus:bg-white/30 focus:border-white/50"
                 />
               </div>
 
               <Button
                 type="submit"
-                className="w-full"
+                className="w-full bg-gradient-to-r from-purple-600 via-pink-600 to-blue-600 hover:from-purple-700 hover:via-pink-700 hover:to-blue-700 border-0 text-white font-semibold py-3 shadow-2xl transform transition-all duration-200 hover:scale-105"
                 disabled={isLoading}
                 data-testid="button-login"
               >
@@ -127,11 +139,11 @@ export default function LoginPage() {
         </Card>
 
         {/* Admin Access Info */}
-        <Card className="bg-blue-50 dark:bg-blue-900/20 border-blue-200 dark:border-blue-800">
+        <Card className="backdrop-blur-lg bg-gradient-to-r from-emerald-500/20 via-blue-500/20 to-purple-500/20 border-white/30 shadow-xl">
           <CardContent className="pt-6">
-            <div className="text-center text-sm text-blue-800 dark:text-blue-200">
-              <p className="font-medium mb-2">Admin Access</p>
-              <p>Use your administrator credentials to access the business operations system.</p>
+            <div className="text-center text-sm">
+              <p className="font-bold mb-2 text-white bg-gradient-to-r from-yellow-200 to-white bg-clip-text text-transparent">Admin Access</p>
+              <p className="text-white/90 font-medium">Use your administrator credentials to access the business operations system.</p>
             </div>
           </CardContent>
         </Card>
