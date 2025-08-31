@@ -23,8 +23,6 @@ const initialFormData = {
   purchase_price_currency: "AED",
   sale_price: "",
   sale_price_currency: "AED",
-  qty_on_hand: 0,
-  reorder_level: 0,
 };
 
 export default function AddProduct() {
@@ -121,8 +119,8 @@ export default function AddProduct() {
         description: formData.size.trim() || null,
         costPrice: parseFloat(formData.purchase_price) || 0,
         unitPrice: parseFloat(formData.sale_price),
-        stockQuantity: parseInt(formData.qty_on_hand) || 0,
-        minStockLevel: parseInt(formData.reorder_level) || 0
+        stockQuantity: 0, // Default initial stock
+        minStockLevel: 10 // Default reorder level
       };
 
       const newProduct = await Product.create(productData);
@@ -256,30 +254,6 @@ export default function AddProduct() {
           />
         </div>
 
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-          <div className="space-y-2">
-            <Label htmlFor="qty_on_hand">Qty on Hand</Label>
-            <Input
-              id="qty_on_hand"
-              type="number"
-              min="0"
-              value={formData.qty_on_hand}
-              onChange={(e) => handleInputChange('qty_on_hand', e.target.value)}
-              placeholder="0"
-            />
-          </div>
-          <div className="space-y-2">
-            <Label htmlFor="reorder_level">Reorder Level</Label>
-            <Input
-              id="reorder_level"
-              type="number"
-              min="0"
-              value={formData.reorder_level}
-              onChange={(e) => handleInputChange('reorder_level', e.target.value)}
-              placeholder="10"
-            />
-          </div>
-        </div>
 
         {/* Pricing Section */}
         <div className="border rounded-lg p-4 bg-gray-50/80">

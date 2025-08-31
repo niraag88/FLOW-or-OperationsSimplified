@@ -33,8 +33,6 @@ const initialFormData = {
   purchase_price_currency: "AED",
   sale_price: "",
   sale_price_currency: "AED",
-  qty_on_hand: 0,
-  reorder_level: 0,
 };
 
 export default function QuickAddProduct({ onProductAdded, canAdd }) {
@@ -206,8 +204,8 @@ export default function QuickAddProduct({ onProductAdded, canAdd }) {
         description: formData.size.trim() || null, // size -> description
         costPrice: parseFloat(formData.purchase_price) || 0, // purchase_price -> costPrice
         unitPrice: parseFloat(formData.sale_price), // sale_price -> unitPrice
-        stockQuantity: parseInt(formData.qty_on_hand) || 0, // qty_on_hand -> stockQuantity
-        minStockLevel: parseInt(formData.reorder_level) || 0 // reorder_level -> minStockLevel
+        stockQuantity: 0, // Default initial stock
+        minStockLevel: 10 // Default reorder level
       };
 
       const newProduct = await Product.create(productData);
@@ -403,28 +401,6 @@ export default function QuickAddProduct({ onProductAdded, canAdd }) {
 
       {/* Stock Fields */}
       <div className="grid grid-cols-2 gap-4">
-        <div className="space-y-2">
-          <Label>Qty on Hand</Label>
-          <Input
-            type="number"
-            min="0"
-            value={formData.qty_on_hand}
-            onChange={(e) => handleInputChange('qty_on_hand', e.target.value)}
-            placeholder="0"
-          />
-          <p className="text-xs text-gray-500">Current stock</p>
-        </div>
-        <div className="space-y-2">
-          <Label>Reorder Level</Label>
-          <Input
-            type="number"
-            min="0"
-            value={formData.reorder_level}
-            onChange={(e) => handleInputChange('reorder_level', e.target.value)}
-            placeholder="0"
-          />
-          <p className="text-xs text-gray-500">Alert threshold</p>
-        </div>
       </div>
 
       {/* Live Preview */}
