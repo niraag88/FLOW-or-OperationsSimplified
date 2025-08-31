@@ -98,8 +98,8 @@ export default function ProductsTab({ products, loading, canEdit, canDelete, onR
                 <Table>
                   <TableHeader>
                     <TableRow>
-                      <TableHead>Product Code</TableHead>
                       <TableHead>Brand</TableHead>
+                      <TableHead>Product Code</TableHead>
                       <TableHead>Product Name</TableHead>
                       <TableHead>Size</TableHead>
                       <TableHead>Cost Price</TableHead>
@@ -114,8 +114,8 @@ export default function ProductsTab({ products, loading, canEdit, canDelete, onR
                         className="hover:bg-gray-50 transition-colors duration-200"
                         data-product-id={product.id}
                       >
-                        <TableCell>{product.sku}</TableCell>
                         <TableCell>{product.brandName || '-'}</TableCell>
+                        <TableCell>{product.sku}</TableCell>
                         <TableCell>
                           <div>{product.name}</div>
                         </TableCell>
