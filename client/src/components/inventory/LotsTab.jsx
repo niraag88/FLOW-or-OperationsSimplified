@@ -4,6 +4,7 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Plus, Calendar, Download, FileText, Trash2 } from "lucide-react";
+import { useNavigate } from "react-router-dom";
 import { Skeleton } from "@/components/ui/skeleton";
 import { format } from "date-fns";
 import {
@@ -15,12 +16,11 @@ import {
 import { StockCount } from "@/api/entities";
 import { RecycleBin } from "@/api/entities";
 import { User } from "@/api/entities";
-import AddStockCountDialog from "./AddStockCountDialog";
 import SimpleConfirmDialog from "../common/SimpleConfirmDialog";
 
 export default function LotsTab({ products, loading, canEdit, currentUser, onRefresh }) {
+  const navigate = useNavigate();
   const [stockCounts, setStockCounts] = useState([]);
-  const [showAddDialog, setShowAddDialog] = useState(false);
   const [showDeleteDialog, setShowDeleteDialog] = useState(false);
   const [selectedStockCount, setSelectedStockCount] = useState(null);
   const [loadingStockCounts, setLoadingStockCounts] = useState(true);
@@ -63,22 +63,6 @@ export default function LotsTab({ products, loading, canEdit, currentUser, onRef
     }
   };
 
-  const handleAddStockCount = async (stockData) => {
-    try {
-      const newStockCount = await StockCount.create({
-        count_date: new Date().toISOString(),
-        total_products: stockData.items.filter(item => item.quantity > 0).length,
-        total_quantity: stockData.items.reduce((sum, item) => sum + item.quantity, 0),
-        created_by: currentUser.email,
-        items: stockData.items.filter(item => item.quantity > 0)
-      });
-
-      setStockCounts(prev => [newStockCount, ...prev]);
-      setShowAddDialog(false);
-    } catch (error) {
-      console.error("Error creating stock count:", error);
-    }
-  };
 
   const handleDeleteStockCount = async () => {
     if (!selectedStockCount) return;
@@ -204,8 +188,9 @@ export default function LotsTab({ products, loading, canEdit, currentUser, onRef
             </div>
             {canEdit && (
               <Button 
-                onClick={() => setShowAddDialog(true)}
+                onClick={() => navigate('/stock-count')}
                 className="bg-emerald-600 hover:bg-emerald-700 w-full sm:w-auto"
+                data-testid="button-new-stock-count"
               >
                 <Plus className="w-4 h-4 mr-2" />
                 New Stock Count
@@ -358,13 +343,6 @@ export default function LotsTab({ products, loading, canEdit, currentUser, onRef
         </CardContent>
       </Card>
 
-      {/* Add Stock Count Dialog */}
-      <AddStockCountDialog
-        open={showAddDialog}
-        onClose={() => setShowAddDialog(false)}
-        products={products}
-        onSuccess={handleAddStockCount}
-      />
 
       {/* Delete Confirmation Dialog */}
       <SimpleConfirmDialog
