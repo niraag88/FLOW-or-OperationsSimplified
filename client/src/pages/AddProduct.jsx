@@ -93,7 +93,7 @@ export default function AddProduct() {
     
     // Check uniqueness of product code
     if (formData.product_code && !newErrors.product_code) {
-        const existing = await Product.filter({ sku: formData.product_code });
+        const existing = await Product.filter({ sku: formData.product_code.trim().toUpperCase() });
         if (existing.length > 0) {
             newErrors.product_code = "This product code already exists.";
         }

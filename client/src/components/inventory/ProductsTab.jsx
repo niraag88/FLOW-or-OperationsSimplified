@@ -92,12 +92,11 @@ export default function ProductsTab({ products, loading, canEdit, canDelete, onR
                 <Table>
                   <TableHeader>
                     <TableRow>
-                      <TableHead>SKU</TableHead>
+                      <TableHead>Product Code</TableHead>
                       <TableHead>Product Name</TableHead>
-                      <TableHead>Description</TableHead>
+                      <TableHead>Size</TableHead>
                       <TableHead>Cost Price</TableHead>
                       <TableHead>Sale Price</TableHead>
-                      <TableHead>Stock</TableHead>
                       {actualCanDelete && <TableHead>Actions</TableHead>}
                     </TableRow>
                   </TableHeader>
@@ -114,8 +113,7 @@ export default function ProductsTab({ products, loading, canEdit, canDelete, onR
                         </TableCell>
                         <TableCell>{product.description || '-'}</TableCell>
                         <TableCell>£{product.costPrice}</TableCell>
-                        <TableCell className="font-semibold">د.إ{product.unitPrice}</TableCell>
-                        <TableCell>{product.stockQuantity}</TableCell>
+                        <TableCell className="font-semibold">AED {product.unitPrice}</TableCell>
                         {actualCanDelete && (
                           <TableCell>
                             <Button
@@ -161,12 +159,8 @@ export default function ProductsTab({ products, loading, canEdit, canDelete, onR
                     
                     <div className="grid grid-cols-2 gap-2 text-sm">
                       <div>
-                        <p className="text-gray-500">Description</p>
+                        <p className="text-gray-500">Size</p>
                         <p className="font-medium">{product.description || '-'}</p>
-                      </div>
-                      <div>
-                        <p className="text-gray-500">Stock</p>
-                        <p className="font-medium">{product.stockQuantity}</p>
                       </div>
                       <div>
                         <p className="text-gray-500">Cost Price</p>
@@ -174,7 +168,7 @@ export default function ProductsTab({ products, loading, canEdit, canDelete, onR
                       </div>
                       <div>
                         <p className="text-gray-500">Sale Price</p>
-                        <p className="font-semibold text-green-600">د.إ{product.unitPrice}</p>
+                        <p className="font-semibold text-green-600">AED {product.unitPrice}</p>
                       </div>
                     </div>
                   </Card>
