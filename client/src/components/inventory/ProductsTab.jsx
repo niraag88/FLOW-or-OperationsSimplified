@@ -99,6 +99,7 @@ export default function ProductsTab({ products, loading, canEdit, canDelete, onR
                   <TableHeader>
                     <TableRow>
                       <TableHead>Product Code</TableHead>
+                      <TableHead>Brand</TableHead>
                       <TableHead>Product Name</TableHead>
                       <TableHead>Size</TableHead>
                       <TableHead>Cost Price</TableHead>
@@ -114,6 +115,7 @@ export default function ProductsTab({ products, loading, canEdit, canDelete, onR
                         data-product-id={product.id}
                       >
                         <TableCell>{product.sku}</TableCell>
+                        <TableCell>{product.brand?.name || '-'}</TableCell>
                         <TableCell>
                           <div>{product.name}</div>
                         </TableCell>
