@@ -334,6 +334,30 @@ export const storageMonitoring = pgTable("storage_monitoring", {
   createdAt: timestamp("created_at").defaultNow().notNull(),
 });
 
+// Stock Counts table
+export const stockCounts = pgTable("stock_counts", {
+  id: serial("id").primaryKey(),
+  countDate: timestamp("count_date").defaultNow().notNull(),
+  totalProducts: integer("total_products").notNull(),
+  totalQuantity: integer("total_quantity").notNull(),
+  createdBy: varchar("created_by").references(() => users.id).notNull(),
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+  updatedAt: timestamp("updated_at").defaultNow().notNull(),
+});
+
+// Stock Count Items table
+export const stockCountItems = pgTable("stock_count_items", {
+  id: serial("id").primaryKey(),
+  stockCountId: integer("stock_count_id").references(() => stockCounts.id).notNull(),
+  productId: integer("product_id").references(() => products.id).notNull(),
+  productCode: text("product_code").notNull(),
+  brandName: text("brand_name"),
+  productName: text("product_name").notNull(),
+  size: text("size"),
+  quantity: integer("quantity").notNull(),
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+});
+
 // Create all the insert schemas for new tables
 export const insertBrandSchema = createInsertSchema(brands).pick({
   name: true,
@@ -412,6 +436,23 @@ export const insertQuotationSchema = createInsertSchema(quotations).pick({
   createdBy: true,
 });
 
+export const insertStockCountSchema = createInsertSchema(stockCounts).pick({
+  countDate: true,
+  totalProducts: true,
+  totalQuantity: true,
+  createdBy: true,
+});
+
+export const insertStockCountItemSchema = createInsertSchema(stockCountItems).pick({
+  stockCountId: true,
+  productId: true,
+  productCode: true,
+  brandName: true,
+  productName: true,
+  size: true,
+  quantity: true,
+});
+
 // Type exports
 export type Brand = typeof brands.$inferSelect;
 export type InsertBrand = z.infer<typeof insertBrandSchema>;
@@ -430,6 +471,12 @@ export type InsertPurchaseOrder = z.infer<typeof insertPurchaseOrderSchema>;
 
 export type Quotation = typeof quotations.$inferSelect;
 export type InsertQuotation = z.infer<typeof insertQuotationSchema>;
+
+export type StockCount = typeof stockCounts.$inferSelect;
+export type InsertStockCount = z.infer<typeof insertStockCountSchema>;
+
+export type StockCountItem = typeof stockCountItems.$inferSelect;
+export type InsertStockCountItem = z.infer<typeof insertStockCountItemSchema>;
 
 export type VatReturn = typeof vatReturns.$inferSelect;
 export type CompanySettings = typeof companySettings.$inferSelect;

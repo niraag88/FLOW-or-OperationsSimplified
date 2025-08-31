@@ -3,10 +3,13 @@ import { eq, desc, like, and, gte, lte } from "drizzle-orm";
 import {
   brands, suppliers, customers, products, purchaseOrders, quotations,
   vatReturns, companySettings, purchaseOrderItems, quotationItems,
+  stockCounts, stockCountItems,
   type Brand, type Supplier, type Customer, type Product, 
   type PurchaseOrder, type Quotation, type VatReturn, type CompanySettings,
+  type StockCount, type StockCountItem,
   type InsertBrand, type InsertSupplier, type InsertCustomer, 
-  type InsertProduct, type InsertPurchaseOrder, type InsertQuotation
+  type InsertProduct, type InsertPurchaseOrder, type InsertQuotation,
+  type InsertStockCount, type InsertStockCountItem
 } from "@shared/schema";
 
 export class BusinessStorage {
@@ -233,7 +236,13 @@ export class BusinessStorage {
         .returning();
       return settings;
     } else {
-      const [settings] = await db.insert(companySettings).values(data).returning();
+      // For new company settings, we need the required fields
+      const defaultSettings = {
+        companyName: data.companyName || 'My Company',
+        ...data,
+        updatedAt: new Date()
+      };
+      const [settings] = await db.insert(companySettings).values(defaultSettings).returning();
       return settings;
     }
   }
@@ -306,6 +315,80 @@ export class BusinessStorage {
       }
     }
     return "QT-2024-001";
+  }
+
+  // Stock Count operations
+  async getStockCounts() {
+    return await db.select({
+      id: stockCounts.id,
+      count_date: stockCounts.countDate,
+      total_products: stockCounts.totalProducts,
+      total_quantity: stockCounts.totalQuantity,
+      created_by: stockCounts.createdBy,
+      created_at: stockCounts.createdAt,
+      updated_at: stockCounts.updatedAt,
+    }).from(stockCounts).orderBy(desc(stockCounts.createdAt));
+  }
+
+  async getStockCountById(id: number) {
+    const [stockCount] = await db.select().from(stockCounts).where(eq(stockCounts.id, id));
+    if (!stockCount) return null;
+
+    const items = await db.select().from(stockCountItems).where(eq(stockCountItems.stockCountId, id));
+    
+    return {
+      id: stockCount.id,
+      count_date: stockCount.countDate,
+      total_products: stockCount.totalProducts,
+      total_quantity: stockCount.totalQuantity,
+      created_by: stockCount.createdBy,
+      created_at: stockCount.createdAt,
+      updated_at: stockCount.updatedAt,
+      items
+    };
+  }
+
+  async createStockCount(data: { items: any[] }) {
+    const totalProducts = data.items.filter(item => item.quantity > 0).length;
+    const totalQuantity = data.items.reduce((sum, item) => sum + item.quantity, 0);
+    
+    const [stockCount] = await db.insert(stockCounts).values({
+      countDate: new Date(),
+      totalProducts,
+      totalQuantity,
+      createdBy: 'admin',
+    }).returning();
+
+    const itemsToInsert = data.items.filter(item => item.quantity > 0).map(item => ({
+      stockCountId: stockCount.id,
+      productId: item.product_id,
+      productCode: item.product_code,
+      brandName: item.brand_name,
+      productName: item.product_name,
+      size: item.size,
+      quantity: item.quantity,
+    }));
+
+    if (itemsToInsert.length > 0) {
+      await db.insert(stockCountItems).values(itemsToInsert);
+    }
+
+    return {
+      id: stockCount.id,
+      count_date: stockCount.countDate,
+      total_products: stockCount.totalProducts,
+      total_quantity: stockCount.totalQuantity,
+      created_by: stockCount.createdBy,
+      created_at: stockCount.createdAt,
+      updated_at: stockCount.updatedAt,
+      items: itemsToInsert
+    };
+  }
+
+  async deleteStockCount(id: number) {
+    await db.delete(stockCountItems).where(eq(stockCountItems.stockCountId, id));
+    await db.delete(stockCounts).where(eq(stockCounts.id, id));
+    return true;
   }
 }
 

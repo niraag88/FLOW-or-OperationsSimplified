@@ -870,6 +870,54 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  // Stock Count management routes
+  app.get('/api/stock-counts', requireAuth(), async (req: AuthenticatedRequest, res) => {
+    try {
+      const stockCounts = await businessStorage.getStockCounts();
+      res.json(stockCounts);
+    } catch (error) {
+      console.error('Error fetching stock counts:', error);
+      res.status(500).json({ error: 'Failed to fetch stock counts' });
+    }
+  });
+
+  app.get('/api/stock-counts/:id', requireAuth(), async (req: AuthenticatedRequest, res) => {
+    try {
+      const stockCountId = parseInt(req.params.id);
+      const stockCount = await businessStorage.getStockCountById(stockCountId);
+      
+      if (!stockCount) {
+        return res.status(404).json({ error: 'Stock count not found' });
+      }
+      
+      res.json(stockCount);
+    } catch (error) {
+      console.error('Error fetching stock count:', error);
+      res.status(500).json({ error: 'Failed to fetch stock count' });
+    }
+  });
+
+  app.post('/api/stock-counts', requireAuth(['Admin', 'Manager']), async (req: AuthenticatedRequest, res) => {
+    try {
+      const stockCount = await businessStorage.createStockCount(req.body);
+      res.status(201).json(stockCount);
+    } catch (error) {
+      console.error('Error creating stock count:', error);
+      res.status(500).json({ error: 'Failed to create stock count' });
+    }
+  });
+
+  app.delete('/api/stock-counts/:id', requireAuth(['Admin', 'Manager']), async (req: AuthenticatedRequest, res) => {
+    try {
+      const stockCountId = parseInt(req.params.id);
+      await businessStorage.deleteStockCount(stockCountId);
+      res.json({ success: true });
+    } catch (error) {
+      console.error('Error deleting stock count:', error);
+      res.status(500).json({ error: 'Failed to delete stock count' });
+    }
+  });
+
   // Dashboard statistics
   app.get('/api/dashboard/stats', requireAuth(), async (req: AuthenticatedRequest, res) => {
     try {

@@ -36,28 +36,7 @@ export default function LotsTab({ products, loading, canEdit, currentUser, onRef
       setStockCounts(counts);
     } catch (error) {
       console.error("Error loading stock counts:", error);
-      // Mock data for preview
-      setStockCounts([
-        {
-          id: '1',
-          count_date: new Date().toISOString(),
-          total_products: 15,
-          total_quantity: 2450,
-          created_by: 'admin@example.com',
-          items: [
-            { product_id: '1', product_code: 'ABC123', brand_name: 'Brand A', product_name: 'Product 1', size: '500ml', quantity: 100 },
-            { product_id: '2', product_code: 'DEF456', brand_name: 'Brand B', product_name: 'Product 2', size: '1kg', quantity: 250 }
-          ]
-        },
-        {
-          id: '2',
-          count_date: new Date(Date.now() - 7 * 24 * 60 * 60 * 1000).toISOString(),
-          total_products: 12,
-          total_quantity: 1800,
-          created_by: 'manager@example.com',
-          items: []
-        }
-      ]);
+      setStockCounts([]);
     } finally {
       setLoadingStockCounts(false);
     }
@@ -208,6 +187,7 @@ export default function LotsTab({ products, loading, canEdit, currentUser, onRef
                   <TableHead>Total Products</TableHead>
                   <TableHead>Total Quantity</TableHead>
                   <TableHead>Created By</TableHead>
+                  <TableHead>Last Modified</TableHead>
                   <TableHead>Actions</TableHead>
                 </TableRow>
               </TableHeader>
@@ -227,6 +207,9 @@ export default function LotsTab({ products, loading, canEdit, currentUser, onRef
                     </TableCell>
                     <TableCell className="text-sm text-gray-600">
                       {stockCount.created_by}
+                    </TableCell>
+                    <TableCell className="text-sm text-gray-500">
+                      {format(new Date(stockCount.updated_at), 'MMM dd, yyyy h:mm a')}
                     </TableCell>
                     <TableCell>
                       <div className="flex items-center gap-2">
@@ -327,6 +310,12 @@ export default function LotsTab({ products, loading, canEdit, currentUser, onRef
                     <Badge className="bg-blue-100 text-blue-800">
                       {stockCount.total_quantity.toLocaleString()}
                     </Badge>
+                  </div>
+                  <div className="col-span-2">
+                    <p className="text-gray-500">Last Modified</p>
+                    <p className="text-sm font-medium">
+                      {format(new Date(stockCount.updated_at), 'MMM dd, yyyy h:mm a')}
+                    </p>
                   </div>
                 </div>
               </Card>
