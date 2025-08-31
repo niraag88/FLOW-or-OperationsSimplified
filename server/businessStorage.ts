@@ -3,7 +3,7 @@ import { eq, desc, like, and, gte, lte } from "drizzle-orm";
 import {
   brands, suppliers, customers, products, purchaseOrders, quotations,
   vatReturns, companySettings, purchaseOrderItems, quotationItems,
-  stockCounts, stockCountItems,
+  stockCounts, stockCountItems, users,
   type Brand, type Supplier, type Customer, type Product, 
   type PurchaseOrder, type Quotation, type VatReturn, type CompanySettings,
   type StockCount, type StockCountItem,
@@ -324,10 +324,12 @@ export class BusinessStorage {
       count_date: stockCounts.countDate,
       total_products: stockCounts.totalProducts,
       total_quantity: stockCounts.totalQuantity,
-      created_by: stockCounts.createdBy,
+      created_by: users.username,
       created_at: stockCounts.createdAt,
       updated_at: stockCounts.updatedAt,
-    }).from(stockCounts).orderBy(desc(stockCounts.createdAt));
+    }).from(stockCounts)
+      .leftJoin(users, eq(stockCounts.createdBy, users.id))
+      .orderBy(desc(stockCounts.createdAt));
   }
 
   async getStockCountById(id: number) {
@@ -348,7 +350,7 @@ export class BusinessStorage {
     };
   }
 
-  async createStockCount(data: { items: any[] }) {
+  async createStockCount(data: { items: any[], createdBy: string }) {
     const totalProducts = data.items.filter(item => item.quantity > 0).length;
     const totalQuantity = data.items.reduce((sum, item) => sum + item.quantity, 0);
     
@@ -356,7 +358,7 @@ export class BusinessStorage {
       countDate: new Date(),
       totalProducts,
       totalQuantity,
-      createdBy: 'admin',
+      createdBy: data.createdBy,
     }).returning();
 
     const itemsToInsert = data.items.filter(item => item.quantity > 0).map(item => ({

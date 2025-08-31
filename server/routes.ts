@@ -899,7 +899,14 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
   app.post('/api/stock-counts', requireAuth(['Admin', 'Manager']), async (req: AuthenticatedRequest, res) => {
     try {
-      const stockCount = await businessStorage.createStockCount(req.body);
+      if (!req.user) {
+        return res.status(401).json({ error: 'Authentication required' });
+      }
+      
+      const stockCount = await businessStorage.createStockCount({
+        ...req.body,
+        createdBy: req.user.id
+      });
       res.status(201).json(stockCount);
     } catch (error) {
       console.error('Error creating stock count:', error);
