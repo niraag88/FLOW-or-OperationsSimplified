@@ -761,6 +761,15 @@ export async function registerRoutes(app: Express): Promise<Server> {
   app.get('/api/products', requireAuth(), async (req: AuthenticatedRequest, res) => {
     try {
       const products = await businessStorage.getProducts();
+      
+      // Handle filtering by query parameters
+      if (req.query.sku) {
+        const filteredProducts = products.filter(product => 
+          product.sku === req.query.sku
+        );
+        return res.json(filteredProducts);
+      }
+      
       res.json(products);
     } catch (error) {
       console.error('Error fetching products:', error);

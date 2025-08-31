@@ -96,7 +96,7 @@ export default function ProductsTab({ products, loading, canEdit, canDelete, onR
                       <TableHead>Product Name</TableHead>
                       <TableHead>Description</TableHead>
                       <TableHead>Cost Price</TableHead>
-                      <TableHead>Unit Price</TableHead>
+                      <TableHead>Sale Price</TableHead>
                       <TableHead>Stock</TableHead>
                       {actualCanDelete && <TableHead>Actions</TableHead>}
                     </TableRow>
@@ -113,8 +113,8 @@ export default function ProductsTab({ products, loading, canEdit, canDelete, onR
                           <div className="font-medium">{product.name}</div>
                         </TableCell>
                         <TableCell>{product.description || '-'}</TableCell>
-                        <TableCell>${product.costPrice}</TableCell>
-                        <TableCell className="font-semibold">${product.unitPrice}</TableCell>
+                        <TableCell>£{product.costPrice}</TableCell>
+                        <TableCell className="font-semibold">د.إ{product.unitPrice}</TableCell>
                         <TableCell>{product.stockQuantity}</TableCell>
                         {actualCanDelete && (
                           <TableCell>
@@ -170,11 +170,11 @@ export default function ProductsTab({ products, loading, canEdit, canDelete, onR
                       </div>
                       <div>
                         <p className="text-gray-500">Cost Price</p>
-                        <p className="font-medium">${product.costPrice}</p>
+                        <p className="font-medium">£{product.costPrice}</p>
                       </div>
                       <div>
-                        <p className="text-gray-500">Unit Price</p>
-                        <p className="font-semibold text-green-600">${product.unitPrice}</p>
+                        <p className="text-gray-500">Sale Price</p>
+                        <p className="font-semibold text-green-600">د.إ{product.unitPrice}</p>
                       </div>
                     </div>
                   </Card>
