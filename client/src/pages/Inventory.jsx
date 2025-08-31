@@ -65,9 +65,9 @@ export default function Inventory() {
   const currentUser = { role: 'Admin', email: 'admin@opsuite.com' };
 
   const filteredProducts = products.filter(product =>
-    product.product_code?.toLowerCase().includes(searchTerm.toLowerCase()) ||
-    product.brand_name?.toLowerCase().includes(searchTerm.toLowerCase()) ||
-    product.product_name?.toLowerCase().includes(searchTerm.toLowerCase())
+    product.sku?.toLowerCase().includes(searchTerm.toLowerCase()) ||
+    product.name?.toLowerCase().includes(searchTerm.toLowerCase()) ||
+    product.description?.toLowerCase().includes(searchTerm.toLowerCase())
   );
 
   // Removed filteredLots as lots state is no longer managed here
