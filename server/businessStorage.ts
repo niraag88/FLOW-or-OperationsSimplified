@@ -114,7 +114,27 @@ export class BusinessStorage {
   }
 
   async getProductById(id: number) {
-    const [product] = await db.select().from(products).where(eq(products.id, id));
+    const [product] = await db.select({
+      id: products.id,
+      sku: products.sku,
+      name: products.name,
+      description: products.description,
+      brandId: products.brandId,
+      category: products.category,
+      unitPrice: products.unitPrice,
+      costPrice: products.costPrice,
+      vatRate: products.vatRate,
+      unit: products.unit,
+      stockQuantity: products.stockQuantity,
+      minStockLevel: products.minStockLevel,
+      maxStockLevel: products.maxStockLevel,
+      isActive: products.isActive,
+      createdAt: products.createdAt,
+      updatedAt: products.updatedAt,
+      brandName: brands.name,
+    }).from(products)
+      .leftJoin(brands, eq(products.brandId, brands.id))
+      .where(eq(products.id, id));
     return product;
   }
 

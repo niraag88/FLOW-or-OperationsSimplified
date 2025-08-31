@@ -115,7 +115,7 @@ export default function ProductsTab({ products, loading, canEdit, canDelete, onR
                         data-product-id={product.id}
                       >
                         <TableCell>{product.sku}</TableCell>
-                        <TableCell>{product.brand?.name || '-'}</TableCell>
+                        <TableCell>{product.brandName || '-'}</TableCell>
                         <TableCell>
                           <div>{product.name}</div>
                         </TableCell>
