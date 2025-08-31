@@ -30,7 +30,7 @@ const initialFormData = {
   product_name: "",
   size: "",
   purchase_price: "",
-  purchase_price_currency: "AED",
+  purchase_price_currency: "GBP",
   sale_price: "",
   sale_price_currency: "AED",
 };
@@ -202,8 +202,8 @@ export default function QuickAddProduct({ onProductAdded, canAdd }) {
         brandId: parseInt(formData.brand_id), // brand_id -> brandId
         name: formData.product_name.trim(), // product_name -> name
         description: formData.size.trim() || null, // size -> description
-        costPrice: parseFloat(formData.purchase_price) || 0, // purchase_price -> costPrice
-        unitPrice: parseFloat(formData.sale_price), // sale_price -> unitPrice
+        costPrice: formData.purchase_price || "0", // purchase_price -> costPrice (keep as string)
+        unitPrice: formData.sale_price || "0", // sale_price -> unitPrice (keep as string)
         stockQuantity: 0, // Default initial stock
         minStockLevel: 10 // Default reorder level
       };
