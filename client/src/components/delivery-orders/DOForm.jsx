@@ -162,9 +162,9 @@ export default function DOForm({ open, onClose, editingDO, currentUser, onSucces
       if (product) {
         newItems[index] = {
           ...newItems[index],
-          product_code: product.product_code || "",
-          description: `${product.product_name || ''}${product.size ? ` - ${product.size}` : ''}`,
-          unit_price: product.sale_price || 0
+          product_code: product.sku || "",
+          description: `${product.name || ''}${product.description ? ` - ${product.description}` : ''}`,
+          unit_price: product.unitPrice || 0
         };
       }
     }
@@ -180,7 +180,7 @@ export default function DOForm({ open, onClose, editingDO, currentUser, onSucces
 
   const getFilteredProducts = (brandId) => {
     if (!brandId) return [];
-    return products.filter(product => product.brand_id === brandId);
+    return products.filter(product => product.brandId === brandId);
   };
 
   const removeItem = (index) => {
@@ -360,8 +360,8 @@ export default function DOForm({ open, onClose, editingDO, currentUser, onSucces
                             {getFilteredProducts(item.brand_id).map(p => (
                               <SelectItem key={p.id} value={p.id}>
                                 <div className="flex flex-col">
-                                  <p className="font-medium truncate">{p.product_name}</p>
-                                  {p.size && <p className="text-sm text-gray-500">{p.size}</p>}
+                                  <p className="font-medium truncate">{p.name}</p>
+                                  {p.description && <p className="text-sm text-gray-500">{p.description}</p>}
                                 </div>
                               </SelectItem>
                             ))}

@@ -25,14 +25,13 @@ import { useToast } from "@/components/ui/use-toast";
 import { logAuditAction } from "../utils/auditLogger";
 
 const initialFormData = {
-  brand_id: "",
-  product_code: "",
-  product_name: "",
-  size: "",
-  purchase_price: "",
-  purchase_price_currency: "GBP", // New field
-  sale_price: "",
-  sale_price_currency: "AED",     // New field
+  brandId: "",
+  sku: "",
+  name: "",
+  description: "",
+  unitPrice: "",
+  costPrice: "",
+  stockQuantity: 0,
 };
 
 export default function QuickAddProduct({ onProductAdded, canAdd }) {
@@ -114,14 +113,14 @@ export default function QuickAddProduct({ onProductAdded, canAdd }) {
     }
   }, [open, formData]);
 
-  const validateProductCode = (code) => {
-    if (!code) return null;
+  const validateSku = (sku) => {
+    if (!sku) return null;
     const regex = /^[A-Za-z0-9]{1,20}$/;
-    return regex.test(code) ? 'valid' : 'invalid';
+    return regex.test(sku) ? 'valid' : 'invalid';
   };
 
-  const checkCodeUniqueness = async (code) => {
-    if (!code || validateProductCode(code) !== 'valid') return;
+  const checkSkuUniqueness = async (sku) => {
+    if (!sku || validateSku(sku) !== 'valid') return;
 
     setCodeStatus('checking');
 
@@ -133,7 +132,7 @@ export default function QuickAddProduct({ onProductAdded, canAdd }) {
     // Debounce the API call
     checkTimeoutRef.current = setTimeout(async () => {
       try {
-        const existing = await Product.filter({ product_code: code.toUpperCase() });
+        const existing = await Product.filter({ sku: sku.toUpperCase() });
         setCodeStatus(existing.length > 0 ? 'taken' : 'valid');
       } catch (error) {
         console.error("Error checking code uniqueness:", error);
@@ -145,13 +144,13 @@ export default function QuickAddProduct({ onProductAdded, canAdd }) {
   const handleInputChange = (field, value) => {
     let processedValue = value;
 
-    if (field === 'product_code') {
+    if (field === 'sku') {
       processedValue = value.toUpperCase().replace(/[^A-Z0-9]/g, '').slice(0, 20);
-      const validation = validateProductCode(processedValue);
+      const validation = validateSku(processedValue);
       setCodeStatus(validation);
 
       if (validation === 'valid') {
-        checkCodeUniqueness(processedValue);
+        checkSkuUniqueness(processedValue);
       }
     }
 
@@ -166,36 +165,25 @@ export default function QuickAddProduct({ onProductAdded, canAdd }) {
   const validate = () => {
     const newErrors = {};
 
-    if (!formData.brand_id) newErrors.brand_id = "Brand is required";
-    if (!formData.product_code.trim()) newErrors.product_code = "Product code is required";
-    if (!formData.product_name.trim()) newErrors.product_name = "Product name is required";
-    if (formData.purchase_price === "" || formData.purchase_price === null) newErrors.purchase_price = "Purchase price is required";
-    if (formData.sale_price === "" || formData.sale_price === null) newErrors.sale_price = "Sale price is required";
+    if (!formData.brandId) newErrors.brandId = "Brand is required";
+    if (!formData.sku.trim()) newErrors.sku = "SKU is required";
+    if (!formData.name.trim()) newErrors.name = "Product name is required";
+    if (formData.unitPrice === "" || formData.unitPrice === null) newErrors.unitPrice = "Unit price is required";
 
-    if (formData.purchase_price && parseFloat(formData.purchase_price) < 0) {
-      newErrors.purchase_price = "Purchase price must be positive";
+    if (formData.unitPrice && parseFloat(formData.unitPrice) < 0) {
+      newErrors.unitPrice = "Unit price must be positive";
     }
 
-    if (formData.sale_price && parseFloat(formData.sale_price) < 0) {
-      newErrors.sale_price = "Sale price must be positive";
-    }
-
-    // Business logic: Sale price should be higher than purchase price
-    // Only apply if currencies are the same, as no conversion logic is implemented
-    if (formData.purchase_price && formData.sale_price && formData.purchase_price_currency === formData.sale_price_currency) {
-      const purchasePrice = parseFloat(formData.purchase_price);
-      const salePrice = parseFloat(formData.sale_price);
-      if (!isNaN(purchasePrice) && !isNaN(salePrice) && salePrice <= purchasePrice) {
-        newErrors.sale_price = "Sale price should be higher than purchase price";
-      }
+    if (formData.costPrice && parseFloat(formData.costPrice) < 0) {
+      newErrors.costPrice = "Cost price must be positive";
     }
 
     if (codeStatus === 'taken') {
-      newErrors.product_code = "This code is already in use";
+      newErrors.sku = "This SKU is already in use";
     }
 
     if (codeStatus === 'invalid') {
-      newErrors.product_code = "Invalid code format";
+      newErrors.sku = "Invalid SKU format";
     }
 
     setErrors(newErrors);
@@ -207,17 +195,14 @@ export default function QuickAddProduct({ onProductAdded, canAdd }) {
 
     setLoading(true);
     try {
-      // Get brand name for denormalization
-      const selectedBrand = brands.find(b => b.id === formData.brand_id);
-
       const productData = {
-        ...formData,
-        brand_name: selectedBrand?.name || '',
-        product_code: formData.product_code.trim().toUpperCase(),
-        product_name: formData.product_name.trim(),
-        size: formData.size.trim() || null,
-        purchase_price: parseFloat(formData.purchase_price),
-        sale_price: parseFloat(formData.sale_price)
+        sku: formData.sku.trim().toUpperCase(),
+        brandId: parseInt(formData.brandId),
+        name: formData.name.trim(),
+        description: formData.description.trim() || null,
+        unitPrice: parseFloat(formData.unitPrice),
+        costPrice: parseFloat(formData.costPrice) || 0,
+        stockQuantity: parseInt(formData.stockQuantity) || 0
       };
 
       const newProduct = await Product.create(productData);
@@ -246,9 +231,9 @@ export default function QuickAddProduct({ onProductAdded, canAdd }) {
       console.error("Error creating product:", error);
 
       // Check if it's a uniqueness error
-      if (error.message?.includes('product_code') || error.message?.includes('unique')) {
+      if (error.message?.includes('sku') || error.message?.includes('unique')) {
         setCodeStatus('taken');
-        setErrors(prev => ({ ...prev, product_code: "This code is already in use" }));
+        setErrors(prev => ({ ...prev, sku: "This SKU is already in use" }));
       } else {
         toast({
           title: "Error",
@@ -296,147 +281,142 @@ export default function QuickAddProduct({ onProductAdded, canAdd }) {
   };
 
   const canSave = !loading && codeStatus !== 'checking' && codeStatus !== 'taken' && codeStatus !== 'invalid' &&
-                  formData.brand_id && formData.product_code && formData.product_name && formData.purchase_price && formData.sale_price;
+                  formData.brandId && formData.sku && formData.name && formData.unitPrice;
 
   const formContent = (
     <div className="space-y-4">
       <div className="space-y-2">
-        <Label htmlFor="brand_id">Brand *</Label>
+        <Label htmlFor="brandId">Brand *</Label>
         <Select
-          value={formData.brand_id}
-          onValueChange={(value) => handleInputChange('brand_id', value)}
+          value={formData.brandId.toString()}
+          onValueChange={(value) => handleInputChange('brandId', value)}
         >
-          <SelectTrigger className={errors.brand_id ? "border-red-500" : ""} ref={brandSelectRef}>
+          <SelectTrigger className={errors.brandId ? "border-red-500" : ""} ref={brandSelectRef}>
             <SelectValue placeholder="Select a brand" />
           </SelectTrigger>
           <SelectContent>
             {brands.map(brand => (
-              <SelectItem key={brand.id} value={brand.id}>
+              <SelectItem key={brand.id} value={brand.id.toString()}>
                 {brand.name}
               </SelectItem>
             ))}
           </SelectContent>
         </Select>
-        {errors.brand_id && <p className="text-xs text-red-500">{errors.brand_id}</p>}
+        {errors.brandId && <p className="text-xs text-red-500">{errors.brandId}</p>}
       </div>
 
       <div className="space-y-2">
-        <Label htmlFor="product_code">Product Code *</Label>
+        <Label htmlFor="sku">SKU *</Label>
         <div className="flex items-center gap-2">
           <Input
-            id="product_code"
-            value={formData.product_code}
-            onChange={(e) => handleInputChange('product_code', e.target.value)}
-            onBlur={() => checkCodeUniqueness(formData.product_code)}
+            id="sku"
+            value={formData.sku}
+            onChange={(e) => handleInputChange('sku', e.target.value)}
+            onBlur={() => checkSkuUniqueness(formData.sku)}
             placeholder="e.g., LAPTOP001"
             maxLength={20}
-            className={errors.product_code ? "border-red-500" : ""}
+            className={errors.sku ? "border-red-500" : ""}
           />
           {getCodeStatusBadge()}
         </div>
         <p className="text-xs text-gray-500">Up to 20 characters, letters and numbers only</p>
-        {errors.product_code && <p className="text-xs text-red-500">{errors.product_code}</p>}
+        {errors.sku && <p className="text-xs text-red-500">{errors.sku}</p>}
       </div>
 
       <div className="space-y-2">
-        <Label htmlFor="product_name">Product Name *</Label>
+        <Label htmlFor="name">Product Name *</Label>
         <Input
-          id="product_name"
-          value={formData.product_name}
-          onChange={(e) => handleInputChange('product_name', e.target.value)}
+          id="name"
+          value={formData.name}
+          onChange={(e) => handleInputChange('name', e.target.value)}
           placeholder="e.g., MacBook Pro 16-inch"
-          className={errors.product_name ? "border-red-500" : ""}
+          className={errors.name ? "border-red-500" : ""}
         />
-        {errors.product_name && <p className="text-xs text-red-500">{errors.product_name}</p>}
+        {errors.name && <p className="text-xs text-red-500">{errors.name}</p>}
       </div>
 
       <div className="space-y-2">
-        <Label htmlFor="size">Size</Label>
+        <Label htmlFor="description">Description</Label>
         <Input
-          id="size"
-          value={formData.size}
-          onChange={(e) => handleInputChange('size', e.target.value)}
-          placeholder="e.g., 250 ml, 1 kg, 10 pcs"
+          id="description"
+          value={formData.description}
+          onChange={(e) => handleInputChange('description', e.target.value)}
+          placeholder="e.g., High-performance laptop"
         />
       </div>
 
       <div className="grid grid-cols-1 gap-4">
-         {/* Purchase Price */}
+         {/* Cost Price */}
         <div className="space-y-2">
-          <Label>Purchase Price *</Label>
-           <div className="flex items-center gap-2">
+          <Label>Cost Price</Label>
             <Input
               type="number"
               step="0.01"
               min="0"
-              value={formData.purchase_price}
-              onChange={(e) => handleInputChange('purchase_price', e.target.value)}
+              value={formData.costPrice}
+              onChange={(e) => handleInputChange('costPrice', e.target.value)}
               placeholder="0.00"
-              className={`${errors.purchase_price ? "border-red-500" : ""}`}
+              className={`${errors.costPrice ? "border-red-500" : ""}`}
             />
-            <Select value={formData.purchase_price_currency} onValueChange={(value) => handleInputChange('purchase_price_currency', value)}>
-              <SelectTrigger className="w-[100px]"><SelectValue /></SelectTrigger>
-              <SelectContent>
-                <SelectItem value="AED">AED</SelectItem>
-                <SelectItem value="GBP">GBP</SelectItem>
-              </SelectContent>
-            </Select>
-          </div>
-          <p className="text-xs text-gray-500">For POs</p>
-          {errors.purchase_price && <p className="text-xs text-red-500">{errors.purchase_price}</p>}
+          <p className="text-xs text-gray-500">Optional cost price</p>
+          {errors.costPrice && <p className="text-xs text-red-500">{errors.costPrice}</p>}
         </div>
-        {/* Sale Price */}
+        {/* Unit Price */}
         <div className="space-y-2">
-          <Label>Sale Price *</Label>
-           <div className="flex items-center gap-2">
+          <Label>Unit Price *</Label>
             <Input
               type="number"
               step="0.01"
               min="0"
-              value={formData.sale_price}
-              onChange={(e) => handleInputChange('sale_price', e.target.value)}
+              value={formData.unitPrice}
+              onChange={(e) => handleInputChange('unitPrice', e.target.value)}
               placeholder="0.00"
-              className={`${errors.sale_price ? "border-red-500" : ""}`}
+              className={`${errors.unitPrice ? "border-red-500" : ""}`}
             />
-             <Select value={formData.sale_price_currency} onValueChange={(value) => handleInputChange('sale_price_currency', value)}>
-              <SelectTrigger className="w-[100px]"><SelectValue /></SelectTrigger>
-              <SelectContent>
-                <SelectItem value="AED">AED</SelectItem>
-                <SelectItem value="GBP">GBP</SelectItem>
-              </SelectContent>
-            </Select>
-          </div>
-          <p className="text-xs text-gray-500">For DO/Invoices</p>
-          {errors.sale_price && <p className="text-xs text-red-500">{errors.sale_price}</p>}
+          <p className="text-xs text-gray-500">Selling price per unit</p>
+          {errors.unitPrice && <p className="text-xs text-red-500">{errors.unitPrice}</p>}
+        </div>
+        {/* Stock Quantity */}
+        <div className="space-y-2">
+          <Label>Stock Quantity</Label>
+            <Input
+              type="number"
+              min="0"
+              value={formData.stockQuantity}
+              onChange={(e) => handleInputChange('stockQuantity', e.target.value)}
+              placeholder="0"
+              className={`${errors.stockQuantity ? "border-red-500" : ""}`}
+            />
+          <p className="text-xs text-gray-500">Current stock level</p>
+          {errors.stockQuantity && <p className="text-xs text-red-500">{errors.stockQuantity}</p>}
         </div>
       </div>
 
       {/* Live Preview */}
-      {(formData.brand_id || formData.product_name || formData.product_code || formData.sale_price) && (
+      {(formData.brandId || formData.name || formData.sku || formData.unitPrice) && (
         <Card className="p-4 bg-gray-50 border-dashed">
           <div className="space-y-1">
             <div className="font-medium text-gray-900">
-              {/* Updated live preview logic for brand name */}
-              {formData.brand_id && formData.product_name ?
-                `${brands.find(b => b.id === formData.brand_id)?.name || ''} — ${formData.product_name}` :
-                (brands.find(b => b.id === formData.brand_id)?.name || formData.product_name || 'Product Preview')
+              {formData.brandId && formData.name ?
+                `${brands.find(b => b.id == formData.brandId)?.name || ''} — ${formData.name}` :
+                (brands.find(b => b.id == formData.brandId)?.name || formData.name || 'Product Preview')
               }
             </div>
             <div className="flex items-center justify-between">
               <div className="text-sm text-gray-600">
-                {formData.product_code && `Code: ${formData.product_code}`}
-                {formData.product_code && (formData.size || true) && ' · '}
-                {`Size: ${formData.size || '—'}`}
+                {formData.sku && `SKU: ${formData.sku}`}
+                {formData.sku && formData.description && ' · '}
+                {formData.description && `${formData.description}`}
               </div>
-              {formData.sale_price && (
+              {formData.unitPrice && (
                 <Badge variant="secondary" className="ml-2">
-                  {formatPreviewPrice(formData.sale_price, formData.sale_price_currency)}
+                  ${formData.unitPrice}
                 </Badge>
               )}
             </div>
-            {formData.purchase_price && formData.sale_price && parseFloat(formData.purchase_price) > 0 && formData.purchase_price_currency === formData.sale_price_currency && (
+            {formData.costPrice && formData.unitPrice && parseFloat(formData.costPrice) > 0 && (
               <div className="text-xs text-emerald-600 pt-1">
-                Margin: {(((parseFloat(formData.sale_price) - parseFloat(formData.purchase_price)) / parseFloat(formData.purchase_price)) * 100).toFixed(1)}%
+                Margin: {(((parseFloat(formData.unitPrice) - parseFloat(formData.costPrice)) / parseFloat(formData.costPrice)) * 100).toFixed(1)}%
               </div>
             )}
           </div>

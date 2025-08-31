@@ -25,13 +25,13 @@ export default function StockOnHandReport({ products, lots, canExport }) {
         // it should probably be `lot.qty_on_hand < product.reorder_level`.
         // However, sticking to original logic if no other changes are requested.
         // Assuming 'product.qty_on_hand' within the 'products' prop is correct for reorder level check.
-        const isLowStock = product.reorder_level && (product.qty_on_hand < product.reorder_level);
+        const isLowStock = product.minStockLevel && (product.stockQuantity < product.minStockLevel);
 
         return {
           ...lot,
           product_name: product.name,
           product_sku: product.sku,
-          reorder_level: product.reorder_level,
+          reorder_level: product.minStockLevel,
           is_low_stock: isLowStock,
         };
       })

@@ -19,14 +19,13 @@ import SimpleConfirmDialog from "../common/SimpleConfirmDialog";
 
 export default function ProductsTab({ products, loading, canEdit, canDelete, onRefresh }) {
   // State variables for Quick Add Product form
-  const [newProductCode, setNewProductCode] = useState("");
-  const [newBrandName, setNewBrandName] = useState("");
-  const [newProductName, setNewProductName] = useState("");
-  const [newSize, setNewSize] = useState("");
-  const [newPurchasePriceValue, setNewPurchasePriceValue] = useState("");
-  const [newPurchasePriceCurrency, setNewPurchasePriceCurrency] = useState("AED");
-  const [newSalePriceValue, setNewSalePriceValue] = useState("");
-  const [newSalePriceCurrency, setNewSalePriceCurrency] = useState("AED");
+  const [newSku, setNewSku] = useState("");
+  const [newBrandId, setNewBrandId] = useState("");
+  const [newName, setNewName] = useState("");
+  const [newDescription, setNewDescription] = useState("");
+  const [newUnitPrice, setNewUnitPrice] = useState("");
+  const [newCostPrice, setNewCostPrice] = useState("");
+  const [newStockQuantity, setNewStockQuantity] = useState(0);
   const [isQuickAddPopoverOpen, setIsQuickAddPopoverOpen] = useState(false);
 
   // State variables for SimpleConfirmDialog
@@ -59,20 +58,19 @@ export default function ProductsTab({ products, loading, canEdit, canDelete, onR
 
   const handleAddProduct = async () => {
     // Basic validation
-    if (!newProductCode || !newBrandName || !newProductName || !newPurchasePriceValue || !newSalePriceValue) {
-      alert("Please fill in all required fields: Product Code, Brand Name, Product Name, Purchase Price, and Sale Price.");
+    if (!newSku || !newBrandId || !newName || !newUnitPrice) {
+      alert("Please fill in all required fields: SKU, Brand, Product Name, and Unit Price.");
       return;
     }
 
     const productData = {
-      product_code: newProductCode,
-      brand_name: newBrandName,
-      product_name: newProductName,
-      size: newSize || null,
-      purchase_price: parseFloat(newPurchasePriceValue),
-      purchase_price_currency: newPurchasePriceCurrency,
-      sale_price: parseFloat(newSalePriceValue),
-      sale_price_currency: newSalePriceCurrency,
+      sku: newSku,
+      brandId: parseInt(newBrandId),
+      name: newName,
+      description: newDescription || null,
+      unitPrice: parseFloat(newUnitPrice),
+      costPrice: parseFloat(newCostPrice) || 0,
+      stockQuantity: parseInt(newStockQuantity) || 0,
     };
 
     try {
@@ -81,14 +79,13 @@ export default function ProductsTab({ products, loading, canEdit, canDelete, onR
       await logAuditAction("Product", createdProduct.id, "create", user.email, { created_product: createdProduct });
       onRefresh();
       // Reset form fields
-      setNewProductCode("");
-      setNewBrandName("");
-      setNewProductName("");
-      setNewSize("");
-      setNewPurchasePriceValue("");
-      setNewPurchasePriceCurrency("AED");
-      setNewSalePriceValue("");
-      setNewSalePriceCurrency("AED");
+      setNewSku("");
+      setNewBrandId("");
+      setNewName("");
+      setNewDescription("");
+      setNewUnitPrice("");
+      setNewCostPrice("");
+      setNewStockQuantity(0);
       setIsQuickAddPopoverOpen(false);
     } catch (error) {
       console.error("Error adding product:", error);
@@ -134,14 +131,12 @@ export default function ProductsTab({ products, loading, canEdit, canDelete, onR
   // Create a temporary product object for live preview
   const livePreviewProduct = {
     id: 'preview',
-    product_code: newProductCode || 'PREVIEWCODE',
-    brand_name: newBrandName || 'Preview Brand',
-    product_name: newProductName || 'Preview Product',
-    size: newSize || '-',
-    purchase_price: parseFloat(newPurchasePriceValue) || 0,
-    purchase_price_currency: newPurchasePriceCurrency,
-    sale_price: parseFloat(newSalePriceValue) || 0,
-    sale_price_currency: newSalePriceCurrency,
+    sku: newSku || 'PREVIEWSKU',
+    name: newName || 'Preview Product',
+    description: newDescription || 'Preview description',
+    unitPrice: parseFloat(newUnitPrice) || 0,
+    costPrice: parseFloat(newCostPrice) || 0,
+    stockQuantity: parseInt(newStockQuantity) || 0,
   };
 
   return (
@@ -170,85 +165,78 @@ export default function ProductsTab({ products, loading, canEdit, canDelete, onR
                   </div>
                   <div className="grid gap-2">
                     <div className="grid grid-cols-3 items-center gap-4">
-                      <Label htmlFor="productCode">Product Code *</Label>
+                      <Label htmlFor="sku">SKU *</Label>
                       <Input
-                        id="productCode"
-                        value={newProductCode}
-                        onChange={(e) => setNewProductCode(e.target.value)}
+                        id="sku"
+                        value={newSku}
+                        onChange={(e) => setNewSku(e.target.value)}
                         className="col-span-2 h-8"
                         placeholder="e.g., ABC-123"
                       />
                     </div>
                     <div className="grid grid-cols-3 items-center gap-4">
-                      <Label htmlFor="brandName">Brand Name *</Label>
+                      <Label htmlFor="brandId">Brand ID *</Label>
                       <Input
-                        id="brandName"
-                        value={newBrandName}
-                        onChange={(e) => setNewBrandName(e.target.value)}
+                        id="brandId"
+                        value={newBrandId}
+                        onChange={(e) => setNewBrandId(e.target.value)}
                         className="col-span-2 h-8"
-                        placeholder="e.g., Acme Corp"
+                        placeholder="Brand ID"
                       />
                     </div>
                     <div className="grid grid-cols-3 items-center gap-4">
-                      <Label htmlFor="productName">Product Name *</Label>
+                      <Label htmlFor="name">Product Name *</Label>
                       <Input
-                        id="productName"
-                        value={newProductName}
-                        onChange={(e) => setNewProductName(e.target.value)}
+                        id="name"
+                        value={newName}
+                        onChange={(e) => setNewName(e.target.value)}
                         className="col-span-2 h-8"
                         placeholder="e.g., Widget Deluxe 5000"
                       />
                     </div>
                     <div className="grid grid-cols-3 items-center gap-4">
-                      <Label htmlFor="size">Size</Label>
+                      <Label htmlFor="description">Description</Label>
                       <Input
-                        id="size"
-                        value={newSize}
-                        onChange={(e) => setNewSize(e.target.value)}
+                        id="description"
+                        value={newDescription}
+                        onChange={(e) => setNewDescription(e.target.value)}
                         className="col-span-2 h-8"
-                        placeholder="e.g., 500g, 100ml"
+                        placeholder="Product description"
                       />
                     </div>
                     <div className="grid grid-cols-3 items-center gap-4">
-                      <Label htmlFor="purchasePriceValue">Purchase Price *</Label>
+                      <Label htmlFor="unitPrice">Unit Price *</Label>
                       <Input
-                        id="purchasePriceValue"
+                        id="unitPrice"
                         type="number"
-                        value={newPurchasePriceValue}
-                        onChange={(e) => setNewPurchasePriceValue(e.target.value)}
-                        className="col-span-2 h-8"
-                        placeholder="e.g., 15.00"
-                      />
-                    </div>
-                    <div className="grid grid-cols-3 items-center gap-4">
-                      <Label htmlFor="purchasePriceCurrency">Purchase Currency</Label>
-                      <Input
-                        id="purchasePriceCurrency"
-                        value={newPurchasePriceCurrency}
-                        onChange={(e) => setNewPurchasePriceCurrency(e.target.value)}
-                        className="col-span-2 h-8"
-                        placeholder="e.g., AED"
-                      />
-                    </div>
-                    <div className="grid grid-cols-3 items-center gap-4">
-                      <Label htmlFor="salePriceValue">Sale Price *</Label>
-                      <Input
-                        id="salePriceValue"
-                        type="number"
-                        value={newSalePriceValue}
-                        onChange={(e) => setNewSalePriceValue(e.target.value)}
+                        step="0.01"
+                        value={newUnitPrice}
+                        onChange={(e) => setNewUnitPrice(e.target.value)}
                         className="col-span-2 h-8"
                         placeholder="e.g., 19.99"
                       />
                     </div>
                     <div className="grid grid-cols-3 items-center gap-4">
-                      <Label htmlFor="salePriceCurrency">Sale Currency</Label>
+                      <Label htmlFor="costPrice">Cost Price</Label>
                       <Input
-                        id="salePriceCurrency"
-                        value={newSalePriceCurrency}
-                        onChange={(e) => setNewSalePriceCurrency(e.target.value)}
+                        id="costPrice"
+                        type="number"
+                        step="0.01"
+                        value={newCostPrice}
+                        onChange={(e) => setNewCostPrice(e.target.value)}
                         className="col-span-2 h-8"
-                        placeholder="e.g., AED"
+                        placeholder="e.g., 15.00"
+                      />
+                    </div>
+                    <div className="grid grid-cols-3 items-center gap-4">
+                      <Label htmlFor="stockQuantity">Stock Quantity</Label>
+                      <Input
+                        id="stockQuantity"
+                        type="number"
+                        value={newStockQuantity}
+                        onChange={(e) => setNewStockQuantity(e.target.value)}
+                        className="col-span-2 h-8"
+                        placeholder="e.g., 100"
                       />
                     </div>
                   </div>
@@ -259,14 +247,14 @@ export default function ProductsTab({ products, loading, canEdit, canDelete, onR
                       <Table>
                         <TableBody>
                           <TableRow className="bg-gray-50/50">
-                            <TableCell className="font-mono text-xs py-2 px-2">{livePreviewProduct.product_code}</TableCell>
+                            <TableCell className="font-mono text-xs py-2 px-2">{livePreviewProduct.sku}</TableCell>
                             <TableCell className="text-xs py-2 px-2">
-                              <div className="font-medium">{livePreviewProduct.brand_name}</div>
-                              <div className="text-muted-foreground">{livePreviewProduct.product_name}</div>
+                              <div className="font-medium">{livePreviewProduct.name}</div>
+                              <div className="text-muted-foreground">{livePreviewProduct.description}</div>
                             </TableCell>
-                            <TableCell className="text-xs py-2 px-2">{livePreviewProduct.size}</TableCell>
-                            <TableCell className="text-xs py-2 px-2">{formatCurrency(livePreviewProduct.purchase_price, livePreviewProduct.purchase_price_currency)}</TableCell>
-                            <TableCell className="font-semibold text-xs py-2 px-2">{formatCurrency(livePreviewProduct.sale_price, livePreviewProduct.sale_price_currency)}</TableCell>
+                            <TableCell className="text-xs py-2 px-2">{livePreviewProduct.stockQuantity}</TableCell>
+                            <TableCell className="text-xs py-2 px-2">${livePreviewProduct.costPrice}</TableCell>
+                            <TableCell className="font-semibold text-xs py-2 px-2">${livePreviewProduct.unitPrice}</TableCell>
                             <TableCell className="text-xs py-2 px-2"><Plus className="w-3 h-3 text-gray-400" /></TableCell>
                           </TableRow>
                         </TableBody>
@@ -274,28 +262,28 @@ export default function ProductsTab({ products, loading, canEdit, canDelete, onR
                     </div>
                     <div className="border rounded-md md:hidden p-2 text-sm bg-gray-50/50">
                       <div className="flex justify-between items-start mb-1">
-                        <h3 className="font-semibold">{livePreviewProduct.product_name}</h3>
+                        <h3 className="font-semibold">{livePreviewProduct.name}</h3>
                         <Plus className="w-3 h-3 text-gray-400" />
                       </div>
-                      <p className="text-xs text-gray-600 font-mono mb-2">{livePreviewProduct.product_code}</p>
+                      <p className="text-xs text-gray-600 font-mono mb-2">{livePreviewProduct.sku}</p>
                       <div className="grid grid-cols-2 gap-2 text-xs">
                         <div>
-                          <p className="text-gray-500">Brand</p>
-                          <p className="font-medium">{livePreviewProduct.brand_name}</p>
+                          <p className="text-gray-500">Description</p>
+                          <p className="font-medium">{livePreviewProduct.description}</p>
                         </div>
                         <div>
-                          <p className="text-gray-500">Size</p>
-                          <p className="font-medium">{livePreviewProduct.size}</p>
+                          <p className="text-gray-500">Stock</p>
+                          <p className="font-medium">{livePreviewProduct.stockQuantity}</p>
                         </div>
                       </div>
                       <div className="mt-2 pt-2 border-t border-gray-200 grid grid-cols-2 gap-2">
                         <div>
-                          <p className="text-gray-500">Purchase Price</p>
-                          <p className="font-bold">{formatCurrency(livePreviewProduct.purchase_price, livePreviewProduct.purchase_price_currency)}</p>
+                          <p className="text-gray-500">Cost Price</p>
+                          <p className="font-bold">${livePreviewProduct.costPrice}</p>
                         </div>
                         <div>
-                          <p className="text-gray-500">Sale Price</p>
-                          <p className="font-bold text-base">{formatCurrency(livePreviewProduct.sale_price, livePreviewProduct.sale_price_currency)}</p>
+                          <p className="text-gray-500">Unit Price</p>
+                          <p className="font-bold text-base">${livePreviewProduct.unitPrice}</p>
                         </div>
                       </div>
                     </div>
@@ -313,11 +301,12 @@ export default function ProductsTab({ products, loading, canEdit, canDelete, onR
             <Table>
               <TableHeader>
                 <TableRow>
-                  <TableHead>Product Code</TableHead>
-                  <TableHead>Brand & Product Name</TableHead>
-                  <TableHead>Size</TableHead>
-                  <TableHead>Purchase Price</TableHead>
-                  <TableHead>Sale Price</TableHead>
+                  <TableHead>SKU</TableHead>
+                  <TableHead>Product Name</TableHead>
+                  <TableHead>Description</TableHead>
+                  <TableHead>Cost Price</TableHead>
+                  <TableHead>Unit Price</TableHead>
+                  <TableHead>Stock</TableHead>
                   {actualCanDelete && <TableHead>Actions</TableHead>}
                 </TableRow>
               </TableHeader>
@@ -328,14 +317,14 @@ export default function ProductsTab({ products, loading, canEdit, canDelete, onR
                     className="hover:bg-gray-50 transition-colors duration-200"
                     data-product-id={product.id}
                   >
-                    <TableCell className="font-mono">{product.product_code}</TableCell>
+                    <TableCell className="font-mono">{product.sku}</TableCell>
                     <TableCell>
-                      <div className="font-medium">{product.brand_name}</div>
-                      <div className="text-sm text-muted-foreground">{product.product_name}</div>
+                      <div className="font-medium">{product.name}</div>
                     </TableCell>
-                    <TableCell>{product.size || '-'}</TableCell>
-                    <TableCell>{formatCurrency(product.purchase_price, product.purchase_price_currency)}</TableCell>
-                    <TableCell className="font-semibold">{formatCurrency(product.sale_price, product.sale_price_currency)}</TableCell>
+                    <TableCell>{product.description || '-'}</TableCell>
+                    <TableCell>${product.costPrice}</TableCell>
+                    <TableCell className="font-semibold">${product.unitPrice}</TableCell>
+                    <TableCell>{product.stockQuantity}</TableCell>
                     {actualCanDelete && (
                       <TableCell>
                         <Button
@@ -364,8 +353,8 @@ export default function ProductsTab({ products, loading, canEdit, canDelete, onR
               >
                 <div className="flex items-start justify-between mb-3">
                   <div>
-                    <h3 className="font-semibold text-gray-900">{product.product_name}</h3>
-                    <p className="text-sm text-gray-600 font-mono">{product.product_code}</p>
+                    <h3 className="font-semibold text-gray-900">{product.name}</h3>
+                    <p className="text-sm text-gray-600 font-mono">{product.sku}</p>
                   </div>
                   {actualCanDelete && (
                     <Button
@@ -381,23 +370,23 @@ export default function ProductsTab({ products, loading, canEdit, canDelete, onR
 
                 <div className="grid grid-cols-2 gap-4 text-sm">
                   <div>
-                    <p className="text-gray-500">Brand</p>
-                    <p className="font-medium">{product.brand_name}</p>
+                    <p className="text-gray-500">Description</p>
+                    <p className="font-medium">{product.description || '-'}</p>
                   </div>
                   <div>
-                    <p className="text-gray-500">Size</p>
-                    <p className="font-medium">{product.size || '-'}</p>
+                    <p className="text-gray-500">Stock</p>
+                    <p className="font-medium">{product.stockQuantity}</p>
                   </div>
                 </div>
                 <div className="mt-4 pt-3 border-t">
                   <div className="grid grid-cols-2 gap-4 text-sm">
                     <div>
-                      <p className="text-gray-500">Purchase Price</p>
-                      <p className="font-bold">{formatCurrency(product.purchase_price, product.purchase_price_currency)}</p>
+                      <p className="text-gray-500">Cost Price</p>
+                      <p className="font-bold">${product.costPrice}</p>
                     </div>
                     <div>
-                      <p className="text-gray-500">Sale Price</p>
-                      <p className="font-bold text-base">{formatCurrency(product.sale_price, product.sale_price_currency)}</p>
+                      <p className="text-gray-500">Unit Price</p>
+                      <p className="font-bold text-base">${product.unitPrice}</p>
                     </div>
                   </div>
                 </div>
@@ -418,7 +407,7 @@ export default function ProductsTab({ products, loading, canEdit, canDelete, onR
         onClose={() => setDialogOpen(false)}
         onConfirm={handleDeleteConfirm}
         title="Confirm Deletion"
-        description={`Do you wish to confirm deleting product "${productToDelete?.product_name}"?`}
+        description={`Do you wish to confirm deleting product "${productToDelete?.name}"?`}
         confirmText="Yes, Delete"
         confirmVariant="destructive"
       />

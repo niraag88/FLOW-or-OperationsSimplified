@@ -17,22 +17,22 @@ export default function ExportDropdown({ products, activeTab }) {
     setIsExporting(true);
     try {
       const headers = [
-        'product_code', 'brand_name', 'product_name', 'size', 
-        'purchase_price', 'sale_price', 'price_currency', 
-        'qty_on_hand', 'reorder_level', 'created_date'
+        'sku', 'name', 'description', 'brand_id', 
+        'unit_price', 'cost_price', 'stock_quantity', 
+        'min_stock_level', 'max_stock_level', 'created_at'
       ];
       
       const exportData = products.map(product => ({
-        product_code: product.product_code,
-        brand_name: product.brand_name,
-        product_name: product.product_name,
-        size: product.size,
-        purchase_price: product.purchase_price,
-        sale_price: product.sale_price,
-        price_currency: product.price_currency,
-        qty_on_hand: product.qty_on_hand,
-        reorder_level: product.reorder_level,
-        created_date: new Date(product.created_date).toLocaleDateString()
+        sku: product.sku,
+        name: product.name,
+        description: product.description || '',
+        brand_id: product.brandId,
+        unit_price: product.unitPrice,
+        cost_price: product.costPrice || 0,
+        stock_quantity: product.stockQuantity || 0,
+        min_stock_level: product.minStockLevel || 0,
+        max_stock_level: product.maxStockLevel || null,
+        created_at: new Date(product.createdAt).toLocaleDateString()
       }));
 
       exportToCsv(exportData, `products-${new Date().toISOString().split('T')[0]}`);

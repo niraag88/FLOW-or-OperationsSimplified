@@ -6,7 +6,7 @@ import { createPageUrl } from '@/utils';
 
 export default function LowStockAlert({ products }) {
   const lowStockProducts = (products || []).filter(p =>
-    p.reorder_level > 0 && (p.qty_on_hand || 0) < p.reorder_level
+    p.minStockLevel > 0 && (p.stockQuantity || 0) < p.minStockLevel
   ).slice(0, 5); // Show top 5 for brevity on dashboard
 
   return (
@@ -24,17 +24,17 @@ export default function LowStockAlert({ products }) {
               <Link to={createPageUrl('Inventory')} key={product.id} className="block p-3 rounded-lg hover:bg-gray-50 transition-colors">
                 <div className="flex items-center justify-between">
                   <div>
-                    <p className="font-semibold text-sm text-gray-900">{product.product_name}</p>
-                    <p className="text-xs text-gray-500">{product.product_code}</p>
+                    <p className="font-semibold text-sm text-gray-900">{product.name}</p>
+                    <p className="text-xs text-gray-500">{product.sku}</p>
                   </div>
                   <div className="text-right">
-                    <p className="text-sm font-bold text-red-600">{product.qty_on_hand || 0}</p>
-                    <p className="text-xs text-gray-500">min: {product.reorder_level}</p>
+                    <p className="text-sm font-bold text-red-600">{product.stockQuantity || 0}</p>
+                    <p className="text-xs text-gray-500">min: {product.minStockLevel}</p>
                   </div>
                 </div>
               </Link>
             ))}
-            {products.filter(p => p.reorder_level > 0 && (p.qty_on_hand || 0) < p.reorder_level).length > 5 && (
+            {products.filter(p => p.minStockLevel > 0 && (p.stockQuantity || 0) < p.minStockLevel).length > 5 && (
                  <Link to={createPageUrl('Reports')} className="text-sm text-blue-600 hover:underline text-center block pt-2">
                     View all...
                  </Link>
