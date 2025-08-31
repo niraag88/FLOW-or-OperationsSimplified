@@ -87,8 +87,8 @@ export default function ProductsTab({ products, loading, canEdit, canDelete, onR
             </div>
           ) : (
             <>
-              {/* Desktop Table */}
-              <div className="hidden lg:block">
+              {/* Desktop and Mobile Table */}
+              <div>
                 <Table>
                   <TableHeader>
                     <TableRow>
@@ -132,48 +132,6 @@ export default function ProductsTab({ products, loading, canEdit, canDelete, onR
                 </Table>
               </div>
 
-              {/* Mobile Cards */}
-              <div className="lg:hidden space-y-4">
-                {products.map((product) => (
-                  <Card
-                    key={product.id}
-                    className="p-4 transition-colors duration-200"
-                    data-product-id={product.id}
-                  >
-                    <div className="flex items-start justify-between mb-3">
-                      <div>
-                        <h3 className="font-semibold text-gray-900">{product.name}</h3>
-                        <p className="text-sm text-gray-600 font-mono">{product.sku}</p>
-                      </div>
-                      {actualCanDelete && (
-                        <Button
-                          size="sm"
-                          variant="ghost"
-                          className="text-red-500 hover:text-red-600 -mt-1 -mr-1"
-                          onClick={() => handleDeleteClick(product)}
-                        >
-                          <Trash2 className="w-4 h-4" />
-                        </Button>
-                      )}
-                    </div>
-                    
-                    <div className="grid grid-cols-2 gap-2 text-sm">
-                      <div>
-                        <p className="text-gray-500">Size</p>
-                        <p className="font-medium">{product.description || '-'}</p>
-                      </div>
-                      <div>
-                        <p className="text-gray-500">Cost Price</p>
-                        <p className="font-medium">£{product.costPrice}</p>
-                      </div>
-                      <div>
-                        <p className="text-gray-500">Sale Price</p>
-                        <p className="font-semibold text-green-600">AED {product.unitPrice}</p>
-                      </div>
-                    </div>
-                  </Card>
-                ))}
-              </div>
             </>
           )}
         </CardContent>
