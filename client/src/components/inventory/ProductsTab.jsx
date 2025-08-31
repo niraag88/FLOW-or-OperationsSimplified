@@ -113,13 +113,13 @@ export default function ProductsTab({ products, loading, canEdit, canDelete, onR
                         className="hover:bg-gray-50 transition-colors duration-200"
                         data-product-id={product.id}
                       >
-                        <TableCell className="font-mono">{product.sku}</TableCell>
+                        <TableCell>{product.sku}</TableCell>
                         <TableCell>
-                          <div className="font-medium">{product.name}</div>
+                          <div>{product.name}</div>
                         </TableCell>
                         <TableCell>{product.description || '-'}</TableCell>
                         <TableCell>£{product.costPrice}</TableCell>
-                        <TableCell className="font-semibold">AED {product.unitPrice}</TableCell>
+                        <TableCell>AED {product.unitPrice}</TableCell>
                         {actualCanDelete && (
                           <TableCell>
                             <DropdownMenu>
