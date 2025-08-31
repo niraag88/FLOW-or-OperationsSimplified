@@ -777,6 +777,22 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  app.get('/api/products/:id', requireAuth(), async (req: AuthenticatedRequest, res) => {
+    try {
+      const productId = parseInt(req.params.id);
+      const product = await businessStorage.getProductById(productId);
+      
+      if (!product) {
+        return res.status(404).json({ error: 'Product not found' });
+      }
+      
+      res.json(product);
+    } catch (error) {
+      console.error('Error fetching product:', error);
+      res.status(500).json({ error: 'Failed to fetch product' });
+    }
+  });
+
   app.post('/api/products', requireAuth(['Admin', 'Manager']), async (req: AuthenticatedRequest, res) => {
     try {
       const validatedData = insertProductSchema.parse(req.body);

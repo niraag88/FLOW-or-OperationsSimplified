@@ -18,6 +18,7 @@ import Invoices from "@/pages/Invoices.jsx";
 import Reports from "@/pages/Reports.jsx";
 import Settings from "@/pages/Settings.jsx";
 import AddProduct from "@/pages/AddProduct.jsx";
+import EditProduct from "@/pages/EditProduct.jsx";
 import Customers from "@/pages/Customers.jsx";
 import BackupDrill from "@/pages/BackupDrill.jsx";
 import Print from "@/pages/Print.jsx";
@@ -97,6 +98,11 @@ function PagesContent() {
       <Route path="/AddProduct" element={
         <ProtectedRoute>
           <Layout currentPageName="Add Product"><AddProduct /></Layout>
+        </ProtectedRoute>
+      } />
+      <Route path="/products/edit/:id" element={
+        <ProtectedRoute>
+          <Layout currentPageName="Edit Product"><EditProduct /></Layout>
         </ProtectedRoute>
       } />
       <Route path="/Customers" element={
