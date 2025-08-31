@@ -4,8 +4,9 @@ class ApiEntity {
     this.endpoint = endpoint;
   }
 
-  async list() {
-    const response = await fetch(`/api/${this.endpoint}`);
+  async list(sort) {
+    const url = sort ? `/api/${this.endpoint}?sort=${encodeURIComponent(sort)}` : `/api/${this.endpoint}`;
+    const response = await fetch(url);
     if (!response.ok) throw new Error(`Failed to fetch ${this.endpoint}`);
     return await response.json();
   }
@@ -46,6 +47,13 @@ class ApiEntity {
     }
     return await response.json();
   }
+
+  async filter(params) {
+    const queryString = new URLSearchParams(params).toString();
+    const response = await fetch(`/api/${this.endpoint}?${queryString}`);
+    if (!response.ok) throw new Error(`Failed to filter ${this.endpoint}`);
+    return await response.json();
+  }
 }
 
 // Fallback entity for endpoints that don't exist yet
@@ -54,7 +62,7 @@ class FallbackEntity {
     this.name = name;
   }
 
-  async list() {
+  async list(sort) {
     console.warn(`${this.name}.list() not implemented yet - returning empty array`);
     return [];
   }
@@ -77,6 +85,11 @@ class FallbackEntity {
   async getById(id) {
     console.warn(`${this.name}.getById() not implemented yet`);
     return null;
+  }
+
+  async filter(params) {
+    console.warn(`${this.name}.filter() not implemented yet - returning empty array`);
+    return [];
   }
 }
 
