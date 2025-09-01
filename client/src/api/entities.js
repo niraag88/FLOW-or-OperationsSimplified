@@ -19,7 +19,8 @@ class ApiEntity {
     const response = await fetch(`/api/${this.endpoint}`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify(data)
+      body: JSON.stringify(data),
+      credentials: 'include' // Include session cookies
     });
     if (!response.ok) throw new Error(`Failed to create ${this.endpoint}`);
     return await response.json();
@@ -29,7 +30,8 @@ class ApiEntity {
     const response = await fetch(`/api/${this.endpoint}/${id}`, {
       method: 'PUT',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify(data)
+      body: JSON.stringify(data),
+      credentials: 'include'
     });
     if (!response.ok) throw new Error(`Failed to update ${this.endpoint}`);
     return await response.json();
@@ -37,14 +39,17 @@ class ApiEntity {
 
   async delete(id) {
     const response = await fetch(`/api/${this.endpoint}/${id}`, {
-      method: 'DELETE'
+      method: 'DELETE',
+      credentials: 'include'
     });
     if (!response.ok) throw new Error(`Failed to delete ${this.endpoint}`);
     return await response.json();
   }
 
   async getById(id) {
-    const response = await fetch(`/api/${this.endpoint}/${id}`);
+    const response = await fetch(`/api/${this.endpoint}/${id}`, {
+      credentials: 'include'
+    });
     if (!response.ok) {
       if (response.status === 404) return null;
       throw new Error(`Failed to fetch ${this.endpoint}`);
@@ -54,7 +59,9 @@ class ApiEntity {
 
   async filter(params) {
     const queryString = new URLSearchParams(params).toString();
-    const response = await fetch(`/api/${this.endpoint}?${queryString}`);
+    const response = await fetch(`/api/${this.endpoint}?${queryString}`, {
+      credentials: 'include'
+    });
     if (!response.ok) throw new Error(`Failed to filter ${this.endpoint}`);
     return await response.json();
   }
