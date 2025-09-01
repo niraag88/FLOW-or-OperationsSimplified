@@ -106,6 +106,8 @@ export default function CompanySettingsComponent() {
       
       handleInputChange('company_logo_url', fileUrl);
       setLogoKey(Date.now()); // Force image refresh
+      console.log("Updated settings.company_logo_url to:", fileUrl);
+      console.log("Current logoKey:", Date.now());
       toast({
         title: "Logo uploaded successfully",
         description: "Company logo has been updated."
@@ -291,28 +293,30 @@ export default function CompanySettingsComponent() {
             <Label>Company Logo</Label>
             <div className="flex items-center gap-4">
               <div className="flex-shrink-0">
-                {settings.company_logo_url ? (
-                  <div className="relative">
-                    <img
-                      key={logoKey}
-                      src={`${settings.company_logo_url}?t=${logoKey}`}
-                      alt="Company Logo"
-                      className="w-20 h-20 object-contain border-2 border-gray-200 rounded-lg bg-white shadow-sm"
-                      onError={(e) => {
-                        console.error("Error loading logo:", e);
-                        console.log("Logo URL:", settings.company_logo_url);
-                      }}
-                      onLoad={() => {
-                        console.log("Logo loaded successfully:", settings.company_logo_url);
-                      }}
-                    />
-                    <div className="absolute -top-1 -right-1 w-3 h-3 bg-green-500 rounded-full border-2 border-white"></div>
-                  </div>
-                ) : (
-                  <div className="w-20 h-20 border-2 border-dashed border-gray-300 rounded-lg flex items-center justify-center bg-gray-50">
+                <div className="w-20 h-20 border-2 border-gray-200 rounded-lg flex items-center justify-center bg-white shadow-sm relative">
+                  {settings.company_logo_url ? (
+                    <>
+                      <img
+                        key={logoKey}
+                        src={settings.company_logo_url}
+                        alt="Company Logo"
+                        className="w-full h-full object-contain rounded-lg"
+                        onError={(e) => {
+                          console.error("Error loading logo:", e);
+                          console.log("Failed logo URL:", settings.company_logo_url);
+                          console.log("Logo URL type:", typeof settings.company_logo_url);
+                          console.log("Logo URL length:", settings.company_logo_url?.length);
+                        }}
+                        onLoad={() => {
+                          console.log("Logo loaded successfully!");
+                        }}
+                      />
+                      <div className="absolute -top-1 -right-1 w-3 h-3 bg-green-500 rounded-full border-2 border-white"></div>
+                    </>
+                  ) : (
                     <Upload className="w-6 h-6 text-gray-400" />
-                  </div>
-                )}
+                  )}
+                </div>
               </div>
               <div>
                 <input
