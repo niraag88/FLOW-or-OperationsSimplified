@@ -19,13 +19,6 @@ export default function StockTab({ products, loading, canEdit, currentUser, onRe
     loadCompanySettings();
   }, []);
 
-  // Initialize stock sub-tab data on mount
-  useEffect(() => {
-    if (onStockSubTabChange && stockMovements.length >= 0) {
-      onStockSubTabChange(activeStockTab, stockMovements, lowStockProducts, outOfStockProducts);
-    }
-  }, [stockMovements, lowStockProducts, outOfStockProducts, activeStockTab, onStockSubTabChange]);
-
   const loadCompanySettings = async () => {
     try {
       const response = await fetch('/api/company-settings', { credentials: 'include' });
@@ -88,6 +81,13 @@ export default function StockTab({ products, loading, canEdit, currentUser, onRe
   });
 
   const outOfStockProducts = products.filter(p => (p.stockQuantity || 0) === 0);
+
+  // Initialize stock sub-tab data after computed values are available
+  useEffect(() => {
+    if (onStockSubTabChange && !loading) {
+      onStockSubTabChange(activeStockTab, stockMovements, lowStockProducts, outOfStockProducts);
+    }
+  }, [stockMovements, lowStockProducts, outOfStockProducts, activeStockTab, onStockSubTabChange, loading]);
 
   const getMovementIcon = (type) => {
     switch (type) {
