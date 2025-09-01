@@ -1,7 +1,7 @@
 import React, { useState } from "react";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { Settings as SettingsIcon, Users, Building2, Package2, Database, HardDrive, Trash2, Package } from "lucide-react";
+import { Settings as SettingsIcon, Users, Building2, Package2, Database, HardDrive, Trash2, Package, Trash } from "lucide-react";
 
 // Import setting components
 import CompanySettings from "../components/settings/CompanySettings";
@@ -62,7 +62,7 @@ export default function Settings() {
               <span className="sm:hidden">St.</span>
             </TabsTrigger>
             <TabsTrigger value="recycle" className="flex flex-col sm:flex-row items-center gap-1 sm:gap-2 text-xs sm:text-sm px-2 sm:px-3">
-              <Trash2 className="w-3.5 h-3.5 sm:w-4 sm:h-4" />
+              <Trash className="w-4 h-4 sm:w-4 sm:h-4" />
               <span className="hidden sm:inline">Recycle Bin</span>
               <span className="sm:hidden">Rec.</span>
             </TabsTrigger>
