@@ -35,6 +35,7 @@ export default function CompanySettingsComponent() {
   const [loading, setLoading] = useState(false);
   const [initialLoad, setInitialLoad] = useState(true);
   const [trnError, setTrnError] = useState(""); // Added trnError state
+  const [logoKey, setLogoKey] = useState(Date.now()); // Added logoKey for forcing image refresh
   const { toast } = useToast();
 
   useEffect(() => {
@@ -93,6 +94,7 @@ export default function CompanySettingsComponent() {
       setLoading(true);
       const { file_url } = await UploadFile({ file });
       handleInputChange('company_logo_url', file_url);
+      setLogoKey(Date.now()); // Force image refresh
       toast({
         title: "Logo uploaded successfully",
         description: "Company logo has been updated."
@@ -279,7 +281,8 @@ export default function CompanySettingsComponent() {
             <div className="flex items-center gap-4">
               {settings.company_logo_url && (
                 <img
-                  src={settings.company_logo_url}
+                  key={logoKey}
+                  src={`${settings.company_logo_url}?t=${logoKey}`}
                   alt="Company Logo"
                   className="w-16 h-16 object-contain border rounded"
                 />
