@@ -32,37 +32,37 @@ export default function Settings() {
         <div className="w-full overflow-x-auto">
           <TabsList className="grid grid-cols-7 min-w-[600px] sm:min-w-0 sm:w-full">
             <TabsTrigger value="company" className="flex flex-col sm:flex-row items-center gap-1 sm:gap-2 text-xs sm:text-sm px-2 sm:px-3">
-              <Building2 className="w-3 h-3 sm:w-4 sm:h-4" />
+              <Building2 className="w-4 h-4" />
               <span className="hidden sm:inline">Company</span>
               <span className="sm:hidden">Co.</span>
             </TabsTrigger>
             <TabsTrigger value="customers" className="flex flex-col sm:flex-row items-center gap-1 sm:gap-2 text-xs sm:text-sm px-2 sm:px-3">
-              <Users className="w-3 h-3 sm:w-4 sm:h-4" />
+              <Users className="w-4 h-4" />
               <span className="hidden sm:inline">Customers</span>
               <span className="sm:hidden">Cust.</span>
             </TabsTrigger>
             <TabsTrigger value="brands" className="flex flex-col sm:flex-row items-center gap-1 sm:gap-2 text-xs sm:text-sm px-2 sm:px-3">
-              <Package2 className="w-3 h-3 sm:w-4 sm:h-4" />
+              <Package2 className="w-4 h-4" />
               <span className="hidden sm:inline">Brands</span>
               <span className="sm:hidden">Br.</span>
             </TabsTrigger>
             <TabsTrigger value="inventory" className="flex flex-col sm:flex-row items-center gap-1 sm:gap-2 text-xs sm:text-sm px-2 sm:px-3">
-              <Package className="w-3 h-3 sm:w-4 sm:h-4" />
+              <Package className="w-4 h-4" />
               <span className="hidden sm:inline">Inventory</span>
               <span className="sm:hidden">Inv.</span>
             </TabsTrigger>
             <TabsTrigger value="books" className="flex flex-col sm:flex-row items-center gap-1 sm:gap-2 text-xs sm:text-sm px-2 sm:px-3">
-              <Database className="w-3 h-3 sm:w-4 sm:h-4" />
+              <Database className="w-4 h-4" />
               <span className="hidden sm:inline">Books</span>
               <span className="sm:hidden">Bk.</span>
             </TabsTrigger>
             <TabsTrigger value="storage" className="flex flex-col sm:flex-row items-center gap-1 sm:gap-2 text-xs sm:text-sm px-2 sm:px-3">
-              <HardDrive className="w-3 h-3 sm:w-4 sm:h-4" />
+              <HardDrive className="w-4 h-4" />
               <span className="hidden sm:inline">Storage</span>
               <span className="sm:hidden">St.</span>
             </TabsTrigger>
             <TabsTrigger value="recycle" className="flex flex-col sm:flex-row items-center gap-1 sm:gap-2 text-xs sm:text-sm px-2 sm:px-3">
-              <Trash className="w-4 h-4 sm:w-5 sm:h-5" />
+              <Trash className="w-4 h-4" />
               <span className="hidden sm:inline">Recycle Bin</span>
               <span className="sm:hidden">Rec.</span>
             </TabsTrigger>
