@@ -20,6 +20,7 @@ import Settings from "@/pages/Settings.jsx";
 import AddProduct from "@/pages/AddProduct.jsx";
 import EditProduct from "@/pages/EditProduct.jsx";
 import StockCount from "@/pages/StockCount.jsx";
+import StockCountNew from "@/pages/StockCountNew.jsx";
 import Customers from "@/pages/Customers.jsx";
 import BackupDrill from "@/pages/BackupDrill.jsx";
 import Print from "@/pages/Print.jsx";
@@ -108,7 +109,7 @@ function PagesContent() {
       } />
       <Route path="/stock-count" element={
         <ProtectedRoute>
-          <Layout currentPageName="Stock Count"><StockCount /></Layout>
+          <Layout currentPageName="Stock Count"><StockCountNew /></Layout>
         </ProtectedRoute>
       } />
       <Route path="/Customers" element={

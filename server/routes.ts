@@ -4,9 +4,9 @@ import { storage } from "./storage";
 import { businessStorage } from "./businessStorage";
 import { Client } from '@replit/object-storage';
 import { invoices, deliveryOrders, auditLog, users, type InsertAuditLog, type InsertUser, type UpdateUser, type User } from "@shared/schema";
-import { insertBrandSchema, insertSupplierSchema, insertCustomerSchema, insertProductSchema, insertPurchaseOrderSchema, insertQuotationSchema } from "@shared/schema";
+import { insertBrandSchema, insertSupplierSchema, insertCustomerSchema, insertProductSchema, insertPurchaseOrderSchema, insertQuotationSchema, stockCounts, stockCountItems } from "@shared/schema";
 import { db } from "./db";
-import { eq } from "drizzle-orm";
+import { eq, desc } from "drizzle-orm";
 import pkg from 'pg';
 import crypto from 'crypto';
 import multer from 'multer';
@@ -873,7 +873,15 @@ export async function registerRoutes(app: Express): Promise<Server> {
   // Stock Count management routes
   app.get('/api/stock-counts', requireAuth(), async (req: AuthenticatedRequest, res) => {
     try {
-      const stockCounts = await businessStorage.getStockCounts();
+      const stockCounts = await db.select({
+        id: stockCounts.id,
+        countDate: stockCounts.countDate,
+        totalProducts: stockCounts.totalProducts,
+        totalQuantity: stockCounts.totalQuantity,
+        createdBy: stockCounts.createdBy,
+        createdAt: stockCounts.createdAt
+      }).from(stockCounts).orderBy(desc(stockCounts.createdAt));
+      
       res.json(stockCounts);
     } catch (error) {
       console.error('Error fetching stock counts:', error);
@@ -884,13 +892,17 @@ export async function registerRoutes(app: Express): Promise<Server> {
   app.get('/api/stock-counts/:id', requireAuth(), async (req: AuthenticatedRequest, res) => {
     try {
       const stockCountId = parseInt(req.params.id);
-      const stockCount = await businessStorage.getStockCountById(stockCountId);
       
+      // Get stock count header
+      const [stockCount] = await db.select().from(stockCounts).where(eq(stockCounts.id, stockCountId));
       if (!stockCount) {
         return res.status(404).json({ error: 'Stock count not found' });
       }
       
-      res.json(stockCount);
+      // Get stock count items
+      const items = await db.select().from(stockCountItems).where(eq(stockCountItems.stockCountId, stockCountId));
+      
+      res.json({ ...stockCount, items });
     } catch (error) {
       console.error('Error fetching stock count:', error);
       res.status(500).json({ error: 'Failed to fetch stock count' });
@@ -903,28 +915,63 @@ export async function registerRoutes(app: Express): Promise<Server> {
         return res.status(401).json({ error: 'Authentication required' });
       }
       
-      // Validate that we have items in the request body
-      if (!req.body.items || !Array.isArray(req.body.items)) {
-        return res.status(400).json({ error: 'Items array is required' });
+      const { items } = req.body;
+      
+      // Validate input
+      if (!items || !Array.isArray(items) || items.length === 0) {
+        return res.status(400).json({ error: 'Items array is required and cannot be empty' });
       }
       
-      const stockCount = await businessStorage.createStockCount({
-        items: req.body.items,
+      // Filter items with quantity > 0
+      const validItems = items.filter(item => item.quantity > 0);
+      if (validItems.length === 0) {
+        return res.status(400).json({ error: 'At least one item must have a quantity greater than 0' });
+      }
+      
+      // Calculate totals
+      const totalProducts = validItems.length;
+      const totalQuantity = validItems.reduce((sum, item) => sum + (parseInt(item.quantity) || 0), 0);
+      
+      // Create stock count header
+      const [stockCount] = await db.insert(stockCounts).values({
+        countDate: new Date(),
+        totalProducts,
+        totalQuantity,
         createdBy: req.user.id
+      }).returning();
+      
+      // Create stock count items
+      const stockCountItemsData = validItems.map(item => ({
+        stockCountId: stockCount.id,
+        productId: item.product_id,
+        productCode: item.product_code,
+        brandName: item.brand_name || '',
+        productName: item.product_name,
+        size: item.size || '',
+        quantity: parseInt(item.quantity) || 0
+      }));
+      
+      await db.insert(stockCountItems).values(stockCountItemsData);
+      
+      res.status(201).json({ 
+        id: stockCount.id,
+        message: `Stock count created with ${totalProducts} products and ${totalQuantity} total quantity` 
       });
-      res.status(201).json(stockCount);
     } catch (error) {
       console.error('Error creating stock count:', error);
-      console.error('Error details:', error.message);
-      console.error('Error stack:', error.stack);
-      res.status(500).json({ error: 'Failed to create stock count', details: error.message });
+      res.status(500).json({ error: 'Failed to create stock count' });
     }
   });
 
   app.delete('/api/stock-counts/:id', requireAuth(['Admin', 'Manager']), async (req: AuthenticatedRequest, res) => {
     try {
       const stockCountId = parseInt(req.params.id);
-      await businessStorage.deleteStockCount(stockCountId);
+      
+      // Delete items first due to foreign key constraint
+      await db.delete(stockCountItems).where(eq(stockCountItems.stockCountId, stockCountId));
+      // Then delete the stock count
+      await db.delete(stockCounts).where(eq(stockCounts.id, stockCountId));
+      
       res.json({ success: true });
     } catch (error) {
       console.error('Error deleting stock count:', error);
