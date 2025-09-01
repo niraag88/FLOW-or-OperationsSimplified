@@ -45,10 +45,16 @@ export const base44 = {
       InvokeLLM: async () => ({ success: true }),
       SendEmail: async () => ({ success: true }),
       UploadFile: async ({ file }) => {
-        // Create a mock URL using object URL for demo purposes
-        const mockUrl = URL.createObjectURL(file);
-        console.log("Mock UploadFile - Created URL:", mockUrl);
-        return { success: true, file_url: mockUrl };
+        // Create a data URL for reliable display
+        return new Promise((resolve) => {
+          const reader = new FileReader();
+          reader.onload = (e) => {
+            const dataUrl = e.target.result;
+            console.log("Mock UploadFile - Created data URL");
+            resolve({ success: true, file_url: dataUrl });
+          };
+          reader.readAsDataURL(file);
+        });
       },
       GenerateImage: async () => ({ success: true, url: '#' }),
       ExtractDataFromUploadedFile: async () => ({ success: true, data: {} })
