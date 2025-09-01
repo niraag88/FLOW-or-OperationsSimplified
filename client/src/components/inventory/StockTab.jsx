@@ -85,9 +85,15 @@ export default function StockTab({ products, loading, canEdit, currentUser, onRe
   // Initialize stock sub-tab data after computed values are available
   useEffect(() => {
     if (onStockSubTabChange && !loading) {
-      onStockSubTabChange(activeStockTab, stockMovements, lowStockProducts, outOfStockProducts);
+      const currentLowStock = products.filter(p => {
+        const lowStockThreshold = companySettings?.lowStockThreshold || 6;
+        return (p.stockQuantity || 0) > 0 && (p.stockQuantity || 0) <= lowStockThreshold;
+      });
+      const currentOutOfStock = products.filter(p => (p.stockQuantity || 0) === 0);
+      
+      onStockSubTabChange(activeStockTab, stockMovements, currentLowStock, currentOutOfStock);
     }
-  }, [stockMovements, lowStockProducts, outOfStockProducts, activeStockTab, onStockSubTabChange, loading]);
+  }, [activeStockTab]); // Only trigger when activeStockTab changes
 
   const getMovementIcon = (type) => {
     switch (type) {
