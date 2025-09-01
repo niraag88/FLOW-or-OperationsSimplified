@@ -9,7 +9,7 @@ import { Plus, Search } from "lucide-react";
 import { Product } from "@/api/entities";
 import { StockCount } from "@/api/entities"; // Changed from InventoryLot
 import ProductsTab from "../components/inventory/ProductsTab";
-import LotsTab from "../components/inventory/LotsTab";
+import StockTab from "../components/inventory/StockTab";
 import ExportDropdown from "../components/inventory/ExportDropdown";
 import QuickAddProduct from "../components/inventory/QuickAddProduct";
 
@@ -153,9 +153,8 @@ export default function Inventory() {
         </TabsContent>
 
         <TabsContent value="stock" className="mt-6">
-          <LotsTab 
-            products={products}
-            stockCounts={stockCounts} // Pass stock counts
+          <StockTab 
+            products={filteredProducts}
             loading={loading}
             canEdit={canEdit}
             currentUser={currentUser}

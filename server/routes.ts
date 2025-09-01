@@ -4,7 +4,7 @@ import { storage } from "./storage";
 import { businessStorage } from "./businessStorage";
 import { Client } from '@replit/object-storage';
 import { invoices, deliveryOrders, auditLog, users, type InsertAuditLog, type InsertUser, type UpdateUser, type User } from "@shared/schema";
-import { insertBrandSchema, insertSupplierSchema, insertCustomerSchema, insertProductSchema, insertPurchaseOrderSchema, insertQuotationSchema, stockCounts, stockCountItems } from "@shared/schema";
+import { insertBrandSchema, insertSupplierSchema, insertCustomerSchema, insertProductSchema, insertPurchaseOrderSchema, insertQuotationSchema, stockCounts, stockCountItems, goodsReceipts, goodsReceiptItems, stockMovements, products, purchaseOrders, purchaseOrderItems, enhancedInvoices, invoiceItems } from "@shared/schema";
 import { db } from "./db";
 import { eq, desc } from "drizzle-orm";
 import pkg from 'pg';
@@ -843,6 +843,32 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  // Get purchase order items for goods receipt
+  app.get('/api/purchase-orders/:id/items', requireAuth(), async (req: AuthenticatedRequest, res) => {
+    try {
+      const poId = parseInt(req.params.id);
+      
+      const items = await db.select({
+        id: purchaseOrderItems.id,
+        productId: purchaseOrderItems.productId,
+        productName: products.name,
+        productSku: products.sku,
+        quantity: purchaseOrderItems.quantity,
+        receivedQuantity: purchaseOrderItems.receivedQuantity,
+        unitPrice: purchaseOrderItems.unitPrice,
+        lineTotal: purchaseOrderItems.lineTotal
+      })
+      .from(purchaseOrderItems)
+      .leftJoin(products, eq(purchaseOrderItems.productId, products.id))
+      .where(eq(purchaseOrderItems.poId, poId));
+      
+      res.json(items);
+    } catch (error) {
+      console.error('Error fetching PO items:', error);
+      res.status(500).json({ error: 'Failed to fetch purchase order items' });
+    }
+  });
+
   // Quotation management routes
   app.get('/api/quotations', requireAuth(), async (req: AuthenticatedRequest, res) => {
     try {
@@ -976,6 +1002,233 @@ export async function registerRoutes(app: Express): Promise<Server> {
     } catch (error) {
       console.error('Error deleting stock count:', error);
       res.status(500).json({ error: 'Failed to delete stock count' });
+    }
+  });
+
+  // === AUTOMATED INVENTORY MANAGEMENT ===
+
+  // Helper function to update product stock and create movement record
+  async function updateProductStock(productId: number, quantityChange: number, movementType: string, referenceId: number, referenceType: string, unitCost: number, notes: string, userId: string) {
+    // Get current product stock
+    const [product] = await db.select().from(products).where(eq(products.id, productId));
+    if (!product) {
+      throw new Error(`Product with ID ${productId} not found`);
+    }
+
+    const previousStock = product.stockQuantity || 0;
+    const newStock = previousStock + quantityChange;
+
+    // Update product stock quantity
+    await db.update(products)
+      .set({ 
+        stockQuantity: newStock,
+        updatedAt: new Date()
+      })
+      .where(eq(products.id, productId));
+
+    // Create stock movement record
+    await db.insert(stockMovements).values({
+      productId,
+      movementType,
+      referenceId,
+      referenceType,
+      quantity: quantityChange,
+      previousStock,
+      newStock,
+      unitCost: unitCost.toString(),
+      notes,
+      createdBy: userId
+    });
+
+    return { previousStock, newStock };
+  }
+
+  // Get all goods receipts
+  app.get('/api/goods-receipts', requireAuth(), async (req: AuthenticatedRequest, res) => {
+    try {
+      const receipts = await db.select({
+        id: goodsReceipts.id,
+        receiptNumber: goodsReceipts.receiptNumber,
+        poId: goodsReceipts.poId,
+        supplierId: goodsReceipts.supplierId,
+        receivedDate: goodsReceipts.receivedDate,
+        status: goodsReceipts.status,
+        notes: goodsReceipts.notes,
+        createdAt: goodsReceipts.createdAt
+      }).from(goodsReceipts).orderBy(desc(goodsReceipts.createdAt));
+      
+      res.json(receipts);
+    } catch (error) {
+      console.error('Error fetching goods receipts:', error);
+      res.status(500).json({ error: 'Failed to fetch goods receipts' });
+    }
+  });
+
+  // Create goods receipt from purchase order
+  app.post('/api/goods-receipts', requireAuth(['Admin', 'Manager']), async (req: AuthenticatedRequest, res) => {
+    try {
+      const { poId, items, notes } = req.body;
+      
+      if (!poId || !items || !Array.isArray(items)) {
+        return res.status(400).json({ error: 'Purchase Order ID and items are required' });
+      }
+
+      // Get purchase order details
+      const [po] = await db.select().from(purchaseOrders).where(eq(purchaseOrders.id, poId));
+      if (!po) {
+        return res.status(404).json({ error: 'Purchase order not found' });
+      }
+
+      // Generate receipt number
+      const receiptCount = await db.select().from(goodsReceipts).then(rows => rows.length);
+      const receiptNumber = `GR${String(receiptCount + 1).padStart(4, '0')}`;
+
+      // Create goods receipt
+      const [receipt] = await db.insert(goodsReceipts).values({
+        receiptNumber,
+        poId,
+        supplierId: po.supplierId,
+        receivedDate: new Date(),
+        status: 'confirmed',
+        notes: notes || '',
+        createdBy: req.user!.id
+      }).returning();
+
+      // Process each item and update stock
+      for (const item of items) {
+        // Create receipt item
+        await db.insert(goodsReceiptItems).values({
+          receiptId: receipt.id,
+          poItemId: item.poItemId,
+          productId: item.productId,
+          orderedQuantity: item.orderedQuantity,
+          receivedQuantity: item.receivedQuantity,
+          unitPrice: item.unitPrice.toString()
+        });
+
+        // Update product stock automatically
+        await updateProductStock(
+          item.productId,
+          item.receivedQuantity, // Add to stock
+          'goods_receipt',
+          receipt.id,
+          'goods_receipt',
+          parseFloat(item.unitPrice),
+          `Goods received from PO ${po.poNumber}`,
+          req.user!.id
+        );
+
+        // Update PO item received quantity
+        await db.update(purchaseOrderItems)
+          .set({ receivedQuantity: item.receivedQuantity })
+          .where(eq(purchaseOrderItems.id, item.poItemId));
+      }
+
+      // Update PO status to received if all items are fully received
+      const poItems = await db.select().from(purchaseOrderItems).where(eq(purchaseOrderItems.poId, poId));
+      const allReceived = poItems.every(item => item.receivedQuantity >= item.quantity);
+      
+      if (allReceived) {
+        await db.update(purchaseOrders)
+          .set({ status: 'received', updatedAt: new Date() })
+          .where(eq(purchaseOrders.id, poId));
+      }
+
+      res.status(201).json({
+        id: receipt.id,
+        receiptNumber: receipt.receiptNumber,
+        message: `Goods receipt ${receipt.receiptNumber} created and stock updated for ${items.length} products`
+      });
+      
+    } catch (error) {
+      console.error('Error creating goods receipt:', error);
+      res.status(500).json({ error: 'Failed to create goods receipt' });
+    }
+  });
+
+  // Process invoice sale and deduct stock automatically
+  app.post('/api/invoices/:id/process-sale', requireAuth(['Admin', 'Manager']), async (req: AuthenticatedRequest, res) => {
+    try {
+      const invoiceId = parseInt(req.params.id);
+      
+      // Get invoice items
+      const items = await db.select().from(invoiceItems).where(eq(invoiceItems.invoiceId, invoiceId));
+      
+      if (items.length === 0) {
+        return res.status(400).json({ error: 'No items found for this invoice' });
+      }
+
+      // Process each item and deduct from stock
+      for (const item of items) {
+        await updateProductStock(
+          item.productId,
+          -item.quantity, // Deduct from stock (negative quantity)
+          'sale',
+          invoiceId,
+          'invoice',
+          parseFloat(item.unitPrice.toString()),
+          `Sale from Invoice #${invoiceId}`,
+          req.user!.id
+        );
+      }
+
+      // Update invoice status to mark as stock-processed
+      await db.update(enhancedInvoices)
+        .set({ status: 'confirmed', updatedAt: new Date() })
+        .where(eq(enhancedInvoices.id, invoiceId));
+
+      res.json({
+        message: `Stock deducted for ${items.length} products from invoice #${invoiceId}`
+      });
+      
+    } catch (error) {
+      console.error('Error processing invoice sale:', error);
+      res.status(500).json({ error: 'Failed to process invoice sale' });
+    }
+  });
+
+  // Get stock movements for a product
+  app.get('/api/products/:id/stock-movements', requireAuth(), async (req: AuthenticatedRequest, res) => {
+    try {
+      const productId = parseInt(req.params.id);
+      
+      const movements = await db.select().from(stockMovements)
+        .where(eq(stockMovements.productId, productId))
+        .orderBy(desc(stockMovements.createdAt));
+      
+      res.json(movements);
+    } catch (error) {
+      console.error('Error fetching stock movements:', error);
+      res.status(500).json({ error: 'Failed to fetch stock movements' });
+    }
+  });
+
+  // Get all stock movements with product details
+  app.get('/api/stock-movements', requireAuth(), async (req: AuthenticatedRequest, res) => {
+    try {
+      const movements = await db.select({
+        id: stockMovements.id,
+        productId: stockMovements.productId,
+        productName: products.name,
+        productSku: products.sku,
+        movementType: stockMovements.movementType,
+        referenceId: stockMovements.referenceId,
+        referenceType: stockMovements.referenceType,
+        quantity: stockMovements.quantity,
+        previousStock: stockMovements.previousStock,
+        newStock: stockMovements.newStock,
+        unitCost: stockMovements.unitCost,
+        notes: stockMovements.notes,
+        createdAt: stockMovements.createdAt
+      })
+      .from(stockMovements)
+      .leftJoin(products, eq(stockMovements.productId, products.id))
+      .orderBy(desc(stockMovements.createdAt));
+      
+      res.json(movements);
+    } catch (error) {
+      console.error('Error fetching stock movements:', error);
+      res.status(500).json({ error: 'Failed to fetch stock movements' });
     }
   });
 

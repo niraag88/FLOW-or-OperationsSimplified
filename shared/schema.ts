@@ -345,7 +345,7 @@ export const stockCounts = pgTable("stock_counts", {
   updatedAt: timestamp("updated_at").defaultNow().notNull(),
 });
 
-// Stock Count Items table
+// Stock Count Items table (keeping for legacy support)
 export const stockCountItems = pgTable("stock_count_items", {
   id: serial("id").primaryKey(),
   stockCountId: integer("stock_count_id").references(() => stockCounts.id).notNull(),
@@ -355,6 +355,48 @@ export const stockCountItems = pgTable("stock_count_items", {
   productName: text("product_name").notNull(),
   size: text("size"),
   quantity: integer("quantity").notNull(),
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+});
+
+// Goods Receipts table for PO → Stock workflow
+export const goodsReceipts = pgTable("goods_receipts", {
+  id: serial("id").primaryKey(),
+  receiptNumber: text("receipt_number").notNull().unique(),
+  poId: integer("po_id").references(() => purchaseOrders.id).notNull(),
+  supplierId: integer("supplier_id").references(() => suppliers.id).notNull(),
+  receivedDate: timestamp("received_date").defaultNow().notNull(),
+  status: text("status").notNull().default("pending"), // pending, confirmed, cancelled
+  notes: text("notes"),
+  createdBy: varchar("created_by").references(() => users.id).notNull(),
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+  updatedAt: timestamp("updated_at").defaultNow().notNull(),
+});
+
+// Goods Receipt Items table
+export const goodsReceiptItems = pgTable("goods_receipt_items", {
+  id: serial("id").primaryKey(),
+  receiptId: integer("receipt_id").references(() => goodsReceipts.id).notNull(),
+  poItemId: integer("po_item_id").references(() => purchaseOrderItems.id).notNull(),
+  productId: integer("product_id").references(() => products.id).notNull(),
+  orderedQuantity: integer("ordered_quantity").notNull(),
+  receivedQuantity: integer("received_quantity").notNull(),
+  unitPrice: decimal("unit_price", { precision: 10, scale: 2 }).notNull(),
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+});
+
+// Stock Movements table for tracking all stock changes
+export const stockMovements = pgTable("stock_movements", {
+  id: serial("id").primaryKey(),
+  productId: integer("product_id").references(() => products.id).notNull(),
+  movementType: text("movement_type").notNull(), // "goods_receipt", "sale", "adjustment", "initial"
+  referenceId: integer("reference_id"), // ID of the source record (goods receipt, invoice, etc.)
+  referenceType: text("reference_type"), // "goods_receipt", "invoice", "stock_count", "manual"
+  quantity: integer("quantity").notNull(), // Positive for additions, negative for deductions
+  previousStock: integer("previous_stock").notNull(),
+  newStock: integer("new_stock").notNull(),
+  unitCost: decimal("unit_cost", { precision: 10, scale: 2 }),
+  notes: text("notes"),
+  createdBy: varchar("created_by").references(() => users.id).notNull(),
   createdAt: timestamp("created_at").defaultNow().notNull(),
 });
 
@@ -453,6 +495,38 @@ export const insertStockCountItemSchema = createInsertSchema(stockCountItems).pi
   quantity: true,
 });
 
+export const insertGoodsReceiptSchema = createInsertSchema(goodsReceipts).pick({
+  receiptNumber: true,
+  poId: true,
+  supplierId: true,
+  receivedDate: true,
+  status: true,
+  notes: true,
+  createdBy: true,
+});
+
+export const insertGoodsReceiptItemSchema = createInsertSchema(goodsReceiptItems).pick({
+  receiptId: true,
+  poItemId: true,
+  productId: true,
+  orderedQuantity: true,
+  receivedQuantity: true,
+  unitPrice: true,
+});
+
+export const insertStockMovementSchema = createInsertSchema(stockMovements).pick({
+  productId: true,
+  movementType: true,
+  referenceId: true,
+  referenceType: true,
+  quantity: true,
+  previousStock: true,
+  newStock: true,
+  unitCost: true,
+  notes: true,
+  createdBy: true,
+});
+
 // Type exports
 export type Brand = typeof brands.$inferSelect;
 export type InsertBrand = z.infer<typeof insertBrandSchema>;
@@ -477,6 +551,15 @@ export type InsertStockCount = z.infer<typeof insertStockCountSchema>;
 
 export type StockCountItem = typeof stockCountItems.$inferSelect;
 export type InsertStockCountItem = z.infer<typeof insertStockCountItemSchema>;
+
+export type GoodsReceipt = typeof goodsReceipts.$inferSelect;
+export type InsertGoodsReceipt = z.infer<typeof insertGoodsReceiptSchema>;
+
+export type GoodsReceiptItem = typeof goodsReceiptItems.$inferSelect;
+export type InsertGoodsReceiptItem = z.infer<typeof insertGoodsReceiptItemSchema>;
+
+export type StockMovement = typeof stockMovements.$inferSelect;
+export type InsertStockMovement = z.infer<typeof insertStockMovementSchema>;
 
 export type VatReturn = typeof vatReturns.$inferSelect;
 export type CompanySettings = typeof companySettings.$inferSelect;
