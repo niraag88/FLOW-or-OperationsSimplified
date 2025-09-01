@@ -92,7 +92,9 @@ export default function CompanySettingsComponent() {
 
     try {
       setLoading(true);
+      console.log("Starting logo upload for file:", file.name);
       const { file_url } = await UploadFile({ file });
+      console.log("Upload successful, file_url:", file_url);
       handleInputChange('company_logo_url', file_url);
       setLogoKey(Date.now()); // Force image refresh
       toast({
@@ -279,14 +281,30 @@ export default function CompanySettingsComponent() {
           <div className="space-y-2">
             <Label>Company Logo</Label>
             <div className="flex items-center gap-4">
-              {settings.company_logo_url && (
-                <img
-                  key={logoKey}
-                  src={`${settings.company_logo_url}?t=${logoKey}`}
-                  alt="Company Logo"
-                  className="w-16 h-16 object-contain border rounded"
-                />
-              )}
+              <div className="flex-shrink-0">
+                {settings.company_logo_url ? (
+                  <div className="relative">
+                    <img
+                      key={logoKey}
+                      src={`${settings.company_logo_url}?t=${logoKey}`}
+                      alt="Company Logo"
+                      className="w-20 h-20 object-contain border-2 border-gray-200 rounded-lg bg-white shadow-sm"
+                      onError={(e) => {
+                        console.error("Error loading logo:", e);
+                        console.log("Logo URL:", settings.company_logo_url);
+                      }}
+                      onLoad={() => {
+                        console.log("Logo loaded successfully:", settings.company_logo_url);
+                      }}
+                    />
+                    <div className="absolute -top-1 -right-1 w-3 h-3 bg-green-500 rounded-full border-2 border-white"></div>
+                  </div>
+                ) : (
+                  <div className="w-20 h-20 border-2 border-dashed border-gray-300 rounded-lg flex items-center justify-center bg-gray-50">
+                    <Upload className="w-6 h-6 text-gray-400" />
+                  </div>
+                )}
+              </div>
               <div>
                 <input
                   type="file"
@@ -302,8 +320,11 @@ export default function CompanySettingsComponent() {
                   disabled={loading}
                 >
                   <Upload className="w-4 h-4 mr-2" />
-                  {settings.company_logo_url ? 'Change Logo' : 'Upload Logo'}
+                  {loading ? 'Uploading...' : (settings.company_logo_url ? 'Change Logo' : 'Upload Logo')}
                 </Button>
+                {settings.company_logo_url && (
+                  <p className="text-xs text-green-600 mt-2">✓ Logo uploaded successfully</p>
+                )}
               </div>
             </div>
           </div>
