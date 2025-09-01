@@ -12,6 +12,7 @@ import POTemplate from '../components/print/POTemplate';
 import InvoiceTemplate from '../components/print/InvoiceTemplate';
 import DOTemplate from '../components/print/DOTemplate';
 import QuotationTemplate from '../components/print/QuotationTemplate';
+import StockCountTemplate from '../components/print/StockCountTemplate';
 
 export default function Print() {
   const [data, setData] = useState(null);
@@ -21,8 +22,10 @@ export default function Print() {
   const [error, setError] = useState(null);
 
   const [searchParams] = useSearchParams();
-  const type = searchParams.get('type');
-  const id = searchParams.get('id');
+  const rawData = searchParams.get('data');
+  const type = rawData ? JSON.parse(rawData).type : searchParams.get('type');
+  const id = rawData ? JSON.parse(rawData).id : searchParams.get('id');
+  const passedData = rawData ? JSON.parse(rawData).data : null;
 
   useEffect(() => {
     if (!type || !id) {
@@ -88,6 +91,13 @@ export default function Print() {
               }
             }
             break;
+          case 'stock-count':
+            if (passedData) {
+              doc = passedData;
+            } else {
+              doc = await StockCount.getById(id);
+            }
+            break;
           default:
             throw new Error(`Unsupported document type: ${type}`);
         }
@@ -137,6 +147,8 @@ export default function Print() {
         return <DOTemplate data={data} customer={relatedData.customer} settings={settings} />;
       case 'quotation':
         return <QuotationTemplate data={data} customer={relatedData.customer} settings={settings} />;
+      case 'stock-count':
+        return <StockCountTemplate data={data} settings={settings} />;
       default:
         return null;
     }

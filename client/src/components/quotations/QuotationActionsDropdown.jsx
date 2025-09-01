@@ -97,7 +97,7 @@ export default function QuotationActionsDropdown({ quotation, canEdit, onEdit, o
   };
 
   const handleExportPDF = () => {
-    window.open(`/Print?type=quotation&id=${quotation.id}`, '_blank');
+    window.open(`/print?type=quotation&id=${quotation.id}`, '_blank');
   };
 
   const handleDelete = async () => {

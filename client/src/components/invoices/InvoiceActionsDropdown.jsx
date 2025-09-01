@@ -123,7 +123,7 @@ export default function InvoiceActionsDropdown({ invoice, canEdit, onEdit, onRef
   };
 
   const handleExportPDF = () => {
-    window.open(`/Print?type=invoice&id=${invoice.id}`, '_blank');
+    window.open(`/print?type=invoice&id=${invoice.id}`, '_blank');
   };
 
   const handleDelete = async () => { // Removed 'reason' parameter

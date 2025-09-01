@@ -106,7 +106,16 @@ export const GoodsReceipt = new FallbackEntity('GoodsReceipt');
 export const DeliveryOrder = new FallbackEntity('DeliveryOrder');
 export const Invoice = new FallbackEntity('Invoice');
 export const InventoryLot = new FallbackEntity('InventoryLot');
-export const StockCount = new ApiEntity('stock-counts');
+export const StockCount = {
+  ...new ApiEntity('stock-counts'),
+  async getById(id) {
+    const response = await fetch(`/api/stock-counts/${id}`);
+    if (!response.ok) {
+      throw new Error('Failed to fetch stock count');
+    }
+    return await response.json();
+  }
+};
 export const CompanySettings = new FallbackEntity('CompanySettings');
 export const Books = new FallbackEntity('Books');
 export const StorageSettings = new FallbackEntity('StorageSettings');

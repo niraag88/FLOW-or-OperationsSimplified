@@ -130,7 +130,7 @@ export default function DOActionsDropdown({ doOrder, canEdit, onEdit, onRefresh 
   };
 
   const handleExportPDF = () => {
-    window.open(`/Print?type=do&id=${doOrder.id}`, '_blank');
+    window.open(`/print?type=do&id=${doOrder.id}`, '_blank');
   };
 
   // Modified handleDelete function - no longer accepts a 'reason' parameter

@@ -110,7 +110,7 @@ export default function POActionsDropdown({ po, canEdit, onEdit, onRefresh }) {
   };
 
   const handleExportPDF = () => {
-    window.open(`/Print?type=po&id=${po.id}`, '_blank');
+    window.open(`/print?type=po&id=${po.id}`, '_blank');
   };
 
   const handleDelete = async () => {

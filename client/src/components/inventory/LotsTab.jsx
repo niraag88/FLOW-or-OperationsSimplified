@@ -71,18 +71,25 @@ export default function LotsTab({ products, loading, canEdit, currentUser, onRef
     }
   };
 
-  const handleExport = (stockCount, format) => {
+  const handleExport = async (stockCount, format) => {
     if (format === 'pdf') {
       // Generate PDF export
       const printData = {
         type: 'stock-count',
-        data: stockCount
+        data: stockCount,
+        id: stockCount.id
       };
       const params = new URLSearchParams({ data: JSON.stringify(printData) });
       window.open(`/print?${params.toString()}`, '_blank');
     } else if (format === 'xlsx') {
-      // Generate XLSX export
-      exportToExcel(stockCount);
+      // Get full stock count data with items before exporting
+      try {
+        const fullStockCount = await StockCount.getById(stockCount.id);
+        exportToExcel(fullStockCount);
+      } catch (error) {
+        console.error('Error fetching stock count details:', error);
+        alert('Failed to export: Unable to load stock count details');
+      }
     }
   };
 
