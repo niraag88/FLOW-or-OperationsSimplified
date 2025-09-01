@@ -62,7 +62,7 @@ export default function Settings() {
               <span className="sm:hidden">St.</span>
             </TabsTrigger>
             <TabsTrigger value="recycle" className="flex flex-col sm:flex-row items-center gap-1 sm:gap-2 text-xs sm:text-sm px-2 sm:px-3">
-              <Archive className="w-4 h-4" />
+              <Trash2 className="w-4 h-4 stroke-2" />
               <span className="hidden sm:inline">Recycle Bin</span>
               <span className="sm:hidden">Rec.</span>
             </TabsTrigger>
