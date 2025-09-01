@@ -85,7 +85,7 @@ export default function RecentActivity({ data }) {
                     {activity.status?.replace(/_/g, ' ')}
                   </Badge>
                   <p className="text-xs text-gray-500 mt-1">
-                    {format(new Date(activity.date), 'MMM d, HH:mm')}
+                    {activity.date ? format(new Date(activity.date), 'MMM d, HH:mm') : 'No date'}
                   </p>
                 </div>
               </div>
