@@ -11,10 +11,24 @@ import { format } from "date-fns";
 export default function StockTab({ products, loading, canEdit, currentUser, onRefresh }) {
   const [stockMovements, setStockMovements] = useState([]);
   const [loadingMovements, setLoadingMovements] = useState(true);
+  const [companySettings, setCompanySettings] = useState(null);
 
   useEffect(() => {
     loadStockMovements();
+    loadCompanySettings();
   }, []);
+
+  const loadCompanySettings = async () => {
+    try {
+      const response = await fetch('/api/company-settings', { credentials: 'include' });
+      if (!response.ok) throw new Error('Failed to fetch company settings');
+      const data = await response.json();
+      setCompanySettings(data);
+    } catch (error) {
+      console.error("Error loading company settings:", error);
+      setCompanySettings({ lowStockThreshold: 6, fxGbpToAed: 4.85 });
+    }
+  };
 
   const loadStockMovements = async () => {
     setLoadingMovements(true);
@@ -31,18 +45,23 @@ export default function StockTab({ products, loading, canEdit, currentUser, onRe
     }
   };
 
-  // Calculate stock summary
+  // Calculate stock summary with configurable threshold and AED conversion
   const stockSummary = products.reduce((acc, product) => {
     const stock = product.stockQuantity || 0;
-    const minStock = product.minStockLevel || 10;
+    const lowStockThreshold = companySettings?.lowStockThreshold || 6;
+    const fxRate = parseFloat(companySettings?.fxGbpToAed || 4.85);
     
     if (stock === 0) {
       acc.outOfStock++;
-    } else if (stock <= minStock) {
+    } else if (stock <= lowStockThreshold) {
       acc.lowStock++;
     }
     
-    acc.totalValue += stock * (parseFloat(product.costPrice) || 0);
+    // Convert cost price to AED if needed
+    const costPrice = parseFloat(product.costPrice) || 0;
+    const costPriceAed = costPrice * fxRate; // Assuming cost price is in GBP
+    
+    acc.totalValue += stock * costPriceAed;
     acc.totalProducts++;
     acc.totalQuantity += stock;
     
@@ -55,9 +74,10 @@ export default function StockTab({ products, loading, canEdit, currentUser, onRe
     outOfStock: 0
   });
 
-  const lowStockProducts = products.filter(p => 
-    (p.stockQuantity || 0) > 0 && (p.stockQuantity || 0) <= (p.minStockLevel || 10)
-  );
+  const lowStockProducts = products.filter(p => {
+    const lowStockThreshold = companySettings?.lowStockThreshold || 6;
+    return (p.stockQuantity || 0) > 0 && (p.stockQuantity || 0) <= lowStockThreshold;
+  });
 
   const outOfStockProducts = products.filter(p => (p.stockQuantity || 0) === 0);
 
@@ -135,12 +155,10 @@ export default function StockTab({ products, loading, canEdit, currentUser, onRe
         <Card>
           <CardContent className="pt-6">
             <div className="flex items-center">
-              <div className="h-8 w-8 bg-green-100 rounded-full flex items-center justify-center">
-                <span className="text-green-600 font-bold">$</span>
-              </div>
+              <TrendingUp className="h-8 w-8 text-green-600" />
               <div className="ml-4">
                 <p className="text-sm font-medium text-gray-600">Stock Value</p>
-                <p className="text-2xl font-bold">${stockSummary.totalValue.toFixed(2)}</p>
+                <p className="text-2xl font-bold">AED {stockSummary.totalValue.toLocaleString('en-AE', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</p>
               </div>
             </div>
           </CardContent>
@@ -153,6 +171,7 @@ export default function StockTab({ products, loading, canEdit, currentUser, onRe
               <div className="ml-4">
                 <p className="text-sm font-medium text-gray-600">Low Stock</p>
                 <p className="text-2xl font-bold text-amber-600">{stockSummary.lowStock}</p>
+                <p className="text-xs text-gray-500">≤{companySettings?.lowStockThreshold || 6} units</p>
               </div>
             </div>
           </CardContent>

@@ -1232,6 +1232,71 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  // Bulk create stock movements for initial stock setup
+  app.post('/api/stock-movements/bulk', requireAuth(), async (req: AuthenticatedRequest, res) => {
+    try {
+      const { movements } = req.body;
+      
+      if (!movements || !Array.isArray(movements)) {
+        return res.status(400).json({ error: 'Movements array is required' });
+      }
+
+      const results = [];
+      
+      // Process each movement
+      for (const movement of movements) {
+        const { productId, quantity, movementType, notes } = movement;
+        
+        if (!productId || !quantity || quantity <= 0) {
+          continue; // Skip invalid movements
+        }
+
+        // Get current product stock
+        const [product] = await db.select().from(products)
+          .where(eq(products.id, productId))
+          .limit(1);
+          
+        if (!product) {
+          continue; // Skip if product doesn't exist
+        }
+
+        const previousStock = product.stockQuantity || 0;
+        const newStock = previousStock + quantity;
+
+        // Create stock movement record
+        const [stockMovement] = await db.insert(stockMovements).values({
+          productId,
+          movementType: movementType || 'adjustment',
+          quantity,
+          previousStock,
+          newStock,
+          unitCost: product.costPrice || '0.00',
+          notes: notes || 'Initial stock entry',
+          createdBy: req.user!.id
+        }).returning();
+
+        // Update product stock
+        await db.update(products)
+          .set({ 
+            stockQuantity: newStock,
+            updatedAt: new Date()
+          })
+          .where(eq(products.id, productId));
+
+        results.push(stockMovement);
+      }
+
+      res.json({ 
+        success: true, 
+        created: results.length,
+        movements: results 
+      });
+    } catch (error) {
+      console.error('Error creating bulk stock movements:', error);
+      res.status(500).json({ error: 'Failed to create stock movements' });
+    }
+  });
+
   // Dashboard statistics
   app.get('/api/dashboard/stats', requireAuth(), async (req: AuthenticatedRequest, res) => {
     try {

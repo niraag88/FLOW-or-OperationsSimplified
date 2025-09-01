@@ -318,6 +318,8 @@ export const companySettings = pgTable("company_settings", {
   currency: text("currency").default("USD"),
   vatEnabled: boolean("vat_enabled").default(true),
   defaultVatRate: decimal("default_vat_rate", { precision: 5, scale: 2 }).default("0.00"),
+  lowStockThreshold: integer("low_stock_threshold").default(6),
+  fxGbpToAed: decimal("fx_gbp_to_aed", { precision: 8, scale: 4 }).default("4.8500"),
   updatedBy: varchar("updated_by").references(() => users.id),
   updatedAt: timestamp("updated_at").defaultNow().notNull(),
 });
