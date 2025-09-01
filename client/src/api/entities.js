@@ -127,7 +127,44 @@ export const StockCount = {
     return await response.json();
   }
 };
-export const CompanySettings = new FallbackEntity('CompanySettings');
+export const CompanySettings = {
+  async list() {
+    const response = await fetch('/api/company-settings', {
+      credentials: 'include'
+    });
+    if (!response.ok) {
+      throw new Error('Failed to fetch company settings');
+    }
+    const settings = await response.json();
+    return settings ? [settings] : [];
+  },
+  
+  async create(data) {
+    const response = await fetch('/api/company-settings', {
+      method: 'PUT', // Server uses PUT for both create and update
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(data),
+      credentials: 'include'
+    });
+    if (!response.ok) {
+      throw new Error('Failed to create company settings');
+    }
+    return await response.json();
+  },
+  
+  async update(id, data) {
+    const response = await fetch('/api/company-settings', {
+      method: 'PUT',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(data),
+      credentials: 'include'
+    });
+    if (!response.ok) {
+      throw new Error('Failed to update company settings');
+    }
+    return await response.json();
+  }
+};
 export const Books = new FallbackEntity('Books');
 export const StorageSettings = new FallbackEntity('StorageSettings');
 export const StorageUsage = new FallbackEntity('StorageUsage');
