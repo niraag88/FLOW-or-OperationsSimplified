@@ -3,8 +3,9 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { TrendingUp, TrendingDown, Package, Activity, AlertTriangle, History } from "lucide-react";
+import { TrendingUp, TrendingDown, Package, Activity, AlertTriangle, History, Search } from "lucide-react";
 import { Skeleton } from "@/components/ui/skeleton";
 import { format } from "date-fns";
 
@@ -13,6 +14,12 @@ export default function StockTab({ products, loading, canEdit, currentUser, onRe
   const [loadingMovements, setLoadingMovements] = useState(true);
   const [companySettings, setCompanySettings] = useState(null);
   const [activeStockTab, setActiveStockTab] = useState("stock-levels");
+  
+  // Filter states for each tab
+  const [currentStockFilter, setCurrentStockFilter] = useState("");
+  const [movementsFilter, setMovementsFilter] = useState("");
+  const [lowStockFilter, setLowStockFilter] = useState("");
+  const [outOfStockFilter, setOutOfStockFilter] = useState("");
 
   useEffect(() => {
     loadStockMovements();
@@ -81,6 +88,35 @@ export default function StockTab({ products, loading, canEdit, currentUser, onRe
   });
 
   const outOfStockProducts = products.filter(p => (p.stockQuantity || 0) === 0);
+
+  // Filter functions
+  const filterProducts = (productList, searchTerm) => {
+    if (!searchTerm) return productList;
+    const term = searchTerm.toLowerCase();
+    return productList.filter(product => 
+      (product.name || '').toLowerCase().includes(term) ||
+      (product.sku || '').toLowerCase().includes(term) ||
+      (product.brandName || '').toLowerCase().includes(term) ||
+      (product.description || '').toLowerCase().includes(term)
+    );
+  };
+
+  const filterMovements = (movementList, searchTerm) => {
+    if (!searchTerm) return movementList;
+    const term = searchTerm.toLowerCase();
+    return movementList.filter(movement => 
+      (movement.productName || '').toLowerCase().includes(term) ||
+      (movement.productSku || '').toLowerCase().includes(term) ||
+      (movement.movementType || '').toLowerCase().includes(term) ||
+      (movement.notes || '').toLowerCase().includes(term)
+    );
+  };
+
+  // Apply filters
+  const filteredProducts = filterProducts(products, currentStockFilter);
+  const filteredLowStockProducts = filterProducts(lowStockProducts, lowStockFilter);
+  const filteredOutOfStockProducts = filterProducts(outOfStockProducts, outOfStockFilter);
+  const filteredStockMovements = filterMovements(stockMovements, movementsFilter);
 
   // Initialize stock sub-tab data after computed values are available
   useEffect(() => {
@@ -227,6 +263,15 @@ export default function StockTab({ products, loading, canEdit, currentUser, onRe
               <p className="text-sm text-gray-600">Real-time stock quantities updated automatically</p>
             </CardHeader>
             <CardContent>
+              <div className="flex items-center gap-2 mb-4">
+                <Search className="w-4 h-4 text-gray-400" />
+                <Input
+                  placeholder="Filter by product name, SKU, brand, or size..."
+                  value={currentStockFilter}
+                  onChange={(e) => setCurrentStockFilter(e.target.value)}
+                  className="max-w-sm"
+                />
+              </div>
               <Table>
                 <TableHeader>
                   <TableRow>
@@ -239,7 +284,7 @@ export default function StockTab({ products, loading, canEdit, currentUser, onRe
                   </TableRow>
                 </TableHeader>
                 <TableBody>
-                  {products.map((product) => {
+                  {filteredProducts.map((product) => {
                     const stock = product.stockQuantity || 0;
                     const lowStockThreshold = companySettings?.lowStockThreshold || 6;
                     const status = stock === 0 ? 'out' : stock <= lowStockThreshold ? 'low' : 'ok';
@@ -282,6 +327,15 @@ export default function StockTab({ products, loading, canEdit, currentUser, onRe
               <p className="text-sm text-gray-600">Automatic stock changes from goods receipts and sales</p>
             </CardHeader>
             <CardContent>
+              <div className="flex items-center gap-2 mb-4">
+                <Search className="w-4 h-4 text-gray-400" />
+                <Input
+                  placeholder="Filter by product, movement type, or notes..."
+                  value={movementsFilter}
+                  onChange={(e) => setMovementsFilter(e.target.value)}
+                  className="max-w-sm"
+                />
+              </div>
               {loadingMovements ? (
                 <div className="space-y-4">
                   {[...Array(5)].map((_, i) => (
@@ -302,7 +356,7 @@ export default function StockTab({ products, loading, canEdit, currentUser, onRe
                     </TableRow>
                   </TableHeader>
                   <TableBody>
-                    {stockMovements.map((movement) => (
+                    {filteredStockMovements.map((movement) => (
                       <TableRow key={movement.id}>
                         <TableCell className="text-sm">
                           {format(new Date(movement.createdAt), 'MMM dd, yyyy h:mm a')}
@@ -335,7 +389,7 @@ export default function StockTab({ products, loading, canEdit, currentUser, onRe
                 </Table>
               )}
 
-              {stockMovements.length === 0 && !loadingMovements && (
+              {filteredStockMovements.length === 0 && !loadingMovements && (
                 <div className="text-center py-12 text-gray-500">
                   <History className="w-12 h-12 mx-auto mb-4 opacity-50" />
                   <p>No stock movements recorded yet</p>
@@ -351,11 +405,20 @@ export default function StockTab({ products, loading, canEdit, currentUser, onRe
             <CardHeader>
               <CardTitle className="flex items-center gap-2 text-amber-600">
                 <AlertTriangle className="w-5 h-5" />
-                Low Stock Products ({lowStockProducts.length})
+                Low Stock Products ({filteredLowStockProducts.length})
               </CardTitle>
               <p className="text-sm text-gray-600">Products at or below minimum stock level</p>
             </CardHeader>
             <CardContent>
+              <div className="flex items-center gap-2 mb-4">
+                <Search className="w-4 h-4 text-gray-400" />
+                <Input
+                  placeholder="Filter by product name, SKU, or brand..."
+                  value={lowStockFilter}
+                  onChange={(e) => setLowStockFilter(e.target.value)}
+                  className="max-w-sm"
+                />
+              </div>
               <Table>
                 <TableHeader>
                   <TableRow>
@@ -365,7 +428,7 @@ export default function StockTab({ products, loading, canEdit, currentUser, onRe
                   </TableRow>
                 </TableHeader>
                 <TableBody>
-                  {lowStockProducts.map((product) => {
+                  {filteredLowStockProducts.map((product) => {
                     const reorderQty = (product.maxStockLevel || 50) - (product.stockQuantity || 0);
                     return (
                       <TableRow key={product.id}>
@@ -391,7 +454,7 @@ export default function StockTab({ products, loading, canEdit, currentUser, onRe
                 </TableBody>
               </Table>
 
-              {lowStockProducts.length === 0 && (
+              {filteredLowStockProducts.length === 0 && (
                 <div className="text-center py-12 text-gray-500">
                   <Package className="w-12 h-12 mx-auto mb-4 opacity-50" />
                   <p>No products with low stock</p>
@@ -407,37 +470,46 @@ export default function StockTab({ products, loading, canEdit, currentUser, onRe
             <CardHeader>
               <CardTitle className="flex items-center gap-2 text-red-600">
                 <AlertTriangle className="w-5 h-5" />
-                Out of Stock Products ({outOfStockProducts.length})
+                Out of Stock Products ({filteredOutOfStockProducts.length})
               </CardTitle>
               <p className="text-sm text-gray-600">Products with zero stock quantity</p>
             </CardHeader>
             <CardContent>
+              <div className="flex items-center gap-2 mb-4">
+                <Search className="w-4 h-4 text-gray-400" />
+                <Input
+                  placeholder="Filter by product name, SKU, or brand..."
+                  value={outOfStockFilter}
+                  onChange={(e) => setOutOfStockFilter(e.target.value)}
+                  className="max-w-sm"
+                />
+              </div>
               <Table>
                 <TableHeader>
                   <TableRow>
-                    <TableHead>Product</TableHead>
-                    <TableHead>Last Sale Price</TableHead>
-                    <TableHead>Suggested Reorder</TableHead>
+                    <TableHead>Brand</TableHead>
+                    <TableHead>Product Code</TableHead>
+                    <TableHead>Product Name</TableHead>
+                    <TableHead>Size</TableHead>
+                    <TableHead>Current Stock</TableHead>
+                    <TableHead>Status</TableHead>
                   </TableRow>
                 </TableHeader>
                 <TableBody>
-                  {outOfStockProducts.map((product) => {
-                    const reorderQty = product.maxStockLevel || 50;
+                  {filteredOutOfStockProducts.map((product) => {
                     return (
                       <TableRow key={product.id}>
+                        <TableCell>{product.brandName || '-'}</TableCell>
+                        <TableCell className="font-mono">{product.sku}</TableCell>
+                        <TableCell>{product.name}</TableCell>
+                        <TableCell>{product.description || '-'}</TableCell>
                         <TableCell>
-                          <div>
-                            <p className="font-medium">{product.name}</p>
-                            <p className="text-xs text-gray-500">{product.sku} • {product.brandName}</p>
-                          </div>
-                        </TableCell>
-                        <TableCell>
-                          ${parseFloat(product.unitPrice).toFixed(2)}
-                        </TableCell>
-                        <TableCell>
-                          <Badge variant="outline" className="text-red-600">
-                            {reorderQty} units
+                          <Badge variant="destructive">
+                            0
                           </Badge>
+                        </TableCell>
+                        <TableCell>
+                          <Badge variant="destructive">Out of Stock</Badge>
                         </TableCell>
                       </TableRow>
                     );
@@ -445,7 +517,7 @@ export default function StockTab({ products, loading, canEdit, currentUser, onRe
                 </TableBody>
               </Table>
 
-              {outOfStockProducts.length === 0 && (
+              {filteredOutOfStockProducts.length === 0 && (
                 <div className="text-center py-12 text-gray-500">
                   <Package className="w-12 h-12 mx-auto mb-4 opacity-50" />
                   <p>No products out of stock</p>
