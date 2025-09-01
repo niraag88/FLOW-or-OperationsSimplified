@@ -915,7 +915,9 @@ export async function registerRoutes(app: Express): Promise<Server> {
       res.status(201).json(stockCount);
     } catch (error) {
       console.error('Error creating stock count:', error);
-      res.status(500).json({ error: 'Failed to create stock count' });
+      console.error('Error details:', error.message);
+      console.error('Error stack:', error.stack);
+      res.status(500).json({ error: 'Failed to create stock count', details: error.message });
     }
   });
 
