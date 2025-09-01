@@ -6,7 +6,7 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { Upload, Building, Save, PoundSterling } from "lucide-react"; // Added PoundSterling icon
+import { Upload, Building, Save, PoundSterling, Edit2, X } from "lucide-react"; // Added Edit2 and X icons
 import { CompanySettings } from "@/api/entities";
 import { UploadFile } from "@/api/integrations";
 import { useToast } from "@/components/ui/use-toast";
@@ -36,6 +36,7 @@ export default function CompanySettingsComponent() {
   const [initialLoad, setInitialLoad] = useState(true);
   const [trnError, setTrnError] = useState(""); // Added trnError state
   const [logoKey, setLogoKey] = useState(Date.now()); // Added logoKey for forcing image refresh
+  const [isEditMode, setIsEditMode] = useState(false); // Added edit mode state
   const { toast } = useToast();
 
   useEffect(() => {
@@ -144,6 +145,7 @@ export default function CompanySettingsComponent() {
         await CompanySettings.create(settings);
       }
       
+      setIsEditMode(false); // Exit edit mode after successful save
       toast({
         title: "Settings saved",
         description: "Company settings have been updated successfully."
@@ -160,6 +162,16 @@ export default function CompanySettingsComponent() {
     }
   };
 
+  const handleEdit = () => {
+    setIsEditMode(true);
+  };
+
+  const handleCancel = async () => {
+    // Reload settings to discard changes
+    setIsEditMode(false);
+    await loadSettings();
+  };
+
   if (initialLoad) {
     return <div>Loading...</div>;
   }
@@ -167,9 +179,35 @@ export default function CompanySettingsComponent() {
   return (
     <Card className="border-0 shadow-lg">
       <CardHeader>
-        <CardTitle className="flex items-center gap-2">
-          <Building className="w-5 h-5" />
-          Company Settings
+        <CardTitle className="flex items-center justify-between">
+          <div className="flex items-center gap-2">
+            <Building className="w-5 h-5" />
+            Company Settings
+          </div>
+          <div className="flex gap-2">
+            {!isEditMode ? (
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={handleEdit}
+                className="flex items-center gap-2"
+              >
+                <Edit2 className="w-4 h-4" />
+                Edit
+              </Button>
+            ) : (
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={handleCancel}
+                disabled={loading}
+                className="flex items-center gap-2"
+              >
+                <X className="w-4 h-4" />
+                Cancel
+              </Button>
+            )}
+          </div>
         </CardTitle>
       </CardHeader>
       <CardContent className="space-y-6">
@@ -185,6 +223,8 @@ export default function CompanySettingsComponent() {
                 value={settings.company_name}
                 onChange={(e) => handleInputChange('company_name', e.target.value)}
                 placeholder="Enter company name"
+                readOnly={!isEditMode}
+                className={!isEditMode ? "bg-gray-50" : ""}
               />
             </div>
             
@@ -196,6 +236,8 @@ export default function CompanySettingsComponent() {
                 value={settings.company_email}
                 onChange={(e) => handleInputChange('company_email', e.target.value)}
                 placeholder="company@example.com"
+                readOnly={!isEditMode}
+                className={!isEditMode ? "bg-gray-50" : ""}
               />
             </div>
           </div>
@@ -208,6 +250,8 @@ export default function CompanySettingsComponent() {
                 value={settings.company_phone}
                 onChange={(e) => handleInputChange('company_phone', e.target.value)}
                 placeholder="+971 XX XXX XXXX"
+                readOnly={!isEditMode}
+                className={!isEditMode ? "bg-gray-50" : ""}
               />
             </div>
             
@@ -220,7 +264,8 @@ export default function CompanySettingsComponent() {
                 onChange={(e) => handleInputChange('company_trn', e.target.value)}
                 placeholder="100000000000000"
                 maxLength={15}
-                className={trnError ? "border-red-500 focus-visible:ring-red-500" : ""}
+                className={trnError ? "border-red-500 focus-visible:ring-red-500" : (!isEditMode ? "bg-gray-50" : "")}
+                readOnly={!isEditMode}
               />
               {trnError && <p className="text-sm text-red-500">{trnError}</p>}
               <p className="text-xs text-gray-500">15-digit UAE Tax Registration Number</p>
@@ -233,8 +278,9 @@ export default function CompanySettingsComponent() {
               <Select
                 value={settings.default_currency}
                 onValueChange={(value) => handleInputChange('default_currency', value)}
+                disabled={!isEditMode}
               >
-                <SelectTrigger>
+                <SelectTrigger className={!isEditMode ? "bg-gray-50" : ""}>
                   <SelectValue />
                 </SelectTrigger>
                 <SelectContent>
@@ -257,6 +303,8 @@ export default function CompanySettingsComponent() {
                 max="100"
                 value={(settings.default_vat_rate * 100).toFixed(2)}
                 onChange={(e) => handleInputChange('default_vat_rate', parseFloat(e.target.value) / 100 || 0)}
+                readOnly={!isEditMode}
+                className={!isEditMode ? "bg-gray-50" : ""}
               />
               <p className="text-xs text-gray-500">Used as default for new invoices</p>
             </div>
@@ -270,6 +318,8 @@ export default function CompanySettingsComponent() {
               onChange={(e) => handleInputChange('company_address', e.target.value)}
               placeholder="Enter company address"
               rows={3}
+              readOnly={!isEditMode}
+              className={!isEditMode ? "bg-gray-50" : ""}
             />
           </div>
 
@@ -330,7 +380,7 @@ export default function CompanySettingsComponent() {
                   type="button"
                   variant="outline"
                   onClick={() => document.getElementById('logo-upload').click()}
-                  disabled={loading}
+                  disabled={loading || !isEditMode}
                 >
                   <Upload className="w-4 h-4 mr-2" />
                   {loading ? 'Uploading...' : (settings.company_logo_url ? 'Change Logo' : 'Upload Logo')}
@@ -358,7 +408,8 @@ export default function CompanySettingsComponent() {
                     min="0"
                     value={settings.fx_gbp_to_aed}
                     onChange={(e) => handleInputChange('fx_gbp_to_aed', parseFloat(e.target.value) || 0)}
-                    className="pl-9"
+                    className={`pl-9 ${!isEditMode ? "bg-gray-50" : ""}`}
+                    readOnly={!isEditMode}
                   />
                 </div>
                 <p className="text-xs text-gray-500">1 GBP = {settings.fx_gbp_to_aed} AED</p>
@@ -378,6 +429,8 @@ export default function CompanySettingsComponent() {
                 value={settings.po_number_prefix}
                 onChange={(e) => handleInputChange('po_number_prefix', e.target.value)}
                 placeholder="PO"
+                readOnly={!isEditMode}
+                className={!isEditMode ? "bg-gray-50" : ""}
               />
             </div>
             
@@ -388,6 +441,8 @@ export default function CompanySettingsComponent() {
                 value={settings.do_number_prefix}
                 onChange={(e) => handleInputChange('do_number_prefix', e.target.value)}
                 placeholder="DO"
+                readOnly={!isEditMode}
+                className={!isEditMode ? "bg-gray-50" : ""}
               />
             </div>
             
@@ -398,6 +453,8 @@ export default function CompanySettingsComponent() {
                 value={settings.invoice_number_prefix}
                 onChange={(e) => handleInputChange('invoice_number_prefix', e.target.value)}
                 placeholder="INV"
+                readOnly={!isEditMode}
+                className={!isEditMode ? "bg-gray-50" : ""}
               />
             </div>
             
@@ -408,6 +465,8 @@ export default function CompanySettingsComponent() {
                 value={settings.grn_number_prefix}
                 onChange={(e) => handleInputChange('grn_number_prefix', e.target.value)}
                 placeholder="GRN"
+                readOnly={!isEditMode}
+                className={!isEditMode ? "bg-gray-50" : ""}
               />
             </div>
           </div>
@@ -421,6 +480,8 @@ export default function CompanySettingsComponent() {
                 min="1"
                 value={settings.next_po_number}
                 onChange={(e) => handleInputChange('next_po_number', parseInt(e.target.value) || 1)}
+                readOnly={!isEditMode}
+                className={!isEditMode ? "bg-gray-50" : ""}
               />
             </div>
             
@@ -432,6 +493,8 @@ export default function CompanySettingsComponent() {
                 min="1"
                 value={settings.next_do_number}
                 onChange={(e) => handleInputChange('next_do_number', parseInt(e.target.value) || 1)}
+                readOnly={!isEditMode}
+                className={!isEditMode ? "bg-gray-50" : ""}
               />
             </div>
             
@@ -443,6 +506,8 @@ export default function CompanySettingsComponent() {
                 min="1"
                 value={settings.next_invoice_number}
                 onChange={(e) => handleInputChange('next_invoice_number', parseInt(e.target.value) || 1)}
+                readOnly={!isEditMode}
+                className={!isEditMode ? "bg-gray-50" : ""}
               />
             </div>
             
@@ -454,21 +519,25 @@ export default function CompanySettingsComponent() {
                 min="1"
                 value={settings.next_grn_number}
                 onChange={(e) => handleInputChange('next_grn_number', parseInt(e.target.value) || 1)}
+                readOnly={!isEditMode}
+                className={!isEditMode ? "bg-gray-50" : ""}
               />
             </div>
           </div>
         </div>
 
-        <div className="flex justify-end pt-6 border-t">
-          <Button 
-            onClick={handleSave} 
-            disabled={loading || !!trnError} // Disabled if loading or TRN error exists
-            className="bg-emerald-600 hover:bg-emerald-700"
-          >
-            <Save className="w-4 h-4 mr-2" />
-            {loading ? "Saving..." : "Save Settings"}
-          </Button>
-        </div>
+        {isEditMode && (
+          <div className="flex justify-end pt-6 border-t">
+            <Button 
+              onClick={handleSave} 
+              disabled={loading || !!trnError} // Disabled if loading or TRN error exists
+              className="bg-emerald-600 hover:bg-emerald-700"
+            >
+              <Save className="w-4 h-4 mr-2" />
+              {loading ? "Saving..." : "Save Settings"}
+            </Button>
+          </div>
+        )}
       </CardContent>
     </Card>
   );
