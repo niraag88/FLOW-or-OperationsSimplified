@@ -11,8 +11,6 @@ import { User } from "@/api/entities";
 import SimpleConfirmDialog from "../common/SimpleConfirmDialog";
 
 export default function ProductsTab({ products, loading, canEdit, canDelete, onRefresh }) {
-  console.log("ProductsTab received:", { products, loading, productsLength: products?.length });
-  
   // State variables for SimpleConfirmDialog
   const [dialogOpen, setDialogOpen] = useState(false);
   const [productToDelete, setProductToDelete] = useState(null);
@@ -82,7 +80,7 @@ export default function ProductsTab({ products, loading, canEdit, canDelete, onR
         <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
           <CardTitle className="flex items-center gap-2">
             <Package className="w-5 h-5" />
-            Products ({products?.length || 0}) - Debug: {JSON.stringify({hasProducts: !!products, isArray: Array.isArray(products), loading})}
+            Products ({products?.length || 0})
           </CardTitle>
         </CardHeader>
 

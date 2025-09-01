@@ -30,8 +30,6 @@ export default function Inventory() {
     try {
       // Load products first
       const productsData = await Product.list('-updated_date');
-      console.log("Loaded products data:", productsData);
-      console.log("Products data length:", productsData?.length);
       setProducts(productsData);
       
       // Load stock counts separately to avoid blocking products
