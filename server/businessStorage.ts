@@ -351,8 +351,12 @@ export class BusinessStorage {
   }
 
   async createStockCount(data: { items: any[], createdBy: string }) {
+    console.log('Creating stock count with data:', JSON.stringify(data, null, 2));
+    
     const totalProducts = data.items.filter(item => item.quantity > 0).length;
     const totalQuantity = data.items.reduce((sum, item) => sum + item.quantity, 0);
+    
+    console.log('Stock count totals:', { totalProducts, totalQuantity });
     
     const [stockCount] = await db.insert(stockCounts).values({
       countDate: new Date(),
@@ -360,6 +364,8 @@ export class BusinessStorage {
       totalQuantity,
       createdBy: data.createdBy,
     }).returning();
+    
+    console.log('Created stock count:', stockCount);
 
     const itemsToInsert = data.items.filter(item => item.quantity > 0).map(item => ({
       stockCountId: stockCount.id,

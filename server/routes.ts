@@ -903,8 +903,13 @@ export async function registerRoutes(app: Express): Promise<Server> {
         return res.status(401).json({ error: 'Authentication required' });
       }
       
+      // Validate that we have items in the request body
+      if (!req.body.items || !Array.isArray(req.body.items)) {
+        return res.status(400).json({ error: 'Items array is required' });
+      }
+      
       const stockCount = await businessStorage.createStockCount({
-        ...req.body,
+        items: req.body.items,
         createdBy: req.user.id
       });
       res.status(201).json(stockCount);
