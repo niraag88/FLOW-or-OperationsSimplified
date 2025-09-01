@@ -235,15 +235,14 @@ export default function StockTab({ products, loading, canEdit, currentUser, onRe
                     <TableHead>Product Name</TableHead>
                     <TableHead>Size</TableHead>
                     <TableHead>Current Stock</TableHead>
-                    <TableHead>Min Level</TableHead>
                     <TableHead>Status</TableHead>
                   </TableRow>
                 </TableHeader>
                 <TableBody>
                   {products.map((product) => {
                     const stock = product.stockQuantity || 0;
-                    const minStock = product.minStockLevel || 10;
-                    const status = stock === 0 ? 'out' : stock <= minStock ? 'low' : 'ok';
+                    const lowStockThreshold = companySettings?.lowStockThreshold || 6;
+                    const status = stock === 0 ? 'out' : stock <= lowStockThreshold ? 'low' : 'ok';
                     
                     return (
                       <TableRow key={product.id}>
@@ -259,7 +258,6 @@ export default function StockTab({ products, loading, canEdit, currentUser, onRe
                             {stock.toLocaleString()}
                           </Badge>
                         </TableCell>
-                        <TableCell>{minStock}</TableCell>
                         <TableCell>
                           {status === 'out' && <Badge variant="destructive">Out of Stock</Badge>}
                           {status === 'low' && <Badge variant="secondary">Low Stock</Badge>}
@@ -363,7 +361,6 @@ export default function StockTab({ products, loading, canEdit, currentUser, onRe
                   <TableRow>
                     <TableHead>Product</TableHead>
                     <TableHead>Current Stock</TableHead>
-                    <TableHead>Min Level</TableHead>
                     <TableHead>Reorder Needed</TableHead>
                   </TableRow>
                 </TableHeader>
@@ -383,7 +380,6 @@ export default function StockTab({ products, loading, canEdit, currentUser, onRe
                             {product.stockQuantity || 0}
                           </Badge>
                         </TableCell>
-                        <TableCell>{product.minStockLevel || 10}</TableCell>
                         <TableCell>
                           <Badge variant="outline">
                             {reorderQty} units
@@ -421,7 +417,6 @@ export default function StockTab({ products, loading, canEdit, currentUser, onRe
                   <TableRow>
                     <TableHead>Product</TableHead>
                     <TableHead>Last Sale Price</TableHead>
-                    <TableHead>Min Level</TableHead>
                     <TableHead>Suggested Reorder</TableHead>
                   </TableRow>
                 </TableHeader>
@@ -439,7 +434,6 @@ export default function StockTab({ products, loading, canEdit, currentUser, onRe
                         <TableCell>
                           ${parseFloat(product.unitPrice).toFixed(2)}
                         </TableCell>
-                        <TableCell>{product.minStockLevel || 10}</TableCell>
                         <TableCell>
                           <Badge variant="outline" className="text-red-600">
                             {reorderQty} units
