@@ -20,6 +20,12 @@ export default function Inventory() {
   const [searchTerm, setSearchTerm] = useState("");
   const [activeTab, setActiveTab] = useState("products");
   const [refreshTrigger, setRefreshTrigger] = useState(0);
+  const [stockSubTab, setStockSubTab] = useState("stock-levels");
+  const [stockSubTabData, setStockSubTabData] = useState({
+    stockMovements: [],
+    lowStockProducts: [],
+    outOfStockProducts: []
+  });
 
   useEffect(() => {
     loadData();
@@ -65,6 +71,15 @@ export default function Inventory() {
     }, 100);
   };
 
+  const handleStockSubTabChange = (subTab, stockMovements, lowStockProducts, outOfStockProducts) => {
+    setStockSubTab(subTab);
+    setStockSubTabData({
+      stockMovements,
+      lowStockProducts,
+      outOfStockProducts
+    });
+  };
+
   const canEdit = true;
   const canDelete = true;
   const currentUser = { role: 'Admin', email: 'admin@opsuite.com' };
@@ -108,19 +123,27 @@ export default function Inventory() {
           <ExportDropdown 
             products={filteredProducts} 
             activeTab={activeTab}
+            stockSubTab={stockSubTab}
+            stockMovements={stockSubTabData.stockMovements}
+            lowStockProducts={stockSubTabData.lowStockProducts}
+            outOfStockProducts={stockSubTabData.outOfStockProducts}
           />
           
-          <QuickAddProduct 
-            onProductAdded={handleProductAdded}
-            canAdd={canEdit}
-          />
-          
-          <Button asChild variant="outline">
-            <Link to={createPageUrl('AddProduct')}>
-              <Plus className="w-4 h-4 mr-2" />
-              Add Product
-            </Link>
-          </Button>
+          {activeTab === "products" && (
+            <>
+              <QuickAddProduct 
+                onProductAdded={handleProductAdded}
+                canAdd={canEdit}
+              />
+              
+              <Button asChild variant="outline">
+                <Link to={createPageUrl('AddProduct')}>
+                  <Plus className="w-4 h-4 mr-2" />
+                  Add Product
+                </Link>
+              </Button>
+            </>
+          )}
         </div>
       </div>
 
@@ -159,6 +182,7 @@ export default function Inventory() {
             canEdit={canEdit}
             currentUser={currentUser}
             onRefresh={handleRefresh}
+            onStockSubTabChange={handleStockSubTabChange}
           />
         </TabsContent>
       </Tabs>

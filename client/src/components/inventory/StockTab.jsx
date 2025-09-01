@@ -8,15 +8,23 @@ import { TrendingUp, TrendingDown, Package, Activity, AlertTriangle, History } f
 import { Skeleton } from "@/components/ui/skeleton";
 import { format } from "date-fns";
 
-export default function StockTab({ products, loading, canEdit, currentUser, onRefresh }) {
+export default function StockTab({ products, loading, canEdit, currentUser, onRefresh, onStockSubTabChange }) {
   const [stockMovements, setStockMovements] = useState([]);
   const [loadingMovements, setLoadingMovements] = useState(true);
   const [companySettings, setCompanySettings] = useState(null);
+  const [activeStockTab, setActiveStockTab] = useState("stock-levels");
 
   useEffect(() => {
     loadStockMovements();
     loadCompanySettings();
   }, []);
+
+  // Initialize stock sub-tab data on mount
+  useEffect(() => {
+    if (onStockSubTabChange && stockMovements.length >= 0) {
+      onStockSubTabChange(activeStockTab, stockMovements, lowStockProducts, outOfStockProducts);
+    }
+  }, [stockMovements, lowStockProducts, outOfStockProducts, activeStockTab, onStockSubTabChange]);
 
   const loadCompanySettings = async () => {
     try {
@@ -193,15 +201,20 @@ export default function StockTab({ products, loading, canEdit, currentUser, onRe
       </div>
 
       {/* Stock Details */}
-      <Tabs defaultValue="current" className="w-full">
+      <Tabs defaultValue="stock-levels" className="w-full" onValueChange={(value) => {
+        setActiveStockTab(value);
+        if (onStockSubTabChange) {
+          onStockSubTabChange(value, stockMovements, lowStockProducts, outOfStockProducts);
+        }
+      }}>
         <TabsList className="grid w-full grid-cols-4">
-          <TabsTrigger value="current">Current Stock</TabsTrigger>
+          <TabsTrigger value="stock-levels">Current Stock</TabsTrigger>
           <TabsTrigger value="movements">Stock Movements</TabsTrigger>
           <TabsTrigger value="low-stock">Low Stock</TabsTrigger>
           <TabsTrigger value="out-of-stock">Out of Stock</TabsTrigger>
         </TabsList>
 
-        <TabsContent value="current" className="space-y-4">
+        <TabsContent value="stock-levels" className="space-y-4">
           <Card>
             <CardHeader>
               <CardTitle>Current Stock Levels</CardTitle>
