@@ -23,7 +23,8 @@ export default function InventorySettings() {
 
   const loadSettings = async () => {
     try {
-      const companySettings = await apiRequest("/api/company-settings");
+      const response = await apiRequest("GET", "/api/company-settings");
+      const companySettings = await response.json();
       setSettings({
         lowStockThreshold: companySettings.lowStockThreshold || 6,
       });
@@ -41,7 +42,8 @@ export default function InventorySettings() {
 
   const loadProducts = async () => {
     try {
-      const productsList = await apiRequest("/api/products");
+      const response = await apiRequest("GET", "/api/products");
+      const productsList = await response.json();
       setProducts(productsList);
       // Initialize stock data for all products
       const stockData = {};
@@ -82,11 +84,8 @@ export default function InventorySettings() {
   const saveSettings = async () => {
     setIsSaving(true);
     try {
-      await apiRequest("/api/company-settings", {
-        method: "PUT",
-        body: JSON.stringify({
-          lowStockThreshold: parseInt(settings.lowStockThreshold) || 6,
-        }),
+      await apiRequest("PUT", "/api/company-settings", {
+        lowStockThreshold: parseInt(settings.lowStockThreshold) || 6,
       });
       
       toast({
@@ -127,11 +126,8 @@ export default function InventorySettings() {
         return;
       }
 
-      await apiRequest("/api/stock-movements/bulk", {
-        method: "POST",
-        body: JSON.stringify({
-          movements: stockEntries
-        }),
+      await apiRequest("POST", "/api/stock-movements/bulk", {
+        movements: stockEntries
       });
 
       toast({
