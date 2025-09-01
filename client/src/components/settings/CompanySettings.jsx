@@ -93,9 +93,18 @@ export default function CompanySettingsComponent() {
     try {
       setLoading(true);
       console.log("Starting logo upload for file:", file.name);
-      const { file_url } = await UploadFile({ file });
-      console.log("Upload successful, file_url:", file_url);
-      handleInputChange('company_logo_url', file_url);
+      const result = await UploadFile({ file });
+      console.log("Upload result:", result);
+      
+      // Handle both possible response formats
+      const fileUrl = result.file_url || result.url;
+      console.log("Extracted file_url:", fileUrl);
+      
+      if (!fileUrl) {
+        throw new Error("No file URL returned from upload");
+      }
+      
+      handleInputChange('company_logo_url', fileUrl);
       setLogoKey(Date.now()); // Force image refresh
       toast({
         title: "Logo uploaded successfully",

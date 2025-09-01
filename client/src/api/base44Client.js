@@ -44,7 +44,12 @@ export const base44 = {
     Core: {
       InvokeLLM: async () => ({ success: true }),
       SendEmail: async () => ({ success: true }),
-      UploadFile: async () => ({ success: true, url: '#' }),
+      UploadFile: async ({ file }) => {
+        // Create a mock URL using object URL for demo purposes
+        const mockUrl = URL.createObjectURL(file);
+        console.log("Mock UploadFile - Created URL:", mockUrl);
+        return { success: true, file_url: mockUrl };
+      },
       GenerateImage: async () => ({ success: true, url: '#' }),
       ExtractDataFromUploadedFile: async () => ({ success: true, data: {} })
     }
