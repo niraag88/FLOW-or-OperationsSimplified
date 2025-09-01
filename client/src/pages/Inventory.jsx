@@ -28,16 +28,23 @@ export default function Inventory() {
   const loadData = async () => {
     setLoading(true);
     try {
-      // Changed lotsData to stockCountsData, removed PO and GRN data fetching
-      const [productsData, stockCountsData] = await Promise.all([
-        Product.list('-updated_date'),
-        StockCount.list('-created_date'), // Load stock counts instead of lots
-      ]);
-
+      // Load products first
+      const productsData = await Product.list('-updated_date');
+      console.log("Loaded products data:", productsData);
+      console.log("Products data length:", productsData?.length);
       setProducts(productsData);
-      setStockCounts(stockCountsData); // Set stock counts
+      
+      // Load stock counts separately to avoid blocking products
+      try {
+        const stockCountsData = await StockCount.list('-created_date');
+        setStockCounts(stockCountsData);
+      } catch (stockError) {
+        console.error("Error loading stock counts:", stockError);
+        setStockCounts([]); // Set empty array if stock counts fail
+      }
     } catch (error) {
       console.error("Error loading inventory data:", error);
+      setProducts([]); // Ensure products is set to empty array on error
     } finally {
       setLoading(false);
     }

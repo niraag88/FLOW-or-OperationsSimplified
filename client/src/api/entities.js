@@ -6,9 +6,18 @@ class ApiEntity {
 
   async list(sort) {
     const url = sort ? `/api/${this.endpoint}?sort=${encodeURIComponent(sort)}` : `/api/${this.endpoint}`;
-    const response = await fetch(url);
-    if (!response.ok) throw new Error(`Failed to fetch ${this.endpoint}`);
-    return await response.json();
+    console.log(`Fetching ${this.endpoint} from:`, url);
+    const response = await fetch(url, {
+      credentials: 'include' // Include session cookies
+    });
+    console.log(`Response for ${this.endpoint}:`, response.status, response.ok);
+    if (!response.ok) {
+      console.error(`Failed to fetch ${this.endpoint}: ${response.status} ${response.statusText}`);
+      throw new Error(`Failed to fetch ${this.endpoint}`);
+    }
+    const data = await response.json();
+    console.log(`Data for ${this.endpoint}:`, data);
+    return data;
   }
 
   async create(data) {
