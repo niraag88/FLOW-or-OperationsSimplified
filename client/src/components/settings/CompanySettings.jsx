@@ -13,16 +13,16 @@ import { useToast } from "@/components/ui/use-toast";
 
 export default function CompanySettingsComponent() {
   const [settings, setSettings] = useState({
-    company_name: "",
-    company_logo_url: "",
-    company_address: "",
-    company_phone: "",
-    company_email: "",
-    company_trn: "", // Added company_trn
-    tax_rate: 5.0,
-    default_vat_rate: 0.05, // Added default_vat_rate
-    default_currency: "AED",
-    fx_gbp_to_aed: 4.85, // Added fx_gbp_to_aed
+    companyName: "",
+    logo: "", // Changed from company_logo_url to match schema
+    address: "", // Changed from company_address to match schema
+    phone: "", // Changed from company_phone to match schema
+    email: "", // Changed from company_email to match schema
+    vatNumber: "", // Changed from company_trn to match schema
+    defaultVatRate: 0.05, // Changed to camelCase to match schema
+    currency: "AED", // Changed from default_currency to match schema
+    fxGbpToAed: 4.85, // Changed to camelCase to match schema
+    // Note: Document numbering fields are not in the schema yet
     po_number_prefix: "PO",
     do_number_prefix: "DO",
     invoice_number_prefix: "INV",
@@ -52,8 +52,8 @@ export default function CompanySettingsComponent() {
         setSettings(prev => ({
           ...prev,
           ...loadedSettings,
-          default_vat_rate: loadedSettings.default_vat_rate !== undefined ? loadedSettings.default_vat_rate : 0.05,
-          fx_gbp_to_aed: loadedSettings.fx_gbp_to_aed !== undefined ? loadedSettings.fx_gbp_to_aed : 4.85
+          defaultVatRate: loadedSettings.defaultVatRate !== undefined ? loadedSettings.defaultVatRate : 0.05,
+          fxGbpToAed: loadedSettings.fxGbpToAed !== undefined ? loadedSettings.fxGbpToAed : 4.85
         }));
       }
     } catch (error) {
@@ -105,9 +105,9 @@ export default function CompanySettingsComponent() {
         throw new Error("No file URL returned from upload");
       }
       
-      handleInputChange('company_logo_url', fileUrl);
+      handleInputChange('logo', fileUrl);
       setLogoKey(Date.now()); // Force image refresh
-      console.log("Updated settings.company_logo_url to:", fileUrl);
+      console.log("Updated settings.logo to:", fileUrl);
       console.log("Current logoKey:", Date.now());
       toast({
         title: "Logo uploaded successfully",
@@ -127,7 +127,7 @@ export default function CompanySettingsComponent() {
 
   const handleSave = async () => {
     // Validate TRN before saving
-    if (settings.company_trn && !validateTRN(settings.company_trn)) {
+    if (settings.vatNumber && !validateTRN(settings.vatNumber)) {
       toast({
         title: "Validation Error",
         description: "Please enter a valid 15-digit TRN",
@@ -220,8 +220,8 @@ export default function CompanySettingsComponent() {
               <Label htmlFor="company_name">Company Name *</Label>
               <Input
                 id="company_name"
-                value={settings.company_name}
-                onChange={(e) => handleInputChange('company_name', e.target.value)}
+                value={settings.companyName}
+                onChange={(e) => handleInputChange('companyName', e.target.value)}
                 placeholder="Enter company name"
                 readOnly={!isEditMode}
                 className={!isEditMode ? "bg-gray-50" : ""}
@@ -233,8 +233,8 @@ export default function CompanySettingsComponent() {
               <Input
                 id="company_email"
                 type="email"
-                value={settings.company_email}
-                onChange={(e) => handleInputChange('company_email', e.target.value)}
+                value={settings.email}
+                onChange={(e) => handleInputChange('email', e.target.value)}
                 placeholder="company@example.com"
                 readOnly={!isEditMode}
                 className={!isEditMode ? "bg-gray-50" : ""}
@@ -247,8 +247,8 @@ export default function CompanySettingsComponent() {
               <Label htmlFor="company_phone">Phone Number</Label>
               <Input
                 id="company_phone"
-                value={settings.company_phone}
-                onChange={(e) => handleInputChange('company_phone', e.target.value)}
+                value={settings.phone}
+                onChange={(e) => handleInputChange('phone', e.target.value)}
                 placeholder="+971 XX XXX XXXX"
                 readOnly={!isEditMode}
                 className={!isEditMode ? "bg-gray-50" : ""}
@@ -260,8 +260,8 @@ export default function CompanySettingsComponent() {
               <Label htmlFor="company_trn">Tax Registration Number (TRN)</Label>
               <Input
                 id="company_trn"
-                value={settings.company_trn}
-                onChange={(e) => handleInputChange('company_trn', e.target.value)}
+                value={settings.vatNumber}
+                onChange={(e) => handleInputChange('vatNumber', e.target.value)}
                 placeholder="100000000000000"
                 maxLength={15}
                 className={trnError ? "border-red-500 focus-visible:ring-red-500" : (!isEditMode ? "bg-gray-50" : "")}
@@ -276,8 +276,8 @@ export default function CompanySettingsComponent() {
             <div className="space-y-2">
               <Label htmlFor="default_currency">Default Currency</Label>
               <Select
-                value={settings.default_currency}
-                onValueChange={(value) => handleInputChange('default_currency', value)}
+                value={settings.currency}
+                onValueChange={(value) => handleInputChange('currency', value)}
                 disabled={!isEditMode}
               >
                 <SelectTrigger className={!isEditMode ? "bg-gray-50" : ""}>
@@ -301,8 +301,8 @@ export default function CompanySettingsComponent() {
                 step="0.01"
                 min="0"
                 max="100"
-                value={(settings.default_vat_rate * 100).toFixed(2)}
-                onChange={(e) => handleInputChange('default_vat_rate', parseFloat(e.target.value) / 100 || 0)}
+                value={(settings.defaultVatRate * 100).toFixed(2)}
+                onChange={(e) => handleInputChange('defaultVatRate', parseFloat(e.target.value) / 100 || 0)}
                 readOnly={!isEditMode}
                 className={!isEditMode ? "bg-gray-50" : ""}
               />
@@ -314,8 +314,8 @@ export default function CompanySettingsComponent() {
             <Label htmlFor="company_address">Address</Label>
             <Textarea
               id="company_address"
-              value={settings.company_address}
-              onChange={(e) => handleInputChange('company_address', e.target.value)}
+              value={settings.address}
+              onChange={(e) => handleInputChange('address', e.target.value)}
               placeholder="Enter company address"
               rows={3}
               readOnly={!isEditMode}
@@ -344,18 +344,18 @@ export default function CompanySettingsComponent() {
             <div className="flex items-center gap-4">
               <div className="flex-shrink-0">
                 <div className="w-20 h-20 border-2 border-gray-200 rounded-lg flex items-center justify-center bg-white shadow-sm relative">
-                  {settings.company_logo_url ? (
+                  {settings.logo ? (
                     <>
                       <img
                         key={logoKey}
-                        src={settings.company_logo_url}
+                        src={settings.logo}
                         alt="Company Logo"
                         className="w-full h-full object-contain rounded-lg"
                         onError={(e) => {
                           console.error("Error loading logo:", e);
-                          console.log("Failed logo URL:", settings.company_logo_url);
-                          console.log("Logo URL type:", typeof settings.company_logo_url);
-                          console.log("Logo URL length:", settings.company_logo_url?.length);
+                          console.log("Failed logo URL:", settings.logo);
+                          console.log("Logo URL type:", typeof settings.logo);
+                          console.log("Logo URL length:", settings.logo?.length);
                         }}
                         onLoad={() => {
                           console.log("Logo loaded successfully!");
@@ -383,9 +383,9 @@ export default function CompanySettingsComponent() {
                   disabled={loading || !isEditMode}
                 >
                   <Upload className="w-4 h-4 mr-2" />
-                  {loading ? 'Uploading...' : (settings.company_logo_url ? 'Change Logo' : 'Upload Logo')}
+                  {loading ? 'Uploading...' : (settings.logo ? 'Change Logo' : 'Upload Logo')}
                 </Button>
-                {settings.company_logo_url && (
+                {settings.logo && (
                   <p className="text-xs text-green-600 mt-2">✓ Logo uploaded successfully</p>
                 )}
               </div>
@@ -406,8 +406,8 @@ export default function CompanySettingsComponent() {
                     type="number"
                     step="0.01"
                     min="0"
-                    value={settings.fx_gbp_to_aed}
-                    onChange={(e) => handleInputChange('fx_gbp_to_aed', parseFloat(e.target.value) || 0)}
+                    value={settings.fxGbpToAed}
+                    onChange={(e) => handleInputChange('fxGbpToAed', parseFloat(e.target.value) || 0)}
                     className={`pl-9 ${!isEditMode ? "bg-gray-50" : ""}`}
                     readOnly={!isEditMode}
                   />
