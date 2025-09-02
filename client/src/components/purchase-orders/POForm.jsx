@@ -63,10 +63,14 @@ export default function POForm({ open, onClose, editingPO, currentUser, onSucces
 
         if (settingsList.length > 0) {
           const currentSettings = settingsList[0];
+          console.log("Current settings loaded:", currentSettings);
+          console.log("Exchange rate value:", currentSettings.fx_gbp_to_aed);
           setCompanySettings(currentSettings);
           
           // For new POs, reset form with correct exchange rate
           if (!editingPO) {
+            const exchangeRate = parseFloat(currentSettings.fx_gbp_to_aed) || 5;
+            console.log("Setting exchange rate to:", exchangeRate);
             const initialFormData = {
               po_number: "",
               supplier_id: "",
@@ -74,7 +78,7 @@ export default function POForm({ open, onClose, editingPO, currentUser, onSucces
               expected_delivery_date: "",
               status: "draft",
               currency: "GBP",
-              fx_rate_to_aed: parseFloat(currentSettings.fx_gbp_to_aed) || 4.85,
+              fx_rate_to_aed: exchangeRate,
               subtotal: 0,
               total_amount: 0,
               po_total_aed: 0,
@@ -140,7 +144,7 @@ export default function POForm({ open, onClose, editingPO, currentUser, onSucces
         ...prev, 
         po_number: poNumber,
         // Ensure exchange rate is set from company settings if available
-        fx_rate_to_aed: companySettings ? parseFloat(companySettings.fx_gbp_to_aed) || 4.85 : prev.fx_rate_to_aed
+        fx_rate_to_aed: companySettings ? parseFloat(companySettings.fx_gbp_to_aed) : prev.fx_rate_to_aed
       }));
     } catch (error) {
       console.error("Error generating PO number:", error);
@@ -150,7 +154,7 @@ export default function POForm({ open, onClose, editingPO, currentUser, onSucces
         ...prev, 
         po_number: poNumber,
         // Ensure exchange rate is set from company settings if available
-        fx_rate_to_aed: companySettings ? parseFloat(companySettings.fx_gbp_to_aed) || 4.85 : prev.fx_rate_to_aed
+        fx_rate_to_aed: companySettings ? parseFloat(companySettings.fx_gbp_to_aed) : prev.fx_rate_to_aed
       }));
     }
   };
@@ -163,7 +167,7 @@ export default function POForm({ open, onClose, editingPO, currentUser, onSucces
       expected_delivery_date: "",
       status: "draft",
       currency: "GBP",
-      fx_rate_to_aed: parseFloat(companySettings?.fx_gbp_to_aed) || 4.85,
+      fx_rate_to_aed: parseFloat(companySettings?.fx_gbp_to_aed) || 5,
       subtotal: 0,
       total_amount: 0,
       po_total_aed: 0,
@@ -184,7 +188,7 @@ export default function POForm({ open, onClose, editingPO, currentUser, onSucces
 
     // Update exchange rate when currency changes
     if (field === 'currency' && companySettings) {
-      const newRate = value === 'GBP' ? parseFloat(companySettings.fx_gbp_to_aed) || 4.85 : 1;
+      const newRate = value === 'GBP' ? parseFloat(companySettings.fx_gbp_to_aed) : 1;
       setFormData(prev => ({
         ...prev,
         fx_rate_to_aed: newRate
