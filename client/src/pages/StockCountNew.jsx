@@ -197,7 +197,7 @@ export default function StockCountNew() {
               {filteredProducts.map((product) => (
                 <TableRow key={product.id}>
                   <TableCell>{product.brandName || '-'}</TableCell>
-                  <TableCell className="font-mono">{product.sku}</TableCell>
+                  <TableCell>{product.sku}</TableCell>
                   <TableCell>{product.name}</TableCell>
                   <TableCell>{product.description || '-'}</TableCell>
                   <TableCell>

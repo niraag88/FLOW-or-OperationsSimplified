@@ -292,7 +292,7 @@ export default function StockTab({ products, loading, canEdit, currentUser, onRe
                     return (
                       <TableRow key={product.id}>
                         <TableCell>{product.brandName || '-'}</TableCell>
-                        <TableCell className="font-mono">{product.sku}</TableCell>
+                        <TableCell>{product.sku}</TableCell>
                         <TableCell>{product.name}</TableCell>
                         <TableCell>{product.description || '-'}</TableCell>
                         <TableCell>
@@ -435,7 +435,7 @@ export default function StockTab({ products, loading, canEdit, currentUser, onRe
                         <TableCell>
                           <div>
                             <p className="font-medium">{product.name}</p>
-                            <p className="text-xs text-gray-500"><span className="font-mono">{product.sku}</span> • {product.brandName}</p>
+                            <p className="text-xs text-gray-500">{product.sku} • {product.brandName}</p>
                           </div>
                         </TableCell>
                         <TableCell>
@@ -500,7 +500,7 @@ export default function StockTab({ products, loading, canEdit, currentUser, onRe
                     return (
                       <TableRow key={product.id}>
                         <TableCell>{product.brandName || '-'}</TableCell>
-                        <TableCell className="font-mono">{product.sku}</TableCell>
+                        <TableCell>{product.sku}</TableCell>
                         <TableCell>{product.name}</TableCell>
                         <TableCell>{product.description || '-'}</TableCell>
                         <TableCell>

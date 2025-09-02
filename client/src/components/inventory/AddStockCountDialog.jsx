@@ -128,7 +128,7 @@ export default function AddStockCountDialog({ open, onClose, products, onSuccess
                   {paginatedProducts.map((product) => (
                     <TableRow key={product.id}>
                       <TableCell className="text-sm">{product.brandName || '-'}</TableCell>
-                      <TableCell className="font-mono text-sm">{product.sku}</TableCell>
+                      <TableCell className="text-sm">{product.sku}</TableCell>
                       <TableCell className="text-sm">{product.name}</TableCell>
                       <TableCell className="text-sm">{product.description || '-'}</TableCell>
                       <TableCell>
@@ -155,7 +155,7 @@ export default function AddStockCountDialog({ open, onClose, products, onSuccess
                   <div className="space-y-3">
                     <div>
                       <h3 className="font-semibold text-gray-900">{product.name}</h3>
-                      <p className="text-sm text-gray-600 font-mono">{product.sku}</p>
+                      <p className="text-sm text-gray-600">{product.sku}</p>
                     </div>
                     <div className="grid grid-cols-2 gap-4 text-sm">
                       <div>

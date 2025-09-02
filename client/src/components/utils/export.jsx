@@ -63,48 +63,54 @@ export const exportToPDF = (data, filename, title = 'Export', columns = null) =>
     return;
   }
 
-  const doc = new jsPDF();
-  
-  // Add title
-  doc.setFontSize(16);
-  doc.text(title, 14, 20);
-  
-  // Add timestamp
-  doc.setFontSize(10);
-  doc.text(`Generated: ${new Date().toLocaleString()}`, 14, 30);
-  
-  // Prepare table data
-  const headers = columns || Object.keys(data[0]);
-  const tableData = data.map(row => 
-    headers.map(header => {
-      const value = row[header];
-      return value !== null && value !== undefined ? String(value) : '';
-    })
-  );
-  
-  // Add table
-  doc.autoTable({
-    head: [headers],
-    body: tableData,
-    startY: 40,
-    styles: {
-      fontSize: 8,
-      cellPadding: 2,
-    },
-    headStyles: {
-      fillColor: [51, 51, 51],
-      textColor: 255,
-      fontStyle: 'bold'
-    },
-    alternateRowStyles: {
-      fillColor: [245, 245, 245]
-    },
-    margin: { top: 40 }
-  });
-  
-  // Generate filename with timestamp
-  const timestampedFilename = `${filename}_${new Date().toISOString().split('T')[0]}.pdf`;
-  
-  // Save the PDF
-  doc.save(timestampedFilename);
+  try {
+    const doc = new jsPDF();
+    
+    // Add title
+    doc.setFontSize(16);
+    doc.text(title, 14, 20);
+    
+    // Add timestamp
+    doc.setFontSize(10);
+    doc.text(`Generated: ${new Date().toLocaleString()}`, 14, 30);
+    
+    // Prepare table data
+    const headers = columns || Object.keys(data[0]);
+    const tableData = data.map(row => 
+      headers.map(header => {
+        const value = row[header];
+        return value !== null && value !== undefined ? String(value) : '';
+      })
+    );
+    
+    // Add table
+    doc.autoTable({
+      head: [headers],
+      body: tableData,
+      startY: 40,
+      styles: {
+        fontSize: 8,
+        cellPadding: 2,
+      },
+      headStyles: {
+        fillColor: [51, 51, 51],
+        textColor: 255,
+        fontStyle: 'bold'
+      },
+      alternateRowStyles: {
+        fillColor: [245, 245, 245]
+      },
+      margin: { top: 40 }
+    });
+    
+    // Generate filename with timestamp
+    const timestampedFilename = `${filename}_${new Date().toISOString().split('T')[0]}.pdf`;
+    
+    // Save the PDF
+    doc.save(timestampedFilename);
+    
+  } catch (error) {
+    console.error("PDF export error:", error);
+    throw error;
+  }
 };

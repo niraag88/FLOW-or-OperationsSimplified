@@ -25,7 +25,7 @@ export default function LowStockAlert({ products }) {
                 <div className="flex items-center justify-between">
                   <div>
                     <p className="font-semibold text-sm text-gray-900">{product.name}</p>
-                    <p className="text-xs text-gray-500 font-mono">{product.sku}</p>
+                    <p className="text-xs text-gray-500">{product.sku}</p>
                   </div>
                   <div className="text-right">
                     <p className="text-sm font-bold text-red-600">{product.stockQuantity || 0}</p>
