@@ -255,9 +255,9 @@ export default function POForm({ open, onClose, editingPO, currentUser, onSucces
       if (product) {
         newItems[index].product_code = product.sku;
         newItems[index].description = `${product.name}${product.size ? ` - ${product.size}` : ''}`;
-        // Use purchase_price in GBP for POs
-        newItems[index].unit_price = product.purchasePrice || 0;
-        newItems[index].line_total = (newItems[index].quantity || 0) * (product.purchasePrice || 0);
+        // Use cost_price in GBP for POs
+        newItems[index].unit_price = product.costPrice || 0;
+        newItems[index].line_total = (newItems[index].quantity || 0) * (product.costPrice || 0);
       }
     }
 
@@ -506,7 +506,7 @@ export default function POForm({ open, onClose, editingPO, currentUser, onSucces
                             </Select>
                           </TableCell>
                           <TableCell>
-                            <span className="font-mono text-sm bg-gray-50 px-2 py-1 rounded">
+                            <span className="text-sm font-medium text-gray-700">
                               {item.product_code || '-'}
                             </span>
                           </TableCell>
@@ -594,7 +594,7 @@ export default function POForm({ open, onClose, editingPO, currentUser, onSucces
                       {item.product_code && (
                         <div className="space-y-2 mb-4">
                           <Label>Product Code</Label>
-                          <div className="font-mono text-sm bg-gray-50 px-3 py-2 rounded border">
+                          <div className="text-sm font-medium text-gray-700 bg-gray-50 px-3 py-2 rounded border">
                             {item.product_code}
                           </div>
                         </div>
