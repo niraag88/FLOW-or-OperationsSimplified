@@ -6,7 +6,7 @@ import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { ShoppingCart, Edit2, Copy, Download, Eye, Truck } from "lucide-react";
 import { Skeleton } from "@/components/ui/skeleton";
-import { format } from "date-fns";
+import { format, parseISO, isValid } from "date-fns";
 import { 
   DropdownMenu,
   DropdownMenuContent,
@@ -57,6 +57,16 @@ export default function POList({ purchaseOrders, loading, canEdit, currentUser, 
       maximumFractionDigits: 2
     });
     return `${formatter.format(amount)} ${currency}`;
+  };
+
+  const formatDate = (dateString) => {
+    if (!dateString) return '';
+    try {
+      const date = typeof dateString === 'string' ? parseISO(dateString) : new Date(dateString);
+      return isValid(date) ? format(date, 'MMM dd, yyyy') : '';
+    } catch (error) {
+      return '';
+    }
   };
 
   const handleReceiveGoods = (po) => {
@@ -125,11 +135,11 @@ export default function POList({ purchaseOrders, loading, canEdit, currentUser, 
                     <TableCell className="font-medium">{po.po_number}</TableCell>
                     <TableCell>{getBrandName(po.supplier_id)}</TableCell> {/* Uses getBrandName */}
                     <TableCell>
-                      {format(new Date(po.order_date), 'MMM dd, yyyy')}
+                      {formatDate(po.order_date)}
                     </TableCell>
                     <TableCell>
                       {po.expected_delivery_date ? 
-                        format(new Date(po.expected_delivery_date), 'MMM dd, yyyy') 
+                        formatDate(po.expected_delivery_date) 
                         : '-'
                       }
                     </TableCell>
@@ -190,13 +200,13 @@ export default function POList({ purchaseOrders, loading, canEdit, currentUser, 
                 <div className="grid grid-cols-2 gap-4 text-sm mb-4">
                   <div>
                     <p className="text-gray-500">Order Date</p>
-                    <p className="font-medium">{format(new Date(po.order_date), 'MMM dd, yyyy')}</p>
+                    <p className="font-medium">{formatDate(po.order_date)}</p>
                   </div>
                   <div>
                     <p className="text-gray-500">Expected Delivery</p>
                     <p className="font-medium">
                       {po.expected_delivery_date ? 
-                        format(new Date(po.expected_delivery_date), 'MMM dd, yyyy') 
+                        formatDate(po.expected_delivery_date) 
                         : '-'
                       }
                     </p>
