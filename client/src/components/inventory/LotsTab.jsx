@@ -230,11 +230,11 @@ export default function LotsTab({ products, loading, canEdit, currentUser, onRef
                           <DropdownMenuContent>
                             <DropdownMenuItem onClick={() => handleExport(stockCount, 'pdf')}>
                               <FileText className="w-4 h-4 mr-2" />
-                              Export as PDF
+                              Export to PDF
                             </DropdownMenuItem>
                             <DropdownMenuItem onClick={() => handleExport(stockCount, 'xlsx')}>
                               <FileText className="w-4 h-4 mr-2" />
-                              Export as XLSX
+                              Export to XLSX
                             </DropdownMenuItem>
                           </DropdownMenuContent>
                         </DropdownMenu>
@@ -282,11 +282,11 @@ export default function LotsTab({ products, loading, canEdit, currentUser, onRef
                       <DropdownMenuContent>
                         <DropdownMenuItem onClick={() => handleExport(stockCount, 'pdf')}>
                           <FileText className="w-4 h-4 mr-2" />
-                          Export as PDF
+                          Export to PDF
                         </DropdownMenuItem>
                         <DropdownMenuItem onClick={() => handleExport(stockCount, 'xlsx')}>
                           <FileText className="w-4 h-4 mr-2" />
-                          Export as XLSX
+                          Export to XLSX
                         </DropdownMenuItem>
                       </DropdownMenuContent>
                     </DropdownMenu>

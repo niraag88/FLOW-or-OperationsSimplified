@@ -203,10 +203,10 @@ export default function VATReportTab({ invoices, customers, books, companySettin
               </DropdownMenuTrigger>
               <DropdownMenuContent align="end">
                 <DropdownMenuItem onClick={handleExportXLSX}>
-                  Export XLSX
+                  Export to XLSX
                 </DropdownMenuItem>
                 <DropdownMenuItem onClick={() => toast({ title: "PDF export", description: "PDF export feature coming soon" })}>
-                  Export PDF
+                  Export to PDF
                 </DropdownMenuItem>
               </DropdownMenuContent>
             </DropdownMenu>

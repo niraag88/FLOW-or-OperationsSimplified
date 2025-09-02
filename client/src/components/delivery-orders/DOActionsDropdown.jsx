@@ -199,11 +199,11 @@ export default function DOActionsDropdown({ doOrder, canEdit, onEdit, onRefresh 
           )}
           <DropdownMenuItem onClick={handleExportPDF}>
             <FileText className="w-4 h-4 mr-2" />
-            Export as PDF
+            Export to PDF
           </DropdownMenuItem>
           <DropdownMenuItem onClick={handleExportXLSX}>
             <Download className="w-4 h-4 mr-2" />
-            Export as XLSX
+            Export to XLSX
           </DropdownMenuItem>
           <DropdownMenuSeparator /> {/* Separator for delete option */}
           <DropdownMenuItem 

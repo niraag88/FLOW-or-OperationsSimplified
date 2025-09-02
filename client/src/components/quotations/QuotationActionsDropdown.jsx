@@ -174,11 +174,11 @@ export default function QuotationActionsDropdown({ quotation, canEdit, onEdit, o
           )}
           <DropdownMenuItem onClick={handleExportPDF}>
             <FileText className="w-4 h-4 mr-2" />
-            Export as PDF
+            Export to PDF
           </DropdownMenuItem>
           <DropdownMenuItem onClick={handleExportXLSX}>
             <Download className="w-4 h-4 mr-2" />
-            Export as XLSX
+            Export to XLSX
           </DropdownMenuItem>
           {/* New dropdown item for converting to invoice */}
           <DropdownMenuItem onClick={() => setShowConvertToInvoiceDialog(true)}>
