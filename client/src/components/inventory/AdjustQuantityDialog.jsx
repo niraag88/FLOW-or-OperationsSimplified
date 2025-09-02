@@ -104,7 +104,7 @@ export default function AdjustQuantityDialog({ open, onClose, lot, product, curr
             <h4 className="font-medium text-gray-900 mb-2">{product.name}</h4>
             <div className="grid grid-cols-2 gap-2 text-sm">
               <div>
-                <span className="text-gray-500">SKU:</span> {product.sku}
+                <span className="text-gray-500">SKU:</span> <span className="font-mono">{product.sku}</span>
               </div>
               <div>
                 <span className="text-gray-500">Batch:</span> {lot.batch_no}

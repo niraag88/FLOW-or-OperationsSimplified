@@ -272,7 +272,7 @@ export default function ReceiveGoodsDialog({ open, onClose, purchaseOrder, curre
                         <TableCell>
                           <div>
                             <p className="font-medium">{product.name}</p>
-                            <p className="text-sm text-gray-500">{product.sku}</p>
+                            <p className="text-sm text-gray-500 font-mono">{product.sku}</p>
                           </div>
                         </TableCell>
                         <TableCell>
