@@ -8,28 +8,40 @@ import {
 } from "@/components/ui/dropdown-menu";
 import { Button } from "@/components/ui/button";
 import { Download, FileSpreadsheet, FileText } from "lucide-react";
-import { exportToCsv } from "../utils/export";
+import { exportToCsv, exportToXLSX, exportToPDF } from "../utils/export";
 
 export default function ExportDropdown({ products, activeTab, stockSubTab, stockMovements, lowStockProducts, outOfStockProducts }) {
   const [isExporting, setIsExporting] = useState(false);
 
-  const exportProducts = async () => {
+  // Helper function to prepare product export data
+  const getProductExportData = () => {
+    return products.map(product => ({
+      SKU: product.sku,
+      'Product Name': product.name,
+      Description: product.description || '',
+      'Brand ID': product.brandId,
+      'Unit Price': product.unitPrice,
+      'Cost Price': product.costPrice || 0,
+      'Stock Quantity': product.stockQuantity || 0,
+      'Min Stock Level': product.minStockLevel || 0,
+      'Max Stock Level': product.maxStockLevel || null,
+      'Created Date': new Date(product.createdAt).toLocaleDateString()
+    }));
+  };
+
+  const exportProducts = async (format = 'csv') => {
     setIsExporting(true);
     try {
-      const exportData = products.map(product => ({
-        sku: product.sku,
-        name: product.name,
-        description: product.description || '',
-        brand_id: product.brandId,
-        unit_price: product.unitPrice,
-        cost_price: product.costPrice || 0,
-        stock_quantity: product.stockQuantity || 0,
-        min_stock_level: product.minStockLevel || 0,
-        max_stock_level: product.maxStockLevel || null,
-        created_at: new Date(product.createdAt).toLocaleDateString()
-      }));
-
-      exportToCsv(exportData, `products-${new Date().toISOString().split('T')[0]}`);
+      const exportData = getProductExportData();
+      const filename = `products-${new Date().toISOString().split('T')[0]}`;
+      
+      if (format === 'xlsx') {
+        exportToXLSX(exportData, filename, 'Products');
+      } else if (format === 'pdf') {
+        exportToPDF(exportData, filename, 'Product Inventory Report');
+      } else {
+        exportToCsv(exportData, filename);
+      }
       
     } catch (error) {
       console.error('Export error:', error);
@@ -38,25 +50,37 @@ export default function ExportDropdown({ products, activeTab, stockSubTab, stock
     }
   };
 
-  const exportCurrentStock = async () => {
+  // Helper function to prepare current stock export data
+  const getCurrentStockExportData = () => {
+    return products.map(product => {
+      const stock = product.stockQuantity || 0;
+      const status = stock === 0 ? 'Out of Stock' : stock <= (product.minStockLevel || 10) ? 'Low Stock' : 'In Stock';
+      
+      return {
+        SKU: product.sku,
+        'Product Name': product.name,
+        'Current Stock': stock,
+        'Min Stock Level': product.minStockLevel || 10,
+        Status: status,
+        'Cost Price': product.costPrice || 0,
+        'Stock Value': (stock * (parseFloat(product.costPrice) || 0)).toFixed(2)
+      };
+    });
+  };
+
+  const exportCurrentStock = async (format = 'csv') => {
     setIsExporting(true);
     try {
-      const exportData = products.map(product => {
-        const stock = product.stockQuantity || 0;
-        const status = stock === 0 ? 'Out of Stock' : stock <= (product.minStockLevel || 10) ? 'Low Stock' : 'In Stock';
-        
-        return {
-          sku: product.sku,
-          name: product.name,
-          current_stock: stock,
-          min_stock_level: product.minStockLevel || 10,
-          status: status,
-          cost_price: product.costPrice || 0,
-          stock_value: (stock * (parseFloat(product.costPrice) || 0)).toFixed(2)
-        };
-      });
-
-      exportToCsv(exportData, `current-stock-${new Date().toISOString().split('T')[0]}`);
+      const exportData = getCurrentStockExportData();
+      const filename = `current-stock-${new Date().toISOString().split('T')[0]}`;
+      
+      if (format === 'xlsx') {
+        exportToXLSX(exportData, filename, 'Current Stock');
+      } else if (format === 'pdf') {
+        exportToPDF(exportData, filename, 'Current Stock Report');
+      } else {
+        exportToCsv(exportData, filename);
+      }
       
     } catch (error) {
       console.error('Export error:', error);
@@ -65,23 +89,35 @@ export default function ExportDropdown({ products, activeTab, stockSubTab, stock
     }
   };
 
-  const exportStockMovements = async () => {
+  // Helper function to prepare stock movements export data
+  const getStockMovementsExportData = () => {
+    return stockMovements.map(movement => ({
+      Date: new Date(movement.createdAt).toLocaleDateString(),
+      Time: new Date(movement.createdAt).toLocaleTimeString(),
+      'Product SKU': movement.productSku,
+      'Product Name': movement.productName,
+      'Movement Type': movement.movementType,
+      Quantity: movement.quantity,
+      'Previous Stock': movement.previousStock,
+      'New Stock': movement.newStock,
+      'Unit Cost': movement.unitCost || 0,
+      Notes: movement.notes || ''
+    }));
+  };
+
+  const exportStockMovements = async (format = 'csv') => {
     setIsExporting(true);
     try {
-      const exportData = stockMovements.map(movement => ({
-        date: new Date(movement.createdAt).toLocaleDateString(),
-        time: new Date(movement.createdAt).toLocaleTimeString(),
-        product_sku: movement.productSku,
-        product_name: movement.productName,
-        movement_type: movement.movementType,
-        quantity: movement.quantity,
-        previous_stock: movement.previousStock,
-        new_stock: movement.newStock,
-        unit_cost: movement.unitCost || 0,
-        notes: movement.notes || ''
-      }));
-
-      exportToCsv(exportData, `stock-movements-${new Date().toISOString().split('T')[0]}`);
+      const exportData = getStockMovementsExportData();
+      const filename = `stock-movements-${new Date().toISOString().split('T')[0]}`;
+      
+      if (format === 'xlsx') {
+        exportToXLSX(exportData, filename, 'Stock Movements');
+      } else if (format === 'pdf') {
+        exportToPDF(exportData, filename, 'Stock Movements Report');
+      } else {
+        exportToCsv(exportData, filename);
+      }
       
     } catch (error) {
       console.error('Export error:', error);
@@ -90,20 +126,32 @@ export default function ExportDropdown({ products, activeTab, stockSubTab, stock
     }
   };
 
-  const exportLowStock = async () => {
+  // Helper function to prepare low stock export data
+  const getLowStockExportData = () => {
+    return lowStockProducts.map(product => ({
+      SKU: product.sku,
+      'Product Name': product.name,
+      'Current Stock': product.stockQuantity || 0,
+      'Min Stock Level': product.minStockLevel || 10,
+      'Reorder Needed': Math.max(0, (product.maxStockLevel || 50) - (product.stockQuantity || 0)),
+      'Cost Price': product.costPrice || 0,
+      'Stock Value': ((product.stockQuantity || 0) * (parseFloat(product.costPrice) || 0)).toFixed(2)
+    }));
+  };
+
+  const exportLowStock = async (format = 'csv') => {
     setIsExporting(true);
     try {
-      const exportData = lowStockProducts.map(product => ({
-        sku: product.sku,
-        name: product.name,
-        current_stock: product.stockQuantity || 0,
-        min_stock_level: product.minStockLevel || 10,
-        reorder_needed: Math.max(0, (product.maxStockLevel || 50) - (product.stockQuantity || 0)),
-        cost_price: product.costPrice || 0,
-        stock_value: ((product.stockQuantity || 0) * (parseFloat(product.costPrice) || 0)).toFixed(2)
-      }));
-
-      exportToCsv(exportData, `low-stock-alerts-${new Date().toISOString().split('T')[0]}`);
+      const exportData = getLowStockExportData();
+      const filename = `low-stock-alerts-${new Date().toISOString().split('T')[0]}`;
+      
+      if (format === 'xlsx') {
+        exportToXLSX(exportData, filename, 'Low Stock Alerts');
+      } else if (format === 'pdf') {
+        exportToPDF(exportData, filename, 'Low Stock Alerts Report');
+      } else {
+        exportToCsv(exportData, filename);
+      }
       
     } catch (error) {
       console.error('Export error:', error);
@@ -112,19 +160,31 @@ export default function ExportDropdown({ products, activeTab, stockSubTab, stock
     }
   };
 
-  const exportOutOfStock = async () => {
+  // Helper function to prepare out of stock export data
+  const getOutOfStockExportData = () => {
+    return outOfStockProducts.map(product => ({
+      SKU: product.sku,
+      'Product Name': product.name,
+      Brand: product.brandName || '',
+      Size: product.description || '',
+      'Current Stock': 0,
+      Status: 'Out of Stock'
+    }));
+  };
+
+  const exportOutOfStock = async (format = 'csv') => {
     setIsExporting(true);
     try {
-      const exportData = outOfStockProducts.map(product => ({
-        sku: product.sku,
-        name: product.name,
-        last_sale_price: product.unitPrice,
-        min_stock_level: product.minStockLevel || 10,
-        suggested_reorder: product.maxStockLevel || 50,
-        cost_price: product.costPrice || 0
-      }));
-
-      exportToCsv(exportData, `out-of-stock-${new Date().toISOString().split('T')[0]}`);
+      const exportData = getOutOfStockExportData();
+      const filename = `out-of-stock-${new Date().toISOString().split('T')[0]}`;
+      
+      if (format === 'xlsx') {
+        exportToXLSX(exportData, filename, 'Out of Stock');
+      } else if (format === 'pdf') {
+        exportToPDF(exportData, filename, 'Out of Stock Report');
+      } else {
+        exportToCsv(exportData, filename);
+      }
       
     } catch (error) {
       console.error('Export error:', error);
@@ -167,53 +227,98 @@ export default function ExportDropdown({ products, activeTab, stockSubTab, stock
         </div>
         
         {activeTab === 'products' && (
-          <DropdownMenuItem 
-            onClick={exportProducts}
-            disabled={itemCount === 0}
-          >
-            <FileSpreadsheet className="w-4 h-4 mr-2" />
-            Export Products CSV
-          </DropdownMenuItem>
+          <>
+            <DropdownMenuItem 
+              onClick={() => exportProducts('xlsx')}
+              disabled={itemCount === 0}
+            >
+              <FileSpreadsheet className="w-4 h-4 mr-2" />
+              Export Products XLSX
+            </DropdownMenuItem>
+            <DropdownMenuItem 
+              onClick={() => exportProducts('pdf')}
+              disabled={itemCount === 0}
+            >
+              <FileText className="w-4 h-4 mr-2" />
+              Export Products PDF
+            </DropdownMenuItem>
+          </>
         )}
         
         {activeTab === 'stock' && stockSubTab === 'stock-levels' && (
-          <DropdownMenuItem 
-            onClick={exportCurrentStock}
-            disabled={itemCount === 0}
-          >
-            <FileSpreadsheet className="w-4 h-4 mr-2" />
-            Export Current Stock CSV
-          </DropdownMenuItem>
+          <>
+            <DropdownMenuItem 
+              onClick={() => exportCurrentStock('xlsx')}
+              disabled={itemCount === 0}
+            >
+              <FileSpreadsheet className="w-4 h-4 mr-2" />
+              Export Current Stock XLSX
+            </DropdownMenuItem>
+            <DropdownMenuItem 
+              onClick={() => exportCurrentStock('pdf')}
+              disabled={itemCount === 0}
+            >
+              <FileText className="w-4 h-4 mr-2" />
+              Export Current Stock PDF
+            </DropdownMenuItem>
+          </>
         )}
         
         {activeTab === 'stock' && stockSubTab === 'movements' && (
-          <DropdownMenuItem 
-            onClick={exportStockMovements}
-            disabled={itemCount === 0}
-          >
-            <FileSpreadsheet className="w-4 h-4 mr-2" />
-            Export Movements CSV
-          </DropdownMenuItem>
+          <>
+            <DropdownMenuItem 
+              onClick={() => exportStockMovements('xlsx')}
+              disabled={itemCount === 0}
+            >
+              <FileSpreadsheet className="w-4 h-4 mr-2" />
+              Export Movements XLSX
+            </DropdownMenuItem>
+            <DropdownMenuItem 
+              onClick={() => exportStockMovements('pdf')}
+              disabled={itemCount === 0}
+            >
+              <FileText className="w-4 h-4 mr-2" />
+              Export Movements PDF
+            </DropdownMenuItem>
+          </>
         )}
         
         {activeTab === 'stock' && stockSubTab === 'low-stock' && (
-          <DropdownMenuItem 
-            onClick={exportLowStock}
-            disabled={itemCount === 0}
-          >
-            <FileSpreadsheet className="w-4 h-4 mr-2" />
-            Export Low Stock CSV
-          </DropdownMenuItem>
+          <>
+            <DropdownMenuItem 
+              onClick={() => exportLowStock('xlsx')}
+              disabled={itemCount === 0}
+            >
+              <FileSpreadsheet className="w-4 h-4 mr-2" />
+              Export Low Stock XLSX
+            </DropdownMenuItem>
+            <DropdownMenuItem 
+              onClick={() => exportLowStock('pdf')}
+              disabled={itemCount === 0}
+            >
+              <FileText className="w-4 h-4 mr-2" />
+              Export Low Stock PDF
+            </DropdownMenuItem>
+          </>
         )}
         
         {activeTab === 'stock' && stockSubTab === 'out-of-stock' && (
-          <DropdownMenuItem 
-            onClick={exportOutOfStock}
-            disabled={itemCount === 0}
-          >
-            <FileSpreadsheet className="w-4 h-4 mr-2" />
-            Export Out of Stock CSV
-          </DropdownMenuItem>
+          <>
+            <DropdownMenuItem 
+              onClick={() => exportOutOfStock('xlsx')}
+              disabled={itemCount === 0}
+            >
+              <FileSpreadsheet className="w-4 h-4 mr-2" />
+              Export Out of Stock XLSX
+            </DropdownMenuItem>
+            <DropdownMenuItem 
+              onClick={() => exportOutOfStock('pdf')}
+              disabled={itemCount === 0}
+            >
+              <FileText className="w-4 h-4 mr-2" />
+              Export Out of Stock PDF
+            </DropdownMenuItem>
+          </>
         )}
         
         <DropdownMenuSeparator />
