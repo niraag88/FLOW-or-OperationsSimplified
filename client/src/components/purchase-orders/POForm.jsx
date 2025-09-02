@@ -65,10 +65,11 @@ export default function POForm({ open, onClose, editingPO, currentUser, onSucces
         if (settingsList.length > 0) {
           const currentSettings = settingsList[0];
           setCompanySettings(currentSettings);
-          // Set initial FX rate from settings if currency is GBP
-          if (formData.currency === 'GBP') {
-            setFormData(prev => ({ ...prev, fx_rate_to_aed: currentSettings.fx_gbp_to_aed || 4.85 }));
-          }
+          // Set initial FX rate from settings for all new forms
+          setFormData(prev => ({ 
+            ...prev, 
+            fx_rate_to_aed: parseFloat(currentSettings.fx_gbp_to_aed) || 4.85 
+          }));
         }
       } catch (error) {
         console.error("Error loading initial data for PO Form:", error);
@@ -113,7 +114,7 @@ export default function POForm({ open, onClose, editingPO, currentUser, onSucces
       setFilteredProducts([]);
       return;
     }
-    const filtered = allProducts.filter(product => product.brand_id === brandId);
+    const filtered = allProducts.filter(product => product.brandId === parseInt(brandId));
     setFilteredProducts(filtered);
   };
 
@@ -137,7 +138,7 @@ export default function POForm({ open, onClose, editingPO, currentUser, onSucces
       expected_delivery_date: "",
       status: "draft",
       currency: "GBP",
-      fx_rate_to_aed: companySettings?.fx_gbp_to_aed || 4.85,
+      fx_rate_to_aed: parseFloat(companySettings?.fx_gbp_to_aed) || 4.85,
       subtotal: 0,
       tax_amount: 0,
       total_amount: 0,
@@ -159,7 +160,7 @@ export default function POForm({ open, onClose, editingPO, currentUser, onSucces
 
     // Update exchange rate when currency changes
     if (field === 'currency' && companySettings) {
-      const newRate = value === 'GBP' ? companySettings.fx_gbp_to_aed : 1;
+      const newRate = value === 'GBP' ? parseFloat(companySettings.fx_gbp_to_aed) || 4.85 : 1;
       setFormData(prev => ({
         ...prev,
         fx_rate_to_aed: newRate
@@ -225,13 +226,13 @@ export default function POForm({ open, onClose, editingPO, currentUser, onSucces
 
     // Update product details when product is selected
     if (field === 'product_id' && value) {
-      const product = filteredProducts.find(p => p.id === value);
+      const product = filteredProducts.find(p => p.id === parseInt(value));
       if (product) {
-        newItems[index].product_code = product.product_code;
-        newItems[index].description = `${product.product_name}${product.size ? ` - ${product.size}` : ''}`;
+        newItems[index].product_code = product.sku;
+        newItems[index].description = `${product.name}${product.size ? ` - ${product.size}` : ''}`;
         // Use purchase_price in GBP for POs
-        newItems[index].unit_price = product.purchase_price || 0;
-        newItems[index].line_total = (newItems[index].quantity || 0) * (product.purchase_price || 0);
+        newItems[index].unit_price = product.purchasePrice || 0;
+        newItems[index].line_total = (newItems[index].quantity || 0) * (product.purchasePrice || 0);
       }
     }
 
@@ -341,7 +342,7 @@ export default function POForm({ open, onClose, editingPO, currentUser, onSucces
                 </SelectTrigger>
                 <SelectContent>
                   {brands.map(brand => (
-                    <SelectItem key={brand.id} value={brand.id}>
+                    <SelectItem key={brand.id} value={brand.id.toString()}>
                       {brand.name}
                     </SelectItem>
                   ))}
@@ -480,9 +481,9 @@ export default function POForm({ open, onClose, editingPO, currentUser, onSucces
                               </SelectTrigger>
                               <SelectContent>
                                 {filteredProducts.map(product => (
-                                  <SelectItem key={product.id} value={product.id}>
+                                  <SelectItem key={product.id} value={product.id.toString()}>
                                     <div className="flex flex-col">
-                                      <p className="font-medium truncate">{product.product_name}</p>
+                                      <p className="font-medium truncate">{product.name}</p>
                                       {product.size && <p className="text-sm text-gray-500">{product.size}</p>}
                                     </div>
                                   </SelectItem>
@@ -559,9 +560,9 @@ export default function POForm({ open, onClose, editingPO, currentUser, onSucces
                               <SelectTrigger><SelectValue placeholder="Select product" /></SelectTrigger>
                               <SelectContent>
                                 {filteredProducts.map(product => ( 
-                                  <SelectItem key={product.id} value={product.id}>
+                                  <SelectItem key={product.id} value={product.id.toString()}>
                                     <div className="flex flex-col">
-                                      <p className="font-medium truncate">{product.product_name}</p>
+                                      <p className="font-medium truncate">{product.name}</p>
                                       {product.size && <p className="text-sm text-gray-500">{product.size}</p>}
                                     </div>
                                   </SelectItem> 
