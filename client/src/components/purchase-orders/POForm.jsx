@@ -301,6 +301,19 @@ export default function POForm({ open, onClose, editingPO, currentUser, onSucces
     setLoading(true);
 
     try {
+      // Transform form data to match API schema
+      const transformedData = {
+        ...formData,
+        supplierId: parseInt(formData.supplier_id),
+        poNumber: formData.po_number,
+        orderDate: formData.order_date,
+        expectedDelivery: formData.expected_delivery_date,
+        totalAmount: formData.total_amount,
+        grandTotal: formData.total_amount, // Same as total for purchase orders
+        notes: formData.notes,
+        termsConditions: formData.terms_conditions
+      };
+
       if (editingPO) {
         // Log status change if status actually changed
         if (formData.status !== editingPO.status) {
@@ -312,10 +325,10 @@ export default function POForm({ open, onClose, editingPO, currentUser, onSucces
             formData.status
           );
         }
-        await PurchaseOrder.update(editingPO.id, formData);
+        await PurchaseOrder.update(editingPO.id, transformedData);
         await logAuditAction("PurchaseOrder", editingPO.id, "update", currentUser.email, { updated_fields: Object.keys(formData) });
       } else {
-        const newPO = await PurchaseOrder.create(formData);
+        const newPO = await PurchaseOrder.create(transformedData);
         await logAuditAction("PurchaseOrder", newPO.id, "create", currentUser.email, { po_number: formData.po_number });
       }
       
