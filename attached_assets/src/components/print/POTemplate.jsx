@@ -130,12 +130,6 @@ export default function POTemplate({ data, brand, settings }) {
             <span className="text-gray-600">Subtotal:</span>
             <span className="font-semibold">{(data.subtotal || 0).toFixed(2)} {data.currency}</span>
           </div>
-          {data.tax_amount && data.tax_amount > 0 && (
-            <div className="flex justify-between py-2">
-              <span className="text-gray-600">Tax:</span>
-              <span className="font-semibold">{(data.tax_amount || 0).toFixed(2)} {data.currency}</span>
-            </div>
-          )}
           <div className="flex justify-between py-2 border-t-2 border-gray-300 mt-2">
             <span className="font-bold text-lg">Total:</span>
             <span className="font-bold text-lg">{(data.total_amount || 0).toFixed(2)} {data.currency}</span>

@@ -39,7 +39,6 @@ export default function POForm({ open, onClose, editingPO, currentUser, onSucces
     currency: "GBP",
     fx_rate_to_aed: 0, // Will be set from company settings
     subtotal: 0,
-    tax_amount: 0,
     total_amount: 0,
     po_total_aed: 0,
     notes: "",
@@ -77,7 +76,6 @@ export default function POForm({ open, onClose, editingPO, currentUser, onSucces
               currency: "GBP",
               fx_rate_to_aed: parseFloat(currentSettings.fx_gbp_to_aed) || 4.85,
               subtotal: 0,
-              tax_amount: 0,
               total_amount: 0,
               po_total_aed: 0,
               notes: "",
@@ -94,17 +92,17 @@ export default function POForm({ open, onClose, editingPO, currentUser, onSucces
     };
 
     if (open) {
-      if (editingPO) {
-        setFormData(editingPO);
-        // Filter products when editing existing PO
-        if (editingPO.supplier_id) {
-          filterProductsByBrand(editingPO.supplier_id);
+      loadInitialData().then(() => {
+        if (editingPO) {
+          setFormData(editingPO);
+          // Filter products when editing existing PO
+          if (editingPO.supplier_id) {
+            filterProductsByBrand(editingPO.supplier_id);
+          }
+        } else {
+          generatePONumber();
         }
-      } else {
-        generatePONumber();
-        // resetForm will be called after loadInitialData completes
-      }
-      loadInitialData();
+      });
     }
   }, [open, editingPO]);
 
@@ -138,12 +136,22 @@ export default function POForm({ open, onClose, editingPO, currentUser, onSucces
   const generatePONumber = async () => {
     try {
       const poNumber = await generateDocumentNumber('po');
-      setFormData(prev => ({ ...prev, po_number: poNumber }));
+      setFormData(prev => ({ 
+        ...prev, 
+        po_number: poNumber,
+        // Ensure exchange rate is set from company settings if available
+        fx_rate_to_aed: companySettings ? parseFloat(companySettings.fx_gbp_to_aed) || 4.85 : prev.fx_rate_to_aed
+      }));
     } catch (error) {
       console.error("Error generating PO number:", error);
       const timestamp = Date.now().toString().slice(-6);
       const poNumber = `PO-${timestamp}`;
-      setFormData(prev => ({ ...prev, po_number: poNumber }));
+      setFormData(prev => ({ 
+        ...prev, 
+        po_number: poNumber,
+        // Ensure exchange rate is set from company settings if available
+        fx_rate_to_aed: companySettings ? parseFloat(companySettings.fx_gbp_to_aed) || 4.85 : prev.fx_rate_to_aed
+      }));
     }
   };
 
@@ -157,7 +165,6 @@ export default function POForm({ open, onClose, editingPO, currentUser, onSucces
       currency: "GBP",
       fx_rate_to_aed: parseFloat(companySettings?.fx_gbp_to_aed) || 4.85,
       subtotal: 0,
-      tax_amount: 0,
       total_amount: 0,
       po_total_aed: 0,
       notes: "",
@@ -201,7 +208,7 @@ export default function POForm({ open, onClose, editingPO, currentUser, onSucces
 
   const calculateTotals = () => {
     const subtotal = formData.items.reduce((sum, item) => sum + (item.line_total || 0), 0);
-    const totalAmount = subtotal + (formData.tax_amount || 0);
+    const totalAmount = subtotal; // No tax for export products
     const poTotalAED = totalAmount * (formData.fx_rate_to_aed || 1);
 
     setFormData(prev => ({
@@ -214,7 +221,7 @@ export default function POForm({ open, onClose, editingPO, currentUser, onSucces
 
   useEffect(() => {
     calculateTotals();
-  }, [formData.items, formData.tax_amount, formData.fx_rate_to_aed]);
+  }, [formData.items, formData.fx_rate_to_aed]);
 
   const addItem = () => {
     const newItem = {
@@ -425,7 +432,7 @@ export default function POForm({ open, onClose, editingPO, currentUser, onSucces
             </div>
           </div>
 
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+          <div className="grid grid-cols-1 md:grid-cols-1 gap-4">
             <div className="space-y-2">
               <Label htmlFor="fx_rate">Exchange Rate to AED</Label>
               <Input
@@ -435,17 +442,6 @@ export default function POForm({ open, onClose, editingPO, currentUser, onSucces
                 value={formData.fx_rate_to_aed}
                 onChange={(e) => handleInputChange('fx_rate_to_aed', parseFloat(e.target.value))}
                 disabled // This field is now disabled
-              />
-            </div>
-            <div className="space-y-2">
-              <Label htmlFor="tax_amount">Tax Amount</Label>
-              <Input
-                id="tax_amount"
-                type="number"
-                step="0.01"
-                value={formData.tax_amount}
-                onChange={(e) => handleInputChange('tax_amount', parseFloat(e.target.value) || 0)}
-                disabled={!canEdit}
               />
             </div>
           </div>
@@ -632,14 +628,10 @@ export default function POForm({ open, onClose, editingPO, currentUser, onSucces
 
           {/* Totals */}
           <div className="bg-gray-50 p-4 rounded-lg">
-            <div className="grid grid-cols-2 md:grid-cols-4 gap-4 text-sm">
+            <div className="grid grid-cols-2 md:grid-cols-3 gap-4 text-sm">
               <div>
                 <p className="text-gray-600">Subtotal ({formData.currency})</p>
                 <p className="font-semibold text-lg">{formData.subtotal?.toFixed(2) || '0.00'}</p>
-              </div>
-              <div>
-                <p className="text-gray-600">Tax ({formData.currency})</p>
-                <p className="font-semibold text-lg">{formData.tax_amount?.toFixed(2) || '0.00'}</p>
               </div>
               <div>
                 <p className="text-gray-600">Total ({formData.currency})</p>
