@@ -37,7 +37,7 @@ export default function POForm({ open, onClose, editingPO, currentUser, onSucces
     expected_delivery_date: "",
     status: "draft",
     currency: "GBP",
-    fx_rate_to_aed: 4.85,
+    fx_rate_to_aed: 0, // Will be set from company settings
     subtotal: 0,
     tax_amount: 0,
     total_amount: 0,
@@ -65,11 +65,28 @@ export default function POForm({ open, onClose, editingPO, currentUser, onSucces
         if (settingsList.length > 0) {
           const currentSettings = settingsList[0];
           setCompanySettings(currentSettings);
-          // Set initial FX rate from settings for all new forms
-          setFormData(prev => ({ 
-            ...prev, 
-            fx_rate_to_aed: parseFloat(currentSettings.fx_gbp_to_aed) || 4.85 
-          }));
+          
+          // For new POs, reset form with correct exchange rate
+          if (!editingPO) {
+            const initialFormData = {
+              po_number: "",
+              supplier_id: "",
+              order_date: new Date().toISOString().split('T')[0],
+              expected_delivery_date: "",
+              status: "draft",
+              currency: "GBP",
+              fx_rate_to_aed: parseFloat(currentSettings.fx_gbp_to_aed) || 4.85,
+              subtotal: 0,
+              tax_amount: 0,
+              total_amount: 0,
+              po_total_aed: 0,
+              notes: "",
+              terms_conditions: "",
+              attachments: [],
+              items: []
+            };
+            setFormData(prev => ({ ...prev, ...initialFormData }));
+          }
         }
       } catch (error) {
         console.error("Error loading initial data for PO Form:", error);
@@ -77,7 +94,6 @@ export default function POForm({ open, onClose, editingPO, currentUser, onSucces
     };
 
     if (open) {
-      loadInitialData();
       if (editingPO) {
         setFormData(editingPO);
         // Filter products when editing existing PO
@@ -86,8 +102,9 @@ export default function POForm({ open, onClose, editingPO, currentUser, onSucces
         }
       } else {
         generatePONumber();
-        resetForm();
+        // resetForm will be called after loadInitialData completes
       }
+      loadInitialData();
     }
   }, [open, editingPO]);
 
