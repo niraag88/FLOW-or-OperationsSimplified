@@ -960,7 +960,25 @@ export async function registerRoutes(app: Express): Promise<Server> {
         poNumber,
         createdBy: req.user!.id
       });
+      
+      // Create the purchase order first
       const purchaseOrder = await businessStorage.createPurchaseOrder(validatedData);
+      
+      // If there are line items, save them
+      if (req.body.items && Array.isArray(req.body.items) && req.body.items.length > 0) {
+        for (const item of req.body.items) {
+          if (item.productId && item.quantity > 0) {
+            await db.insert(purchaseOrderItems).values({
+              poId: purchaseOrder.id,
+              productId: parseInt(item.productId),
+              quantity: item.quantity,
+              unitPrice: item.unitPrice.toString(),
+              lineTotal: item.lineTotal.toString()
+            });
+          }
+        }
+      }
+      
       res.status(201).json(purchaseOrder);
     } catch (error) {
       console.error('Error creating purchase order:', error);
