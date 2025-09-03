@@ -189,6 +189,10 @@ export class BusinessStorage {
   }
 
   async deletePurchaseOrder(id: number) {
+    // First delete all line items associated with this purchase order
+    await db.delete(purchaseOrderItems).where(eq(purchaseOrderItems.poId, id));
+    
+    // Then delete the purchase order itself
     const [deletedPO] = await db.delete(purchaseOrders).where(eq(purchaseOrders.id, id)).returning();
     return deletedPO;
   }
