@@ -306,10 +306,10 @@ export default function POForm({ open, onClose, editingPO, currentUser, onSucces
         ...formData,
         supplierId: parseInt(formData.supplier_id),
         poNumber: formData.po_number,
-        orderDate: formData.order_date,
-        expectedDelivery: formData.expected_delivery_date,
-        totalAmount: formData.total_amount,
-        grandTotal: formData.total_amount, // Same as total for purchase orders
+        orderDate: new Date(formData.order_date),
+        expectedDelivery: new Date(formData.expected_delivery_date),
+        totalAmount: formData.total_amount.toString(),
+        grandTotal: formData.total_amount.toString(), // Same as total for purchase orders
         notes: formData.notes,
         termsConditions: formData.terms_conditions
       };
