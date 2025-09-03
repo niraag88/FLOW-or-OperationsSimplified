@@ -40,13 +40,6 @@ export default function POForm({ open, onClose, editingPO, currentUser, onSucces
     if (open) {
       loadInitialData();
     }
-  }, [open]);
-
-  // Load data when editing
-  useEffect(() => {
-    if (open && editingPO) {
-      loadEditingData();
-    }
   }, [open, editingPO]);
 
   const loadInitialData = async () => {
@@ -59,7 +52,10 @@ export default function POForm({ open, onClose, editingPO, currentUser, onSucces
       setBrands(brandsData.filter(b => b.isActive));
       setProducts(productsData);
       
-      if (!editingPO) {
+      if (editingPO) {
+        // Load editing data
+        await loadEditingData();
+      } else {
         generatePONumber();
       }
     } catch (error) {
