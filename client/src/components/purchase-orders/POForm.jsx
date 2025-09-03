@@ -109,10 +109,35 @@ export default function POForm({ open, onClose, editingPO, currentUser, onSucces
     }
   };
 
-  const generatePONumber = () => {
-    const timestamp = Date.now().toString().slice(-6);
-    const poNumber = `PO-${new Date().getFullYear()}-${timestamp}`;
-    setFormData(prev => ({ ...prev, poNumber }));
+  const generatePONumber = async () => {
+    try {
+      // Get the latest PO number to calculate the next sequence
+      const response = await fetch('/api/purchase-orders');
+      const existingPOs = await response.json();
+      
+      const currentYear = new Date().getFullYear();
+      const currentYearPOs = existingPOs.filter(po => 
+        po.poNumber && po.poNumber.startsWith(`PO-${currentYear}`)
+      );
+      
+      let nextNumber = 1;
+      if (currentYearPOs.length > 0) {
+        // Extract sequence numbers and find the highest
+        const sequenceNumbers = currentYearPOs.map(po => {
+          const match = po.poNumber.match(/PO-\d{4}-(\d{3})/);
+          return match ? parseInt(match[1]) : 0;
+        });
+        nextNumber = Math.max(...sequenceNumbers) + 1;
+      }
+      
+      const poNumber = `PO-${currentYear}-${nextNumber.toString().padStart(3, '0')}`;
+      setFormData(prev => ({ ...prev, poNumber }));
+    } catch (error) {
+      console.error("Error generating PO number:", error);
+      // Fallback to simple numbering
+      const poNumber = `PO-${new Date().getFullYear()}-001`;
+      setFormData(prev => ({ ...prev, poNumber }));
+    }
   };
 
   const handleInputChange = (field, value) => {

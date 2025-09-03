@@ -188,7 +188,7 @@ export const products = pgTable("products", {
 export const purchaseOrders = pgTable("purchase_orders", {
   id: serial("id").primaryKey(),
   poNumber: text("po_number").notNull().unique(),
-  supplierId: integer("supplier_id").references(() => suppliers.id).notNull(),
+  supplierId: integer("supplier_id").references(() => brands.id).notNull(),
   status: text("status").notNull().default("draft"), // draft, sent, confirmed, received, cancelled
   orderDate: timestamp("order_date").defaultNow().notNull(),
   expectedDelivery: timestamp("expected_delivery"),
