@@ -95,6 +95,7 @@ export default function POForm({ open, onClose, editingPO, currentUser, onSucces
     if (open) {
       loadInitialData().then(() => {
         if (editingPO) {
+          console.log("Editing PO data received:", editingPO);
           // Map database field names to form field names
           const mappedFormData = {
             po_number: editingPO.poNumber || "",
@@ -113,6 +114,7 @@ export default function POForm({ open, onClose, editingPO, currentUser, onSucces
             items: [] // Will be loaded separately if needed
           };
           
+          console.log("Mapped form data:", mappedFormData);
           setFormData(mappedFormData);
           
           // Filter products when editing existing PO
@@ -368,7 +370,7 @@ export default function POForm({ open, onClose, editingPO, currentUser, onSucces
       <DialogContent className="max-w-6xl max-h-[90vh] overflow-y-auto p-0 md:p-6">
         <DialogHeader className="p-6 md:p-0">
           <DialogTitle>
-            {editingPO ? `Edit Purchase Order ${editingPO.po_number}` : 'New Purchase Order'}
+            {editingPO ? `Edit Purchase Order ${editingPO.poNumber || editingPO.po_number}` : 'New Purchase Order'}
           </DialogTitle>
           <DialogDescription>
             {editingPO ? 'Update purchase order details and line items' : 'Create a new purchase order'}
