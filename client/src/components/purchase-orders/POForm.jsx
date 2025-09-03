@@ -49,12 +49,13 @@ export default function POForm({ open, onClose, editingPO, currentUser, onSucces
         Product.list()
       ]);
       
-      setBrands(brandsData.filter(b => b.isActive));
+      const filteredBrands = brandsData.filter(b => b.isActive);
+      setBrands(filteredBrands);
       setProducts(productsData);
       
       if (editingPO) {
-        // Load editing data
-        await loadEditingData();
+        // Load editing data, passing the brands data directly
+        await loadEditingData(filteredBrands);
       } else {
         generatePONumber();
       }
@@ -63,10 +64,12 @@ export default function POForm({ open, onClose, editingPO, currentUser, onSucces
     }
   };
 
-  const loadEditingData = async () => {
+  const loadEditingData = async (availableBrands = brands) => {
     if (!editingPO) return;
     
     try {
+      console.log("Loading editing data:", editingPO.supplierId, "Available brands:", availableBrands.length);
+      
       // Set basic form data
       setFormData({
         poNumber: editingPO.poNumber || "",
