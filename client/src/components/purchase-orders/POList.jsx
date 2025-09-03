@@ -20,9 +20,9 @@ export default function POList({ purchaseOrders, loading, canEdit, currentUser, 
   const [showReceiveDialog, setShowReceiveDialog] = useState(false);
   const [selectedPO, setSelectedPO] = useState(null);
 
-  // Get supplier name directly from API response
-  const getSupplierName = (po) => {
-    return po.supplierName || 'Unknown Supplier';
+  // Get brand name directly from API response  
+  const getBrandName = (po) => {
+    return po.brandName || 'Unknown Brand';
   };
 
   const getStatusColor = (status) => {
@@ -114,7 +114,6 @@ export default function POList({ purchaseOrders, loading, canEdit, currentUser, 
                   <TableHead>PO Number</TableHead>
                   <TableHead>Brand</TableHead>
                   <TableHead>Order Date</TableHead>
-                  <TableHead>Expected Delivery</TableHead>
                   <TableHead>Total (GBP)</TableHead>
                   <TableHead>Total (AED)</TableHead>
                   <TableHead>Status</TableHead>
@@ -125,7 +124,7 @@ export default function POList({ purchaseOrders, loading, canEdit, currentUser, 
                 {purchaseOrders.map((po) => (
                   <TableRow key={po.id} className="hover:bg-gray-50">
                     <TableCell className="font-medium">{po.poNumber}</TableCell>
-                    <TableCell>{getSupplierName(po)}</TableCell>
+                    <TableCell>{getBrandName(po)}</TableCell>
                     <TableCell>
                       {formatDate(po.orderDate)}
                     </TableCell>

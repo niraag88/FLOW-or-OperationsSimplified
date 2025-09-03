@@ -172,8 +172,30 @@ export class BusinessStorage {
       createdAt: purchaseOrders.createdAt,
       updatedAt: purchaseOrders.updatedAt,
       supplierName: suppliers.name,
+      brandName: brands.name,
     }).from(purchaseOrders)
       .leftJoin(suppliers, eq(purchaseOrders.supplierId, suppliers.id))
+      .leftJoin(purchaseOrderItems, eq(purchaseOrders.id, purchaseOrderItems.poId))
+      .leftJoin(products, eq(purchaseOrderItems.productId, products.id))
+      .leftJoin(brands, eq(products.brandId, brands.id))
+      .groupBy(
+        purchaseOrders.id,
+        purchaseOrders.poNumber,
+        purchaseOrders.supplierId,
+        purchaseOrders.status,
+        purchaseOrders.orderDate,
+        purchaseOrders.expectedDelivery,
+        purchaseOrders.totalAmount,
+        purchaseOrders.vatAmount,
+        purchaseOrders.grandTotal,
+        purchaseOrders.notes,
+        purchaseOrders.objectKey,
+        purchaseOrders.createdBy,
+        purchaseOrders.createdAt,
+        purchaseOrders.updatedAt,
+        suppliers.name,
+        brands.name
+      )
       .orderBy(desc(purchaseOrders.createdAt));
   }
 
