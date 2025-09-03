@@ -44,10 +44,10 @@ export default function POActionsDropdown({ po, canEdit, onEdit, onRefresh }) {
     // Add PO header info
     exportData.push({
       'Document Type': 'PURCHASE ORDER',
-      'PO Number': po.po_number,
-      'Order Date': format(new Date(po.order_date), 'yyyy-MM-dd'),
-      'Expected Delivery': po.expected_delivery_date ? format(new Date(po.expected_delivery_date), 'yyyy-MM-dd') : '',
-      'Currency': po.currency,
+      'PO Number': po.poNumber,
+      'Order Date': format(new Date(po.orderDate), 'yyyy-MM-dd'),
+      'Expected Delivery': po.expectedDelivery ? format(new Date(po.expectedDelivery), 'yyyy-MM-dd') : '',
+      'Currency': 'GBP',
       'Status': po.status
     });
 
@@ -84,29 +84,11 @@ export default function POActionsDropdown({ po, canEdit, onEdit, onRefresh }) {
       'Product Code': '',
       'Description': '',
       'Quantity': '',
-      'Unit Price': 'Subtotal:',
-      'Line Total': (po.subtotal || 0).toFixed(2)
-    });
-
-    if (po.tax_amount && po.tax_amount > 0) {
-      exportData.push({
-        'Product Code': '',
-        'Description': '',
-        'Quantity': '',
-        'Unit Price': 'Tax:',
-        'Line Total': (po.tax_amount || 0).toFixed(2)
-      });
-    }
-
-    exportData.push({
-      'Product Code': '',
-      'Description': '',
-      'Quantity': '',
-      'Unit Price': 'TOTAL:',
-      'Line Total': (po.total_amount || 0).toFixed(2)
+      'Unit Price': 'TOTAL (GBP):',
+      'Line Total': (po.totalAmount || 0).toFixed(2)
     });
     
-    exportToCsv(exportData, `Purchase_Order_${po.po_number}`);
+    exportToCsv(exportData, `Purchase_Order_${po.poNumber}`);
   };
 
   const handleExportPDF = () => {
@@ -119,7 +101,7 @@ export default function POActionsDropdown({ po, canEdit, onEdit, onRefresh }) {
       await RecycleBin.create({
         document_type: 'PurchaseOrder',
         document_id: po.id,
-        document_number: po.po_number,
+        document_number: po.poNumber,
         document_data: po,
         deleted_by: currentUser?.email || 'unknown',
         deleted_date: new Date().toISOString(),
@@ -135,7 +117,7 @@ export default function POActionsDropdown({ po, canEdit, onEdit, onRefresh }) {
         action: 'deleted',
         user_email: currentUser?.email || 'unknown',
         changes: { 
-          document_number: po.po_number,
+          document_number: po.poNumber,
           deletion_reason: 'Deleted from UI',
           moved_to_recycle_bin: true
         },
@@ -147,7 +129,7 @@ export default function POActionsDropdown({ po, canEdit, onEdit, onRefresh }) {
 
       toast({
         title: 'Purchase Order Deleted',
-        description: `${po.po_number} has been moved to the recycle bin.`
+        description: `${po.poNumber} has been moved to the recycle bin.`
       });
 
       setShowDeleteDialog(false);
@@ -201,7 +183,7 @@ export default function POActionsDropdown({ po, canEdit, onEdit, onRefresh }) {
         onClose={() => setShowDeleteDialog(false)}
         onConfirm={handleDelete}
         title="Confirm Deletion"
-        description={`Do you wish to confirm deleting Purchase Order "${po.po_number}"? It will be moved to the recycle bin.`}
+        description={`Do you wish to confirm deleting Purchase Order "${po.poNumber}"? It will be moved to the recycle bin.`}
         confirmText="Yes, Delete"
         confirmVariant="destructive"
       />
