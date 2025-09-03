@@ -10,7 +10,7 @@ import {
 import { Button } from "@/components/ui/button";
 import { MoreHorizontal, Edit2, FileText, Download, Trash2 } from "lucide-react";
 import { useToast } from "@/components/ui/use-toast";
-import { exportToCsv } from "../utils/export";
+import { exportToCsv, exportToXLSX } from "../utils/export";
 import { format } from 'date-fns';
 import { PurchaseOrder } from "@/api/entities";
 import { RecycleBin } from "@/api/entities";
@@ -88,11 +88,11 @@ export default function POActionsDropdown({ po, canEdit, onEdit, onRefresh }) {
       'Line Total': (po.totalAmount || 0).toFixed(2)
     });
     
-    exportToCsv(exportData, `Purchase_Order_${po.poNumber}`);
+    exportToXLSX(exportData, `Purchase_Order_${po.poNumber}`);
   };
 
   const handleExportPDF = () => {
-    window.open(`/print?type=po&id=${po.id}`, '_blank');
+    window.open(`/api/export/po?poId=${po.id}`, '_blank');
   };
 
   const handleDelete = async () => {

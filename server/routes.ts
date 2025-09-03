@@ -4,7 +4,7 @@ import { storage } from "./storage";
 import { businessStorage } from "./businessStorage";
 import { Client } from '@replit/object-storage';
 import { invoices, deliveryOrders, auditLog, users, type InsertAuditLog, type InsertUser, type UpdateUser, type User } from "@shared/schema";
-import { insertBrandSchema, insertSupplierSchema, insertCustomerSchema, insertProductSchema, insertPurchaseOrderSchema, insertQuotationSchema, stockCounts, stockCountItems, goodsReceipts, goodsReceiptItems, stockMovements, products, purchaseOrders, purchaseOrderItems, enhancedInvoices, invoiceItems } from "@shared/schema";
+import { insertBrandSchema, insertSupplierSchema, insertCustomerSchema, insertProductSchema, insertPurchaseOrderSchema, insertQuotationSchema, stockCounts, stockCountItems, goodsReceipts, goodsReceiptItems, stockMovements, products, purchaseOrders, purchaseOrderItems, enhancedInvoices, invoiceItems, suppliers } from "@shared/schema";
 import { db } from "./db";
 import { eq, desc } from "drizzle-orm";
 import pkg from 'pg';
@@ -124,6 +124,123 @@ async function generateInvoicePDF(invoice: any): Promise<string> {
         </div>
         <div class="signature-box">
           <p>Customer Signature</p>
+        </div>
+      </div>
+    </body>
+    </html>
+  `;
+}
+
+async function generatePOPDF(purchaseOrder: any): Promise<string> {
+  const formatDate = (dateString: string | Date) => {
+    if (!dateString) return '';
+    const date = new Date(dateString);
+    return date.toLocaleDateString('en-GB');
+  };
+
+  return `
+    <!DOCTYPE html>
+    <html>
+    <head>
+      <meta charset="utf-8">
+      <title>Purchase Order ${purchaseOrder.poNumber}</title>
+      <style>
+        body { font-family: Arial, sans-serif; margin: 0; padding: 20px; }
+        .header { display: flex; justify-content: space-between; margin-bottom: 30px; border-bottom: 2px solid #333; padding-bottom: 20px; }
+        .po-title { font-size: 32px; font-weight: bold; color: #333; }
+        .po-details { margin-top: 10px; }
+        .company-info { text-align: right; }
+        .section { margin-bottom: 20px; }
+        .grid { display: grid; grid-template-columns: 1fr 1fr; gap: 30px; }
+        .totals { text-align: right; margin-top: 20px; }
+        .total-line { margin: 5px 0; }
+        .final-total { font-size: 18px; font-weight: bold; border-top: 2px solid #333; padding-top: 10px; }
+        table { width: 100%; border-collapse: collapse; margin-top: 20px; }
+        th, td { border: 1px solid #ddd; padding: 12px; text-align: left; }
+        th { background-color: #f5f5f5; font-weight: bold; }
+        .text-right { text-align: right; }
+        .signature-section { margin-top: 50px; display: grid; grid-template-columns: 1fr 1fr; gap: 50px; }
+        .signature-box { text-align: center; border-top: 1px solid #333; padding-top: 10px; }
+      </style>
+    </head>
+    <body>
+      <div class="header">
+        <div>
+          <h1 class="po-title">PURCHASE ORDER</h1>
+          <div class="po-details">
+            <p>PO Number: <strong>${purchaseOrder.poNumber}</strong></p>
+            <p>Order Date: <strong>${formatDate(purchaseOrder.orderDate)}</strong></p>
+            ${purchaseOrder.expectedDelivery ? `<p>Expected Delivery: <strong>${formatDate(purchaseOrder.expectedDelivery)}</strong></p>` : ''}
+          </div>
+        </div>
+        <div class="company-info">
+          <h2>SUPERNATURE LLC</h2>
+          <p>Company Address</p>
+          <p>Tel: Company Phone</p>
+          <p>Email: company@email.com</p>
+        </div>
+      </div>
+
+      <div class="section grid">
+        <div>
+          <h3>Supplier:</h3>
+          <p><strong>${purchaseOrder.supplierName || 'Unknown Supplier'}</strong></p>
+        </div>
+        <div>
+          <h3>Order Details:</h3>
+          <p>Status: <strong>${purchaseOrder.status}</strong></p>
+          <p>Currency: <strong>GBP</strong></p>
+        </div>
+      </div>
+
+      <table>
+        <thead>
+          <tr>
+            <th>Product Code</th>
+            <th>Description</th>
+            <th>Quantity</th>
+            <th>Unit Price (GBP)</th>
+            <th>Line Total (GBP)</th>
+          </tr>
+        </thead>
+        <tbody>
+          ${purchaseOrder.items && purchaseOrder.items.length > 0 ? 
+            purchaseOrder.items.map((item: any) => `
+              <tr>
+                <td>${item.product_code || ''}</td>
+                <td>${item.description || ''}</td>
+                <td class="text-right">${item.quantity || 0}</td>
+                <td class="text-right">${(item.unit_price || 0).toFixed(2)}</td>
+                <td class="text-right">${(item.line_total || 0).toFixed(2)}</td>
+              </tr>
+            `).join('') : 
+            '<tr><td colspan="5" style="text-align: center; color: #666;">No line items added</td></tr>'
+          }
+        </tbody>
+      </table>
+
+      <div class="totals">
+        <div class="total-line">
+          <span>Total (GBP): <strong>${(purchaseOrder.totalAmount || 0).toFixed(2)}</strong></span>
+        </div>
+        <div class="total-line">
+          <span>Total (AED): <strong>${((purchaseOrder.totalAmount || 0) * 5.0).toFixed(2)}</strong></span>
+        </div>
+      </div>
+
+      ${purchaseOrder.notes ? `
+        <div class="section" style="margin-top: 30px;">
+          <h3>Notes:</h3>
+          <p>${purchaseOrder.notes}</p>
+        </div>
+      ` : ''}
+
+      <div class="signature-section">
+        <div class="signature-box">
+          <p>Prepared By</p>
+        </div>
+        <div class="signature-box">
+          <p>Approved By</p>
         </div>
       </div>
     </body>
@@ -1964,6 +2081,94 @@ export async function registerRoutes(app: Express): Promise<Server> {
     } catch (error) {
       console.error('Error exporting delivery order:', error);
       res.status(500).json({ error: 'Failed to export delivery order' });
+    }
+  });
+
+  // GET /api/export/po - Generate and stream purchase order PDF
+  app.get('/api/export/po', requireAuth(), async (req, res) => {
+    try {
+      const { poId } = req.query;
+      
+      if (!poId) {
+        return res.status(400).json({ error: 'poId parameter is required' });
+      }
+
+      // Get purchase order data from database
+      const [purchaseOrder] = await db.select({
+        id: purchaseOrders.id,
+        poNumber: purchaseOrders.poNumber,
+        supplierId: purchaseOrders.supplierId,
+        status: purchaseOrders.status,
+        orderDate: purchaseOrders.orderDate,
+        expectedDelivery: purchaseOrders.expectedDelivery,
+        totalAmount: purchaseOrders.totalAmount,
+        notes: purchaseOrders.notes,
+        supplierName: suppliers.name,
+      }).from(purchaseOrders)
+        .leftJoin(suppliers, eq(purchaseOrders.supplierId, suppliers.id))
+        .where(eq(purchaseOrders.id, parseInt(poId as string)));
+      
+      if (!purchaseOrder) {
+        return res.status(404).json({ error: 'Purchase order not found' });
+      }
+
+      // Get purchase order items
+      const items = await db.select({
+        productCode: products.sku,
+        description: products.name,
+        quantity: purchaseOrderItems.quantity,
+        unitPrice: purchaseOrderItems.unitPrice,
+        lineTotal: purchaseOrderItems.lineTotal
+      }).from(purchaseOrderItems)
+        .leftJoin(products, eq(purchaseOrderItems.productId, products.id))
+        .where(eq(purchaseOrderItems.poId, parseInt(poId as string)));
+
+      // Add items to purchase order object
+      const purchaseOrderWithItems = {
+        ...purchaseOrder,
+        items: items.map(item => ({
+          product_code: item.productCode,
+          description: item.description,
+          quantity: item.quantity,
+          unit_price: item.unitPrice,
+          line_total: item.lineTotal
+        }))
+      };
+
+      // Generate PDF using puppeteer
+      const puppeteer = await import('puppeteer');
+      
+      const templateHtml = await generatePOPDF(purchaseOrderWithItems);
+      
+      const browser = await puppeteer.default.launch({
+        args: ['--no-sandbox', '--disable-setuid-sandbox'],
+        headless: true
+      });
+      
+      const page = await browser.newPage();
+      await page.setContent(templateHtml, { waitUntil: 'networkidle0' });
+      
+      const pdfBuffer = await page.pdf({
+        format: 'A4',
+        printBackground: true,
+        margin: { top: '1.2cm', right: '1.2cm', bottom: '1.2cm', left: '1.2cm' }
+      });
+      
+      await browser.close();
+
+      // Set headers for PDF streaming
+      res.set({
+        'Content-Type': 'application/pdf',
+        'Content-Disposition': `attachment; filename="purchase-order-${purchaseOrder.poNumber}.pdf"`,
+        'Content-Length': pdfBuffer.length
+      });
+
+      // Stream the PDF bytes
+      res.send(pdfBuffer);
+      
+    } catch (error) {
+      console.error('Error exporting purchase order:', error);
+      res.status(500).json({ error: 'Failed to export purchase order' });
     }
   });
 
