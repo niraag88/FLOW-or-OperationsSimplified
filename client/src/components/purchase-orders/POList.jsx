@@ -5,7 +5,7 @@ import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { ShoppingCart, Edit2, Copy, Download, Eye, Truck } from "lucide-react";
 import { Skeleton } from "@/components/ui/skeleton";
-import { format, parseISO, isValid } from "date-fns";
+import { formatDate } from "@/utils/dateUtils";
 import { 
   DropdownMenu,
   DropdownMenuContent,
@@ -20,9 +20,9 @@ export default function POList({ purchaseOrders, loading, canEdit, currentUser, 
   const [showReceiveDialog, setShowReceiveDialog] = useState(false);
   const [selectedPO, setSelectedPO] = useState(null);
 
-  // Get brand name directly from API response  
+  // Use supplier name as brand since line items aren't saved with PO
   const getBrandName = (po) => {
-    return po.brandName || 'Unknown Brand';
+    return po.supplierName || 'Unknown Brand';
   };
 
   const getStatusColor = (status) => {
@@ -51,15 +51,7 @@ export default function POList({ purchaseOrders, loading, canEdit, currentUser, 
     return numericAmount * exchangeRate;
   };
 
-  const formatDate = (dateString) => {
-    if (!dateString) return '';
-    try {
-      const date = typeof dateString === 'string' ? parseISO(dateString) : new Date(dateString);
-      return isValid(date) ? format(date, 'MMM dd, yyyy') : '';
-    } catch (error) {
-      return '';
-    }
-  };
+  // Using shared date utility
 
   const handleReceiveGoods = (po) => {
     setSelectedPO(po);
