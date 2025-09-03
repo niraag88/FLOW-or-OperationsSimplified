@@ -986,6 +986,48 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  app.put('/api/purchase-orders/:id', requireAuth(['Admin', 'Manager']), async (req: AuthenticatedRequest, res) => {
+    try {
+      const poId = parseInt(req.params.id);
+      
+      const transformedBody = {
+        ...req.body,
+        supplierId: req.body.supplierId ? parseInt(req.body.supplierId) : undefined,
+        orderDate: req.body.orderDate ? new Date(req.body.orderDate) : undefined,
+        expectedDelivery: req.body.expectedDelivery ? new Date(req.body.expectedDelivery) : undefined
+      };
+      
+      const validatedData = insertPurchaseOrderSchema.partial().parse(transformedBody);
+      
+      // Update the purchase order
+      const updatedPO = await businessStorage.updatePurchaseOrder(poId, validatedData);
+      
+      // Handle line items update
+      if (req.body.items && Array.isArray(req.body.items)) {
+        // Delete existing line items
+        await db.delete(purchaseOrderItems).where(eq(purchaseOrderItems.poId, poId));
+        
+        // Insert new line items
+        for (const item of req.body.items) {
+          if (item.productId && item.quantity > 0) {
+            await db.insert(purchaseOrderItems).values({
+              poId: poId,
+              productId: parseInt(item.productId),
+              quantity: item.quantity,
+              unitPrice: item.unitPrice.toString(),
+              lineTotal: item.lineTotal.toString()
+            });
+          }
+        }
+      }
+      
+      res.json(updatedPO);
+    } catch (error) {
+      console.error('Error updating purchase order:', error);
+      res.status(500).json({ error: 'Failed to update purchase order' });
+    }
+  });
+
   app.delete('/api/purchase-orders/:id', requireAuth(['Admin', 'Manager']), async (req: AuthenticatedRequest, res) => {
     try {
       const poId = parseInt(req.params.id);

@@ -188,6 +188,14 @@ export class BusinessStorage {
     return po;
   }
 
+  async updatePurchaseOrder(id: number, data: Partial<InsertPurchaseOrder>) {
+    const [po] = await db.update(purchaseOrders).set({
+      ...data,
+      updatedAt: new Date()
+    }).where(eq(purchaseOrders.id, id)).returning();
+    return po;
+  }
+
   async deletePurchaseOrder(id: number) {
     // First delete all line items associated with this purchase order
     await db.delete(purchaseOrderItems).where(eq(purchaseOrderItems.poId, id));
