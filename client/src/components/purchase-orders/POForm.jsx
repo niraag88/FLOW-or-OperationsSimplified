@@ -71,8 +71,8 @@ export default function POForm({ open, onClose, editingPO, currentUser, onSucces
       setFormData({
         poNumber: editingPO.poNumber || "",
         supplierId: editingPO.supplierId?.toString() || "",
-        orderDate: editingPO.orderDate ? formatDate(editingPO.orderDate, 'yyyy-MM-dd') : "",
-        expectedDelivery: editingPO.expectedDelivery ? formatDate(editingPO.expectedDelivery, 'yyyy-MM-dd') : "",
+        orderDate: editingPO.orderDate ? new Date(editingPO.orderDate).toISOString().split('T')[0] : "",
+        expectedDelivery: editingPO.expectedDelivery ? new Date(editingPO.expectedDelivery).toISOString().split('T')[0] : "",
         status: editingPO.status || "draft",
         notes: editingPO.notes || "",
         totalAmount: editingPO.totalAmount || "0.00",
