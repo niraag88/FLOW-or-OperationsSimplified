@@ -71,7 +71,7 @@ export default function POForm({ open, onClose, editingPO, currentUser, onSucces
       console.log("Loading editing data:", editingPO.supplierId, "Available brands:", availableBrands.length);
       
       // Set basic form data
-      setFormData({
+      const formDataToSet = {
         poNumber: editingPO.poNumber || "",
         supplierId: editingPO.supplierId?.toString() || "",
         orderDate: editingPO.orderDate ? new Date(editingPO.orderDate).toISOString().split('T')[0] : "",
@@ -80,7 +80,16 @@ export default function POForm({ open, onClose, editingPO, currentUser, onSucces
         notes: editingPO.notes || "",
         totalAmount: editingPO.totalAmount || "0.00",
         items: []
-      });
+      };
+      
+      console.log("Setting form data:", formDataToSet);
+      setFormData(formDataToSet);
+      
+      // Force a small delay to ensure React state updates are processed
+      await new Promise(resolve => setTimeout(resolve, 100));
+      
+      // Set the supplier ID again separately to force Select component update
+      setFormData(prev => ({ ...prev, supplierId: editingPO.supplierId?.toString() || "" }));
       
       // Load line items
       if (editingPO.id) {
@@ -283,11 +292,14 @@ export default function POForm({ open, onClose, editingPO, currentUser, onSucces
                   <SelectValue placeholder="Select brand" />
                 </SelectTrigger>
                 <SelectContent>
-                  {brands.map(brand => (
-                    <SelectItem key={brand.id} value={brand.id.toString()}>
-                      {brand.name}
-                    </SelectItem>
-                  ))}
+                  {brands.map(brand => {
+                    console.log("Brand option:", brand.id.toString(), brand.name, "Selected:", formData.supplierId);
+                    return (
+                      <SelectItem key={brand.id} value={brand.id.toString()}>
+                        {brand.name}
+                      </SelectItem>
+                    );
+                  })}
                 </SelectContent>
               </Select>
             </div>
