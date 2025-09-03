@@ -303,16 +303,17 @@ export default function POForm({ open, onClose, editingPO, currentUser, onSucces
     try {
       // Transform form data to match API schema
       const transformedData = {
-        ...formData,
         supplierId: parseInt(formData.supplier_id),
         poNumber: formData.po_number,
-        orderDate: new Date(formData.order_date),
-        expectedDelivery: new Date(formData.expected_delivery_date),
+        orderDate: formData.order_date + 'T00:00:00.000Z', // Convert to ISO datetime
+        expectedDelivery: formData.expected_delivery_date + 'T00:00:00.000Z', // Convert to ISO datetime
         totalAmount: formData.total_amount.toString(),
-        grandTotal: formData.total_amount.toString(), // Same as total for purchase orders
-        notes: formData.notes,
-        termsConditions: formData.terms_conditions
+        grandTotal: formData.total_amount.toString(),
+        notes: formData.notes || '',
+        status: formData.status || 'draft'
       };
+
+      console.log("Transformed data being sent:", transformedData);
 
       if (editingPO) {
         // Log status change if status actually changed
