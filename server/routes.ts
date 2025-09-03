@@ -4,7 +4,7 @@ import { storage } from "./storage";
 import { businessStorage } from "./businessStorage";
 import { Client } from '@replit/object-storage';
 import { invoices, deliveryOrders, auditLog, users, type InsertAuditLog, type InsertUser, type UpdateUser, type User } from "@shared/schema";
-import { insertBrandSchema, insertSupplierSchema, insertCustomerSchema, insertProductSchema, insertPurchaseOrderSchema, insertQuotationSchema, stockCounts, stockCountItems, goodsReceipts, goodsReceiptItems, stockMovements, products, purchaseOrders, purchaseOrderItems, enhancedInvoices, invoiceItems, suppliers } from "@shared/schema";
+import { insertBrandSchema, insertSupplierSchema, insertCustomerSchema, insertProductSchema, insertPurchaseOrderSchema, insertQuotationSchema, stockCounts, stockCountItems, goodsReceipts, goodsReceiptItems, stockMovements, products, purchaseOrders, purchaseOrderItems, enhancedInvoices, invoiceItems, suppliers, brands } from "@shared/schema";
 import { db } from "./db";
 import { eq, desc } from "drizzle-orm";
 import pkg from 'pg';
@@ -2103,9 +2103,9 @@ export async function registerRoutes(app: Express): Promise<Server> {
         expectedDelivery: purchaseOrders.expectedDelivery,
         totalAmount: purchaseOrders.totalAmount,
         notes: purchaseOrders.notes,
-        supplierName: suppliers.name,
+        supplierName: brands.name, // Since supplierId is actually brandId
       }).from(purchaseOrders)
-        .leftJoin(suppliers, eq(purchaseOrders.supplierId, suppliers.id))
+        .leftJoin(brands, eq(purchaseOrders.supplierId, brands.id)) // Join to brands instead
         .where(eq(purchaseOrders.id, parseInt(poId as string)));
       
       if (!purchaseOrder) {
