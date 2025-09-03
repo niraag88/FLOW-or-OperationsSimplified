@@ -208,7 +208,7 @@ export default function POForm({ open, onClose, editingPO, currentUser, onSucces
   // Removed confirmStatusChange function
 
   const calculateTotals = () => {
-    const subtotal = formData.items.reduce((sum, item) => sum + (item.line_total || 0), 0);
+    const subtotal = (formData.items || []).reduce((sum, item) => sum + (item.line_total || 0), 0);
     const totalAmount = subtotal; // No tax for export products
     const poTotalAED = totalAmount * (formData.fx_rate_to_aed || 1);
 
@@ -479,7 +479,7 @@ export default function POForm({ open, onClose, editingPO, currentUser, onSucces
               </div>
             )}
 
-            {formData.items.length > 0 && (
+            {formData.items && formData.items.length > 0 && (
               <>
                 {/* Desktop Table View */}
                 <div className="rounded-md border hidden md:block">
@@ -496,7 +496,7 @@ export default function POForm({ open, onClose, editingPO, currentUser, onSucces
                       </TableRow>
                     </TableHeader>
                     <TableBody>
-                      {formData.items.map((item, index) => (
+                      {(formData.items || []).map((item, index) => (
                         <TableRow key={index}>
                           <TableCell>
                             <Select
@@ -575,7 +575,7 @@ export default function POForm({ open, onClose, editingPO, currentUser, onSucces
 
                 {/* Mobile Card View */}
                 <div className="space-y-3 md:hidden">
-                  {formData.items.map((item, index) => (
+                  {(formData.items || []).map((item, index) => (
                     <Card key={index} className="p-4">
                        <div className="flex justify-between items-start mb-4">
                         <div className="flex-grow space-y-2">

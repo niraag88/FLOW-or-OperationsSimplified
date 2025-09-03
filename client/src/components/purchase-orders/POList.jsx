@@ -22,7 +22,7 @@ export default function POList({ purchaseOrders, loading, canEdit, currentUser, 
 
   // Use supplier name as brand since line items aren't saved with PO
   const getBrandName = (po) => {
-    return po.supplierName || 'Unknown Brand';
+    return po.supplierName || 'Unknown Supplier';
   };
 
   const getStatusColor = (status) => {
