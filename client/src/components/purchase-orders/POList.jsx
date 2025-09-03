@@ -121,12 +121,6 @@ export default function POList({ purchaseOrders, loading, canEdit, currentUser, 
                       {formatDate(po.orderDate)}
                     </TableCell>
                     <TableCell>
-                      {po.expectedDelivery ? 
-                        formatDate(po.expectedDelivery) 
-                        : '-'
-                      }
-                    </TableCell>
-                    <TableCell>
                       {formatCurrency(po.totalAmount || 0, 'GBP')}
                     </TableCell>
                     <TableCell>
