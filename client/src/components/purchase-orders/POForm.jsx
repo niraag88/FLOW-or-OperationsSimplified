@@ -68,7 +68,6 @@ export default function POForm({ open, onClose, editingPO, currentUser, onSucces
     if (!editingPO) return;
     
     try {
-      console.log("Loading editing data:", editingPO.supplierId, "Available brands:", availableBrands.length);
       
       // Set basic form data
       const formDataToSet = {
@@ -82,7 +81,6 @@ export default function POForm({ open, onClose, editingPO, currentUser, onSucces
         items: []
       };
       
-      console.log("Setting form data:", formDataToSet);
       setFormData(formDataToSet);
       
       // Force a small delay to ensure React state updates are processed
@@ -292,14 +290,11 @@ export default function POForm({ open, onClose, editingPO, currentUser, onSucces
                   <SelectValue placeholder="Select brand" />
                 </SelectTrigger>
                 <SelectContent>
-                  {brands.map(brand => {
-                    console.log("Brand option:", brand.id.toString(), brand.name, "Selected:", formData.supplierId);
-                    return (
-                      <SelectItem key={brand.id} value={brand.id.toString()}>
-                        {brand.name}
-                      </SelectItem>
-                    );
-                  })}
+                  {brands.map(brand => (
+                    <SelectItem key={brand.id} value={brand.id.toString()}>
+                      {brand.name}
+                    </SelectItem>
+                  ))}
                 </SelectContent>
               </Select>
             </div>
