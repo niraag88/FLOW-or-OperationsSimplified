@@ -96,6 +96,8 @@ export default function POForm({ open, onClose, editingPO, currentUser, onSucces
       loadInitialData().then(() => {
         if (editingPO) {
           console.log("Editing PO data received:", editingPO);
+          console.log("Available brands:", brands);
+          
           // Map database field names to form field names
           const mappedFormData = {
             po_number: editingPO.poNumber || "",
@@ -115,7 +117,12 @@ export default function POForm({ open, onClose, editingPO, currentUser, onSucces
           };
           
           console.log("Mapped form data:", mappedFormData);
-          setFormData(mappedFormData);
+          
+          // Use a small delay to ensure the form has rendered
+          setTimeout(() => {
+            setFormData(mappedFormData);
+            console.log("Form data set with delay");
+          }, 100);
           
           // Filter products when editing existing PO
           if (editingPO.supplierId) {

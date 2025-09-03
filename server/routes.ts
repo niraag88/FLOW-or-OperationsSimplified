@@ -221,10 +221,10 @@ async function generatePOPDF(purchaseOrder: any): Promise<string> {
 
       <div class="totals">
         <div class="total-line">
-          <span>Total (GBP): <strong>${(purchaseOrder.totalAmount || 0).toFixed(2)}</strong></span>
+          <span>Total (GBP): <strong>${parseFloat(purchaseOrder.totalAmount || 0).toFixed(2)}</strong></span>
         </div>
         <div class="total-line">
-          <span>Total (AED): <strong>${((purchaseOrder.totalAmount || 0) * 5.0).toFixed(2)}</strong></span>
+          <span>Total (AED): <strong>${(parseFloat(purchaseOrder.totalAmount || 0) * 5.0).toFixed(2)}</strong></span>
         </div>
       </div>
 
