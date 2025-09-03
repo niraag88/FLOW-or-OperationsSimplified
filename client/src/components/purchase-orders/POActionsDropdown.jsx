@@ -85,7 +85,7 @@ export default function POActionsDropdown({ po, canEdit, onEdit, onRefresh }) {
       'Description': '',
       'Quantity': '',
       'Unit Price': 'TOTAL (GBP):',
-      'Line Total': (po.totalAmount || 0).toFixed(2)
+      'Line Total': parseFloat(po.totalAmount || 0).toFixed(2)
     });
     
     exportToXLSX(exportData, `Purchase_Order_${po.poNumber}`);
