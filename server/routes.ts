@@ -830,8 +830,16 @@ export async function registerRoutes(app: Express): Promise<Server> {
   app.post('/api/purchase-orders', requireAuth(['Admin', 'Manager']), async (req: AuthenticatedRequest, res) => {
     try {
       const poNumber = await businessStorage.generatePoNumber();
-      const validatedData = insertPurchaseOrderSchema.parse({
+      
+      // Transform date strings to Date objects for validation
+      const transformedBody = {
         ...req.body,
+        orderDate: req.body.orderDate ? new Date(req.body.orderDate) : undefined,
+        expectedDelivery: req.body.expectedDelivery ? new Date(req.body.expectedDelivery) : undefined
+      };
+      
+      const validatedData = insertPurchaseOrderSchema.parse({
+        ...transformedBody,
         poNumber,
         createdBy: req.user!.id
       });
