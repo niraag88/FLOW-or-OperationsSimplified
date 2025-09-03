@@ -58,8 +58,11 @@ export default function POForm({ open, onClose, editingPO, currentUser, onSucces
           CompanySettings.list()
         ]);
         
-        setBrands(brandsData.filter(b => b.isActive));
+        const activeBrands = brandsData.filter(b => b.isActive);
+        setBrands(activeBrands);
         setAllProducts(productsData);
+        
+        console.log("Loaded brands:", activeBrands);
 
         if (settingsList.length > 0) {
           const currentSettings = settingsList[0];
@@ -93,7 +96,7 @@ export default function POForm({ open, onClose, editingPO, currentUser, onSucces
     };
 
     if (open) {
-      loadInitialData().then(() => {
+      loadInitialData().then(async () => {
         if (editingPO) {
           console.log("Editing PO data received:", editingPO);
           console.log("Available brands:", brands);
@@ -118,10 +121,43 @@ export default function POForm({ open, onClose, editingPO, currentUser, onSucces
           
           console.log("Mapped form data:", mappedFormData);
           
+          // Load line items for existing PO
+          if (editingPO.id) {
+            try {
+              const response = await fetch(`/api/purchase-orders/${editingPO.id}/items`);
+              if (response.ok) {
+                const items = await response.json();
+                console.log("Loaded PO items:", items);
+                
+                // Map the items to the form format
+                const formattedItems = items.map(item => ({
+                  product_id: item.productId?.toString() || "",
+                  product_code: item.productSku || "",
+                  description: item.productName || "",
+                  quantity: item.quantity || 0,
+                  unit_price: parseFloat(item.unitPrice) || 0,
+                  line_total: parseFloat(item.lineTotal) || 0
+                }));
+                
+                mappedFormData.items = formattedItems;
+                console.log("Formatted items for form:", formattedItems);
+                
+                // Recalculate totals from line items
+                const subtotal = formattedItems.reduce((sum, item) => sum + parseFloat(item.line_total || 0), 0);
+                mappedFormData.subtotal = subtotal;
+                mappedFormData.total_amount = subtotal;
+                mappedFormData.po_total_aed = subtotal * (companySettings ? parseFloat(companySettings.fxGbpToAed) : 5);
+                console.log("Recalculated totals from items:", { subtotal, total_amount: subtotal });
+              }
+            } catch (error) {
+              console.error("Error loading PO items:", error);
+            }
+          }
+
           // Use a small delay to ensure the form has rendered
           setTimeout(() => {
             setFormData(mappedFormData);
-            console.log("Form data set with delay");
+            console.log("Form data set with delay, including items");
           }, 100);
           
           // Filter products when editing existing PO
