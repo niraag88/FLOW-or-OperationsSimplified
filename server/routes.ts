@@ -210,8 +210,8 @@ async function generatePOPDF(purchaseOrder: any): Promise<string> {
                 <td>${item.product_code || ''}</td>
                 <td>${item.description || ''}</td>
                 <td class="text-right">${item.quantity || 0}</td>
-                <td class="text-right">${(item.unit_price || 0).toFixed(2)}</td>
-                <td class="text-right">${(item.line_total || 0).toFixed(2)}</td>
+                <td class="text-right">${(parseFloat(item.unit_price) || 0).toFixed(2)}</td>
+                <td class="text-right">${(parseFloat(item.line_total) || 0).toFixed(2)}</td>
               </tr>
             `).join('') : 
             '<tr><td colspan="5" style="text-align: center; color: #666;">No line items added</td></tr>'
