@@ -95,10 +95,29 @@ export default function POForm({ open, onClose, editingPO, currentUser, onSucces
     if (open) {
       loadInitialData().then(() => {
         if (editingPO) {
-          setFormData(editingPO);
+          // Map database field names to form field names
+          const mappedFormData = {
+            po_number: editingPO.poNumber || "",
+            supplier_id: editingPO.supplierId ? editingPO.supplierId.toString() : "",
+            order_date: editingPO.orderDate ? new Date(editingPO.orderDate).toISOString().split('T')[0] : new Date().toISOString().split('T')[0],
+            expected_delivery_date: editingPO.expectedDelivery ? new Date(editingPO.expectedDelivery).toISOString().split('T')[0] : "",
+            status: editingPO.status || "draft",
+            currency: "GBP", // Default currency
+            fx_rate_to_aed: companySettings ? parseFloat(companySettings.fxGbpToAed) : 5,
+            subtotal: parseFloat(editingPO.totalAmount) || 0,
+            total_amount: parseFloat(editingPO.totalAmount) || 0,
+            po_total_aed: (parseFloat(editingPO.totalAmount) || 0) * (companySettings ? parseFloat(companySettings.fxGbpToAed) : 5),
+            notes: editingPO.notes || "",
+            terms_conditions: "",
+            attachments: [],
+            items: [] // Will be loaded separately if needed
+          };
+          
+          setFormData(mappedFormData);
+          
           // Filter products when editing existing PO
-          if (editingPO.supplier_id) {
-            filterProductsByBrand(editingPO.supplier_id);
+          if (editingPO.supplierId) {
+            filterProductsByBrand(editingPO.supplierId.toString());
           }
         } else {
           generatePONumber();
