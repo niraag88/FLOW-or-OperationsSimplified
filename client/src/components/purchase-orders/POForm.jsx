@@ -99,7 +99,7 @@ export default function POForm({ open, onClose, editingPO, currentUser, onSucces
       loadInitialData().then(async () => {
         if (editingPO) {
           console.log("Editing PO data received:", editingPO);
-          console.log("Available brands when editing starts:", activeBrands);
+          console.log("Available brands when editing starts:", brands);
           
           // Map database field names to form field names
           const mappedFormData = {
