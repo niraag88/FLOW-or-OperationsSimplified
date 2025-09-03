@@ -209,6 +209,11 @@ export class BusinessStorage {
     return po;
   }
 
+  async deletePurchaseOrder(id: number) {
+    const [deletedPO] = await db.delete(purchaseOrders).where(eq(purchaseOrders.id, id)).returning();
+    return deletedPO;
+  }
+
   // Quotation operations
   async getQuotations() {
     return await db.select({

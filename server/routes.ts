@@ -851,6 +851,17 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  app.delete('/api/purchase-orders/:id', requireAuth(['Admin', 'Manager']), async (req: AuthenticatedRequest, res) => {
+    try {
+      const poId = parseInt(req.params.id);
+      const deletedPO = await businessStorage.deletePurchaseOrder(poId);
+      res.json({ success: true, deletedPO });
+    } catch (error) {
+      console.error('Error deleting purchase order:', error);
+      res.status(500).json({ error: 'Failed to delete purchase order' });
+    }
+  });
+
   // Get purchase order items for goods receipt
   app.get('/api/purchase-orders/:id/items', requireAuth(), async (req: AuthenticatedRequest, res) => {
     try {
