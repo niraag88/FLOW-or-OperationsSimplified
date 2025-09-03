@@ -282,7 +282,8 @@ export class BusinessStorage {
       .limit(1);
     
     if (result.length === 0) {
-      return "PO-2024-001";
+      const currentYear = new Date().getFullYear();
+      return `PO-${currentYear}-001`;
     }
     
     const lastNumber = result[0].poNumber;
@@ -298,7 +299,8 @@ export class BusinessStorage {
         return `PO-${year}-001`;
       }
     }
-    return "PO-2024-001";
+    const currentYear = new Date().getFullYear();
+    return `PO-${currentYear}-001`;
   }
 
   async generateQuoteNumber() {
@@ -308,7 +310,8 @@ export class BusinessStorage {
       .limit(1);
     
     if (result.length === 0) {
-      return "QT-2024-001";
+      const currentYear = new Date().getFullYear();
+      return `QT-${currentYear}-001`;
     }
     
     const lastNumber = result[0].quoteNumber;
@@ -324,7 +327,8 @@ export class BusinessStorage {
         return `QT-${year}-001`;
       }
     }
-    return "QT-2024-001";
+    const currentYear = new Date().getFullYear();
+    return `QT-${currentYear}-001`;
   }
 
   // Stock Count operations

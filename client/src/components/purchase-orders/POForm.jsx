@@ -214,7 +214,15 @@ export default function POForm({ open, onClose, editingPO, currentUser, onSucces
         status: formData.status,
         notes: formData.notes,
         totalAmount: formData.totalAmount,
-        grandTotal: formData.totalAmount
+        grandTotal: formData.totalAmount,
+        items: formData.items.map(item => ({
+          productId: parseInt(item.productId),
+          productSku: item.productSku,
+          productName: item.productName,
+          quantity: parseInt(item.quantity),
+          unitPrice: parseFloat(item.unitPrice),
+          lineTotal: parseFloat(item.lineTotal)
+        }))
       };
 
       if (editingPO) {
@@ -445,12 +453,12 @@ export default function POForm({ open, onClose, editingPO, currentUser, onSucces
               <div></div>
               <div className="space-y-2">
                 <div className="flex justify-between items-center">
-                  <span className="font-medium">Subtotal (GBP)</span>
-                  <span data-testid="text-subtotal">£{formData.totalAmount}</span>
+                  <span className="font-medium">Subtotal</span>
+                  <span data-testid="text-subtotal">GBP £{formData.totalAmount}</span>
                 </div>
                 <div className="flex justify-between items-center text-lg font-bold">
-                  <span>Total (GBP)</span>
-                  <span data-testid="text-total">£{formData.totalAmount}</span>
+                  <span>Total</span>
+                  <span data-testid="text-total">GBP £{formData.totalAmount}</span>
                 </div>
               </div>
             </div>

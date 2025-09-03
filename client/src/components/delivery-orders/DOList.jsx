@@ -54,7 +54,7 @@ export default function DOList({ deliveryOrders, loading, canEdit, currentUser, 
       minimumFractionDigits: 2,
       maximumFractionDigits: 2
     });
-    return `${formatter.format(amount || 0)} ${currency}`;
+    return currency === 'GBP' ? `GBP £${formatter.format(amount || 0)}` : `${currency} ${formatter.format(amount || 0)}`;
   };
 
   const getTaxBadge = (doOrder) => {
