@@ -370,7 +370,7 @@ export default function POForm({ open, onClose, editingPO, currentUser, onSucces
               />
             </div>
             <div className="space-y-2">
-              <Label htmlFor="supplier">Brand/Supplier *</Label>
+              <Label htmlFor="supplier">Brand *</Label>
               <Select 
                 value={formData.supplier_id} 
                 onValueChange={(value) => handleInputChange('supplier_id', value)}
