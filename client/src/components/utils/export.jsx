@@ -238,40 +238,76 @@ export const exportPurchaseOrderToPDF = async (purchaseOrder) => {
     
     currentY += 20;
     
-    // Use autoTable for proper table formatting
-    const tableData = (purchaseOrder.items || []).map(item => [
-      item.product_code || '',
-      item.description || '',
-      item.quantity || 0,
-      parseFloat(item.unit_price || 0).toFixed(2),
-      parseFloat(item.line_total || 0).toFixed(2)
-    ]);
+    // Manual table creation with proper alignment
+    const tableStartY = currentY;
+    const rowHeight = 12;
+    const colWidths = [35, 75, 20, 35, 35];
+    const colX = [14, 49, 124, 144, 179];
     
-    doc.autoTable({
-      head: [['Product Code', 'Description', 'Qty', 'Unit Price (GBP)', 'Line Total (GBP)']],
-      body: tableData,
-      startY: currentY,
-      theme: 'grid',
-      styles: {
-        fontSize: 10,
-        cellPadding: 3
-      },
-      headStyles: {
-        fillColor: [240, 240, 240],
-        textColor: [0, 0, 0],
-        fontStyle: 'bold'
-      },
-      columnStyles: {
-        0: { cellWidth: 30 }, // Product Code
-        1: { cellWidth: 70 }, // Description
-        2: { cellWidth: 20, halign: 'center' }, // Qty
-        3: { cellWidth: 35, halign: 'right' }, // Unit Price
-        4: { cellWidth: 35, halign: 'right' }  // Line Total
+    // Table header
+    doc.setFillColor(240, 240, 240);
+    doc.rect(14, currentY, pageWidth - 28, rowHeight, 'F');
+    
+    doc.setDrawColor(200, 200, 200);
+    doc.setLineWidth(0.5);
+    doc.rect(14, currentY, pageWidth - 28, rowHeight);
+    
+    doc.setFontSize(10);
+    doc.setFont(undefined, 'bold');
+    doc.text('Product Code', colX[0] + 2, currentY + 8);
+    doc.text('Description', colX[1] + 2, currentY + 8);
+    doc.text('Qty', colX[2] + 8, currentY + 8);
+    doc.text('Unit Price (GBP)', colX[3] + 2, currentY + 8);
+    doc.text('Line Total (GBP)', colX[4] + 2, currentY + 8);
+    
+    // Vertical lines for header
+    colX.forEach((x, i) => {
+      if (i > 0) {
+        doc.line(x, currentY, x, currentY + rowHeight);
       }
     });
+    doc.line(pageWidth - 14, currentY, pageWidth - 14, currentY + rowHeight);
     
-    // Get the final Y position after the table
-    currentY = doc.lastAutoTable.finalY + 20;
+    currentY += rowHeight;
+    
+    // Table rows
+    doc.setFont(undefined, 'normal');
+    (purchaseOrder.items || []).forEach((item, index) => {
+      // Alternate row colors
+      if (index % 2 === 1) {
+        doc.setFillColor(248, 248, 248);
+        doc.rect(14, currentY, pageWidth - 28, rowHeight, 'F');
+      }
+      
+      // Row border
+      doc.setDrawColor(230, 230, 230);
+      doc.setLineWidth(0.3);
+      doc.rect(14, currentY, pageWidth - 28, rowHeight);
+      
+      // Cell content
+      doc.text(item.product_code || '', colX[0] + 2, currentY + 8);
+      doc.text(item.description || '', colX[1] + 2, currentY + 8);
+      doc.text(String(item.quantity || 0), colX[2] + 8, currentY + 8);
+      doc.text(parseFloat(item.unit_price || 0).toFixed(2), colX[3] + 15, currentY + 8);
+      doc.text(parseFloat(item.line_total || 0).toFixed(2), colX[4] + 15, currentY + 8);
+      
+      // Vertical lines for row
+      colX.forEach((x, i) => {
+        if (i > 0) {
+          doc.line(x, currentY, x, currentY + rowHeight);
+        }
+      });
+      doc.line(pageWidth - 14, currentY, pageWidth - 14, currentY + rowHeight);
+      
+      currentY += rowHeight;
+    });
+    
+    // Bottom border of table
+    doc.setDrawColor(200, 200, 200);
+    doc.setLineWidth(0.5);
+    doc.line(14, currentY, pageWidth - 14, currentY);
+    
+    currentY += 20;
     
     // Total section (clean and simple)
     const total = parseFloat(purchaseOrder.totalAmount || 0);
