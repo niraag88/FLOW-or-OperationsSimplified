@@ -126,6 +126,11 @@ export const brands = pgTable("brands", {
   name: text("name").notNull().unique(),
   description: text("description"),
   logo: text("logo"), // Object storage key for brand logo
+  website: text("website"),
+  contactPerson: text("contact_person"),
+  contactEmail: text("contact_email"),
+  contactPhone: text("contact_phone"),
+  sortOrder: integer("sort_order").default(0),
   isActive: boolean("is_active").notNull().default(true),
   createdAt: timestamp("created_at").defaultNow().notNull(),
   updatedAt: timestamp("updated_at").defaultNow().notNull(),
@@ -408,6 +413,11 @@ export const insertBrandSchema = createInsertSchema(brands).pick({
   name: true,
   description: true,
   logo: true,
+  website: true,
+  contactPerson: true,
+  contactEmail: true,
+  contactPhone: true,
+  sortOrder: true,
   isActive: true,
 });
 

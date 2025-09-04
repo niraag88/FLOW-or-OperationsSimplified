@@ -88,11 +88,11 @@ export default function BrandManagement() {
         name: formData.name,
         description: formData.address,
         website: formData.website,
-        contact_person: formData.contact_person,
-        contact_email: formData.contact_email,
-        contact_phone: formData.contact_phone,
+        contactPerson: formData.contact_person,
+        contactEmail: formData.contact_email,
+        contactPhone: formData.contact_phone,
         isActive: formData.isActive,
-        sort_order: formData.sort_order
+        sortOrder: formData.sort_order
       };
       
       if (editingBrand) {
@@ -129,11 +129,11 @@ export default function BrandManagement() {
       name: brand.name || "",
       address: brand.description || "", // Map description to address
       website: brand.website || "",
-      contact_person: brand.contact_person || "",
-      contact_email: brand.contact_email || "",
-      contact_phone: brand.contact_phone || "",
+      contact_person: brand.contactPerson || "",
+      contact_email: brand.contactEmail || "",
+      contact_phone: brand.contactPhone || "",
       isActive: brand.isActive !== undefined ? brand.isActive : true,
-      sort_order: brand.sort_order || 0
+      sort_order: brand.sortOrder || 0
     });
     setShowForm(true);
   };
