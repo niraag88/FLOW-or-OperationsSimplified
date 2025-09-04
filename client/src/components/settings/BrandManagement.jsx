@@ -23,8 +23,7 @@ import SimpleConfirmDialog from "../common/SimpleConfirmDialog";
 
 const initialFormData = {
   name: "",
-  description: "",
-  logo_url: "",
+  address: "",
   website: "",
   contact_person: "",
   contact_email: "",
@@ -84,15 +83,22 @@ export default function BrandManagement() {
     }
 
     try {
+      // Map address back to description for API
+      const apiData = {
+        ...formData,
+        description: formData.address,
+        address: undefined // Remove address field
+      };
+      
       if (editingBrand) {
-        await Brand.update(editingBrand.id, formData);
+        await Brand.update(editingBrand.id, apiData);
         await logAuditAction("Brand", editingBrand.id, "update", currentUser?.email, { updated_brand: formData });
         toast({
           title: "Success",
           description: "Brand updated successfully.",
         });
       } else {
-        const newBrand = await Brand.create(formData);
+        const newBrand = await Brand.create(apiData);
         await logAuditAction("Brand", newBrand.id, "create", currentUser?.email, { created_brand: formData });
         toast({
           title: "Success",
@@ -115,7 +121,13 @@ export default function BrandManagement() {
   const handleEdit = (brand) => {
     setEditingBrand(brand);
     setFormData({
-      ...brand,
+      name: brand.name || "",
+      address: brand.description || "", // Map description to address
+      website: brand.website || "",
+      contact_person: brand.contact_person || "",
+      contact_email: brand.contact_email || "",
+      contact_phone: brand.contact_phone || "",
+      isActive: brand.isActive !== undefined ? brand.isActive : true,
       sort_order: brand.sort_order || 0
     });
     setShowForm(true);
@@ -192,7 +204,7 @@ export default function BrandManagement() {
                   <TableHeader>
                     <TableRow>
                       <TableHead className="min-w-[120px]">Brand Name</TableHead>
-                      <TableHead className="min-w-[150px]">Description</TableHead>
+                      <TableHead className="min-w-[150px]">Address</TableHead>
                       <TableHead className="min-w-[120px]">Contact</TableHead>
                       <TableHead className="min-w-[100px]">Website</TableHead>
                       <TableHead className="min-w-[80px]">Status</TableHead>
@@ -297,7 +309,10 @@ export default function BrandManagement() {
                       </div>
                       
                       {brand.description && (
-                        <p className="text-sm text-gray-600 break-words">{brand.description}</p>
+                        <div className="text-sm">
+                          <strong>Address:</strong> 
+                          <p className="text-gray-600 break-words mt-1">{brand.description}</p>
+                        </div>
                       )}
                       
                       {brand.contact_person && (
@@ -374,37 +389,25 @@ export default function BrandManagement() {
                 </div>
 
                 <div className="space-y-2">
-                  <Label htmlFor="description">Description</Label>
+                  <Label htmlFor="address">Address</Label>
                   <Textarea
-                    id="description"
-                    value={formData.description}
-                    onChange={(e) => handleInputChange('description', e.target.value)}
-                    placeholder="Brief description of the brand"
+                    id="address"
+                    value={formData.address}
+                    onChange={(e) => handleInputChange('address', e.target.value)}
+                    placeholder="Company address"
                     rows={3}
                   />
                 </div>
 
-                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                  <div className="space-y-2">
-                    <Label htmlFor="logo_url">Logo URL</Label>
-                    <Input
-                      id="logo_url"
-                      type="url"
-                      value={formData.logo_url}
-                      onChange={(e) => handleInputChange('logo_url', e.target.value)}
-                      placeholder="https://example.com/logo.png"
-                    />
-                  </div>
-                  <div className="space-y-2">
-                    <Label htmlFor="website">Website</Label>
-                    <Input
-                      id="website"
-                      type="url"
-                      value={formData.website}
-                      onChange={(e) => handleInputChange('website', e.target.value)}
-                      placeholder="https://example.com"
-                    />
-                  </div>
+                <div className="space-y-2">
+                  <Label htmlFor="website">Website</Label>
+                  <Input
+                    id="website"
+                    type="url"
+                    value={formData.website}
+                    onChange={(e) => handleInputChange('website', e.target.value)}
+                    placeholder="https://example.com"
+                  />
                 </div>
 
                 <div className="grid grid-cols-1 gap-4">
