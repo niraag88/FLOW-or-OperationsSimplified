@@ -26,7 +26,6 @@ import Customers from "@/pages/Customers.jsx";
 import BackupDrill from "@/pages/BackupDrill.jsx";
 import Print from "@/pages/Print.jsx";
 import Quotations from "@/pages/Quotations.jsx";
-import POPrint from "@/pages/POPrint.jsx";
 
 function PagesContent() {
   const { isAuthenticated, isLoading } = useAuth();
@@ -137,11 +136,6 @@ function PagesContent() {
       <Route path="/Quotations" element={
         <ProtectedRoute>
           <Layout currentPageName="Quotations"><Quotations /></Layout>
-        </ProtectedRoute>
-      } />
-      <Route path="/print/purchase-order/:id" element={
-        <ProtectedRoute>
-          <POPrint />
         </ProtectedRoute>
       } />
     </Routes>

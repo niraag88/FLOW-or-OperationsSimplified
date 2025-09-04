@@ -104,9 +104,38 @@ export default function POActionsDropdown({ po, canEdit, onEdit, onRefresh }) {
     }
   };
 
-  const handleExportPDF = () => {
-    // Open the print-optimized page in a new window
-    window.open(`/print/purchase-order/${po.id}`, '_blank');
+  const handleExportPDF = async () => {
+    try {
+      // Get the PO data with line items from the server
+      const response = await fetch(`/api/export/po?poId=${po.id}`, {
+        credentials: 'include'
+      });
+      
+      if (!response.ok) {
+        throw new Error(`Server error: ${response.status}`);
+      }
+      
+      const result = await response.json();
+      
+      if (!result.success) {
+        throw new Error('Failed to get PO data');
+      }
+      
+      const purchaseOrder = result.data;
+      console.log('Purchase Order data:', purchaseOrder);
+      
+      // Use the existing export function
+      exportPurchaseOrderToPDF(purchaseOrder);
+      
+    } catch (error) {
+      console.error('Error exporting PDF:', error);
+      console.error('Error details:', error.message, error.stack);
+      toast({
+        title: 'Export Failed',
+        description: `Failed to export PDF: ${error.message}`,
+        variant: 'destructive'
+      });
+    }
   };
 
   const handleDelete = async () => {
@@ -175,7 +204,7 @@ export default function POActionsDropdown({ po, canEdit, onEdit, onRefresh }) {
           )}
           <DropdownMenuItem onClick={handleExportPDF}>
             <FileText className="w-4 h-4 mr-2" />
-            Print PDF
+            Export to PDF
           </DropdownMenuItem>
           <DropdownMenuItem onClick={handleExportXLSX}>
             <Download className="w-4 h-4 mr-2" />
