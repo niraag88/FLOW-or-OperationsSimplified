@@ -252,6 +252,11 @@
     visibility: visible;
   }
   
+  /* Hide the print button when printing */
+  .print-controls {
+    display: none !important;
+  }
+  
   .print-document {
     position: absolute;
     left: 0;

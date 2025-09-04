@@ -34,14 +34,15 @@ export default function POPrint() {
     fetchData();
   }, [id]);
 
-  useEffect(() => {
-    // Auto-trigger print dialog after data loads
-    if (poData && companySettings) {
-      setTimeout(() => {
-        window.print();
-      }, 500);
-    }
-  }, [poData, companySettings]);
+  // Remove auto-print for now to allow preview
+  // useEffect(() => {
+  //   // Auto-trigger print dialog after data loads
+  //   if (poData && companySettings) {
+  //     setTimeout(() => {
+  //       window.print();
+  //     }, 500);
+  //   }
+  // }, [poData, companySettings]);
 
   if (loading) {
     return (
@@ -66,8 +67,30 @@ export default function POPrint() {
     return `GBP ${numAmount.toFixed(2)}`;
   };
 
+  const handlePrint = () => {
+    window.print();
+  };
+
   return (
     <div className="print-document">
+      {/* Print Button for manual control */}
+      <div className="print-controls" style={{textAlign: 'center', marginBottom: '20px', pageBreakInside: 'avoid'}}>
+        <button 
+          onClick={handlePrint}
+          style={{
+            backgroundColor: '#007bff',
+            color: 'white',
+            border: 'none',
+            padding: '10px 20px',
+            borderRadius: '5px',
+            cursor: 'pointer',
+            fontSize: '14px'
+          }}
+        >
+          Print PDF
+        </button>
+      </div>
+      
       {/* Header Section */}
       <div className="document-header">
         <div className="company-info">
