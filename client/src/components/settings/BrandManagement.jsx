@@ -226,11 +226,11 @@ export default function BrandManagement() {
                           </div>
                         </TableCell>
                         <TableCell>
-                          {brand.contact_person && (
+                          {brand.contactPerson && (
                             <div className="text-sm">
-                              <div className="truncate">{brand.contact_person}</div>
-                              {brand.contact_email && (
-                                <div className="text-gray-500 truncate">{brand.contact_email}</div>
+                              <div className="truncate">{brand.contactPerson}</div>
+                              {brand.contactEmail && (
+                                <div className="text-gray-500 truncate">{brand.contactEmail}</div>
                               )}
                             </div>
                           )}
@@ -320,11 +320,11 @@ export default function BrandManagement() {
                         </div>
                       )}
                       
-                      {brand.contact_person && (
+                      {brand.contactPerson && (
                         <div className="text-sm">
-                          <strong>Contact:</strong> {brand.contact_person}
-                          {brand.contact_email && (
-                            <div className="text-gray-500 break-all">{brand.contact_email}</div>
+                          <strong>Contact:</strong> {brand.contactPerson}
+                          {brand.contactEmail && (
+                            <div className="text-gray-500 break-all">{brand.contactEmail}</div>
                           )}
                         </div>
                       )}
