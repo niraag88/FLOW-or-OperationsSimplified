@@ -209,9 +209,8 @@ export default function BrandManagement() {
                   <TableHeader>
                     <TableRow>
                       <TableHead className="min-w-[120px]">Brand Name</TableHead>
-                      <TableHead className="min-w-[150px]">Address</TableHead>
-                      <TableHead className="min-w-[120px]">Contact</TableHead>
-                      <TableHead className="min-w-[100px]">Website</TableHead>
+                      <TableHead className="min-w-[120px]">Contact Name</TableHead>
+                      <TableHead className="min-w-[120px]">Email</TableHead>
                       <TableHead className="min-w-[80px]">Status</TableHead>
                       <TableHead className="min-w-[100px]">Actions</TableHead>
                     </TableRow>
@@ -220,33 +219,11 @@ export default function BrandManagement() {
                     {brands.map((brand) => (
                       <TableRow key={brand.id}>
                         <TableCell className="font-medium">{brand.name}</TableCell>
-                        <TableCell className="max-w-xs">
-                          <div className="truncate" title={brand.description}>
-                            {brand.description || '-'}
-                          </div>
+                        <TableCell>
+                          <div className="truncate">{brand.contactPerson || '-'}</div>
                         </TableCell>
                         <TableCell>
-                          {brand.contactPerson && (
-                            <div className="text-sm">
-                              <div className="truncate">{brand.contactPerson}</div>
-                              {brand.contactEmail && (
-                                <div className="text-gray-500 truncate">{brand.contactEmail}</div>
-                              )}
-                            </div>
-                          )}
-                        </TableCell>
-                        <TableCell>
-                          {brand.website && (
-                            <a 
-                              href={brand.website} 
-                              target="_blank" 
-                              rel="noopener noreferrer"
-                              className="text-blue-600 hover:text-blue-800 flex items-center gap-1"
-                            >
-                              <ExternalLink className="w-3 h-3" />
-                              Visit
-                            </a>
-                          )}
+                          <div className="truncate">{brand.contactEmail || '-'}</div>
                         </TableCell>
                         <TableCell>
                           <span className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium ${
@@ -313,32 +290,17 @@ export default function BrandManagement() {
                         </div>
                       </div>
                       
-                      {brand.description && (
-                        <div className="text-sm">
-                          <strong>Address:</strong> 
-                          <p className="text-gray-600 break-words mt-1">{brand.description}</p>
-                        </div>
-                      )}
-                      
                       {brand.contactPerson && (
                         <div className="text-sm">
                           <strong>Contact:</strong> {brand.contactPerson}
-                          {brand.contactEmail && (
-                            <div className="text-gray-500 break-all">{brand.contactEmail}</div>
-                          )}
                         </div>
                       )}
                       
-                      {brand.website && (
-                        <a 
-                          href={brand.website} 
-                          target="_blank" 
-                          rel="noopener noreferrer"
-                          className="text-blue-600 hover:text-blue-800 text-sm flex items-center gap-1 break-all"
-                        >
-                          <ExternalLink className="w-3 h-3 flex-shrink-0" />
-                          Visit Website
-                        </a>
+                      {brand.contactEmail && (
+                        <div className="text-sm">
+                          <strong>Email:</strong> 
+                          <div className="text-gray-500 break-all">{brand.contactEmail}</div>
+                        </div>
                       )}
                     </div>
                   </Card>
