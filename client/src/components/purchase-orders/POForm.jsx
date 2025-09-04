@@ -155,6 +155,7 @@ export default function POForm({ open, onClose, editingPO, currentUser, onSucces
       productId: "",
       productSku: "",
       productName: "",
+      size: "",
       quantity: 1,
       unitPrice: 0,
       lineTotal: 0
@@ -175,6 +176,7 @@ export default function POForm({ open, onClose, editingPO, currentUser, onSucces
       if (product) {
         newItems[index].productSku = product.sku;
         newItems[index].productName = product.name;
+        newItems[index].size = product.size || '';
         newItems[index].unitPrice = parseFloat(product.costPrice) || 0;
         newItems[index].lineTotal = newItems[index].quantity * (parseFloat(product.costPrice) || 0);
       }
@@ -377,6 +379,7 @@ export default function POForm({ open, onClose, editingPO, currentUser, onSucces
                       <TableHead>Product</TableHead>
                       <TableHead>Product Code</TableHead>
                       <TableHead>Description</TableHead>
+                      <TableHead>Size</TableHead>
                       <TableHead>Quantity</TableHead>
                       <TableHead>Unit Price (GBP)</TableHead>
                       <TableHead>Line Total</TableHead>
@@ -398,7 +401,7 @@ export default function POForm({ open, onClose, editingPO, currentUser, onSucces
                             <SelectContent>
                               {getFilteredProducts().map(product => (
                                 <SelectItem key={product.id} value={product.id.toString()}>
-                                  {product.name}
+                                  {product.name}{product.size ? ` - ${product.size}` : ''}
                                 </SelectItem>
                               ))}
                             </SelectContent>
@@ -406,6 +409,7 @@ export default function POForm({ open, onClose, editingPO, currentUser, onSucces
                         </TableCell>
                         <TableCell>{item.productSku}</TableCell>
                         <TableCell>{item.productName}</TableCell>
+                        <TableCell>{item.size}</TableCell>
                         <TableCell>
                           <Input
                             type="number"
