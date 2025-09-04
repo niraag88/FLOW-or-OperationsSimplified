@@ -282,12 +282,12 @@ export const exportPurchaseOrderToPDF = async (purchaseOrder) => {
         lineColor: [0, 0, 0]
       },
       columnStyles: {
-        0: { cellWidth: 25, halign: 'left' }, // Product Code
-        1: { cellWidth: 60, halign: 'left' }, // Description
-        2: { cellWidth: 25, halign: 'left' }, // Size
-        3: { cellWidth: 15, halign: 'center' }, // Qty
-        4: { cellWidth: 25, halign: 'right' }, // Unit Price
-        5: { cellWidth: 25, halign: 'right' }  // Line Total
+        0: { cellWidth: 22, halign: 'left' }, // Product Code
+        1: { cellWidth: 55, halign: 'left' }, // Description
+        2: { cellWidth: 20, halign: 'left' }, // Size
+        3: { cellWidth: 12, halign: 'center' }, // Qty
+        4: { cellWidth: 22, halign: 'right' }, // Unit Price
+        5: { cellWidth: 22, halign: 'right' }  // Line Total
       },
       drawHorizontalLine: (lineIndex, startX, endX, startY, endY, doc) => {
         // Draw top border, header separator, and bottom border only
