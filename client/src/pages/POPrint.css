@@ -1,0 +1,325 @@
+/* Print-specific styles for Purchase Orders */
+
+/* Screen styles for loading/error states */
+.loading-screen, .error-screen {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  min-height: 100vh;
+  padding: 2rem;
+  text-align: center;
+}
+
+.loading-spinner {
+  border: 3px solid #f3f3f3;
+  border-top: 3px solid #3498db;
+  border-radius: 50%;
+  width: 40px;
+  height: 40px;
+  animation: spin 1s linear infinite;
+  margin-bottom: 1rem;
+}
+
+@keyframes spin {
+  0% { transform: rotate(0deg); }
+  100% { transform: rotate(360deg); }
+}
+
+/* Print document styles */
+.print-document {
+  max-width: 210mm; /* A4 width */
+  margin: 0 auto;
+  padding: 20mm;
+  background: white;
+  color: black;
+  font-family: 'Arial', 'Helvetica', sans-serif;
+  font-size: 11pt;
+  line-height: 1.4;
+}
+
+/* Header Section */
+.document-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+  margin-bottom: 30px;
+  padding-bottom: 20px;
+  border-bottom: 2px solid #333;
+}
+
+.company-info {
+  flex: 1;
+}
+
+.company-name {
+  font-size: 24pt;
+  font-weight: bold;
+  margin: 0 0 10px 0;
+  color: #333;
+}
+
+.company-details p {
+  margin: 2px 0;
+  font-size: 10pt;
+  color: #555;
+}
+
+.logo-section {
+  flex-shrink: 0;
+  margin-left: 20px;
+}
+
+.company-logo {
+  max-height: 80px;
+  max-width: 120px;
+  object-fit: contain;
+}
+
+/* Document Title */
+.document-title {
+  text-align: center;
+  margin: 30px 0;
+}
+
+.document-title h2 {
+  font-size: 28pt;
+  font-weight: bold;
+  margin: 0;
+  color: #333;
+  letter-spacing: 2px;
+}
+
+/* Document Info Grid */
+.document-info {
+  display: flex;
+  justify-content: space-between;
+  margin-bottom: 30px;
+  gap: 40px;
+}
+
+.info-left, .info-right {
+  flex: 1;
+}
+
+.info-group {
+  display: flex;
+  margin-bottom: 8px;
+}
+
+.info-group label {
+  font-weight: bold;
+  min-width: 120px;
+  color: #333;
+}
+
+.po-number {
+  font-weight: bold;
+  font-size: 12pt;
+  color: #2c3e50;
+}
+
+.supplier-section h3 {
+  font-size: 14pt;
+  font-weight: bold;
+  margin: 0 0 10px 0;
+  color: #333;
+  border-bottom: 1px solid #ddd;
+  padding-bottom: 5px;
+}
+
+.supplier-details {
+  font-size: 11pt;
+}
+
+/* Items Table */
+.items-section {
+  margin: 30px 0;
+}
+
+.items-table {
+  width: 100%;
+  border-collapse: collapse;
+  margin: 20px 0;
+  font-size: 10pt;
+}
+
+.items-table th {
+  background-color: #f8f9fa;
+  border: 1px solid #333;
+  padding: 12px 8px;
+  text-align: left;
+  font-weight: bold;
+  color: #333;
+}
+
+.items-table td {
+  border: 1px solid #333;
+  padding: 10px 8px;
+  vertical-align: top;
+}
+
+.items-table tbody tr:nth-child(even) {
+  background-color: #f9f9f9;
+}
+
+/* Column widths for optimal layout */
+.col-code { width: 15%; }
+.col-description { width: 35%; }
+.col-size { width: 12%; }
+.col-qty { width: 8%; text-align: center; }
+.col-price { width: 15%; text-align: right; }
+.col-total { width: 15%; text-align: right; }
+
+/* Totals Section */
+.totals-section {
+  margin: 30px 0;
+  display: flex;
+  justify-content: flex-end;
+}
+
+.totals-table {
+  min-width: 300px;
+}
+
+.total-row {
+  display: flex;
+  justify-content: space-between;
+  padding: 8px 0;
+  border-bottom: 1px solid #ddd;
+}
+
+.grand-total {
+  font-weight: bold;
+  font-size: 14pt;
+  border-bottom: 3px double #333;
+  border-top: 2px solid #333;
+  margin-top: 10px;
+  padding: 15px 0;
+}
+
+.total-label {
+  color: #333;
+}
+
+.total-amount {
+  color: #2c3e50;
+  font-weight: bold;
+}
+
+/* Notes Section */
+.notes-section {
+  margin: 30px 0;
+  padding: 20px;
+  background-color: #f8f9fa;
+  border-left: 4px solid #007bff;
+}
+
+.notes-section h4 {
+  margin: 0 0 10px 0;
+  color: #333;
+  font-size: 12pt;
+}
+
+.notes-section p {
+  margin: 0;
+  color: #555;
+  line-height: 1.5;
+}
+
+/* Footer */
+.document-footer {
+  margin-top: 40px;
+  padding-top: 20px;
+  border-top: 1px solid #ddd;
+  font-size: 9pt;
+  color: #666;
+  text-align: center;
+}
+
+.document-footer p {
+  margin: 5px 0;
+}
+
+/* Print-specific styles */
+@media print {
+  /* Hide everything except the print document */
+  body * {
+    visibility: hidden;
+  }
+  
+  .print-document, .print-document * {
+    visibility: visible;
+  }
+  
+  .print-document {
+    position: absolute;
+    left: 0;
+    top: 0;
+    width: 100%;
+    max-width: none;
+    margin: 0;
+    padding: 0;
+    box-shadow: none;
+  }
+  
+  /* Ensure proper page breaks */
+  .document-header {
+    page-break-inside: avoid;
+  }
+  
+  .items-table {
+    page-break-inside: auto;
+  }
+  
+  .items-table thead {
+    display: table-header-group;
+  }
+  
+  .items-table tr {
+    page-break-inside: avoid;
+  }
+  
+  .totals-section {
+    page-break-inside: avoid;
+  }
+  
+  .notes-section {
+    page-break-inside: avoid;
+  }
+  
+  /* Remove backgrounds for better printing */
+  .items-table th {
+    background-color: #f0f0f0 !important;
+    -webkit-print-color-adjust: exact;
+  }
+  
+  .items-table tbody tr:nth-child(even) {
+    background-color: #f8f8f8 !important;
+    -webkit-print-color-adjust: exact;
+  }
+  
+  .notes-section {
+    background-color: #f5f5f5 !important;
+    -webkit-print-color-adjust: exact;
+  }
+  
+  /* Ensure proper margins for printing */
+  @page {
+    margin: 1in;
+    size: A4;
+  }
+}
+
+/* Screen preview styles (for viewing before print) */
+@media screen {
+  body {
+    background-color: #f5f5f5;
+    padding: 20px;
+  }
+  
+  .print-document {
+    box-shadow: 0 0 20px rgba(0, 0, 0, 0.1);
+    min-height: 297mm; /* A4 height */
+  }
+}
