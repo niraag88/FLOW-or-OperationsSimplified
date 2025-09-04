@@ -13,7 +13,7 @@ export default function POPrint() {
     const fetchData = async () => {
       try {
         // Fetch PO data
-        const poResponse = await fetch(`/api/export/po?id=${id}`);
+        const poResponse = await fetch(`/api/export/po?poId=${id}`);
         const poResult = await poResponse.json();
         
         // Fetch company settings
