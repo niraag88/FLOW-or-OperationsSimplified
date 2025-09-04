@@ -1,6 +1,6 @@
 import * as XLSX from 'xlsx';
 import jsPDF from 'jspdf';
-import 'jspdf-autotable';
+import autoTable from 'jspdf-autotable';
 
 export const exportToCsv = (data, filename) => {
   if (!data || data.length === 0) {
@@ -155,31 +155,39 @@ export const exportPurchaseOrderToPDF = (purchaseOrder) => {
     doc.text(`Supplier: ${purchaseOrder.supplierName || 'Unknown'}`, 14, 70);
     doc.text(`Status: ${purchaseOrder.status}`, 14, 80);
     
-    // Prepare table data for line items
-    const tableData = (purchaseOrder.items || []).map(item => [
-      item.product_code || '',
-      item.description || '',
-      item.quantity || 0,
-      `GBP £${parseFloat(item.unit_price || 0).toFixed(2)}`,
-      `GBP £${parseFloat(item.line_total || 0).toFixed(2)}`
-    ]);
+    // Add line items header
+    doc.setFontSize(10);
+    doc.text('Line Items:', 14, 100);
     
-    // Add line items table
-    doc.autoTable({
-      head: [['Product Code', 'Description', 'Qty', 'Unit Price', 'Line Total']],
-      body: tableData,
-      startY: 95,
-      styles: { fontSize: 10 },
-      headStyles: { fillColor: [51, 51, 51] }
+    // Add line items manually (simpler approach without autoTable)
+    let yPosition = 110;
+    doc.text('Product Code', 14, yPosition);
+    doc.text('Description', 60, yPosition);
+    doc.text('Qty', 130, yPosition);
+    doc.text('Unit Price', 150, yPosition);
+    doc.text('Line Total', 180, yPosition);
+    
+    yPosition += 10;
+    
+    // Add each item
+    (purchaseOrder.items || []).forEach(item => {
+      doc.text(item.product_code || '', 14, yPosition);
+      doc.text(item.description || '', 60, yPosition);
+      doc.text(String(item.quantity || 0), 130, yPosition);
+      doc.text(`£${parseFloat(item.unit_price || 0).toFixed(2)}`, 150, yPosition);
+      doc.text(`£${parseFloat(item.line_total || 0).toFixed(2)}`, 180, yPosition);
+      yPosition += 10;
     });
     
     // Add total
-    const finalY = doc.lastAutoTable.finalY + 10;
-    doc.text(`Total: GBP £${parseFloat(purchaseOrder.totalAmount || 0).toFixed(2)}`, 150, finalY);
+    yPosition += 10;
+    doc.setFontSize(12);
+    doc.text(`Total: GBP £${parseFloat(purchaseOrder.totalAmount || 0).toFixed(2)}`, 14, yPosition);
     
     // Add notes if any
     if (purchaseOrder.notes) {
-      doc.text(`Notes: ${purchaseOrder.notes}`, 14, finalY + 20);
+      yPosition += 20;
+      doc.text(`Notes: ${purchaseOrder.notes}`, 14, yPosition);
     }
     
     // Download the PDF
