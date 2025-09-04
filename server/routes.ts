@@ -2213,35 +2213,54 @@ export async function registerRoutes(app: Express): Promise<Server> {
         }))
       };
 
-      // Generate PDF using puppeteer
-      const puppeteer = await import('puppeteer');
+      // Generate PDF using jsPDF (simpler and more reliable)
+      const jsPDF = await import('jspdf');
+      require('jspdf-autotable');
       
-      const templateHtml = await generatePOPDF(purchaseOrderWithItems);
+      const doc = new jsPDF.default();
       
-      const browser = await puppeteer.default.launch({
-        args: [
-          '--no-sandbox',
-          '--disable-setuid-sandbox',
-          '--disable-dev-shm-usage',
-          '--disable-accelerated-2d-canvas',
-          '--no-first-run',
-          '--no-zygote',
-          '--single-process',
-          '--disable-gpu'
-        ],
-        headless: true
+      // Add title
+      doc.setFontSize(20);
+      doc.text('PURCHASE ORDER', 14, 25);
+      
+      // Add PO details
+      doc.setFontSize(12);
+      doc.text(`PO Number: ${purchaseOrder.poNumber}`, 14, 40);
+      doc.text(`Order Date: ${new Date(purchaseOrder.orderDate).toLocaleDateString('en-GB')}`, 14, 50);
+      if (purchaseOrder.expectedDelivery) {
+        doc.text(`Expected Delivery: ${new Date(purchaseOrder.expectedDelivery).toLocaleDateString('en-GB')}`, 14, 60);
+      }
+      doc.text(`Supplier: ${purchaseOrder.supplierName || 'Unknown'}`, 14, 70);
+      doc.text(`Status: ${purchaseOrder.status}`, 14, 80);
+      
+      // Prepare table data for line items
+      const tableData = items.map(item => [
+        item.productCode || '',
+        item.description || '',
+        item.quantity || 0,
+        `£${parseFloat(item.unitPrice || 0).toFixed(2)}`,
+        `£${parseFloat(item.lineTotal || 0).toFixed(2)}`
+      ]);
+      
+      // Add line items table
+      (doc as any).autoTable({
+        head: [['Product Code', 'Description', 'Qty', 'Unit Price', 'Line Total']],
+        body: tableData,
+        startY: 95,
+        styles: { fontSize: 10 },
+        headStyles: { fillColor: [51, 51, 51] }
       });
       
-      const page = await browser.newPage();
-      await page.setContent(templateHtml, { waitUntil: 'networkidle0' });
+      // Add total
+      const finalY = (doc as any).lastAutoTable.finalY + 10;
+      doc.text(`Total: GBP £${parseFloat(purchaseOrder.totalAmount || 0).toFixed(2)}`, 150, finalY);
       
-      const pdfBuffer = await page.pdf({
-        format: 'A4',
-        printBackground: true,
-        margin: { top: '1.2cm', right: '1.2cm', bottom: '1.2cm', left: '1.2cm' }
-      });
+      // Add notes if any
+      if (purchaseOrder.notes) {
+        doc.text(`Notes: ${purchaseOrder.notes}`, 14, finalY + 20);
+      }
       
-      await browser.close();
+      const pdfBuffer = Buffer.from(doc.output('arraybuffer'));
 
       // Set headers for PDF streaming
       res.set({
