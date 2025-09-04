@@ -172,6 +172,7 @@ export const products = pgTable("products", {
   description: text("description"),
   brandId: integer("brand_id").references(() => brands.id),
   category: text("category"),
+  size: text("size"), // Product size (e.g., 100ml, 5L, 1kg, 250g)
   unitPrice: decimal("unit_price", { precision: 10, scale: 2 }).notNull(),
   costPrice: decimal("cost_price", { precision: 10, scale: 2 }),
   vatRate: decimal("vat_rate", { precision: 5, scale: 2 }).default("0.00"),
