@@ -99,6 +99,7 @@ export default function POForm({ open, onClose, editingPO, currentUser, onSucces
             productId: item.productId?.toString() || "",
             productSku: item.productSku || "",
             productName: item.productName || "",
+            size: item.size || "",
             quantity: item.quantity || 0,
             unitPrice: parseFloat(item.unitPrice) || 0,
             lineTotal: parseFloat(item.lineTotal) || 0
