@@ -107,7 +107,14 @@ export default function POActionsDropdown({ po, canEdit, onEdit, onRefresh }) {
   const handleExportPDF = async () => {
     try {
       // Get the PO data with line items from the server
-      const response = await fetch(`/api/export/po?poId=${po.id}`);
+      const response = await fetch(`/api/export/po?poId=${po.id}`, {
+        credentials: 'include'
+      });
+      
+      if (!response.ok) {
+        throw new Error(`Server error: ${response.status}`);
+      }
+      
       const result = await response.json();
       
       if (!result.success) {
