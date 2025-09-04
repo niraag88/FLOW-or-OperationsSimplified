@@ -115,80 +115,187 @@ export const exportToPDF = (data, filename, title = 'Export', columns = null) =>
   }
 };
 
-export const exportPurchaseOrderToPDF = (purchaseOrder) => {
+export const exportPurchaseOrderToPDF = async (purchaseOrder) => {
   try {
+    // Get company settings first
+    let companyInfo = {
+      companyName: 'SUPERNATURE LLC',
+      address: 'Dubai, UAE',
+      phone: '+971 4 4582211',
+      email: 'info@supernaturellc.com',
+      vatNumber: '100042339000003',
+      currency: 'GBP'
+    };
+    
+    try {
+      const response = await fetch('/api/company-settings', {
+        credentials: 'include'
+      });
+      if (response.ok) {
+        const settings = await response.json();
+        if (settings) {
+          companyInfo = {
+            companyName: settings.companyName || companyInfo.companyName,
+            address: settings.address || companyInfo.address,
+            phone: settings.phone || companyInfo.phone,
+            email: settings.email || companyInfo.email,
+            vatNumber: settings.vatNumber || companyInfo.vatNumber,
+            currency: settings.currency || companyInfo.currency
+          };
+        }
+      }
+    } catch (err) {
+      console.warn('Could not fetch company settings, using defaults');
+    }
+
     const doc = new jsPDF();
+    const pageWidth = doc.internal.pageSize.width;
+    const pageHeight = doc.internal.pageSize.height;
+    let currentY = 20;
     
-    // Add title
-    doc.setFontSize(20);
-    doc.text('PURCHASE ORDER', 14, 25);
+    // Header Section
+    doc.setFontSize(18);
+    doc.setFont(undefined, 'bold');
+    doc.text('PURCHASE ORDER', 14, currentY);
     
-    // Add company info
-    doc.setFontSize(12);
-    doc.text('SUPERNATURE LLC', 150, 25);
-    
-    // Add PO details
-    doc.setFontSize(12);
-    doc.text(`PO Number: ${purchaseOrder.poNumber}`, 14, 40);
-    
-    // Format dates safely
-    let orderDateText = 'N/A';
-    if (purchaseOrder.orderDate) {
-      try {
-        const orderDate = new Date(purchaseOrder.orderDate);
-        orderDateText = orderDate.toLocaleDateString('en-GB');
-      } catch (error) {
-        console.warn('Invalid order date:', purchaseOrder.orderDate);
-      }
-    }
-    doc.text(`Order Date: ${orderDateText}`, 14, 50);
-    
-    if (purchaseOrder.expectedDelivery) {
-      try {
-        const deliveryDate = new Date(purchaseOrder.expectedDelivery);
-        doc.text(`Expected Delivery: ${deliveryDate.toLocaleDateString('en-GB')}`, 14, 60);
-      } catch (error) {
-        console.warn('Invalid delivery date:', purchaseOrder.expectedDelivery);
-      }
-    }
-    
-    doc.text(`Supplier: ${purchaseOrder.supplierName || 'Unknown'}`, 14, 70);
-    doc.text(`Status: ${purchaseOrder.status}`, 14, 80);
-    
-    // Add line items header
+    // Company Logo placeholder (right side)
     doc.setFontSize(10);
-    doc.text('Line Items:', 14, 100);
+    doc.text('Company Logo', pageWidth - 40, currentY);
     
-    // Add line items manually (simpler approach without autoTable)
-    let yPosition = 110;
-    doc.text('Product Code', 14, yPosition);
-    doc.text('Description', 60, yPosition);
-    doc.text('Qty', 130, yPosition);
-    doc.text('Unit Price', 150, yPosition);
-    doc.text('Line Total', 180, yPosition);
+    currentY += 20;
     
-    yPosition += 10;
+    // PO Number and Order Date (left side)
+    doc.setFontSize(11);
+    doc.setFont(undefined, 'normal');
+    doc.text(`PO Number: ${purchaseOrder.poNumber}`, 14, currentY);
     
-    // Add each item
-    (purchaseOrder.items || []).forEach(item => {
-      doc.text(item.product_code || '', 14, yPosition);
-      doc.text(item.description || '', 60, yPosition);
-      doc.text(String(item.quantity || 0), 130, yPosition);
-      doc.text(`£${parseFloat(item.unit_price || 0).toFixed(2)}`, 150, yPosition);
-      doc.text(`£${parseFloat(item.line_total || 0).toFixed(2)}`, 180, yPosition);
-      yPosition += 10;
+    const orderDate = purchaseOrder.orderDate ? new Date(purchaseOrder.orderDate).toLocaleDateString('en-GB') : 'N/A';
+    currentY += 6;
+    doc.text(`Order Date: ${orderDate}`, 14, currentY);
+    
+    // Company Information (right side)
+    doc.setFontSize(11);
+    doc.setFont(undefined, 'bold');
+    const companyStartY = currentY - 6;
+    doc.text(companyInfo.companyName, pageWidth - 70, companyStartY);
+    
+    doc.setFont(undefined, 'normal');
+    doc.text(companyInfo.address, pageWidth - 70, companyStartY + 8);
+    doc.text(`Tel: ${companyInfo.phone}`, pageWidth - 70, companyStartY + 16);
+    doc.text(`Email: ${companyInfo.email}`, pageWidth - 70, companyStartY + 24);
+    if (companyInfo.vatNumber) {
+      doc.text(`TRN: ${companyInfo.vatNumber}`, pageWidth - 70, companyStartY + 32);
+    }
+    
+    currentY += 35;
+    
+    // Horizontal line separator
+    doc.setDrawColor(0, 0, 0);
+    doc.line(14, currentY, pageWidth - 14, currentY);
+    currentY += 15;
+    
+    // Supplier/Brand Section and Currency/Status
+    doc.setFontSize(11);
+    doc.setFont(undefined, 'bold');
+    doc.text('SUPPLIER/BRAND', 14, currentY);
+    doc.text(`Currency: ${companyInfo.currency}`, pageWidth - 60, currentY);
+    
+    currentY += 8;
+    doc.setFont(undefined, 'normal');
+    doc.text(purchaseOrder.supplierName || 'Unknown Supplier', 14, currentY);
+    doc.text(`Status: ${purchaseOrder.status}`, pageWidth - 60, currentY);
+    
+    // Add supplier contact info if available
+    currentY += 10;
+    doc.text('Contact: [Contact Name]', 14, currentY);
+    currentY += 6;
+    doc.text('Email: [Contact Email]', 14, currentY);
+    
+    currentY += 15;
+    
+    // Items Table Header
+    const tableStartY = currentY;
+    const colWidths = [35, 70, 20, 35, 35];
+    const colPositions = [14, 49, 119, 139, 174];
+    
+    // Table header background (light gray)
+    doc.setFillColor(240, 240, 240);
+    doc.rect(14, currentY - 2, pageWidth - 28, 10, 'F');
+    
+    doc.setFontSize(10);
+    doc.setFont(undefined, 'bold');
+    doc.text('Product Code', colPositions[0], currentY + 6);
+    doc.text('Description', colPositions[1], currentY + 6);
+    doc.text('Qty', colPositions[2], currentY + 6);
+    doc.text(`Unit Price (${companyInfo.currency})`, colPositions[3], currentY + 6);
+    doc.text(`Line Total (${companyInfo.currency})`, colPositions[4], currentY + 6);
+    
+    currentY += 12;
+    
+    // Table borders
+    doc.setDrawColor(200, 200, 200);
+    doc.setLineWidth(0.1);
+    
+    // Vertical lines
+    colPositions.forEach(pos => {
+      doc.line(pos - 2, tableStartY - 2, pos - 2, currentY + (purchaseOrder.items?.length || 0) * 8 + 2);
+    });
+    doc.line(pageWidth - 14, tableStartY - 2, pageWidth - 14, currentY + (purchaseOrder.items?.length || 0) * 8 + 2);
+    
+    // Items
+    doc.setFont(undefined, 'normal');
+    (purchaseOrder.items || []).forEach((item, index) => {
+      // Horizontal line
+      if (index > 0) {
+        doc.line(14, currentY - 2, pageWidth - 14, currentY - 2);
+      }
+      
+      doc.text(item.product_code || '', colPositions[0], currentY + 6);
+      doc.text(item.description || '', colPositions[1], currentY + 6);
+      doc.text(String(item.quantity || 0), colPositions[2] + 10, currentY + 6);
+      doc.text(parseFloat(item.unit_price || 0).toFixed(2), colPositions[3] + 15, currentY + 6);
+      doc.text(parseFloat(item.line_total || 0).toFixed(2), colPositions[4] + 15, currentY + 6);
+      
+      currentY += 8;
     });
     
-    // Add total
-    yPosition += 10;
-    doc.setFontSize(12);
-    doc.text(`Total: GBP £${parseFloat(purchaseOrder.totalAmount || 0).toFixed(2)}`, 14, yPosition);
+    // Bottom table border
+    doc.line(14, currentY + 2, pageWidth - 14, currentY + 2);
     
-    // Add notes if any
-    if (purchaseOrder.notes) {
-      yPosition += 20;
-      doc.text(`Notes: ${purchaseOrder.notes}`, 14, yPosition);
-    }
+    currentY += 15;
+    
+    // Subtotal and Total
+    const subtotal = parseFloat(purchaseOrder.totalAmount || 0);
+    doc.setFont(undefined, 'normal');
+    doc.text('Subtotal:', pageWidth - 80, currentY);
+    doc.text(`${subtotal.toFixed(2)} ${companyInfo.currency}`, pageWidth - 40, currentY);
+    
+    currentY += 8;
+    doc.text('0', pageWidth - 40, currentY); // VAT or other charges line
+    
+    currentY += 10;
+    doc.setFont(undefined, 'bold');
+    doc.text('Total:', pageWidth - 80, currentY);
+    doc.text(`${subtotal.toFixed(2)} ${companyInfo.currency}`, pageWidth - 40, currentY);
+    
+    // Signature section (only for quotations, invoices, and delivery orders - not purchase orders)
+    // For purchase orders, we add a simple "For Company" section
+    currentY += 30;
+    doc.setFont(undefined, 'normal');
+    doc.text(`For ${companyInfo.companyName}`, 14, currentY);
+    doc.text(`For ${purchaseOrder.supplierName || 'Supplier'}`, pageWidth - 80, currentY);
+    
+    // Calculate total pages needed based on content
+    const itemsPerPage = Math.floor((pageHeight - 200) / 8); // Approximate items per page
+    const totalPages = Math.max(1, Math.ceil((purchaseOrder.items?.length || 1) / itemsPerPage));
+    
+    // Footer with page numbers
+    const addFooter = (currentPage = 1) => {
+      doc.setFontSize(8);
+      doc.text(`Page ${currentPage}/${totalPages}`, pageWidth / 2 - 10, pageHeight - 10);
+    };
+    
+    addFooter();
     
     // Download the PDF
     doc.save(`purchase-order-${purchaseOrder.poNumber}.pdf`);
