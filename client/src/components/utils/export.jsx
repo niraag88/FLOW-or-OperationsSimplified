@@ -158,9 +158,13 @@ export const exportPurchaseOrderToPDF = async (purchaseOrder) => {
     doc.setFont(undefined, 'bold');
     doc.text('PURCHASE ORDER', 14, currentY);
     
-    // Company Logo placeholder (right side)
+    // Company Logo (right side) - for now use placeholder, logo support can be enhanced later
     doc.setFontSize(10);
-    doc.text('Company Logo', pageWidth - 40, currentY);
+    if (companyInfo.logo) {
+      doc.text('[Company Logo]', pageWidth - 45, currentY);
+    } else {
+      doc.text('Company Logo', pageWidth - 40, currentY);
+    }
     
     currentY += 20;
     
@@ -173,21 +177,27 @@ export const exportPurchaseOrderToPDF = async (purchaseOrder) => {
     currentY += 6;
     doc.text(`Order Date: ${orderDate}`, 14, currentY);
     
-    // Company Information (right side)
+    // Company Information (right side) - fix overlap with proper spacing
     doc.setFontSize(11);
     doc.setFont(undefined, 'bold');
     const companyStartY = currentY - 6;
-    doc.text(companyInfo.companyName, pageWidth - 70, companyStartY);
+    doc.text(companyInfo.companyName, pageWidth - 80, companyStartY);
     
     doc.setFont(undefined, 'normal');
-    doc.text(companyInfo.address, pageWidth - 70, companyStartY + 8);
-    doc.text(`Tel: ${companyInfo.phone}`, pageWidth - 70, companyStartY + 16);
-    doc.text(`Email: ${companyInfo.email}`, pageWidth - 70, companyStartY + 24);
+    // Split address properly if it's long
+    const addressLines = companyInfo.address.split(',').map(line => line.trim());
+    addressLines.forEach((line, index) => {
+      doc.text(line, pageWidth - 80, companyStartY + 8 + (index * 6));
+    });
+    
+    const addressHeight = addressLines.length * 6;
+    doc.text(`Tel: ${companyInfo.phone}`, pageWidth - 80, companyStartY + 8 + addressHeight + 6);
+    doc.text(`Email: ${companyInfo.email}`, pageWidth - 80, companyStartY + 8 + addressHeight + 12);
     if (companyInfo.vatNumber) {
-      doc.text(`TRN: ${companyInfo.vatNumber}`, pageWidth - 70, companyStartY + 32);
+      doc.text(`TRN: ${companyInfo.vatNumber}`, pageWidth - 80, companyStartY + 8 + addressHeight + 18);
     }
     
-    currentY += 35;
+    currentY += 50;
     
     // Horizontal line separator
     doc.setDrawColor(0, 0, 0);
@@ -278,12 +288,7 @@ export const exportPurchaseOrderToPDF = async (purchaseOrder) => {
     doc.text('Total:', pageWidth - 80, currentY);
     doc.text(`${subtotal.toFixed(2)} ${companyInfo.currency}`, pageWidth - 40, currentY);
     
-    // Signature section (only for quotations, invoices, and delivery orders - not purchase orders)
-    // For purchase orders, we add a simple "For Company" section
-    currentY += 30;
-    doc.setFont(undefined, 'normal');
-    doc.text(`For ${companyInfo.companyName}`, 14, currentY);
-    doc.text(`For ${purchaseOrder.supplierName || 'Supplier'}`, pageWidth - 80, currentY);
+    // No signature section needed for purchase orders
     
     // Calculate total pages needed based on content
     const itemsPerPage = Math.floor((pageHeight - 200) / 8); // Approximate items per page
