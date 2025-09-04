@@ -431,7 +431,7 @@ export default function POForm({ open, onClose, editingPO, currentUser, onSucces
                             className="w-24"
                           />
                         </TableCell>
-                        <TableCell>£{item.lineTotal.toFixed(2)}</TableCell>
+                        <TableCell>GBP {item.lineTotal.toFixed(2)}</TableCell>
                         {canEdit && (
                           <TableCell>
                             <Button
@@ -459,11 +459,11 @@ export default function POForm({ open, onClose, editingPO, currentUser, onSucces
               <div className="space-y-2">
                 <div className="flex justify-between items-center">
                   <span className="font-medium">Subtotal</span>
-                  <span data-testid="text-subtotal">GBP £{formData.totalAmount}</span>
+                  <span data-testid="text-subtotal">GBP {formData.totalAmount}</span>
                 </div>
                 <div className="flex justify-between items-center text-lg font-bold">
                   <span>Total</span>
-                  <span data-testid="text-total">GBP £{formData.totalAmount}</span>
+                  <span data-testid="text-total">GBP {formData.totalAmount}</span>
                 </div>
               </div>
             </div>

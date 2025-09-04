@@ -62,7 +62,7 @@ export default function InvoiceList({ invoices, loading, canEdit, canOverride, c
       minimumFractionDigits: 2,
       maximumFractionDigits: 2
     });
-    return currency === 'GBP' ? `GBP £${formatter.format(amount || 0)}` : `${currency} ${formatter.format(amount || 0)}`;
+    return `${currency} ${formatter.format(amount || 0)}`;
   };
 
   const getOutstandingAmount = (invoice) => {
