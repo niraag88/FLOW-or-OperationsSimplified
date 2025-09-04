@@ -22,6 +22,7 @@ export default function POForm({ open, onClose, editingPO, currentUser, onSucces
   const [loading, setLoading] = useState(false);
   const [brands, setBrands] = useState([]);
   const [products, setProducts] = useState([]);
+  const [companySettings, setCompanySettings] = useState(null);
   
   // Simple form state
   const [formData, setFormData] = useState({
@@ -44,14 +45,20 @@ export default function POForm({ open, onClose, editingPO, currentUser, onSucces
 
   const loadInitialData = async () => {
     try {
-      const [brandsData, productsData] = await Promise.all([
+      const [brandsData, productsData, settingsResponse] = await Promise.all([
         Brand.list(),
-        Product.list()
+        Product.list(),
+        fetch('/api/company-settings')
       ]);
       
       const filteredBrands = brandsData.filter(b => b.isActive);
       setBrands(filteredBrands);
       setProducts(productsData);
+      
+      if (settingsResponse.ok) {
+        const settings = await settingsResponse.json();
+        setCompanySettings(settings);
+      }
       
       if (editingPO) {
         // Load editing data, passing the brands data directly
@@ -465,6 +472,12 @@ export default function POForm({ open, onClose, editingPO, currentUser, onSucces
                   <span>Total</span>
                   <span data-testid="text-total">GBP {formData.totalAmount}</span>
                 </div>
+                {companySettings && (
+                  <div className="flex justify-between items-center text-sm text-gray-600">
+                    <span>Total (AED)</span>
+                    <span data-testid="text-total-aed">AED {(parseFloat(formData.totalAmount) * parseFloat(companySettings.fxGbpToAed || 4.85)).toFixed(2)}</span>
+                  </div>
+                )}
               </div>
             </div>
           </div>
