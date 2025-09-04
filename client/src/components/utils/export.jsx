@@ -320,7 +320,7 @@ export const exportPurchaseOrderToPDF = async (purchaseOrder) => {
       parseFloat(item.line_total || 0).toFixed(2)
     ]);
 
-    doc.autoTable({
+    autoTable(doc, {
       head: [['Product Code', 'Description', 'Size', 'Qty', 'Unit Price (GBP)', 'Line Total (GBP)']],
       body: tableData,
       startY: currentY,
@@ -351,7 +351,7 @@ export const exportPurchaseOrderToPDF = async (purchaseOrder) => {
       margin: { left: 14, right: 14 }
     });
     
-    currentY = doc.lastAutoTable.finalY + 20;
+    currentY = doc.autoTable.previous.finalY + 20;
     
     // Total section
     const total = parseFloat(purchaseOrder.totalAmount || 0);
