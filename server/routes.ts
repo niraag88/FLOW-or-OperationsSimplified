@@ -2059,7 +2059,16 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const templateHtml = await generateInvoicePDF(invoice);
       
       const browser = await puppeteer.default.launch({
-        args: ['--no-sandbox', '--disable-setuid-sandbox'],
+        args: [
+          '--no-sandbox',
+          '--disable-setuid-sandbox',
+          '--disable-dev-shm-usage',
+          '--disable-accelerated-2d-canvas',
+          '--no-first-run',
+          '--no-zygote',
+          '--single-process',
+          '--disable-gpu'
+        ],
         headless: true
       });
       
@@ -2113,7 +2122,16 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const templateHtml = await generateDOPDF(deliveryOrder);
       
       const browser = await puppeteer.default.launch({
-        args: ['--no-sandbox', '--disable-setuid-sandbox'],
+        args: [
+          '--no-sandbox',
+          '--disable-setuid-sandbox',
+          '--disable-dev-shm-usage',
+          '--disable-accelerated-2d-canvas',
+          '--no-first-run',
+          '--no-zygote',
+          '--single-process',
+          '--disable-gpu'
+        ],
         headless: true
       });
       
@@ -2201,7 +2219,16 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const templateHtml = await generatePOPDF(purchaseOrderWithItems);
       
       const browser = await puppeteer.default.launch({
-        args: ['--no-sandbox', '--disable-setuid-sandbox'],
+        args: [
+          '--no-sandbox',
+          '--disable-setuid-sandbox',
+          '--disable-dev-shm-usage',
+          '--disable-accelerated-2d-canvas',
+          '--no-first-run',
+          '--no-zygote',
+          '--single-process',
+          '--disable-gpu'
+        ],
         headless: true
       });
       
