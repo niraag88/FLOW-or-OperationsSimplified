@@ -2213,54 +2213,12 @@ export async function registerRoutes(app: Express): Promise<Server> {
         }))
       };
 
-      // Generate PDF using jsPDF (simpler and more reliable)
-      const jsPDF = await import('jspdf');
-      await import('jspdf-autotable');
-      
-      const doc = new jsPDF.default();
-      
-      // Add title
-      doc.setFontSize(20);
-      doc.text('PURCHASE ORDER', 14, 25);
-      
-      // Add PO details
-      doc.setFontSize(12);
-      doc.text(`PO Number: ${purchaseOrder.poNumber}`, 14, 40);
-      doc.text(`Order Date: ${new Date(purchaseOrder.orderDate).toLocaleDateString('en-GB')}`, 14, 50);
-      if (purchaseOrder.expectedDelivery) {
-        doc.text(`Expected Delivery: ${new Date(purchaseOrder.expectedDelivery).toLocaleDateString('en-GB')}`, 14, 60);
-      }
-      doc.text(`Supplier: ${purchaseOrder.supplierName || 'Unknown'}`, 14, 70);
-      doc.text(`Status: ${purchaseOrder.status}`, 14, 80);
-      
-      // Prepare table data for line items
-      const tableData = items.map(item => [
-        item.productCode || '',
-        item.description || '',
-        item.quantity || 0,
-        `£${parseFloat(item.unitPrice || 0).toFixed(2)}`,
-        `£${parseFloat(item.lineTotal || 0).toFixed(2)}`
-      ]);
-      
-      // Add line items table
-      (doc as any).autoTable({
-        head: [['Product Code', 'Description', 'Qty', 'Unit Price', 'Line Total']],
-        body: tableData,
-        startY: 95,
-        styles: { fontSize: 10 },
-        headStyles: { fillColor: [51, 51, 51] }
+      // Return structured data for frontend PDF generation instead
+      res.json({
+        success: true,
+        data: purchaseOrderWithItems,
+        message: 'Use frontend PDF generation'
       });
-      
-      // Add total
-      const finalY = (doc as any).lastAutoTable.finalY + 10;
-      doc.text(`Total: GBP £${parseFloat(purchaseOrder.totalAmount || 0).toFixed(2)}`, 150, finalY);
-      
-      // Add notes if any
-      if (purchaseOrder.notes) {
-        doc.text(`Notes: ${purchaseOrder.notes}`, 14, finalY + 20);
-      }
-      
-      const pdfBuffer = Buffer.from(doc.output('arraybuffer'));
 
       // Set headers for PDF streaming
       res.set({

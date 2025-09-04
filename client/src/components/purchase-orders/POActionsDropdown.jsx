@@ -104,8 +104,80 @@ export default function POActionsDropdown({ po, canEdit, onEdit, onRefresh }) {
     }
   };
 
-  const handleExportPDF = () => {
-    window.open(`/api/export/po?poId=${po.id}`, '_blank');
+  const handleExportPDF = async () => {
+    try {
+      // Get the PO data with line items from the server
+      const response = await fetch(`/api/export/po?poId=${po.id}`);
+      const result = await response.json();
+      
+      if (!result.success) {
+        throw new Error('Failed to get PO data');
+      }
+      
+      const purchaseOrder = result.data;
+      
+      // Import jsPDF and autotable dynamically (frontend only)
+      const { default: jsPDF } = await import('jspdf');
+      await import('jspdf-autotable');
+      
+      const doc = new jsPDF();
+      
+      // Add title
+      doc.setFontSize(20);
+      doc.text('PURCHASE ORDER', 14, 25);
+      
+      // Add company info
+      doc.setFontSize(12);
+      doc.text('SUPERNATURE LLC', 150, 25);
+      
+      // Add PO details
+      doc.setFontSize(12);
+      doc.text(`PO Number: ${purchaseOrder.poNumber}`, 14, 40);
+      doc.text(`Order Date: ${format(new Date(purchaseOrder.orderDate), 'dd/MM/yy')}`, 14, 50);
+      if (purchaseOrder.expectedDelivery) {
+        doc.text(`Expected Delivery: ${format(new Date(purchaseOrder.expectedDelivery), 'dd/MM/yy')}`, 14, 60);
+      }
+      doc.text(`Supplier: ${purchaseOrder.supplierName || 'Unknown'}`, 14, 70);
+      doc.text(`Status: ${purchaseOrder.status}`, 14, 80);
+      
+      // Prepare table data for line items
+      const tableData = purchaseOrder.items.map(item => [
+        item.product_code || '',
+        item.description || '',
+        item.quantity || 0,
+        `GBP £${parseFloat(item.unit_price || 0).toFixed(2)}`,
+        `GBP £${parseFloat(item.line_total || 0).toFixed(2)}`
+      ]);
+      
+      // Add line items table
+      doc.autoTable({
+        head: [['Product Code', 'Description', 'Qty', 'Unit Price', 'Line Total']],
+        body: tableData,
+        startY: 95,
+        styles: { fontSize: 10 },
+        headStyles: { fillColor: [51, 51, 51] }
+      });
+      
+      // Add total
+      const finalY = doc.lastAutoTable.finalY + 10;
+      doc.text(`Total: GBP £${parseFloat(purchaseOrder.totalAmount || 0).toFixed(2)}`, 150, finalY);
+      
+      // Add notes if any
+      if (purchaseOrder.notes) {
+        doc.text(`Notes: ${purchaseOrder.notes}`, 14, finalY + 20);
+      }
+      
+      // Download the PDF
+      doc.save(`purchase-order-${purchaseOrder.poNumber}.pdf`);
+      
+    } catch (error) {
+      console.error('Error exporting PDF:', error);
+      toast({
+        title: 'Export Failed',
+        description: 'Failed to export PDF. Please try again.',
+        variant: 'destructive'
+      });
+    }
   };
 
   const handleDelete = async () => {
