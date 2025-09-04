@@ -338,12 +338,12 @@ export const exportPurchaseOrderToPDF = async (purchaseOrder) => {
         fontSize: 9
       },
       columnStyles: {
-        0: { cellWidth: 25 }, // Product Code
-        1: { cellWidth: 55 }, // Description  
-        2: { cellWidth: 20 }, // Size
-        3: { cellWidth: 15, halign: 'center' }, // Qty
-        4: { cellWidth: 30, halign: 'right' }, // Unit Price
-        5: { cellWidth: 30, halign: 'right' }  // Line Total
+        0: { cellWidth: 20 }, // Product Code
+        1: { cellWidth: 45 }, // Description  
+        2: { cellWidth: 15 }, // Size
+        3: { cellWidth: 12, halign: 'center' }, // Qty
+        4: { cellWidth: 25, halign: 'right' }, // Unit Price
+        5: { cellWidth: 25, halign: 'right' }  // Line Total
       },
       alternateRowStyles: {
         fillColor: [248, 248, 248]
@@ -351,7 +351,11 @@ export const exportPurchaseOrderToPDF = async (purchaseOrder) => {
       margin: { left: 14, right: 14 }
     });
     
-    currentY = doc.autoTable.previous.finalY + 20;
+    // Calculate the end position manually since autoTable doesn't reliably provide finalY
+    const rowHeight = 12; // Approximate row height including padding
+    const headerHeight = 12;
+    const tableRows = (purchaseOrder.items || []).length;
+    currentY = currentY + headerHeight + (tableRows * rowHeight) + 20;
     
     // Total section
     const total = parseFloat(purchaseOrder.totalAmount || 0);
