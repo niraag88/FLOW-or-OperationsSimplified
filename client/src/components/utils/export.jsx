@@ -116,216 +116,255 @@ export const exportToPDF = (data, filename, title = 'Export', columns = null) =>
 };
 
 export const exportPurchaseOrderToPDF = async (purchaseOrder) => {
+  console.log('Purchase Order data:', purchaseOrder);
+  
   try {
     // Get company settings dynamically
     let companyInfo = {
       companyName: 'SUPERNATURE LLC',
-      address: 'Al Rukhaimi Building, Sheikh Zayed Road, Dubai, U.A.E.',
+      address: 'Al Rukhaimi Building\nSheikh Zayed Road\nDubai\nU.A.E.',
       phone: '+971 4 4582211',
       email: 'info@supernaturellc.com',
+      website: '',
       vatNumber: '100042339000003',
       currency: 'GBP',
       logo: null
     };
     
+    // Fetch supplier/brand information 
+    let supplierInfo = {
+      name: purchaseOrder.supplierName || 'Unknown Supplier',
+      address: '',
+      phone: '',
+      email: '',
+      contactPerson: ''
+    };
+
     try {
-      const response = await fetch('/api/company-settings', {
-        credentials: 'include'
-      });
-      if (response.ok) {
-        const settings = await response.json();
+      const [settingsResponse, supplierResponse] = await Promise.all([
+        fetch('/api/company-settings', { credentials: 'include' }),
+        fetch('/api/suppliers', { credentials: 'include' })
+      ]);
+      
+      if (settingsResponse.ok) {
+        const settings = await settingsResponse.json();
         if (settings) {
           companyInfo = {
             companyName: settings.companyName || companyInfo.companyName,
             address: settings.address || companyInfo.address,
             phone: settings.phone || companyInfo.phone,
             email: settings.email || companyInfo.email,
+            website: settings.website || companyInfo.website,
             vatNumber: settings.vatNumber || companyInfo.vatNumber,
-            currency: 'GBP', // Always use GBP for purchase orders
+            currency: 'GBP',
             logo: settings.logo || null
           };
         }
       }
+
+      if (supplierResponse.ok) {
+        const suppliers = await supplierResponse.json();
+        const supplier = suppliers.find(s => s.id === purchaseOrder.supplierId);
+        if (supplier) {
+          supplierInfo = {
+            name: supplier.name || supplierInfo.name,
+            address: supplier.address || '',
+            phone: supplier.phone || '',
+            email: supplier.email || '',
+            contactPerson: supplier.contactPerson || ''
+          };
+        }
+      }
+      
     } catch (err) {
-      console.warn('Could not fetch company settings, using defaults');
+      console.warn('Could not fetch company/supplier settings, using defaults');
     }
 
     const doc = new jsPDF();
     const pageWidth = doc.internal.pageSize.width;
     const pageHeight = doc.internal.pageSize.height;
-    let currentY = 30;
+    let currentY = 20;
     
-    // Header with clean line
-    doc.setDrawColor(0, 0, 0);
-    doc.setLineWidth(0.5);
-    doc.line(14, 20, pageWidth - 14, 20);
-    
-    // Title and Logo section
-    doc.setFontSize(22);
-    doc.setFont(undefined, 'bold');
-    doc.text('PURCHASE ORDER', 14, currentY);
-    
-    // Company Logo - placeholder for now, will implement proper loading
-    doc.setFontSize(10);
-    doc.setFont(undefined, 'normal');
-    doc.text('[Logo]', pageWidth - 25, currentY - 5);
-    
-    currentY += 25;
-    
-    // Two-column layout for PO details and Company info
-    // Left column - PO Information
-    doc.setFontSize(12);
-    doc.setFont(undefined, 'normal');
-    doc.text(`PO Number: ${purchaseOrder.poNumber}`, 14, currentY);
-    
-    const orderDate = purchaseOrder.orderDate ? new Date(purchaseOrder.orderDate).toLocaleDateString('en-GB') : '';
-    if (orderDate) {
-      currentY += 8;
-      doc.text(`Order Date: ${orderDate}`, 14, currentY);
+    // Header section with logo on left, title on right
+    // Left side - Logo and Company Info
+    let logoHeight = 0;
+    if (companyInfo.logo) {
+      try {
+        // Try to add actual logo from company settings
+        doc.addImage(companyInfo.logo, 'PNG', 14, currentY, 40, 30);
+        logoHeight = 35;
+      } catch (err) {
+        console.warn('Could not load logo, using placeholder');
+        doc.setFontSize(8);
+        doc.setFont(undefined, 'italic');
+        doc.text('[LOGO]', 14, currentY + 5);
+        logoHeight = 10;
+      }
+    } else {
+      doc.setFontSize(8);
+      doc.setFont(undefined, 'italic');
+      doc.text('[LOGO]', 14, currentY + 5);
+      logoHeight = 10;
     }
-    
-    // Right column - Company Information (properly spaced)
-    const rightColX = 120;
-    let rightY = currentY - (orderDate ? 8 : 0);
-    
-    doc.setFontSize(13);
+
+    // Right side - Purchase Order Title
+    doc.setFontSize(20);
     doc.setFont(undefined, 'bold');
-    doc.text(companyInfo.companyName, rightColX, rightY);
+    doc.text('PURCHASE ORDER', pageWidth - 80, currentY + 15);
     
-    doc.setFontSize(10);
+    // Company information under logo
+    currentY = Math.max(currentY + logoHeight, currentY + 20) + 10;
+    
+    doc.setFontSize(11);
+    doc.setFont(undefined, 'bold');
+    doc.text(companyInfo.companyName, 14, currentY);
+    
+    currentY += 8;
+    doc.setFontSize(9);
     doc.setFont(undefined, 'normal');
-    rightY += 8;
     
-    // Split and display address properly
-    const addressLines = companyInfo.address.replace(/,\s*/g, '\n').split('\n');
-    addressLines.forEach((line) => {
+    // Company address (multi-line)
+    const addressLines = companyInfo.address.split('\n');
+    addressLines.forEach(line => {
       if (line.trim()) {
-        doc.text(line.trim(), rightColX, rightY);
-        rightY += 5;
+        doc.text(line.trim(), 14, currentY);
+        currentY += 5;
       }
     });
     
-    rightY += 3;
     if (companyInfo.phone) {
-      doc.text(`Tel: ${companyInfo.phone}`, rightColX, rightY);
-      rightY += 5;
+      doc.text(`Tel: ${companyInfo.phone}`, 14, currentY);
+      currentY += 5;
     }
     if (companyInfo.email) {
-      doc.text(`Email: ${companyInfo.email}`, rightColX, rightY);
-      rightY += 5;
+      doc.text(`Email: ${companyInfo.email}`, 14, currentY);
+      currentY += 5;
+    }
+    if (companyInfo.website) {
+      doc.text(`Website: ${companyInfo.website}`, 14, currentY);
+      currentY += 5;
     }
     if (companyInfo.vatNumber) {
-      doc.text(`TRN: ${companyInfo.vatNumber}`, rightColX, rightY);
-      rightY += 5;
+      doc.text(`TRN: ${companyInfo.vatNumber}`, 14, currentY);
+      currentY += 5;
     }
+
+    // PO details on right side (aligned with title)
+    let rightY = 50;
+    doc.setFontSize(10);
+    doc.setFont(undefined, 'normal');
+    doc.text(`PO Number: ${purchaseOrder.poNumber}`, pageWidth - 80, rightY);
     
-    currentY = Math.max(currentY, rightY) + 20;
+    const orderDate = purchaseOrder.orderDate ? new Date(purchaseOrder.orderDate).toLocaleDateString('en-GB') : '';
+    if (orderDate) {
+      rightY += 7;
+      doc.text(`PO Date: ${orderDate}`, pageWidth - 80, rightY);
+    }
+
+    const expectedDelivery = purchaseOrder.expectedDelivery ? new Date(purchaseOrder.expectedDelivery).toLocaleDateString('en-GB') : '';
+    if (expectedDelivery) {
+      rightY += 7;
+      doc.text(`Expected Delivery: ${expectedDelivery}`, pageWidth - 80, rightY);
+    }
+
+    currentY = Math.max(currentY, rightY) + 15;
     
-    // Separator line
+    // Horizontal separator line
     doc.setDrawColor(0, 0, 0);
-    doc.setLineWidth(0.3);
+    doc.setLineWidth(0.5);
     doc.line(14, currentY, pageWidth - 14, currentY);
     currentY += 15;
     
-    // Supplier section
+    // Supplier/Brand section
     doc.setFontSize(12);
     doc.setFont(undefined, 'bold');
     doc.text('SUPPLIER/BRAND', 14, currentY);
     
-    currentY += 12;
-    doc.setFont(undefined, 'normal');
-    doc.text(purchaseOrder.supplierName || 'Unknown Supplier', 14, currentY);
-    
-    currentY += 20;
-    
-    // Manual table creation with proper alignment
-    const tableStartY = currentY;
-    const rowHeight = 12;
-    const colWidths = [35, 75, 20, 35, 35];
-    const colX = [14, 49, 124, 144, 179];
-    
-    // Table header
-    doc.setFillColor(240, 240, 240);
-    doc.rect(14, currentY, pageWidth - 28, rowHeight, 'F');
-    
-    doc.setDrawColor(200, 200, 200);
-    doc.setLineWidth(0.5);
-    doc.rect(14, currentY, pageWidth - 28, rowHeight);
-    
+    currentY += 10;
     doc.setFontSize(10);
-    doc.setFont(undefined, 'bold');
-    doc.text('Product Code', colX[0] + 2, currentY + 8);
-    doc.text('Description', colX[1] + 2, currentY + 8);
-    doc.text('Qty', colX[2] + 8, currentY + 8);
-    doc.text('Unit Price (GBP)', colX[3] + 2, currentY + 8);
-    doc.text('Line Total (GBP)', colX[4] + 2, currentY + 8);
-    
-    // Vertical lines for header
-    colX.forEach((x, i) => {
-      if (i > 0) {
-        doc.line(x, currentY, x, currentY + rowHeight);
-      }
-    });
-    doc.line(pageWidth - 14, currentY, pageWidth - 14, currentY + rowHeight);
-    
-    currentY += rowHeight;
-    
-    // Table rows
     doc.setFont(undefined, 'normal');
-    (purchaseOrder.items || []).forEach((item, index) => {
-      // Alternate row colors
-      if (index % 2 === 1) {
-        doc.setFillColor(248, 248, 248);
-        doc.rect(14, currentY, pageWidth - 28, rowHeight, 'F');
-      }
-      
-      // Row border
-      doc.setDrawColor(230, 230, 230);
-      doc.setLineWidth(0.3);
-      doc.rect(14, currentY, pageWidth - 28, rowHeight);
-      
-      // Cell content
-      doc.text(item.product_code || '', colX[0] + 2, currentY + 8);
-      doc.text(item.description || '', colX[1] + 2, currentY + 8);
-      doc.text(String(item.quantity || 0), colX[2] + 8, currentY + 8);
-      doc.text(parseFloat(item.unit_price || 0).toFixed(2), colX[3] + 15, currentY + 8);
-      doc.text(parseFloat(item.line_total || 0).toFixed(2), colX[4] + 15, currentY + 8);
-      
-      // Vertical lines for row
-      colX.forEach((x, i) => {
-        if (i > 0) {
-          doc.line(x, currentY, x, currentY + rowHeight);
+    doc.text(supplierInfo.name, 14, currentY);
+    
+    currentY += 6;
+    if (supplierInfo.contactPerson) {
+      doc.text(`Contact: ${supplierInfo.contactPerson}`, 14, currentY);
+      currentY += 6;
+    }
+    if (supplierInfo.address) {
+      const suppAddressLines = supplierInfo.address.split('\n');
+      suppAddressLines.forEach(line => {
+        if (line.trim()) {
+          doc.text(line.trim(), 14, currentY);
+          currentY += 5;
         }
       });
-      doc.line(pageWidth - 14, currentY, pageWidth - 14, currentY + rowHeight);
-      
-      currentY += rowHeight;
+    }
+    if (supplierInfo.phone) {
+      doc.text(`Tel: ${supplierInfo.phone}`, 14, currentY);
+      currentY += 6;
+    }
+    if (supplierInfo.email) {
+      doc.text(`Email: ${supplierInfo.email}`, 14, currentY);
+      currentY += 6;
+    }
+    
+    currentY += 15;
+    
+    // Table with proper column widths and size column
+    const tableData = (purchaseOrder.items || []).map(item => [
+      item.product_code || '',
+      item.description || '',
+      item.size || '', // Add size column
+      String(item.quantity || 0),
+      parseFloat(item.unit_price || 0).toFixed(2),
+      parseFloat(item.line_total || 0).toFixed(2)
+    ]);
+
+    doc.autoTable({
+      head: [['Product Code', 'Description', 'Size', 'Qty', 'Unit Price (GBP)', 'Line Total (GBP)']],
+      body: tableData,
+      startY: currentY,
+      theme: 'grid',
+      styles: {
+        fontSize: 9,
+        cellPadding: 3,
+        lineWidth: 0.3,
+        lineColor: [200, 200, 200]
+      },
+      headStyles: {
+        fillColor: [240, 240, 240],
+        textColor: [0, 0, 0],
+        fontStyle: 'bold',
+        fontSize: 9
+      },
+      columnStyles: {
+        0: { cellWidth: 25 }, // Product Code
+        1: { cellWidth: 55 }, // Description  
+        2: { cellWidth: 20 }, // Size
+        3: { cellWidth: 15, halign: 'center' }, // Qty
+        4: { cellWidth: 30, halign: 'right' }, // Unit Price
+        5: { cellWidth: 30, halign: 'right' }  // Line Total
+      },
+      alternateRowStyles: {
+        fillColor: [248, 248, 248]
+      },
+      margin: { left: 14, right: 14 }
     });
     
-    // Bottom border of table
-    doc.setDrawColor(200, 200, 200);
-    doc.setLineWidth(0.5);
-    doc.line(14, currentY, pageWidth - 14, currentY);
+    currentY = doc.lastAutoTable.finalY + 20;
     
-    currentY += 20;
-    
-    // Total section (clean and simple)
+    // Total section
     const total = parseFloat(purchaseOrder.totalAmount || 0);
     
     doc.setFontSize(12);
     doc.setFont(undefined, 'bold');
-    doc.text('Total:', pageWidth - 60, currentY);
-    doc.text(`GBP ${total.toFixed(2)}`, pageWidth - 30, currentY);
+    doc.text('Total:', pageWidth - 70, currentY);
+    doc.text(`GBP ${total.toFixed(2)}`, pageWidth - 40, currentY);
     
     // Footer
     doc.setFontSize(8);
     doc.setFont(undefined, 'normal');
-    doc.text('Page 1/1', pageWidth / 2 - 8, pageHeight - 15);
-    
-    // Footer line
-    doc.setDrawColor(200, 200, 200);
-    doc.setLineWidth(0.3);
-    doc.line(14, pageHeight - 25, pageWidth - 14, pageHeight - 25);
+    doc.text(`Page 1/1`, pageWidth / 2 - 10, pageHeight - 15);
     
     // Download the PDF
     doc.save(`purchase-order-${purchaseOrder.poNumber}.pdf`);
