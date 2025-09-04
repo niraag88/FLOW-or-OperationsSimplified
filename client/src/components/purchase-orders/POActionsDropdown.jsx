@@ -38,57 +38,70 @@ export default function POActionsDropdown({ po, canEdit, onEdit, onRefresh }) {
     }
   };
 
-  const handleExportXLSX = () => {
-    const exportData = [];
-    
-    // Add PO header info
-    exportData.push({
-      'Document Type': 'PURCHASE ORDER',
-      'PO Number': po.poNumber,
-      'Order Date': format(new Date(po.orderDate), 'yyyy-MM-dd'),
-      'Expected Delivery': po.expectedDelivery ? format(new Date(po.expectedDelivery), 'yyyy-MM-dd') : '',
-      'Currency': 'GBP',
-      'Status': po.status
-    });
+  const handleExportXLSX = async () => {
+    try {
+      // Fetch line items for this PO
+      const response = await fetch(`/api/purchase-orders/${po.id}/items`);
+      const items = await response.json();
+      
+      const exportData = [];
+      
+      // Add PO header info
+      exportData.push({
+        'Document Type': 'PURCHASE ORDER',
+        'PO Number': po.poNumber,
+        'Order Date': format(new Date(po.orderDate), 'yyyy-MM-dd'),
+        'Expected Delivery': po.expectedDelivery ? format(new Date(po.expectedDelivery), 'yyyy-MM-dd') : '',
+        'Currency': 'GBP',
+        'Status': po.status
+      });
 
-    // Add empty row
-    exportData.push({});
+      // Add empty row
+      exportData.push({});
 
-    // Add line items header
-    exportData.push({
-      'Product Code': 'PRODUCT CODE',
-      'Description': 'DESCRIPTION',
-      'Quantity': 'QTY',
-      'Unit Price': 'UNIT PRICE',
-      'Line Total': 'LINE TOTAL'
-    });
+      // Add line items header
+      exportData.push({
+        'Product Code': 'PRODUCT CODE',
+        'Description': 'DESCRIPTION',
+        'Quantity': 'QTY',
+        'Unit Price': 'UNIT PRICE',
+        'Line Total': 'LINE TOTAL'
+      });
 
-    // Add line items - Removed AED currency references
-    if (po.items && po.items.length > 0) {
-      po.items.forEach(item => {
-        exportData.push({
-          'Product Code': item.product_code || '',
-          'Description': item.description || '',
-          'Quantity': item.quantity || 0,
-          'Unit Price': (item.unit_price || 0).toFixed(2),
-          'Line Total': (item.line_total || 0).toFixed(2)
+      // Add line items
+      if (items && items.length > 0) {
+        items.forEach(item => {
+          exportData.push({
+            'Product Code': item.productSku || '',
+            'Description': item.productName || '',
+            'Quantity': item.quantity || 0,
+            'Unit Price': parseFloat(item.unitPrice || 0).toFixed(2),
+            'Line Total': parseFloat(item.lineTotal || 0).toFixed(2)
+          });
         });
+      }
+
+      // Add empty row
+      exportData.push({});
+
+      // Add totals
+      exportData.push({
+        'Product Code': '',
+        'Description': '',
+        'Quantity': '',
+        'Unit Price': 'TOTAL (GBP):',
+        'Line Total': parseFloat(po.totalAmount || 0).toFixed(2)
+      });
+      
+      exportToXLSX(exportData, `Purchase_Order_${po.poNumber}`);
+    } catch (error) {
+      console.error('Error exporting XLSX:', error);
+      toast({
+        title: 'Export Failed',
+        description: 'Failed to export XLSX. Please try again.',
+        variant: 'destructive'
       });
     }
-
-    // Add empty row
-    exportData.push({});
-
-    // Add totals - Removed AED references
-    exportData.push({
-      'Product Code': '',
-      'Description': '',
-      'Quantity': '',
-      'Unit Price': 'TOTAL (GBP):',
-      'Line Total': parseFloat(po.totalAmount || 0).toFixed(2)
-    });
-    
-    exportToXLSX(exportData, `Purchase_Order_${po.poNumber}`);
   };
 
   const handleExportPDF = () => {
