@@ -8,6 +8,7 @@ export default function POPrint() {
   const [poData, setPOData] = useState(null);
   const [companySettings, setCompanySettings] = useState(null);
   const [loading, setLoading] = useState(true);
+  const [error, setError] = useState(null);
   
   console.log('POPrint component loaded, ID:', id);
 
@@ -25,9 +26,12 @@ export default function POPrint() {
         if (poResult.success) {
           setPOData(poResult.data);
           setCompanySettings(companyResult);
+        } else {
+          setError('Failed to load purchase order data');
         }
       } catch (error) {
         console.error('Error fetching data:', error);
+        setError(error.message);
       } finally {
         setLoading(false);
       }
@@ -51,6 +55,17 @@ export default function POPrint() {
       <div className="loading-screen">
         <div className="loading-spinner"></div>
         <p>Preparing document for printing...</p>
+        <p>PO ID: {id}</p>
+      </div>
+    );
+  }
+
+  if (error) {
+    return (
+      <div className="error-screen">
+        <h2>Error Loading Purchase Order</h2>
+        <p>Error: {error}</p>
+        <p>PO ID: {id}</p>
       </div>
     );
   }
@@ -60,6 +75,7 @@ export default function POPrint() {
       <div className="error-screen">
         <h2>Purchase Order Not Found</h2>
         <p>The requested purchase order could not be loaded.</p>
+        <p>PO ID: {id}</p>
       </div>
     );
   }
