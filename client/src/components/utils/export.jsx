@@ -286,28 +286,7 @@ export const exportPurchaseOrderToPDF = async (purchaseOrder) => {
     // Use supplier name from purchase order data, not from API lookup
     doc.text(purchaseOrder.supplierName || 'N/A', 14, currentY);
     
-    currentY += 6;
-    if (supplierInfo.contactPerson) {
-      doc.text(`Contact: ${supplierInfo.contactPerson}`, 14, currentY);
-      currentY += 6;
-    }
-    if (supplierInfo.address) {
-      const suppAddressLines = supplierInfo.address.split('\n');
-      suppAddressLines.forEach(line => {
-        if (line.trim()) {
-          doc.text(line.trim(), 14, currentY);
-          currentY += 5;
-        }
-      });
-    }
-    if (supplierInfo.phone) {
-      doc.text(`Tel: ${supplierInfo.phone}`, 14, currentY);
-      currentY += 6;
-    }
-    if (supplierInfo.email) {
-      doc.text(`Email: ${supplierInfo.email}`, 14, currentY);
-      currentY += 6;
-    }
+    // Only show supplier name - no additional contact details
     
     currentY += 15;
     
@@ -358,23 +337,12 @@ export const exportPurchaseOrderToPDF = async (purchaseOrder) => {
     const tableRows = (purchaseOrder.items || []).length;
     currentY = currentY + headerHeight + (tableRows * rowHeight) + 20;
     
-    // Total section with subtotal and VAT breakdown
+    // Total section - simple total only as in PO form
     const total = parseFloat(purchaseOrder.totalAmount || 0);
-    const vatRate = 0.20; // 20% VAT
-    const subtotal = total / (1 + vatRate);
-    const vatAmount = total - subtotal;
     
-    // Right-align totals
+    // Right-align total
     const rightMargin = pageWidth - 14;
     
-    doc.setFontSize(10);
-    doc.setFont(undefined, 'normal');
-    doc.text(`Subtotal: GBP ${subtotal.toFixed(2)}`, rightMargin, currentY, { align: 'right' });
-    
-    currentY += 6;
-    doc.text(`VAT (20%): GBP ${vatAmount.toFixed(2)}`, rightMargin, currentY, { align: 'right' });
-    
-    currentY += 8;
     doc.setFontSize(12);
     doc.setFont(undefined, 'bold');
     doc.text(`Total: GBP ${total.toFixed(2)}`, rightMargin, currentY, { align: 'right' });
