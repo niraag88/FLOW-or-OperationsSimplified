@@ -1095,7 +1095,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   // Stock Count management routes
   app.get('/api/stock-counts', requireAuth(), async (req: AuthenticatedRequest, res) => {
     try {
-      const stockCounts = await db.select({
+      const stockCountsList = await db.select({
         id: stockCounts.id,
         countDate: stockCounts.countDate,
         totalProducts: stockCounts.totalProducts,
@@ -1104,7 +1104,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
         createdAt: stockCounts.createdAt
       }).from(stockCounts).orderBy(desc(stockCounts.createdAt));
       
-      res.json(stockCounts);
+      res.json(stockCountsList);
     } catch (error) {
       console.error('Error fetching stock counts:', error);
       res.status(500).json({ error: 'Failed to fetch stock counts' });
@@ -1322,7 +1322,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
       // Update PO status to received if all items are fully received
       const poItems = await db.select().from(purchaseOrderItems).where(eq(purchaseOrderItems.poId, poId));
-      const allReceived = poItems.every(item => item.receivedQuantity >= item.quantity);
+      const allReceived = poItems.every(item => (item.receivedQuantity ?? 0) >= item.quantity);
       
       if (allReceived) {
         await db.update(purchaseOrders)
@@ -2219,16 +2219,6 @@ export async function registerRoutes(app: Express): Promise<Server> {
         data: purchaseOrderWithItems,
         message: 'Use frontend PDF generation'
       });
-
-      // Set headers for PDF streaming
-      res.set({
-        'Content-Type': 'application/pdf',
-        'Content-Disposition': `attachment; filename="purchase-order-${purchaseOrder.poNumber}.pdf"`,
-        'Content-Length': pdfBuffer.length
-      });
-
-      // Stream the PDF bytes
-      res.send(pdfBuffer);
       
     } catch (error) {
       console.error('Error exporting purchase order:', error);
