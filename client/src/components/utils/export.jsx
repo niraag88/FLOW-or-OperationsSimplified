@@ -114,3 +114,79 @@ export const exportToPDF = (data, filename, title = 'Export', columns = null) =>
     throw error;
   }
 };
+
+export const exportPurchaseOrderToPDF = (purchaseOrder) => {
+  try {
+    const doc = new jsPDF();
+    
+    // Add title
+    doc.setFontSize(20);
+    doc.text('PURCHASE ORDER', 14, 25);
+    
+    // Add company info
+    doc.setFontSize(12);
+    doc.text('SUPERNATURE LLC', 150, 25);
+    
+    // Add PO details
+    doc.setFontSize(12);
+    doc.text(`PO Number: ${purchaseOrder.poNumber}`, 14, 40);
+    
+    // Format dates safely
+    let orderDateText = 'N/A';
+    if (purchaseOrder.orderDate) {
+      try {
+        const orderDate = new Date(purchaseOrder.orderDate);
+        orderDateText = orderDate.toLocaleDateString('en-GB');
+      } catch (error) {
+        console.warn('Invalid order date:', purchaseOrder.orderDate);
+      }
+    }
+    doc.text(`Order Date: ${orderDateText}`, 14, 50);
+    
+    if (purchaseOrder.expectedDelivery) {
+      try {
+        const deliveryDate = new Date(purchaseOrder.expectedDelivery);
+        doc.text(`Expected Delivery: ${deliveryDate.toLocaleDateString('en-GB')}`, 14, 60);
+      } catch (error) {
+        console.warn('Invalid delivery date:', purchaseOrder.expectedDelivery);
+      }
+    }
+    
+    doc.text(`Supplier: ${purchaseOrder.supplierName || 'Unknown'}`, 14, 70);
+    doc.text(`Status: ${purchaseOrder.status}`, 14, 80);
+    
+    // Prepare table data for line items
+    const tableData = (purchaseOrder.items || []).map(item => [
+      item.product_code || '',
+      item.description || '',
+      item.quantity || 0,
+      `GBP £${parseFloat(item.unit_price || 0).toFixed(2)}`,
+      `GBP £${parseFloat(item.line_total || 0).toFixed(2)}`
+    ]);
+    
+    // Add line items table
+    doc.autoTable({
+      head: [['Product Code', 'Description', 'Qty', 'Unit Price', 'Line Total']],
+      body: tableData,
+      startY: 95,
+      styles: { fontSize: 10 },
+      headStyles: { fillColor: [51, 51, 51] }
+    });
+    
+    // Add total
+    const finalY = doc.lastAutoTable.finalY + 10;
+    doc.text(`Total: GBP £${parseFloat(purchaseOrder.totalAmount || 0).toFixed(2)}`, 150, finalY);
+    
+    // Add notes if any
+    if (purchaseOrder.notes) {
+      doc.text(`Notes: ${purchaseOrder.notes}`, 14, finalY + 20);
+    }
+    
+    // Download the PDF
+    doc.save(`purchase-order-${purchaseOrder.poNumber}.pdf`);
+    
+  } catch (error) {
+    console.error("Purchase Order PDF export error:", error);
+    throw error;
+  }
+};
