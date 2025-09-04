@@ -120,7 +120,7 @@ export const exportPurchaseOrderToPDF = async (purchaseOrder) => {
     // Get company settings first
     let companyInfo = {
       companyName: 'SUPERNATURE LLC',
-      address: 'Dubai, UAE',
+      address: 'Al Rukhaimi Building, Sheikh Zayed Road, Dubai, U.A.E.',
       phone: '+971 4 4582211',
       email: 'info@supernaturellc.com',
       vatNumber: '100042339000003',
@@ -140,7 +140,7 @@ export const exportPurchaseOrderToPDF = async (purchaseOrder) => {
             phone: settings.phone || companyInfo.phone,
             email: settings.email || companyInfo.email,
             vatNumber: settings.vatNumber || companyInfo.vatNumber,
-            currency: settings.currency || companyInfo.currency
+            currency: 'GBP' // Always use GBP for purchase orders
           };
         }
       }
@@ -151,153 +151,151 @@ export const exportPurchaseOrderToPDF = async (purchaseOrder) => {
     const doc = new jsPDF();
     const pageWidth = doc.internal.pageSize.width;
     const pageHeight = doc.internal.pageSize.height;
-    let currentY = 20;
+    let currentY = 25;
     
-    // Header Section
-    doc.setFontSize(18);
+    // Professional Header
+    doc.setDrawColor(0, 0, 0);
+    doc.setLineWidth(0.5);
+    doc.line(14, currentY - 5, pageWidth - 14, currentY - 5);
+    
+    doc.setFontSize(20);
     doc.setFont(undefined, 'bold');
     doc.text('PURCHASE ORDER', 14, currentY);
     
-    // Company Logo (right side) - for now use placeholder, logo support can be enhanced later
-    doc.setFontSize(10);
-    if (companyInfo.logo) {
-      doc.text('[Company Logo]', pageWidth - 45, currentY);
-    } else {
-      doc.text('Company Logo', pageWidth - 40, currentY);
-    }
+    // Logo placeholder (right aligned)
+    doc.setFontSize(9);
+    doc.setFont(undefined, 'normal');
+    doc.text('Company Logo', pageWidth - 35, currentY);
     
     currentY += 20;
     
-    // PO Number and Order Date (left side)
+    // Document details and company info in two columns
+    // Left column - PO details
     doc.setFontSize(11);
     doc.setFont(undefined, 'normal');
     doc.text(`PO Number: ${purchaseOrder.poNumber}`, 14, currentY);
     
     const orderDate = purchaseOrder.orderDate ? new Date(purchaseOrder.orderDate).toLocaleDateString('en-GB') : 'N/A';
-    currentY += 6;
+    currentY += 8;
     doc.text(`Order Date: ${orderDate}`, 14, currentY);
     
-    // Company Information (right side) - fix overlap with proper spacing
-    doc.setFontSize(11);
+    // Right column - Company info
+    doc.setFontSize(12);
     doc.setFont(undefined, 'bold');
-    const companyStartY = currentY - 6;
-    doc.text(companyInfo.companyName, pageWidth - 80, companyStartY);
+    const companyX = pageWidth - 90;
+    doc.text(companyInfo.companyName, companyX, currentY - 8);
     
+    doc.setFontSize(9);
     doc.setFont(undefined, 'normal');
-    // Split address properly if it's long
-    const addressLines = companyInfo.address.split(',').map(line => line.trim());
-    addressLines.forEach((line, index) => {
-      doc.text(line, pageWidth - 80, companyStartY + 8 + (index * 6));
+    
+    // Format address properly on separate lines
+    const addressParts = companyInfo.address.split(',').map(part => part.trim());
+    let addressY = currentY;
+    addressParts.forEach((part, index) => {
+      doc.text(part, companyX, addressY + (index * 5));
     });
     
-    const addressHeight = addressLines.length * 6;
-    doc.text(`Tel: ${companyInfo.phone}`, pageWidth - 80, companyStartY + 8 + addressHeight + 6);
-    doc.text(`Email: ${companyInfo.email}`, pageWidth - 80, companyStartY + 8 + addressHeight + 12);
+    const addressHeight = addressParts.length * 5;
+    doc.text(`Tel: ${companyInfo.phone}`, companyX, addressY + addressHeight + 5);
+    doc.text(`Email: ${companyInfo.email}`, companyX, addressY + addressHeight + 10);
     if (companyInfo.vatNumber) {
-      doc.text(`TRN: ${companyInfo.vatNumber}`, pageWidth - 80, companyStartY + 8 + addressHeight + 18);
+      doc.text(`TRN: ${companyInfo.vatNumber}`, companyX, addressY + addressHeight + 15);
     }
     
-    currentY += 50;
+    currentY += 40;
     
-    // Horizontal line separator
+    // Separator line
     doc.setDrawColor(0, 0, 0);
+    doc.setLineWidth(0.3);
     doc.line(14, currentY, pageWidth - 14, currentY);
     currentY += 15;
     
-    // Supplier/Brand Section and Currency/Status
+    // Supplier section (clean, professional)
     doc.setFontSize(11);
     doc.setFont(undefined, 'bold');
     doc.text('SUPPLIER/BRAND', 14, currentY);
-    doc.text(`Currency: ${companyInfo.currency}`, pageWidth - 60, currentY);
     
-    currentY += 8;
+    currentY += 10;
     doc.setFont(undefined, 'normal');
     doc.text(purchaseOrder.supplierName || 'Unknown Supplier', 14, currentY);
-    doc.text(`Status: ${purchaseOrder.status}`, pageWidth - 60, currentY);
     
-    // Add supplier contact info if available
-    currentY += 10;
-    doc.text('Contact: [Contact Name]', 14, currentY);
-    currentY += 6;
-    doc.text('Email: [Contact Email]', 14, currentY);
-    
+    // Only add supplier contact info if it exists (remove placeholders)
     currentY += 15;
     
-    // Items Table Header
-    const tableStartY = currentY;
-    const colWidths = [35, 70, 20, 35, 35];
-    const colPositions = [14, 49, 119, 139, 174];
+    // Professional items table
+    const tableY = currentY;
     
-    // Table header background (light gray)
-    doc.setFillColor(240, 240, 240);
-    doc.rect(14, currentY - 2, pageWidth - 28, 10, 'F');
+    // Table header with better styling
+    doc.setFillColor(245, 245, 245);
+    doc.rect(14, currentY, pageWidth - 28, 12, 'F');
+    
+    doc.setDrawColor(200, 200, 200);
+    doc.setLineWidth(0.5);
+    doc.rect(14, currentY, pageWidth - 28, 12);
+    
+    // Column positions for better alignment
+    const cols = {
+      code: 16,
+      description: 55,
+      qty: 135,
+      unitPrice: 155,
+      total: 180
+    };
     
     doc.setFontSize(10);
     doc.setFont(undefined, 'bold');
-    doc.text('Product Code', colPositions[0], currentY + 6);
-    doc.text('Description', colPositions[1], currentY + 6);
-    doc.text('Qty', colPositions[2], currentY + 6);
-    doc.text(`Unit Price (${companyInfo.currency})`, colPositions[3], currentY + 6);
-    doc.text(`Line Total (${companyInfo.currency})`, colPositions[4], currentY + 6);
+    doc.text('Product Code', cols.code, currentY + 8);
+    doc.text('Description', cols.description, currentY + 8);
+    doc.text('Qty', cols.qty, currentY + 8);
+    doc.text(`Unit Price (GBP)`, cols.unitPrice, currentY + 8);
+    doc.text(`Line Total (GBP)`, cols.total, currentY + 8);
     
     currentY += 12;
-    
-    // Table borders
-    doc.setDrawColor(200, 200, 200);
-    doc.setLineWidth(0.1);
-    
-    // Vertical lines
-    colPositions.forEach(pos => {
-      doc.line(pos - 2, tableStartY - 2, pos - 2, currentY + (purchaseOrder.items?.length || 0) * 8 + 2);
-    });
-    doc.line(pageWidth - 14, tableStartY - 2, pageWidth - 14, currentY + (purchaseOrder.items?.length || 0) * 8 + 2);
     
     // Items
     doc.setFont(undefined, 'normal');
     (purchaseOrder.items || []).forEach((item, index) => {
-      // Horizontal line
-      if (index > 0) {
-        doc.line(14, currentY - 2, pageWidth - 14, currentY - 2);
+      // Alternate row colors for better readability
+      if (index % 2 === 1) {
+        doc.setFillColor(250, 250, 250);
+        doc.rect(14, currentY, pageWidth - 28, 10, 'F');
       }
       
-      doc.text(item.product_code || '', colPositions[0], currentY + 6);
-      doc.text(item.description || '', colPositions[1], currentY + 6);
-      doc.text(String(item.quantity || 0), colPositions[2] + 10, currentY + 6);
-      doc.text(parseFloat(item.unit_price || 0).toFixed(2), colPositions[3] + 15, currentY + 6);
-      doc.text(parseFloat(item.line_total || 0).toFixed(2), colPositions[4] + 15, currentY + 6);
+      // Table borders
+      doc.setDrawColor(230, 230, 230);
+      doc.setLineWidth(0.1);
+      doc.rect(14, currentY, pageWidth - 28, 10);
       
-      currentY += 8;
+      doc.text(item.product_code || '', cols.code, currentY + 7);
+      doc.text(item.description || '', cols.description, currentY + 7);
+      doc.text(String(item.quantity || 0), cols.qty + 5, currentY + 7);
+      doc.text(parseFloat(item.unit_price || 0).toFixed(2), cols.unitPrice + 10, currentY + 7);
+      doc.text(parseFloat(item.line_total || 0).toFixed(2), cols.total + 10, currentY + 7);
+      
+      currentY += 10;
     });
-    
-    // Bottom table border
-    doc.line(14, currentY + 2, pageWidth - 14, currentY + 2);
     
     currentY += 15;
     
-    // Subtotal and Total
-    const subtotal = parseFloat(purchaseOrder.totalAmount || 0);
-    doc.setFont(undefined, 'normal');
-    doc.text('Subtotal:', pageWidth - 80, currentY);
-    doc.text(`${subtotal.toFixed(2)} ${companyInfo.currency}`, pageWidth - 40, currentY);
+    // Professional totals section (right aligned)
+    const total = parseFloat(purchaseOrder.totalAmount || 0);
     
-    currentY += 8;
-    doc.text('0', pageWidth - 40, currentY); // VAT or other charges line
-    
-    currentY += 10;
+    // Use proper currency format: GBP 634.00
+    doc.setFontSize(12);
     doc.setFont(undefined, 'bold');
-    doc.text('Total:', pageWidth - 80, currentY);
-    doc.text(`${subtotal.toFixed(2)} ${companyInfo.currency}`, pageWidth - 40, currentY);
-    
-    // No signature section needed for purchase orders
-    
-    // Calculate total pages needed based on content
-    const itemsPerPage = Math.floor((pageHeight - 200) / 8); // Approximate items per page
-    const totalPages = Math.max(1, Math.ceil((purchaseOrder.items?.length || 1) / itemsPerPage));
+    doc.text('Total:', pageWidth - 70, currentY);
+    doc.text(`GBP ${total.toFixed(2)}`, pageWidth - 40, currentY);
     
     // Footer with page numbers
-    const addFooter = (currentPage = 1) => {
+    const addFooter = () => {
       doc.setFontSize(8);
-      doc.text(`Page ${currentPage}/${totalPages}`, pageWidth / 2 - 10, pageHeight - 10);
+      doc.setFont(undefined, 'normal');
+      doc.text(`Page 1/1`, pageWidth / 2 - 10, pageHeight - 15);
+      
+      // Professional footer line
+      doc.setDrawColor(200, 200, 200);
+      doc.setLineWidth(0.3);
+      doc.line(14, pageHeight - 25, pageWidth - 14, pageHeight - 25);
     };
     
     addFooter();
