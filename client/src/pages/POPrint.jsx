@@ -8,6 +8,8 @@ export default function POPrint() {
   const [poData, setPOData] = useState(null);
   const [companySettings, setCompanySettings] = useState(null);
   const [loading, setLoading] = useState(true);
+  
+  console.log('POPrint component loaded, ID:', id);
 
   useEffect(() => {
     const fetchData = async () => {
