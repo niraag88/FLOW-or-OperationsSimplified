@@ -41,7 +41,7 @@ export default function POList({ purchaseOrders, loading, canEdit, currentUser, 
       maximumFractionDigits: 2
     });
     const numericAmount = parseFloat(amount) || 0;
-    return currency === 'GBP' ? `GBP £${formatter.format(numericAmount)}` : `${currency} ${formatter.format(numericAmount)}`;
+    return currency === 'GBP' ? `£${formatter.format(numericAmount)}` : `${currency} ${formatter.format(numericAmount)}`;
   };
 
   // Calculate AED equivalent (assuming 5.00 exchange rate from company settings)
