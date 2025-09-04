@@ -2215,7 +2215,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
       // Generate PDF using jsPDF (simpler and more reliable)
       const jsPDF = await import('jspdf');
-      require('jspdf-autotable');
+      await import('jspdf-autotable');
       
       const doc = new jsPDF.default();
       
