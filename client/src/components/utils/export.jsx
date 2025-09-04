@@ -191,7 +191,7 @@ export const exportPurchaseOrderToPDF = async (purchaseOrder) => {
     if (companyInfo.logo) {
       try {
         // Try to add actual logo from company settings
-        doc.addImage(companyInfo.logo, 'PNG', 14, currentY, 40, 30);
+        doc.addImage(companyInfo.logo, 'PNG', 14, currentY, 35, 25);
         logoHeight = 35;
       } catch (err) {
         console.warn('Could not load logo, using placeholder');
@@ -283,7 +283,8 @@ export const exportPurchaseOrderToPDF = async (purchaseOrder) => {
     currentY += 10;
     doc.setFontSize(10);
     doc.setFont(undefined, 'normal');
-    doc.text(supplierInfo.name, 14, currentY);
+    // Use supplier name from purchase order data, not from API lookup
+    doc.text(purchaseOrder.supplierName || 'N/A', 14, currentY);
     
     currentY += 6;
     if (supplierInfo.contactPerson) {
@@ -338,12 +339,12 @@ export const exportPurchaseOrderToPDF = async (purchaseOrder) => {
         fontSize: 9
       },
       columnStyles: {
-        0: { cellWidth: 20 }, // Product Code
-        1: { cellWidth: 45 }, // Description  
-        2: { cellWidth: 15 }, // Size
-        3: { cellWidth: 12, halign: 'center' }, // Qty
-        4: { cellWidth: 25, halign: 'right' }, // Unit Price
-        5: { cellWidth: 25, halign: 'right' }  // Line Total
+        0: { cellWidth: 30 }, // Product Code
+        1: { cellWidth: 65 }, // Description  
+        2: { cellWidth: 25 }, // Size
+        3: { cellWidth: 20, halign: 'center' }, // Qty
+        4: { cellWidth: 35, halign: 'right' }, // Unit Price
+        5: { cellWidth: 35, halign: 'right' }  // Line Total
       },
       alternateRowStyles: {
         fillColor: [248, 248, 248]
@@ -357,13 +358,26 @@ export const exportPurchaseOrderToPDF = async (purchaseOrder) => {
     const tableRows = (purchaseOrder.items || []).length;
     currentY = currentY + headerHeight + (tableRows * rowHeight) + 20;
     
-    // Total section
+    // Total section with subtotal and VAT breakdown
     const total = parseFloat(purchaseOrder.totalAmount || 0);
+    const vatRate = 0.20; // 20% VAT
+    const subtotal = total / (1 + vatRate);
+    const vatAmount = total - subtotal;
     
+    // Right-align totals
+    const rightMargin = pageWidth - 14;
+    
+    doc.setFontSize(10);
+    doc.setFont(undefined, 'normal');
+    doc.text(`Subtotal: GBP ${subtotal.toFixed(2)}`, rightMargin, currentY, { align: 'right' });
+    
+    currentY += 6;
+    doc.text(`VAT (20%): GBP ${vatAmount.toFixed(2)}`, rightMargin, currentY, { align: 'right' });
+    
+    currentY += 8;
     doc.setFontSize(12);
     doc.setFont(undefined, 'bold');
-    doc.text('Total:', pageWidth - 70, currentY);
-    doc.text(`GBP ${total.toFixed(2)}`, pageWidth - 40, currentY);
+    doc.text(`Total: GBP ${total.toFixed(2)}`, rightMargin, currentY, { align: 'right' });
     
     // Footer
     doc.setFontSize(8);
