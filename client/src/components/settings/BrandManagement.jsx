@@ -85,9 +85,14 @@ export default function BrandManagement() {
     try {
       // Map address back to description for API
       const apiData = {
-        ...formData,
+        name: formData.name,
         description: formData.address,
-        address: undefined // Remove address field
+        website: formData.website,
+        contact_person: formData.contact_person,
+        contact_email: formData.contact_email,
+        contact_phone: formData.contact_phone,
+        isActive: formData.isActive,
+        sort_order: formData.sort_order
       };
       
       if (editingBrand) {
