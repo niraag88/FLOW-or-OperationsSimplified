@@ -165,39 +165,10 @@ export const exportPurchaseOrderToPDF = async (purchaseOrder) => {
     doc.setFont(undefined, 'bold');
     doc.text('PURCHASE ORDER', 14, currentY);
     
-    // Company Logo - load actual logo from settings
-    if (companyInfo.logo) {
-      try {
-        // Create a function to load logo as base64
-        const loadLogoAsBase64 = () => {
-          return new Promise((resolve, reject) => {
-            const img = new Image();
-            img.crossOrigin = 'anonymous';
-            img.onload = function() {
-              const canvas = document.createElement('canvas');
-              const ctx = canvas.getContext('2d');
-              canvas.width = this.width;
-              canvas.height = this.height;
-              ctx.drawImage(this, 0, 0);
-              const dataURL = canvas.toDataURL('image/png');
-              resolve(dataURL);
-            };
-            img.onerror = () => reject(new Error('Failed to load logo'));
-            const logoUrl = companyInfo.logo.startsWith('http') ? companyInfo.logo : `/api/files/${companyInfo.logo}`;
-            img.src = logoUrl;
-          });
-        };
-        
-        // Try to load logo synchronously for PDF
-        const logoBase64 = await loadLogoAsBase64();
-        doc.addImage(logoBase64, 'PNG', pageWidth - 55, currentY - 15, 35, 20);
-      } catch (error) {
-        console.warn('Could not load logo, using placeholder:', error);
-        doc.setFontSize(10);
-        doc.setFont(undefined, 'normal');
-        doc.text('[Logo]', pageWidth - 25, currentY - 5);
-      }
-    }
+    // Company Logo - placeholder for now, will implement proper loading
+    doc.setFontSize(10);
+    doc.setFont(undefined, 'normal');
+    doc.text('[Logo]', pageWidth - 25, currentY - 5);
     
     currentY += 25;
     
