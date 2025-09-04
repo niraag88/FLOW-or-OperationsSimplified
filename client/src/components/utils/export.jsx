@@ -183,169 +183,145 @@ export const exportPurchaseOrderToPDF = async (purchaseOrder) => {
     const doc = new jsPDF();
     const pageWidth = doc.internal.pageSize.width;
     const pageHeight = doc.internal.pageSize.height;
-    let currentY = 20;
+    let currentY = 30;
     
-    // Header section with logo on left, title on right
-    // Left side - Logo and Company Info
-    let logoHeight = 0;
-    if (companyInfo.logo) {
-      try {
-        // Try to add actual logo from company settings
-        doc.addImage(companyInfo.logo, 'PNG', 14, currentY, 35, 25);
-        logoHeight = 35;
-      } catch (err) {
-        console.warn('Could not load logo, using placeholder');
-        doc.setFontSize(8);
-        doc.setFont(undefined, 'italic');
-        doc.text('[LOGO]', 14, currentY + 5);
-        logoHeight = 10;
-      }
-    } else {
-      doc.setFontSize(8);
-      doc.setFont(undefined, 'italic');
-      doc.text('[LOGO]', 14, currentY + 5);
-      logoHeight = 10;
-    }
-
-    // Right side - Purchase Order Title
-    doc.setFontSize(20);
+    // Title centered at top - exactly like the reference format
+    doc.setFontSize(16);
     doc.setFont(undefined, 'bold');
-    doc.text('PURCHASE ORDER', pageWidth - 80, currentY + 15);
+    doc.text('PURCHASE ORDER', pageWidth / 2, currentY, { align: 'center' });
     
-    // Company information under logo
-    currentY = Math.max(currentY + logoHeight, currentY + 20) + 10;
+    currentY += 20;
     
+    // Two column layout: Company info left, PO details right
+    // Left column - Company information
     doc.setFontSize(11);
     doc.setFont(undefined, 'bold');
     doc.text(companyInfo.companyName, 14, currentY);
     
-    currentY += 8;
-    doc.setFontSize(9);
+    let leftY = currentY + 6;
+    doc.setFontSize(10);
     doc.setFont(undefined, 'normal');
     
     // Company address (multi-line)
     const addressLines = companyInfo.address.split('\n');
     addressLines.forEach(line => {
       if (line.trim()) {
-        doc.text(line.trim(), 14, currentY);
-        currentY += 5;
+        doc.text(line.trim(), 14, leftY);
+        leftY += 5;
       }
     });
     
+    leftY += 2; // Extra space before phone
     if (companyInfo.phone) {
-      doc.text(`Tel: ${companyInfo.phone}`, 14, currentY);
-      currentY += 5;
+      doc.text(`Tel: ${companyInfo.phone}`, 14, leftY);
+      leftY += 5;
     }
     if (companyInfo.email) {
-      doc.text(`Email: ${companyInfo.email}`, 14, currentY);
-      currentY += 5;
-    }
-    if (companyInfo.website) {
-      doc.text(`Website: ${companyInfo.website}`, 14, currentY);
-      currentY += 5;
+      doc.text(`Email: ${companyInfo.email}`, 14, leftY);
+      leftY += 5;
     }
     if (companyInfo.vatNumber) {
-      doc.text(`TRN: ${companyInfo.vatNumber}`, 14, currentY);
-      currentY += 5;
+      doc.text(`TRN: ${companyInfo.vatNumber}`, 14, leftY);
+      leftY += 5;
     }
 
-    // PO details on right side (aligned with title)
-    let rightY = 50;
+    // Right column - PO details with proper alignment
+    let rightY = currentY;
     doc.setFontSize(10);
     doc.setFont(undefined, 'normal');
-    doc.text(`PO Number: ${purchaseOrder.poNumber}`, pageWidth - 80, rightY);
     
+    // PO Number with spacing like the reference
+    doc.text('PO Number', 130, rightY);
+    doc.text(purchaseOrder.poNumber, 175, rightY);
+    
+    rightY += 10;
+    doc.text('PO Date', 130, rightY);
     const orderDate = purchaseOrder.orderDate ? new Date(purchaseOrder.orderDate).toLocaleDateString('en-GB') : '';
     if (orderDate) {
-      rightY += 7;
-      doc.text(`PO Date: ${orderDate}`, pageWidth - 80, rightY);
+      doc.text(orderDate, 175, rightY);
     }
 
+    rightY += 10;
+    doc.text('Expected Delivery', 130, rightY);
     const expectedDelivery = purchaseOrder.expectedDelivery ? new Date(purchaseOrder.expectedDelivery).toLocaleDateString('en-GB') : '';
     if (expectedDelivery) {
-      rightY += 7;
-      doc.text(`Expected Delivery: ${expectedDelivery}`, pageWidth - 80, rightY);
+      doc.text(expectedDelivery, 175, rightY);
     }
 
-    currentY = Math.max(currentY, rightY) + 15;
+    // Set currentY to give proper spacing after both columns
+    currentY = Math.max(leftY, rightY) + 25;
     
-    // Horizontal separator line
-    doc.setDrawColor(0, 0, 0);
-    doc.setLineWidth(0.5);
-    doc.line(14, currentY, pageWidth - 14, currentY);
-    currentY += 15;
-    
-    // Supplier/Brand section
-    doc.setFontSize(12);
-    doc.setFont(undefined, 'bold');
-    doc.text('SUPPLIER/BRAND', 14, currentY);
-    
-    currentY += 10;
-    doc.setFontSize(10);
-    doc.setFont(undefined, 'normal');
-    // Use supplier name from purchase order data, not from API lookup
-    doc.text(purchaseOrder.supplierName || 'N/A', 14, currentY);
-    
-    // Only show supplier name - no additional contact details
-    
-    currentY += 15;
-    
-    // Table with proper column widths and size column
+    // Table exactly matching the reference format
     const tableData = (purchaseOrder.items || []).map(item => [
       item.product_code || '',
       item.description || '',
-      item.size || '', // Add size column
+      item.size || '',
       String(item.quantity || 0),
       parseFloat(item.unit_price || 0).toFixed(2),
       parseFloat(item.line_total || 0).toFixed(2)
     ]);
 
     autoTable(doc, {
-      head: [['Product Code', 'Description', 'Size', 'Qty', 'Unit Price (GBP)', 'Line Total (GBP)']],
+      head: [['Product\nCode', 'Description', 'Size', 'Qty', 'Unit Price\n(GBP)', 'Line Total\n(GBP)']],
       body: tableData,
       startY: currentY,
-      theme: 'grid',
+      theme: 'plain',
       styles: {
-        fontSize: 9,
-        cellPadding: 3,
-        lineWidth: 0.3,
-        lineColor: [200, 200, 200]
+        fontSize: 10,
+        cellPadding: 4,
+        lineWidth: 0.5,
+        lineColor: [0, 0, 0],
+        textColor: [0, 0, 0]
       },
       headStyles: {
-        fillColor: [240, 240, 240],
+        fillColor: [255, 255, 255],
         textColor: [0, 0, 0],
-        fontStyle: 'bold',
-        fontSize: 9
+        fontStyle: 'normal',
+        fontSize: 10,
+        lineWidth: 0.5,
+        lineColor: [0, 0, 0]
       },
       columnStyles: {
-        0: { cellWidth: 30 }, // Product Code
-        1: { cellWidth: 65 }, // Description  
-        2: { cellWidth: 25 }, // Size
-        3: { cellWidth: 20, halign: 'center' }, // Qty
-        4: { cellWidth: 35, halign: 'right' }, // Unit Price
-        5: { cellWidth: 35, halign: 'right' }  // Line Total
+        0: { cellWidth: 25, halign: 'left' }, // Product Code
+        1: { cellWidth: 60, halign: 'left' }, // Description
+        2: { cellWidth: 25, halign: 'left' }, // Size
+        3: { cellWidth: 15, halign: 'center' }, // Qty
+        4: { cellWidth: 25, halign: 'right' }, // Unit Price
+        5: { cellWidth: 25, halign: 'right' }  // Line Total
       },
-      alternateRowStyles: {
-        fillColor: [248, 248, 248]
+      drawHorizontalLine: (lineIndex, startX, endX, startY, endY, doc) => {
+        // Draw top border, header separator, and bottom border only
+        return lineIndex === 0 || lineIndex === 1 || lineIndex === tableData.length + 1;
       },
+      drawVerticalLine: () => false, // No vertical lines like in the reference
       margin: { left: 14, right: 14 }
     });
     
-    // Calculate the end position manually since autoTable doesn't reliably provide finalY
-    const rowHeight = 12; // Approximate row height including padding
-    const headerHeight = 12;
+    // Calculate the end position manually
+    const rowHeight = 15;
+    const headerHeight = 15;
     const tableRows = (purchaseOrder.items || []).length;
-    currentY = currentY + headerHeight + (tableRows * rowHeight) + 20;
+    currentY = currentY + headerHeight + (tableRows * rowHeight) + 25;
     
-    // Total section - simple total only as in PO form
+    // Totals section - exactly matching the reference format
     const total = parseFloat(purchaseOrder.totalAmount || 0);
     
-    // Right-align total
+    // Right-align totals with proper spacing
     const rightMargin = pageWidth - 14;
     
-    doc.setFontSize(12);
-    doc.setFont(undefined, 'bold');
-    doc.text(`Total: GBP ${total.toFixed(2)}`, rightMargin, currentY, { align: 'right' });
+    currentY += 10;
+    
+    doc.setFontSize(11);
+    doc.setFont(undefined, 'normal');
+    doc.text(`Subtotal`, rightMargin - 50, currentY);
+    doc.text(`GBP ${total.toFixed(2)}`, rightMargin, currentY, { align: 'right' });
+    
+    currentY += 10;
+    
+    doc.setFontSize(11);
+    doc.setFont(undefined, 'normal');
+    doc.text(`Total`, rightMargin - 50, currentY);
+    doc.text(`GBP ${total.toFixed(2)}`, rightMargin, currentY, { align: 'right' });
     
     // Footer
     doc.setFontSize(8);
