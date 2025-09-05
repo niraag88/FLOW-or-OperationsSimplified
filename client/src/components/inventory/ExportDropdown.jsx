@@ -316,7 +316,7 @@ export default function ExportDropdown({ products, activeTab, stockSubTab, stock
               disabled={itemCount === 0}
             >
               <FileText className="w-4 h-4 mr-2" />
-              Print to PDF
+              View & Print
             </DropdownMenuItem>
           </>
         )}
