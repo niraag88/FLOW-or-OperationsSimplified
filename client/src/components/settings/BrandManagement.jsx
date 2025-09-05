@@ -24,7 +24,6 @@ import SimpleConfirmDialog from "../common/SimpleConfirmDialog";
 const initialFormData = {
   name: "",
   address: "",
-  website: "",
   contact_person: "",
   contact_email: "",
   contact_phone: "",
@@ -87,7 +86,6 @@ export default function BrandManagement() {
       const apiData = {
         name: formData.name,
         description: formData.address,
-        website: formData.website,
         contactPerson: formData.contact_person,
         contactEmail: formData.contact_email,
         contactPhone: formData.contact_phone,
@@ -128,7 +126,6 @@ export default function BrandManagement() {
     setFormData({
       name: brand.name || "",
       address: brand.description || "", // Map description to address
-      website: brand.website || "",
       contact_person: brand.contactPerson || "",
       contact_email: brand.contactEmail || "",
       contact_phone: brand.contactPhone || "",
@@ -366,16 +363,6 @@ export default function BrandManagement() {
                   />
                 </div>
 
-                <div className="space-y-2">
-                  <Label htmlFor="website">Website</Label>
-                  <Input
-                    id="website"
-                    type="url"
-                    value={formData.website}
-                    onChange={(e) => handleInputChange('website', e.target.value)}
-                    placeholder="https://example.com"
-                  />
-                </div>
 
                 <div className="grid grid-cols-1 gap-4">
                   <div className="space-y-2">
