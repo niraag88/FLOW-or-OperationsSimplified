@@ -90,12 +90,17 @@ export default function POPrintView() {
         <div className="print-info-section">
           {/* Left Column - Company Info */}
           <div className="print-company-info">
+            {companyData?.logo && (
+              <div className="company-logo">
+                <img src={companyData.logo} alt="Company Logo" />
+              </div>
+            )}
             <div className="company-name">{companyData?.companyName || 'SUPERNATURE LLC'}</div>
             <div className="company-address">
               {companyData?.address || 'Al Rukhaimi Building, Sheikh Zayed Road'}
             </div>
             <div className="company-address">
-              {companyData?.city || 'Dubai'}, {companyData?.country || 'U.A.E.'}
+              Dubai, U.A.E.
             </div>
             <div className="company-contact">
               Tel: {companyData?.phone || '+971 4 4582211'}
@@ -129,12 +134,12 @@ export default function POPrintView() {
         <div className="print-supplier-section">
           <div className="supplier-title">SUPPLIER/BRAND</div>
           <div className="supplier-name">{poData.supplierName}</div>
-          <div className="supplier-address">
-            {poData.supplierAddress || 'Alton, GU34 2PX,'}
-          </div>
-          <div className="supplier-address">
-            {poData.supplierCountry || 'U.K.'}
-          </div>
+          {poData.supplierAddress && (
+            <div className="supplier-address">{poData.supplierAddress}</div>
+          )}
+          {poData.supplierCountry && (
+            <div className="supplier-address">{poData.supplierCountry}</div>
+          )}
           {poData.supplierContactPerson && (
             <div className="supplier-contact">Contact: {poData.supplierContactPerson}</div>
           )}
