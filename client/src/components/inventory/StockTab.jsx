@@ -30,6 +30,19 @@ export default function StockTab({ products, loading, canEdit, currentUser, onRe
   const [selectedStockStatus, setSelectedStockStatus] = useState([]);
   const [stockLevelFilter, setStockLevelFilter] = useState({ min: "", max: "" });
 
+  // Advanced filter states for movements
+  const [selectedMovementBrands, setSelectedMovementBrands] = useState([]);
+  const [selectedMovementTypes, setSelectedMovementTypes] = useState([]);
+  const [movementDateFilter, setMovementDateFilter] = useState({ start: "", end: "" });
+
+  // Advanced filter states for low stock  
+  const [selectedLowStockBrands, setSelectedLowStockBrands] = useState([]);
+  const [selectedLowStockSizes, setSelectedLowStockSizes] = useState([]);
+
+  // Advanced filter states for out of stock
+  const [selectedOutOfStockBrands, setSelectedOutOfStockBrands] = useState([]);
+  const [selectedOutOfStockSizes, setSelectedOutOfStockSizes] = useState([]);
+
   // Pagination states for each tab
   const [currentStockPage, setCurrentStockPage] = useState(1);
   const [movementsPage, setMovementsPage] = useState(1);
@@ -108,6 +121,8 @@ export default function StockTab({ products, loading, canEdit, currentUser, onRe
   // Get unique values for filters
   const uniqueStockBrands = [...new Set(products.map(p => p.brandName).filter(Boolean))].sort();
   const uniqueStockSizes = [...new Set(products.map(p => p.size).filter(Boolean))].sort();
+  const uniqueMovementBrands = [...new Set(stockMovements.map(m => m.productName?.split(' ')[0]).filter(Boolean))].sort();
+  const uniqueMovementTypes = [...new Set(stockMovements.map(m => m.movementType).filter(Boolean))].sort();
 
   // Filter functions
   const filterProducts = (productList, searchTerm) => {
@@ -188,6 +203,51 @@ export default function StockTab({ products, loading, canEdit, currentUser, onRe
     );
   };
 
+  // Advanced filter function for movements
+  const applyAdvancedMovementFilters = (movementList, searchTerm, selectedBrands, selectedTypes, dateRange) => {
+    let filtered = movementList;
+
+    // Text search filter
+    if (searchTerm) {
+      const term = searchTerm.toLowerCase();
+      filtered = filtered.filter(movement => 
+        (movement.productName || '').toLowerCase().includes(term) ||
+        (movement.productSku || '').toLowerCase().includes(term) ||
+        (movement.movementType || '').toLowerCase().includes(term) ||
+        (movement.notes || '').toLowerCase().includes(term)
+      );
+    }
+
+    // Brand filter (using product name)
+    if (selectedBrands.length > 0) {
+      filtered = filtered.filter(movement => 
+        selectedBrands.some(brand => 
+          (movement.productName || '').toLowerCase().includes(brand.toLowerCase())
+        )
+      );
+    }
+
+    // Movement type filter
+    if (selectedTypes.length > 0) {
+      filtered = filtered.filter(movement => selectedTypes.includes(movement.movementType));
+    }
+
+    // Date range filter
+    if (dateRange.start || dateRange.end) {
+      filtered = filtered.filter(movement => {
+        const movementDate = new Date(movement.createdAt);
+        const startDate = dateRange.start ? new Date(dateRange.start) : null;
+        const endDate = dateRange.end ? new Date(dateRange.end) : null;
+        
+        if (startDate && movementDate < startDate) return false;
+        if (endDate && movementDate > endDate) return false;
+        return true;
+      });
+    }
+
+    return filtered;
+  };
+
   // Apply filters
   const filteredProducts = applyAdvancedStockFilters(
     products, 
@@ -197,9 +257,29 @@ export default function StockTab({ products, loading, canEdit, currentUser, onRe
     selectedStockStatus, 
     stockLevelFilter
   );
-  const filteredLowStockProducts = filterProducts(lowStockProducts, lowStockFilter);
-  const filteredOutOfStockProducts = filterProducts(outOfStockProducts, outOfStockFilter);
-  const filteredStockMovements = filterMovements(stockMovements, movementsFilter);
+  const filteredLowStockProducts = applyAdvancedStockFilters(
+    lowStockProducts, 
+    lowStockFilter, 
+    selectedLowStockBrands, 
+    selectedLowStockSizes, 
+    [], 
+    { min: "", max: "" }
+  );
+  const filteredOutOfStockProducts = applyAdvancedStockFilters(
+    outOfStockProducts, 
+    outOfStockFilter, 
+    selectedOutOfStockBrands, 
+    selectedOutOfStockSizes, 
+    [], 
+    { min: "", max: "" }
+  );
+  const filteredStockMovements = applyAdvancedMovementFilters(
+    stockMovements, 
+    movementsFilter, 
+    selectedMovementBrands, 
+    selectedMovementTypes, 
+    movementDateFilter
+  );
 
   // Pagination logic for each tab
   const paginateData = (data, page, perPage) => {
@@ -797,17 +877,201 @@ export default function StockTab({ products, loading, canEdit, currentUser, onRe
               <p className="text-sm text-gray-600">Automatic stock changes from goods receipts and sales</p>
             </CardHeader>
             <CardContent>
-              <div className="flex items-center gap-2 mb-4">
-                <Search className="w-4 h-4 text-gray-400" />
-                <Input
-                  placeholder="Filter by product, movement type, or notes..."
-                  value={movementsFilter}
-                  onChange={(e) => {
-                    setMovementsFilter(e.target.value);
-                    resetPagination('movements');
-                  }}
-                  className="max-w-sm"
-                />
+              {/* Search and Filters */}
+              <div className="space-y-4 mb-6">
+                {/* Search Bar */}
+                <div className="flex items-center gap-2">
+                  <Search className="w-4 h-4 text-gray-400" />
+                  <Input
+                    placeholder="Search by product, movement type, or notes..."
+                    value={movementsFilter}
+                    onChange={(e) => {
+                      setMovementsFilter(e.target.value);
+                      resetPagination('movements');
+                    }}
+                    className="max-w-sm"
+                  />
+                </div>
+
+                {/* Advanced Filters */}
+                <div className="flex items-center gap-3 flex-wrap">
+                  <Filter className="w-4 h-4 text-gray-400" />
+                  
+                  {/* Brand Filter */}
+                  <Popover>
+                    <PopoverTrigger asChild>
+                      <Button variant="outline" className="justify-between w-40">
+                        {selectedMovementBrands.length === 0 ? "All Brands" : `${selectedMovementBrands.length} selected`}
+                        <ChevronDown className="ml-2 h-4 w-4" />
+                      </Button>
+                    </PopoverTrigger>
+                    <PopoverContent className="w-60 p-4">
+                      <div className="space-y-3">
+                        <h4 className="font-medium leading-none">Select Brands</h4>
+                        <div className="space-y-2 max-h-60 overflow-y-auto">
+                          {uniqueMovementBrands.map(brand => (
+                            <div key={brand} className="flex items-center space-x-2">
+                              <Checkbox
+                                id={`movement-brand-${brand}`}
+                                checked={selectedMovementBrands.includes(brand)}
+                                onCheckedChange={(checked) => {
+                                  if (checked) {
+                                    setSelectedMovementBrands(prev => [...prev, brand]);
+                                  } else {
+                                    setSelectedMovementBrands(prev => prev.filter(b => b !== brand));
+                                  }
+                                  resetPagination('movements');
+                                }}
+                              />
+                              <label
+                                htmlFor={`movement-brand-${brand}`}
+                                className="text-sm leading-none peer-disabled:cursor-not-allowed peer-disabled:opacity-70 cursor-pointer"
+                              >
+                                {brand}
+                              </label>
+                            </div>
+                          ))}
+                        </div>
+                      </div>
+                    </PopoverContent>
+                  </Popover>
+                  
+                  {/* Movement Type Filter */}
+                  <Popover>
+                    <PopoverTrigger asChild>
+                      <Button variant="outline" className="justify-between w-44">
+                        {selectedMovementTypes.length === 0 ? "All Movement Types" : `${selectedMovementTypes.length} selected`}
+                        <ChevronDown className="ml-2 h-4 w-4" />
+                      </Button>
+                    </PopoverTrigger>
+                    <PopoverContent className="w-60 p-4">
+                      <div className="space-y-3">
+                        <h4 className="font-medium leading-none">Select Movement Types</h4>
+                        <div className="space-y-2">
+                          {uniqueMovementTypes.map(type => (
+                            <div key={type} className="flex items-center space-x-2">
+                              <Checkbox
+                                id={`movement-type-${type}`}
+                                checked={selectedMovementTypes.includes(type)}
+                                onCheckedChange={(checked) => {
+                                  if (checked) {
+                                    setSelectedMovementTypes(prev => [...prev, type]);
+                                  } else {
+                                    setSelectedMovementTypes(prev => prev.filter(t => t !== type));
+                                  }
+                                  resetPagination('movements');
+                                }}
+                              />
+                              <label
+                                htmlFor={`movement-type-${type}`}
+                                className="text-sm leading-none peer-disabled:cursor-not-allowed peer-disabled:opacity-70 cursor-pointer"
+                              >
+                                {getMovementTypeLabel(type)}
+                              </label>
+                            </div>
+                          ))}
+                        </div>
+                      </div>
+                    </PopoverContent>
+                  </Popover>
+
+                  {/* Date Range Filter */}
+                  <Popover>
+                    <PopoverTrigger asChild>
+                      <Button variant="outline" className="justify-between w-44">
+                        {movementDateFilter.start || movementDateFilter.end ? 
+                          `${movementDateFilter.start || 'Start'} - ${movementDateFilter.end || 'End'}` : 
+                          "Date Range"
+                        }
+                        <ChevronDown className="ml-2 h-4 w-4" />
+                      </Button>
+                    </PopoverTrigger>
+                    <PopoverContent className="w-60 p-4">
+                      <div className="space-y-3">
+                        <h4 className="font-medium leading-none">Date Range</h4>
+                        <div className="space-y-2">
+                          <Input
+                            type="date"
+                            placeholder="Start Date"
+                            value={movementDateFilter.start}
+                            onChange={(e) => {
+                              setMovementDateFilter(prev => ({ ...prev, start: e.target.value }));
+                              resetPagination('movements');
+                            }}
+                          />
+                          <Input
+                            type="date"
+                            placeholder="End Date"
+                            value={movementDateFilter.end}
+                            onChange={(e) => {
+                              setMovementDateFilter(prev => ({ ...prev, end: e.target.value }));
+                              resetPagination('movements');
+                            }}
+                          />
+                        </div>
+                      </div>
+                    </PopoverContent>
+                  </Popover>
+                  
+                  {/* Clear Filters Button */}
+                  {(selectedMovementBrands.length > 0 || selectedMovementTypes.length > 0 || movementDateFilter.start || movementDateFilter.end) && (
+                    <Button 
+                      variant="ghost" 
+                      size="sm" 
+                      onClick={() => {
+                        setSelectedMovementBrands([]);
+                        setSelectedMovementTypes([]);
+                        setMovementDateFilter({ start: "", end: "" });
+                        resetPagination('movements');
+                      }}
+                    >
+                      Clear Filters
+                    </Button>
+                  )}
+                </div>
+
+                {/* Active Filter Badges */}
+                {(selectedMovementBrands.length > 0 || selectedMovementTypes.length > 0 || movementDateFilter.start || movementDateFilter.end) && (
+                  <div className="flex items-center gap-2 flex-wrap">
+                    <span className="text-sm text-gray-600">Active filters:</span>
+                    {selectedMovementBrands.map(brand => (
+                      <Badge key={brand} variant="secondary" className="gap-1">
+                        Brand: {brand}
+                        <X 
+                          className="h-3 w-3 cursor-pointer" 
+                          onClick={() => {
+                            setSelectedMovementBrands(prev => prev.filter(b => b !== brand));
+                            resetPagination('movements');
+                          }}
+                        />
+                      </Badge>
+                    ))}
+                    {selectedMovementTypes.map(type => (
+                      <Badge key={type} variant="secondary" className="gap-1">
+                        Type: {getMovementTypeLabel(type)}
+                        <X 
+                          className="h-3 w-3 cursor-pointer" 
+                          onClick={() => {
+                            setSelectedMovementTypes(prev => prev.filter(t => t !== type));
+                            resetPagination('movements');
+                          }}
+                        />
+                      </Badge>
+                    ))}
+                    {(movementDateFilter.start || movementDateFilter.end) && (
+                      <Badge variant="secondary" className="gap-1">
+                        Date: {movementDateFilter.start || 'Start'} - {movementDateFilter.end || 'End'}
+                        <X 
+                          className="h-3 w-3 cursor-pointer" 
+                          onClick={() => {
+                            setMovementDateFilter({ start: "", end: "" });
+                            resetPagination('movements');
+                          }}
+                        />
+                      </Badge>
+                    )}
+                  </div>
+                )}
               </div>
               {loadingMovements ? (
                 <div className="space-y-4">
@@ -893,17 +1157,150 @@ export default function StockTab({ products, loading, canEdit, currentUser, onRe
               <p className="text-sm text-gray-600">Products at or below minimum stock level</p>
             </CardHeader>
             <CardContent>
-              <div className="flex items-center gap-2 mb-4">
-                <Search className="w-4 h-4 text-gray-400" />
-                <Input
-                  placeholder="Filter by product name, SKU, or brand..."
-                  value={lowStockFilter}
-                  onChange={(e) => {
-                    setLowStockFilter(e.target.value);
-                    resetPagination('low-stock');
-                  }}
-                  className="max-w-sm"
-                />
+              {/* Search and Filters */}
+              <div className="space-y-4 mb-6">
+                {/* Search Bar */}
+                <div className="flex items-center gap-2">
+                  <Search className="w-4 h-4 text-gray-400" />
+                  <Input
+                    placeholder="Search by product name, SKU, or brand..."
+                    value={lowStockFilter}
+                    onChange={(e) => {
+                      setLowStockFilter(e.target.value);
+                      resetPagination('low-stock');
+                    }}
+                    className="max-w-sm"
+                  />
+                </div>
+
+                {/* Advanced Filters */}
+                <div className="flex items-center gap-3 flex-wrap">
+                  <Filter className="w-4 h-4 text-gray-400" />
+                  
+                  {/* Brand Filter */}
+                  <Popover>
+                    <PopoverTrigger asChild>
+                      <Button variant="outline" className="justify-between w-40">
+                        {selectedLowStockBrands.length === 0 ? "All Brands" : `${selectedLowStockBrands.length} selected`}
+                        <ChevronDown className="ml-2 h-4 w-4" />
+                      </Button>
+                    </PopoverTrigger>
+                    <PopoverContent className="w-60 p-4">
+                      <div className="space-y-3">
+                        <h4 className="font-medium leading-none">Select Brands</h4>
+                        <div className="space-y-2 max-h-60 overflow-y-auto">
+                          {uniqueStockBrands.map(brand => (
+                            <div key={brand} className="flex items-center space-x-2">
+                              <Checkbox
+                                id={`low-stock-brand-${brand}`}
+                                checked={selectedLowStockBrands.includes(brand)}
+                                onCheckedChange={(checked) => {
+                                  if (checked) {
+                                    setSelectedLowStockBrands(prev => [...prev, brand]);
+                                  } else {
+                                    setSelectedLowStockBrands(prev => prev.filter(b => b !== brand));
+                                  }
+                                  resetPagination('low-stock');
+                                }}
+                              />
+                              <label
+                                htmlFor={`low-stock-brand-${brand}`}
+                                className="text-sm leading-none peer-disabled:cursor-not-allowed peer-disabled:opacity-70 cursor-pointer"
+                              >
+                                {brand}
+                              </label>
+                            </div>
+                          ))}
+                        </div>
+                      </div>
+                    </PopoverContent>
+                  </Popover>
+                  
+                  {/* Size Filter */}
+                  <Popover>
+                    <PopoverTrigger asChild>
+                      <Button variant="outline" className="justify-between w-36">
+                        {selectedLowStockSizes.length === 0 ? "All Sizes" : `${selectedLowStockSizes.length} selected`}
+                        <ChevronDown className="ml-2 h-4 w-4" />
+                      </Button>
+                    </PopoverTrigger>
+                    <PopoverContent className="w-60 p-4">
+                      <div className="space-y-3">
+                        <h4 className="font-medium leading-none">Select Sizes</h4>
+                        <div className="space-y-2 max-h-60 overflow-y-auto">
+                          {uniqueStockSizes.map(size => (
+                            <div key={size} className="flex items-center space-x-2">
+                              <Checkbox
+                                id={`low-stock-size-${size}`}
+                                checked={selectedLowStockSizes.includes(size)}
+                                onCheckedChange={(checked) => {
+                                  if (checked) {
+                                    setSelectedLowStockSizes(prev => [...prev, size]);
+                                  } else {
+                                    setSelectedLowStockSizes(prev => prev.filter(s => s !== size));
+                                  }
+                                  resetPagination('low-stock');
+                                }}
+                              />
+                              <label
+                                htmlFor={`low-stock-size-${size}`}
+                                className="text-sm leading-none peer-disabled:cursor-not-allowed peer-disabled:opacity-70 cursor-pointer"
+                              >
+                                {size}
+                              </label>
+                            </div>
+                          ))}
+                        </div>
+                      </div>
+                    </PopoverContent>
+                  </Popover>
+                  
+                  {/* Clear Filters Button */}
+                  {(selectedLowStockBrands.length > 0 || selectedLowStockSizes.length > 0) && (
+                    <Button 
+                      variant="ghost" 
+                      size="sm" 
+                      onClick={() => {
+                        setSelectedLowStockBrands([]);
+                        setSelectedLowStockSizes([]);
+                        resetPagination('low-stock');
+                      }}
+                    >
+                      Clear Filters
+                    </Button>
+                  )}
+                </div>
+
+                {/* Active Filter Badges */}
+                {(selectedLowStockBrands.length > 0 || selectedLowStockSizes.length > 0) && (
+                  <div className="flex items-center gap-2 flex-wrap">
+                    <span className="text-sm text-gray-600">Active filters:</span>
+                    {selectedLowStockBrands.map(brand => (
+                      <Badge key={brand} variant="secondary" className="gap-1">
+                        Brand: {brand}
+                        <X 
+                          className="h-3 w-3 cursor-pointer" 
+                          onClick={() => {
+                            setSelectedLowStockBrands(prev => prev.filter(b => b !== brand));
+                            resetPagination('low-stock');
+                          }}
+                        />
+                      </Badge>
+                    ))}
+                    {selectedLowStockSizes.map(size => (
+                      <Badge key={size} variant="secondary" className="gap-1">
+                        Size: {size}
+                        <X 
+                          className="h-3 w-3 cursor-pointer" 
+                          onClick={() => {
+                            setSelectedLowStockSizes(prev => prev.filter(s => s !== size));
+                            resetPagination('low-stock');
+                          }}
+                        />
+                      </Badge>
+                    ))}
+                  </div>
+                )}
               </div>
               <Table>
                 <TableHeader>
@@ -969,17 +1366,150 @@ export default function StockTab({ products, loading, canEdit, currentUser, onRe
               <p className="text-sm text-gray-600">Products with zero stock quantity</p>
             </CardHeader>
             <CardContent>
-              <div className="flex items-center gap-2 mb-4">
-                <Search className="w-4 h-4 text-gray-400" />
-                <Input
-                  placeholder="Filter by product name, SKU, or brand..."
-                  value={outOfStockFilter}
-                  onChange={(e) => {
-                    setOutOfStockFilter(e.target.value);
-                    resetPagination('out-of-stock');
-                  }}
-                  className="max-w-sm"
-                />
+              {/* Search and Filters */}
+              <div className="space-y-4 mb-6">
+                {/* Search Bar */}
+                <div className="flex items-center gap-2">
+                  <Search className="w-4 h-4 text-gray-400" />
+                  <Input
+                    placeholder="Search by product name, SKU, or brand..."
+                    value={outOfStockFilter}
+                    onChange={(e) => {
+                      setOutOfStockFilter(e.target.value);
+                      resetPagination('out-of-stock');
+                    }}
+                    className="max-w-sm"
+                  />
+                </div>
+
+                {/* Advanced Filters */}
+                <div className="flex items-center gap-3 flex-wrap">
+                  <Filter className="w-4 h-4 text-gray-400" />
+                  
+                  {/* Brand Filter */}
+                  <Popover>
+                    <PopoverTrigger asChild>
+                      <Button variant="outline" className="justify-between w-40">
+                        {selectedOutOfStockBrands.length === 0 ? "All Brands" : `${selectedOutOfStockBrands.length} selected`}
+                        <ChevronDown className="ml-2 h-4 w-4" />
+                      </Button>
+                    </PopoverTrigger>
+                    <PopoverContent className="w-60 p-4">
+                      <div className="space-y-3">
+                        <h4 className="font-medium leading-none">Select Brands</h4>
+                        <div className="space-y-2 max-h-60 overflow-y-auto">
+                          {uniqueStockBrands.map(brand => (
+                            <div key={brand} className="flex items-center space-x-2">
+                              <Checkbox
+                                id={`out-of-stock-brand-${brand}`}
+                                checked={selectedOutOfStockBrands.includes(brand)}
+                                onCheckedChange={(checked) => {
+                                  if (checked) {
+                                    setSelectedOutOfStockBrands(prev => [...prev, brand]);
+                                  } else {
+                                    setSelectedOutOfStockBrands(prev => prev.filter(b => b !== brand));
+                                  }
+                                  resetPagination('out-of-stock');
+                                }}
+                              />
+                              <label
+                                htmlFor={`out-of-stock-brand-${brand}`}
+                                className="text-sm leading-none peer-disabled:cursor-not-allowed peer-disabled:opacity-70 cursor-pointer"
+                              >
+                                {brand}
+                              </label>
+                            </div>
+                          ))}
+                        </div>
+                      </div>
+                    </PopoverContent>
+                  </Popover>
+                  
+                  {/* Size Filter */}
+                  <Popover>
+                    <PopoverTrigger asChild>
+                      <Button variant="outline" className="justify-between w-36">
+                        {selectedOutOfStockSizes.length === 0 ? "All Sizes" : `${selectedOutOfStockSizes.length} selected`}
+                        <ChevronDown className="ml-2 h-4 w-4" />
+                      </Button>
+                    </PopoverTrigger>
+                    <PopoverContent className="w-60 p-4">
+                      <div className="space-y-3">
+                        <h4 className="font-medium leading-none">Select Sizes</h4>
+                        <div className="space-y-2 max-h-60 overflow-y-auto">
+                          {uniqueStockSizes.map(size => (
+                            <div key={size} className="flex items-center space-x-2">
+                              <Checkbox
+                                id={`out-of-stock-size-${size}`}
+                                checked={selectedOutOfStockSizes.includes(size)}
+                                onCheckedChange={(checked) => {
+                                  if (checked) {
+                                    setSelectedOutOfStockSizes(prev => [...prev, size]);
+                                  } else {
+                                    setSelectedOutOfStockSizes(prev => prev.filter(s => s !== size));
+                                  }
+                                  resetPagination('out-of-stock');
+                                }}
+                              />
+                              <label
+                                htmlFor={`out-of-stock-size-${size}`}
+                                className="text-sm leading-none peer-disabled:cursor-not-allowed peer-disabled:opacity-70 cursor-pointer"
+                              >
+                                {size}
+                              </label>
+                            </div>
+                          ))}
+                        </div>
+                      </div>
+                    </PopoverContent>
+                  </Popover>
+                  
+                  {/* Clear Filters Button */}
+                  {(selectedOutOfStockBrands.length > 0 || selectedOutOfStockSizes.length > 0) && (
+                    <Button 
+                      variant="ghost" 
+                      size="sm" 
+                      onClick={() => {
+                        setSelectedOutOfStockBrands([]);
+                        setSelectedOutOfStockSizes([]);
+                        resetPagination('out-of-stock');
+                      }}
+                    >
+                      Clear Filters
+                    </Button>
+                  )}
+                </div>
+
+                {/* Active Filter Badges */}
+                {(selectedOutOfStockBrands.length > 0 || selectedOutOfStockSizes.length > 0) && (
+                  <div className="flex items-center gap-2 flex-wrap">
+                    <span className="text-sm text-gray-600">Active filters:</span>
+                    {selectedOutOfStockBrands.map(brand => (
+                      <Badge key={brand} variant="secondary" className="gap-1">
+                        Brand: {brand}
+                        <X 
+                          className="h-3 w-3 cursor-pointer" 
+                          onClick={() => {
+                            setSelectedOutOfStockBrands(prev => prev.filter(b => b !== brand));
+                            resetPagination('out-of-stock');
+                          }}
+                        />
+                      </Badge>
+                    ))}
+                    {selectedOutOfStockSizes.map(size => (
+                      <Badge key={size} variant="secondary" className="gap-1">
+                        Size: {size}
+                        <X 
+                          className="h-3 w-3 cursor-pointer" 
+                          onClick={() => {
+                            setSelectedOutOfStockSizes(prev => prev.filter(s => s !== size));
+                            resetPagination('out-of-stock');
+                          }}
+                        />
+                      </Badge>
+                    ))}
+                  </div>
+                )}
               </div>
               <Table>
                 <TableHeader>
