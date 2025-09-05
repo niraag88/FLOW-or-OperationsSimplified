@@ -2,15 +2,43 @@ import React, { useState } from "react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
+import { Badge } from "@/components/ui/badge";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
+import { Checkbox } from "@/components/ui/checkbox";
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
-import { Package, Trash2, MoreHorizontal, Edit } from "lucide-react";
+import { Package, Trash2, MoreHorizontal, Edit, Search, Filter, ChevronDown, X } from "lucide-react";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Product } from "@/api/entities";
 import { logAuditAction } from "../utils/auditLogger";
 import { User } from "@/api/entities";
 import SimpleConfirmDialog from "../common/SimpleConfirmDialog";
 
-export default function ProductsTab({ products, loading, canEdit, canDelete, onRefresh }) {
+export default function ProductsTab({ 
+  products, 
+  paginatedProducts, 
+  loading, 
+  canEdit, 
+  canDelete, 
+  onRefresh,
+  searchTerm,
+  setSearchTerm,
+  selectedBrands,
+  setSelectedBrands,
+  selectedSizes,
+  setSelectedSizes,
+  uniqueBrands,
+  uniqueSizes,
+  resetPagination,
+  currentPage,
+  setCurrentPage,
+  itemsPerPage,
+  setItemsPerPage,
+  totalPages,
+  startIndex,
+  endIndex
+}) {
   // State variables for SimpleConfirmDialog
   const [dialogOpen, setDialogOpen] = useState(false);
   const [productToDelete, setProductToDelete] = useState(null);
@@ -85,6 +113,152 @@ export default function ProductsTab({ products, loading, canEdit, canDelete, onR
         </CardHeader>
 
         <CardContent className="pt-6">
+          {/* Search and Filters */}
+          <div className="space-y-4 mb-6">
+            {/* Search Bar */}
+            <div className="flex items-center gap-2">
+              <Search className="w-4 h-4 text-gray-400" />
+              <Input
+                placeholder="Search product code, brand, name..."
+                value={searchTerm}
+                onChange={(e) => {
+                  setSearchTerm(e.target.value);
+                  resetPagination();
+                }}
+                className="max-w-sm"
+              />
+            </div>
+
+            {/* Advanced Filters */}
+            <div className="flex items-center gap-3 flex-wrap">
+              <Filter className="w-4 h-4 text-gray-400" />
+              
+              {/* Brand Filter */}
+              <Popover>
+                <PopoverTrigger asChild>
+                  <Button variant="outline" className="justify-between w-40">
+                    {selectedBrands.length === 0 ? "All Brands" : `${selectedBrands.length} selected`}
+                    <ChevronDown className="ml-2 h-4 w-4" />
+                  </Button>
+                </PopoverTrigger>
+                <PopoverContent className="w-60 p-4">
+                  <div className="space-y-3">
+                    <h4 className="font-medium leading-none">Select Brands</h4>
+                    <div className="space-y-2 max-h-60 overflow-y-auto">
+                      {uniqueBrands.map(brand => (
+                        <div key={brand} className="flex items-center space-x-2">
+                          <Checkbox
+                            id={`product-brand-${brand}`}
+                            checked={selectedBrands.includes(brand)}
+                            onCheckedChange={(checked) => {
+                              if (checked) {
+                                setSelectedBrands(prev => [...prev, brand]);
+                              } else {
+                                setSelectedBrands(prev => prev.filter(b => b !== brand));
+                              }
+                              resetPagination();
+                            }}
+                          />
+                          <label
+                            htmlFor={`product-brand-${brand}`}
+                            className="text-sm leading-none peer-disabled:cursor-not-allowed peer-disabled:opacity-70 cursor-pointer"
+                          >
+                            {brand}
+                          </label>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                </PopoverContent>
+              </Popover>
+              
+              {/* Size Filter */}
+              <Popover>
+                <PopoverTrigger asChild>
+                  <Button variant="outline" className="justify-between w-40">
+                    {selectedSizes.length === 0 ? "All Sizes" : `${selectedSizes.length} selected`}
+                    <ChevronDown className="ml-2 h-4 w-4" />
+                  </Button>
+                </PopoverTrigger>
+                <PopoverContent className="w-60 p-4">
+                  <div className="space-y-3">
+                    <h4 className="font-medium leading-none">Select Sizes</h4>
+                    <div className="space-y-2 max-h-60 overflow-y-auto">
+                      {uniqueSizes.map(size => (
+                        <div key={size} className="flex items-center space-x-2">
+                          <Checkbox
+                            id={`product-size-${size}`}
+                            checked={selectedSizes.includes(size)}
+                            onCheckedChange={(checked) => {
+                              if (checked) {
+                                setSelectedSizes(prev => [...prev, size]);
+                              } else {
+                                setSelectedSizes(prev => prev.filter(s => s !== size));
+                              }
+                              resetPagination();
+                            }}
+                          />
+                          <label
+                            htmlFor={`product-size-${size}`}
+                            className="text-sm leading-none peer-disabled:cursor-not-allowed peer-disabled:opacity-70 cursor-pointer"
+                          >
+                            {size}
+                          </label>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                </PopoverContent>
+              </Popover>
+              
+              {/* Clear Filters Button */}
+              {(selectedBrands.length > 0 || selectedSizes.length > 0) && (
+                <Button 
+                  variant="ghost" 
+                  size="sm" 
+                  onClick={() => {
+                    setSelectedBrands([]);
+                    setSelectedSizes([]);
+                    resetPagination();
+                  }}
+                >
+                  Clear Filters
+                </Button>
+              )}
+            </div>
+
+            {/* Active Filter Badges */}
+            {(selectedBrands.length > 0 || selectedSizes.length > 0) && (
+              <div className="flex items-center gap-2 flex-wrap">
+                <span className="text-sm text-gray-600">Active filters:</span>
+                {selectedBrands.map(brand => (
+                  <Badge key={brand} variant="secondary" className="gap-1">
+                    Brand: {brand}
+                    <X 
+                      className="h-3 w-3 cursor-pointer" 
+                      onClick={() => {
+                        setSelectedBrands(prev => prev.filter(b => b !== brand));
+                        resetPagination();
+                      }}
+                    />
+                  </Badge>
+                ))}
+                {selectedSizes.map(size => (
+                  <Badge key={size} variant="secondary" className="gap-1">
+                    Size: {size}
+                    <X 
+                      className="h-3 w-3 cursor-pointer" 
+                      onClick={() => {
+                        setSelectedSizes(prev => prev.filter(s => s !== size));
+                        resetPagination();
+                      }}
+                    />
+                  </Badge>
+                ))}
+              </div>
+            )}
+          </div>
+
           {products.length === 0 ? (
             <div className="text-center py-12">
               <Package className="mx-auto h-12 w-12 text-gray-400 mb-4" />
@@ -108,7 +282,7 @@ export default function ProductsTab({ products, loading, canEdit, canDelete, onR
                     </TableRow>
                   </TableHeader>
                   <TableBody>
-                    {products.map((product) => (
+                    {paginatedProducts.map((product) => (
                       <TableRow
                         key={product.id}
                         className="hover:bg-gray-50 transition-colors duration-200"
@@ -155,6 +329,88 @@ export default function ProductsTab({ products, loading, canEdit, canDelete, onR
                   </TableBody>
                 </Table>
               </div>
+
+              {/* Pagination Controls */}
+              {products.length > 0 && (
+                <div className="flex items-center justify-between mt-6 pt-4 border-t">
+                  <div className="flex items-center gap-2">
+                    <span className="text-sm text-gray-700">
+                      Showing {startIndex + 1} to {Math.min(endIndex, products.length)} of {products.length} products
+                    </span>
+                  </div>
+                  
+                  <div className="flex items-center gap-4">
+                    {/* Items per page selector */}
+                    <div className="flex items-center gap-2">
+                      <span className="text-sm text-gray-700">Show:</span>
+                      <Select value={itemsPerPage.toString()} onValueChange={(value) => {
+                        setItemsPerPage(Number(value));
+                        setCurrentPage(1);
+                      }}>
+                        <SelectTrigger className="w-20">
+                          <SelectValue />
+                        </SelectTrigger>
+                        <SelectContent>
+                          <SelectItem value="20">20</SelectItem>
+                          <SelectItem value="50">50</SelectItem>
+                          <SelectItem value="100">100</SelectItem>
+                          <SelectItem value={products.length.toString()}>All</SelectItem>
+                        </SelectContent>
+                      </Select>
+                    </div>
+                    
+                    {/* Page navigation */}
+                    {totalPages > 1 && (
+                      <div className="flex items-center gap-2">
+                        <Button
+                          variant="outline"
+                          size="sm"
+                          onClick={() => setCurrentPage(prev => Math.max(1, prev - 1))}
+                          disabled={currentPage === 1}
+                        >
+                          Previous
+                        </Button>
+                        
+                        <div className="flex items-center gap-1">
+                          {Array.from({ length: Math.min(5, totalPages) }, (_, i) => {
+                            let pageNumber;
+                            if (totalPages <= 5) {
+                              pageNumber = i + 1;
+                            } else if (currentPage <= 3) {
+                              pageNumber = i + 1;
+                            } else if (currentPage >= totalPages - 2) {
+                              pageNumber = totalPages - 4 + i;
+                            } else {
+                              pageNumber = currentPage - 2 + i;
+                            }
+                            
+                            return (
+                              <Button
+                                key={pageNumber}
+                                variant={currentPage === pageNumber ? "default" : "outline"}
+                                size="sm"
+                                className="w-8 h-8 p-0"
+                                onClick={() => setCurrentPage(pageNumber)}
+                              >
+                                {pageNumber}
+                              </Button>
+                            );
+                          })}
+                        </div>
+                        
+                        <Button
+                          variant="outline"
+                          size="sm"
+                          onClick={() => setCurrentPage(prev => Math.min(totalPages, prev + 1))}
+                          disabled={currentPage === totalPages}
+                        >
+                          Next
+                        </Button>
+                      </div>
+                    )}
+                  </div>
+                </div>
+              )}
 
             </>
           )}

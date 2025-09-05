@@ -175,159 +175,6 @@ export default function Inventory() {
         </div>
       </div>
 
-      {/* Search and Filters */}
-      {activeTab === "products" && (
-        <div className="space-y-4">
-          <div className="flex flex-col sm:flex-row gap-4 items-start sm:items-center">
-            <div className="relative max-w-md">
-              <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 w-4 h-4" />
-              <Input
-                placeholder="Search product code, brand, name..."
-                value={searchTerm}
-                onChange={(e) => {
-                  setSearchTerm(e.target.value);
-                  resetPagination();
-                }}
-                className="pl-10"
-              />
-            </div>
-            
-            <div className="flex items-center gap-3">
-              <Filter className="w-4 h-4 text-gray-400" />
-              
-              {/* Brand Filter */}
-              <Popover>
-                <PopoverTrigger asChild>
-                  <Button variant="outline" className="justify-between w-40">
-                    {selectedBrands.length === 0 ? "All Brands" : `${selectedBrands.length} selected`}
-                    <ChevronDown className="ml-2 h-4 w-4" />
-                  </Button>
-                </PopoverTrigger>
-                <PopoverContent className="w-60 p-4">
-                  <div className="space-y-3">
-                    <h4 className="font-medium leading-none">Select Brands</h4>
-                    <div className="space-y-2 max-h-60 overflow-y-auto">
-                      {uniqueBrands.map(brand => (
-                        <div key={brand} className="flex items-center space-x-2">
-                          <Checkbox
-                            id={`brand-${brand}`}
-                            checked={selectedBrands.includes(brand)}
-                            onCheckedChange={(checked) => {
-                              if (checked) {
-                                setSelectedBrands(prev => [...prev, brand]);
-                              } else {
-                                setSelectedBrands(prev => prev.filter(b => b !== brand));
-                              }
-                              resetPagination();
-                            }}
-                          />
-                          <label
-                            htmlFor={`brand-${brand}`}
-                            className="text-sm leading-none peer-disabled:cursor-not-allowed peer-disabled:opacity-70 cursor-pointer"
-                          >
-                            {brand}
-                          </label>
-                        </div>
-                      ))}
-                    </div>
-                  </div>
-                </PopoverContent>
-              </Popover>
-              
-              {/* Size Filter */}
-              <Popover>
-                <PopoverTrigger asChild>
-                  <Button variant="outline" className="justify-between w-40">
-                    {selectedSizes.length === 0 ? "All Sizes" : `${selectedSizes.length} selected`}
-                    <ChevronDown className="ml-2 h-4 w-4" />
-                  </Button>
-                </PopoverTrigger>
-                <PopoverContent className="w-60 p-4">
-                  <div className="space-y-3">
-                    <h4 className="font-medium leading-none">Select Sizes</h4>
-                    <div className="space-y-2 max-h-60 overflow-y-auto">
-                      {uniqueSizes.map(size => (
-                        <div key={size} className="flex items-center space-x-2">
-                          <Checkbox
-                            id={`size-${size}`}
-                            checked={selectedSizes.includes(size)}
-                            onCheckedChange={(checked) => {
-                              if (checked) {
-                                setSelectedSizes(prev => [...prev, size]);
-                              } else {
-                                setSelectedSizes(prev => prev.filter(s => s !== size));
-                              }
-                              resetPagination();
-                            }}
-                          />
-                          <label
-                            htmlFor={`size-${size}`}
-                            className="text-sm leading-none peer-disabled:cursor-not-allowed peer-disabled:opacity-70 cursor-pointer"
-                          >
-                            {size}
-                          </label>
-                        </div>
-                      ))}
-                    </div>
-                  </div>
-                </PopoverContent>
-              </Popover>
-              
-              {/* Clear Filters */}
-              {(selectedBrands.length > 0 || selectedSizes.length > 0) && (
-                <Button
-                  variant="ghost"
-                  size="sm"
-                  onClick={() => {
-                    setSelectedBrands([]);
-                    setSelectedSizes([]);
-                    resetPagination();
-                  }}
-                  className="text-gray-500 hover:text-gray-700"
-                >
-                  <X className="w-4 h-4 mr-1" />
-                  Clear
-                </Button>
-              )}
-            </div>
-          </div>
-
-          {/* Active Filters Display */}
-          {(selectedBrands.length > 0 || selectedSizes.length > 0) && (
-            <div className="flex items-center gap-2 flex-wrap">
-              <span className="text-sm text-gray-500">Active filters:</span>
-              {selectedBrands.map(brand => (
-                <Badge key={brand} variant="secondary" className="text-xs">
-                  Brand: {brand}
-                  <button
-                    onClick={() => {
-                      setSelectedBrands(prev => prev.filter(b => b !== brand));
-                      resetPagination();
-                    }}
-                    className="ml-1 hover:bg-gray-300 rounded-full w-3 h-3 flex items-center justify-center"
-                  >
-                    <X className="w-2 h-2" />
-                  </button>
-                </Badge>
-              ))}
-              {selectedSizes.map(size => (
-                <Badge key={size} variant="secondary" className="text-xs">
-                  Size: {size}
-                  <button
-                    onClick={() => {
-                      setSelectedSizes(prev => prev.filter(s => s !== size));
-                      resetPagination();
-                    }}
-                    className="ml-1 hover:bg-gray-300 rounded-full w-3 h-3 flex items-center justify-center"
-                  >
-                    <X className="w-2 h-2" />
-                  </button>
-                </Badge>
-              ))}
-            </div>
-          )}
-        </div>
-      )}
 
       {/* Tabs */}
       <Tabs value={activeTab} onValueChange={setActiveTab} className="w-full">
@@ -338,94 +185,29 @@ export default function Inventory() {
 
         <TabsContent value="products" className="mt-6">
           <ProductsTab 
-            products={paginatedProducts}
+            products={filteredProducts}
+            paginatedProducts={paginatedProducts}
             loading={loading}
             canEdit={canEdit}
             canDelete={canDelete}
             onRefresh={handleRefresh}
+            searchTerm={searchTerm}
+            setSearchTerm={setSearchTerm}
+            selectedBrands={selectedBrands}
+            setSelectedBrands={setSelectedBrands}
+            selectedSizes={selectedSizes}
+            setSelectedSizes={setSelectedSizes}
+            uniqueBrands={uniqueBrands}
+            uniqueSizes={uniqueSizes}
+            resetPagination={resetPagination}
+            currentPage={currentPage}
+            setCurrentPage={setCurrentPage}
+            itemsPerPage={itemsPerPage}
+            setItemsPerPage={setItemsPerPage}
+            totalPages={totalPages}
+            startIndex={startIndex}
+            endIndex={endIndex}
           />
-          
-          {/* Pagination Controls */}
-          {!loading && filteredProducts.length > 0 && (
-            <div className="flex items-center justify-between mt-6 pt-4 border-t">
-              <div className="flex items-center gap-2">
-                <span className="text-sm text-gray-700">
-                  Showing {startIndex + 1} to {Math.min(endIndex, filteredProducts.length)} of {filteredProducts.length} products
-                </span>
-              </div>
-              
-              <div className="flex items-center gap-4">
-                {/* Items per page selector */}
-                <div className="flex items-center gap-2">
-                  <span className="text-sm text-gray-700">Show:</span>
-                  <Select value={itemsPerPage.toString()} onValueChange={(value) => {
-                    setItemsPerPage(Number(value));
-                    setCurrentPage(1);
-                  }}>
-                    <SelectTrigger className="w-20">
-                      <SelectValue />
-                    </SelectTrigger>
-                    <SelectContent>
-                      <SelectItem value="20">20</SelectItem>
-                      <SelectItem value="50">50</SelectItem>
-                      <SelectItem value="100">100</SelectItem>
-                      <SelectItem value={filteredProducts.length.toString()}>All</SelectItem>
-                    </SelectContent>
-                  </Select>
-                </div>
-                
-                {/* Page navigation */}
-                {totalPages > 1 && (
-                  <div className="flex items-center gap-2">
-                    <Button
-                      variant="outline"
-                      size="sm"
-                      onClick={() => setCurrentPage(prev => Math.max(1, prev - 1))}
-                      disabled={currentPage === 1}
-                    >
-                      Previous
-                    </Button>
-                    
-                    <div className="flex items-center gap-1">
-                      {Array.from({ length: Math.min(5, totalPages) }, (_, i) => {
-                        let pageNumber;
-                        if (totalPages <= 5) {
-                          pageNumber = i + 1;
-                        } else if (currentPage <= 3) {
-                          pageNumber = i + 1;
-                        } else if (currentPage >= totalPages - 2) {
-                          pageNumber = totalPages - 4 + i;
-                        } else {
-                          pageNumber = currentPage - 2 + i;
-                        }
-                        
-                        return (
-                          <Button
-                            key={pageNumber}
-                            variant={currentPage === pageNumber ? "default" : "outline"}
-                            size="sm"
-                            className="w-8 h-8 p-0"
-                            onClick={() => setCurrentPage(pageNumber)}
-                          >
-                            {pageNumber}
-                          </Button>
-                        );
-                      })}
-                    </div>
-                    
-                    <Button
-                      variant="outline"
-                      size="sm"
-                      onClick={() => setCurrentPage(prev => Math.min(totalPages, prev + 1))}
-                      disabled={currentPage === totalPages}
-                    >
-                      Next
-                    </Button>
-                  </div>
-                )}
-              </div>
-            </div>
-          )}
         </TabsContent>
 
         <TabsContent value="stock" className="mt-6">
