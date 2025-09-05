@@ -5,7 +5,8 @@ import { createPageUrl } from "@/utils";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import { Plus, Search } from "lucide-react";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { Plus, Search, Filter } from "lucide-react";
 import { Product } from "@/api/entities";
 import { StockCount } from "@/api/entities"; // Changed from InventoryLot
 import ProductsTab from "../components/inventory/ProductsTab";
@@ -19,6 +20,8 @@ export default function Inventory() {
   const [loading, setLoading] = useState(true);
   const [searchTerm, setSearchTerm] = useState("");
   const [activeTab, setActiveTab] = useState("products");
+  const [brandFilter, setBrandFilter] = useState("");
+  const [sizeFilter, setSizeFilter] = useState("");
   const [refreshTrigger, setRefreshTrigger] = useState(0);
   const [stockSubTab, setStockSubTab] = useState("stock-levels");
   const [stockSubTabData, setStockSubTabData] = useState({
@@ -84,11 +87,20 @@ export default function Inventory() {
   const canDelete = true;
   const currentUser = { role: 'Admin', email: 'admin@opsuite.com' };
 
-  const filteredProducts = products.filter(product =>
-    product.sku?.toLowerCase().includes(searchTerm.toLowerCase()) ||
-    product.name?.toLowerCase().includes(searchTerm.toLowerCase()) ||
-    product.description?.toLowerCase().includes(searchTerm.toLowerCase())
-  );
+  const filteredProducts = products.filter(product => {
+    const matchesSearch = product.sku?.toLowerCase().includes(searchTerm.toLowerCase()) ||
+                         product.name?.toLowerCase().includes(searchTerm.toLowerCase()) ||
+                         product.description?.toLowerCase().includes(searchTerm.toLowerCase());
+    
+    const matchesBrand = !brandFilter || product.brandName === brandFilter;
+    const matchesSize = !sizeFilter || product.description === sizeFilter;
+    
+    return matchesSearch && matchesBrand && matchesSize;
+  });
+
+  // Get unique brands and sizes for filter dropdowns
+  const uniqueBrands = [...new Set(products.map(p => p.brandName).filter(Boolean))].sort();
+  const uniqueSizes = [...new Set(products.map(p => p.description).filter(Boolean))].sort();
 
   // Removed filteredLots as lots state is no longer managed here
   /*
@@ -147,15 +159,60 @@ export default function Inventory() {
         </div>
       </div>
 
-      {/* Search Bar */}
-      <div className="relative max-w-md">
-        <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 w-4 h-4" />
-        <Input
-          placeholder="Search product code, brand, name..."
-          value={searchTerm}
-          onChange={(e) => setSearchTerm(e.target.value)}
-          className="pl-10"
-        />
+      {/* Search and Filters */}
+      <div className="flex flex-col sm:flex-row gap-4 items-start sm:items-center">
+        <div className="relative max-w-md">
+          <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 w-4 h-4" />
+          <Input
+            placeholder="Search product code, brand, name..."
+            value={searchTerm}
+            onChange={(e) => setSearchTerm(e.target.value)}
+            className="pl-10"
+          />
+        </div>
+        
+        {activeTab === "products" && (
+          <div className="flex items-center gap-3">
+            <Filter className="w-4 h-4 text-gray-400" />
+            
+            <Select value={brandFilter} onValueChange={setBrandFilter}>
+              <SelectTrigger className="w-40">
+                <SelectValue placeholder="All Brands" />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="">All Brands</SelectItem>
+                {uniqueBrands.map(brand => (
+                  <SelectItem key={brand} value={brand}>{brand}</SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+            
+            <Select value={sizeFilter} onValueChange={setSizeFilter}>
+              <SelectTrigger className="w-40">
+                <SelectValue placeholder="All Sizes" />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="">All Sizes</SelectItem>
+                {uniqueSizes.map(size => (
+                  <SelectItem key={size} value={size}>{size}</SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+            
+            {(brandFilter || sizeFilter) && (
+              <Button 
+                variant="ghost" 
+                size="sm" 
+                onClick={() => {
+                  setBrandFilter("");
+                  setSizeFilter("");
+                }}
+              >
+                Clear Filters
+              </Button>
+            )}
+          </div>
+        )}
       </div>
 
       {/* Tabs */}
