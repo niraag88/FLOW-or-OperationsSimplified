@@ -81,20 +81,22 @@ export default function POPrintView() {
   return (
     <div className="print-container">
       <div className="print-page">
-        {/* Header */}
+        {/* Header with Logo and Title */}
         <div className="print-header">
-          <h1 className="print-title">PURCHASE ORDER</h1>
+          <div className="header-content">
+            {companyData?.logo && (
+              <div className="header-logo">
+                <img src={companyData.logo} alt="Company Logo" />
+              </div>
+            )}
+            <h1 className="print-title">PURCHASE ORDER</h1>
+          </div>
         </div>
 
         {/* Company and PO Info Section */}
         <div className="print-info-section">
           {/* Left Column - Company Info */}
           <div className="print-company-info">
-            {companyData?.logo && (
-              <div className="company-logo">
-                <img src={companyData.logo} alt="Company Logo" />
-              </div>
-            )}
             <div className="company-name">{companyData?.companyName || 'SUPERNATURE LLC'}</div>
             <div className="company-address">
               {companyData?.address || 'Al Rukhaimi Building, Sheikh Zayed Road'}

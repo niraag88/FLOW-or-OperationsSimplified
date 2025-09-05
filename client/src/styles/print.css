@@ -27,10 +27,25 @@
 
 /* Header */
 .print-header {
-  text-align: center;
   margin-bottom: 25px;
   border-bottom: 3px solid #1a472a;
   padding-bottom: 15px;
+}
+
+.header-content {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+}
+
+.header-logo {
+  flex-shrink: 0;
+}
+
+.header-logo img {
+  max-height: 70px;
+  max-width: 200px;
+  object-fit: contain;
 }
 
 .print-title {
@@ -40,6 +55,8 @@
   margin: 0;
   padding: 0;
   color: #1a472a;
+  text-align: right;
+  flex-grow: 1;
 }
 
 /* Company and PO Info Section */
@@ -55,16 +72,6 @@
 .print-company-info {
   flex: 1;
   max-width: 50%;
-}
-
-.company-logo {
-  margin-bottom: 10px;
-}
-
-.company-logo img {
-  max-height: 60px;
-  max-width: 150px;
-  object-fit: contain;
 }
 
 .company-name {
