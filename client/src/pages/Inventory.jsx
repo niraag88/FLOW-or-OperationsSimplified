@@ -92,8 +92,8 @@ export default function Inventory() {
                          product.name?.toLowerCase().includes(searchTerm.toLowerCase()) ||
                          product.description?.toLowerCase().includes(searchTerm.toLowerCase());
     
-    const matchesBrand = !brandFilter || product.brandName === brandFilter;
-    const matchesSize = !sizeFilter || product.description === sizeFilter;
+    const matchesBrand = !brandFilter || brandFilter === "__all__" || product.brandName === brandFilter;
+    const matchesSize = !sizeFilter || sizeFilter === "__all__" || product.description === sizeFilter;
     
     return matchesSearch && matchesBrand && matchesSize;
   });
@@ -180,7 +180,7 @@ export default function Inventory() {
                 <SelectValue placeholder="All Brands" />
               </SelectTrigger>
               <SelectContent>
-                <SelectItem value="">All Brands</SelectItem>
+                <SelectItem value="__all__">All Brands</SelectItem>
                 {uniqueBrands.map(brand => (
                   <SelectItem key={brand} value={brand}>{brand}</SelectItem>
                 ))}
@@ -192,14 +192,14 @@ export default function Inventory() {
                 <SelectValue placeholder="All Sizes" />
               </SelectTrigger>
               <SelectContent>
-                <SelectItem value="">All Sizes</SelectItem>
+                <SelectItem value="__all__">All Sizes</SelectItem>
                 {uniqueSizes.map(size => (
                   <SelectItem key={size} value={size}>{size}</SelectItem>
                 ))}
               </SelectContent>
             </Select>
             
-            {(brandFilter || sizeFilter) && (
+            {(brandFilter && brandFilter !== "__all__") || (sizeFilter && sizeFilter !== "__all__") ? (
               <Button 
                 variant="ghost" 
                 size="sm" 
@@ -210,7 +210,7 @@ export default function Inventory() {
               >
                 Clear Filters
               </Button>
-            )}
+            ) : null}
           </div>
         )}
       </div>
