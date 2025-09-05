@@ -87,7 +87,7 @@ export default function ExportDropdown({ products, activeTab, stockSubTab, stock
                     <td>${product.name || '-'}</td>
                     <td>${product.size || '-'}</td>
                     <td>£${parseFloat(product.costPrice || 0).toFixed(2)}</td>
-                    <td>AED ${(parseFloat(product.unitPrice || 0) * 5.0).toFixed(2)}</td>
+                    <td>AED ${product.unitPrice}</td>
                     <td>${product.isActive ? 'Active' : 'Inactive'}</td>
                   </tr>
                 `).join('')}
