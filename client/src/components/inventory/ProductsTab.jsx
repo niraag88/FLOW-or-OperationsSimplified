@@ -32,17 +32,12 @@ export default function ProductsTab({ products, loading, canEdit, canDelete, onR
   const handleDeleteConfirm = async () => {
     if (!productToDelete) return;
     try {
-      console.log("Attempting to delete product:", productToDelete.id);
-      const result = await Product.delete(productToDelete.id);
-      console.log("Delete result:", result);
-      
+      await Product.delete(productToDelete.id);
       const user = await User.me();
       await logAuditAction("Product", productToDelete.id, "delete", user.email, { deleted_product: productToDelete });
       onRefresh();
     } catch (error) {
       console.error("Error deleting product:", error);
-      console.error("Error message:", error.message);
-      console.error("Error details:", JSON.stringify(error, null, 2));
     } finally {
       setDialogOpen(false);
       setProductToDelete(null);
