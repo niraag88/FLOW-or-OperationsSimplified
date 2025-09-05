@@ -176,22 +176,158 @@ export default function Inventory() {
       </div>
 
       {/* Search and Filters */}
-      <div className="space-y-4">
-        <div className="flex flex-col sm:flex-row gap-4 items-start sm:items-center">
-          <div className="relative max-w-md">
-            <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 w-4 h-4" />
-            <Input
-              placeholder="Search product code, brand, name..."
-              value={searchTerm}
-              onChange={(e) => {
-                setSearchTerm(e.target.value);
-                resetPagination();
-              }}
-              className="pl-10"
-            />
+      {activeTab === "products" && (
+        <div className="space-y-4">
+          <div className="flex flex-col sm:flex-row gap-4 items-start sm:items-center">
+            <div className="relative max-w-md">
+              <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 w-4 h-4" />
+              <Input
+                placeholder="Search product code, brand, name..."
+                value={searchTerm}
+                onChange={(e) => {
+                  setSearchTerm(e.target.value);
+                  resetPagination();
+                }}
+                className="pl-10"
+              />
+            </div>
+            
+            <div className="flex items-center gap-3">
+              <Filter className="w-4 h-4 text-gray-400" />
+              
+              {/* Brand Filter */}
+              <Popover>
+                <PopoverTrigger asChild>
+                  <Button variant="outline" className="justify-between w-40">
+                    {selectedBrands.length === 0 ? "All Brands" : `${selectedBrands.length} selected`}
+                    <ChevronDown className="ml-2 h-4 w-4" />
+                  </Button>
+                </PopoverTrigger>
+                <PopoverContent className="w-60 p-4">
+                  <div className="space-y-3">
+                    <h4 className="font-medium leading-none">Select Brands</h4>
+                    <div className="space-y-2 max-h-60 overflow-y-auto">
+                      {uniqueBrands.map(brand => (
+                        <div key={brand} className="flex items-center space-x-2">
+                          <Checkbox
+                            id={`brand-${brand}`}
+                            checked={selectedBrands.includes(brand)}
+                            onCheckedChange={(checked) => {
+                              if (checked) {
+                                setSelectedBrands(prev => [...prev, brand]);
+                              } else {
+                                setSelectedBrands(prev => prev.filter(b => b !== brand));
+                              }
+                              resetPagination();
+                            }}
+                          />
+                          <label
+                            htmlFor={`brand-${brand}`}
+                            className="text-sm leading-none peer-disabled:cursor-not-allowed peer-disabled:opacity-70 cursor-pointer"
+                          >
+                            {brand}
+                          </label>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                </PopoverContent>
+              </Popover>
+              
+              {/* Size Filter */}
+              <Popover>
+                <PopoverTrigger asChild>
+                  <Button variant="outline" className="justify-between w-40">
+                    {selectedSizes.length === 0 ? "All Sizes" : `${selectedSizes.length} selected`}
+                    <ChevronDown className="ml-2 h-4 w-4" />
+                  </Button>
+                </PopoverTrigger>
+                <PopoverContent className="w-60 p-4">
+                  <div className="space-y-3">
+                    <h4 className="font-medium leading-none">Select Sizes</h4>
+                    <div className="space-y-2 max-h-60 overflow-y-auto">
+                      {uniqueSizes.map(size => (
+                        <div key={size} className="flex items-center space-x-2">
+                          <Checkbox
+                            id={`size-${size}`}
+                            checked={selectedSizes.includes(size)}
+                            onCheckedChange={(checked) => {
+                              if (checked) {
+                                setSelectedSizes(prev => [...prev, size]);
+                              } else {
+                                setSelectedSizes(prev => prev.filter(s => s !== size));
+                              }
+                              resetPagination();
+                            }}
+                          />
+                          <label
+                            htmlFor={`size-${size}`}
+                            className="text-sm leading-none peer-disabled:cursor-not-allowed peer-disabled:opacity-70 cursor-pointer"
+                          >
+                            {size}
+                          </label>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                </PopoverContent>
+              </Popover>
+              
+              {/* Clear Filters */}
+              {(selectedBrands.length > 0 || selectedSizes.length > 0) && (
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  onClick={() => {
+                    setSelectedBrands([]);
+                    setSelectedSizes([]);
+                    resetPagination();
+                  }}
+                  className="text-gray-500 hover:text-gray-700"
+                >
+                  <X className="w-4 h-4 mr-1" />
+                  Clear
+                </Button>
+              )}
+            </div>
           </div>
-          
-          {activeTab === "products" && (
+
+          {/* Active Filters Display */}
+          {(selectedBrands.length > 0 || selectedSizes.length > 0) && (
+            <div className="flex items-center gap-2 flex-wrap">
+              <span className="text-sm text-gray-500">Active filters:</span>
+              {selectedBrands.map(brand => (
+                <Badge key={brand} variant="secondary" className="text-xs">
+                  Brand: {brand}
+                  <button
+                    onClick={() => {
+                      setSelectedBrands(prev => prev.filter(b => b !== brand));
+                      resetPagination();
+                    }}
+                    className="ml-1 hover:bg-gray-300 rounded-full w-3 h-3 flex items-center justify-center"
+                  >
+                    <X className="w-2 h-2" />
+                  </button>
+                </Badge>
+              ))}
+              {selectedSizes.map(size => (
+                <Badge key={size} variant="secondary" className="text-xs">
+                  Size: {size}
+                  <button
+                    onClick={() => {
+                      setSelectedSizes(prev => prev.filter(s => s !== size));
+                      resetPagination();
+                    }}
+                    className="ml-1 hover:bg-gray-300 rounded-full w-3 h-3 flex items-center justify-center"
+                  >
+                    <X className="w-2 h-2" />
+                  </button>
+                </Badge>
+              ))}
+            </div>
+          )}
+        </div>
+      )}
             <div className="flex items-center gap-3">
               <Filter className="w-4 h-4 text-gray-400" />
               
