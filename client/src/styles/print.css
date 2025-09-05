@@ -172,10 +172,11 @@
   vertical-align: top;
 }
 
-/* Column widths to match reference */
+/* Column widths and alignments */
 .col-code {
-  width: 12%;
+  width: 15%;
   text-align: center;
+  white-space: nowrap;
 }
 
 .col-description {
@@ -184,7 +185,7 @@
 }
 
 .col-size {
-  width: 12%;
+  width: 10%;
   text-align: center;
 }
 
@@ -194,13 +195,15 @@
 }
 
 .col-price {
-  width: 15%;
-  text-align: right;
+  width: 16%;
+  text-align: center;
+  white-space: nowrap;
 }
 
 .col-total {
-  width: 18%;
+  width: 16%;
   text-align: right;
+  white-space: nowrap;
 }
 
 /* Totals Section */

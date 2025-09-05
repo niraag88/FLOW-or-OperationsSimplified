@@ -155,12 +155,12 @@ export default function POPrintView() {
           <table className="print-table">
             <thead>
               <tr>
-                <th className="col-code">Product<br/>Code</th>
+                <th className="col-code">Product Code</th>
                 <th className="col-description">Description</th>
                 <th className="col-size">Size</th>
                 <th className="col-qty">Qty</th>
-                <th className="col-price">Unit Price<br/>(GBP)</th>
-                <th className="col-total">Line Total<br/>(GBP)</th>
+                <th className="col-price">Unit Price (GBP)</th>
+                <th className="col-total">Line Total (GBP)</th>
               </tr>
             </thead>
             <tbody>
