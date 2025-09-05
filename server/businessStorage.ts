@@ -156,6 +156,14 @@ export class BusinessStorage {
     return product;
   }
 
+  async deleteProduct(id: number) {
+    await db.update(products).set({ 
+      isActive: false,
+      updatedAt: new Date()
+    }).where(eq(products.id, id));
+    return true;
+  }
+
   // Purchase Order operations
   async getPurchaseOrders() {
     return await db.select({
