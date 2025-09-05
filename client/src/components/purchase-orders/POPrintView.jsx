@@ -25,7 +25,7 @@ export default function POPrintView() {
     try {
       // Load PO data and company settings
       const [poResponse, companyResponse] = await Promise.all([
-        fetch(`/api/export/po?id=${poId}`),
+        fetch(`/api/export/po?poId=${poId}`),
         fetch('/api/company-settings')
       ]);
 
