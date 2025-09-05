@@ -8,7 +8,7 @@ import {
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
 import { Button } from "@/components/ui/button";
-import { MoreHorizontal, Edit2, FileText, Download, Trash2 } from "lucide-react";
+import { MoreHorizontal, Edit2, FileText, Download, Trash2, Eye } from "lucide-react";
 import { useToast } from "@/components/ui/use-toast";
 import { exportToCsv, exportToXLSX, exportPurchaseOrderToPDF } from "../utils/export";
 import { format } from 'date-fns';
@@ -104,6 +104,12 @@ export default function POActionsDropdown({ po, canEdit, onEdit, onRefresh }) {
     }
   };
 
+  const handleViewPrint = () => {
+    // Open print view in new tab
+    const printUrl = `/po-print?id=${po.id}`;
+    window.open(printUrl, '_blank');
+  };
+
   const handleExportPDF = async () => {
     try {
       // Get the PO data with line items from the server
@@ -196,6 +202,10 @@ export default function POActionsDropdown({ po, canEdit, onEdit, onRefresh }) {
           </Button>
         </DropdownMenuTrigger>
         <DropdownMenuContent align="end">
+          <DropdownMenuItem onClick={handleViewPrint}>
+            <Eye className="w-4 h-4 mr-2" />
+            View & Print
+          </DropdownMenuItem>
           {canEdit && (
             <DropdownMenuItem onClick={() => onEdit(po)}>
               <Edit2 className="w-4 h-4 mr-2" />
