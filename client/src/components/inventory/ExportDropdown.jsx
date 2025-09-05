@@ -309,18 +309,18 @@ export default function ExportDropdown({ products, activeTab, stockSubTab, stock
         {activeTab === 'stock' && stockSubTab === 'stock-levels' && (
           <>
             <DropdownMenuItem 
+              onClick={() => exportCurrentStock('pdf')}
+              disabled={itemCount === 0}
+            >
+              <FileText className="w-4 h-4 mr-2" />
+              View & Print
+            </DropdownMenuItem>
+            <DropdownMenuItem 
               onClick={() => exportCurrentStock('xlsx')}
               disabled={itemCount === 0}
             >
               <FileSpreadsheet className="w-4 h-4 mr-2" />
               Export to XLSX
-            </DropdownMenuItem>
-            <DropdownMenuItem 
-              onClick={() => exportCurrentStock('pdf')}
-              disabled={itemCount === 0}
-            >
-              <FileText className="w-4 h-4 mr-2" />
-              Export to PDF
             </DropdownMenuItem>
           </>
         )}
@@ -328,18 +328,18 @@ export default function ExportDropdown({ products, activeTab, stockSubTab, stock
         {activeTab === 'stock' && stockSubTab === 'movements' && (
           <>
             <DropdownMenuItem 
+              onClick={() => exportStockMovements('pdf')}
+              disabled={itemCount === 0}
+            >
+              <FileText className="w-4 h-4 mr-2" />
+              View & Print
+            </DropdownMenuItem>
+            <DropdownMenuItem 
               onClick={() => exportStockMovements('xlsx')}
               disabled={itemCount === 0}
             >
               <FileSpreadsheet className="w-4 h-4 mr-2" />
               Export to XLSX
-            </DropdownMenuItem>
-            <DropdownMenuItem 
-              onClick={() => exportStockMovements('pdf')}
-              disabled={itemCount === 0}
-            >
-              <FileText className="w-4 h-4 mr-2" />
-              Export to PDF
             </DropdownMenuItem>
           </>
         )}
@@ -347,18 +347,18 @@ export default function ExportDropdown({ products, activeTab, stockSubTab, stock
         {activeTab === 'stock' && stockSubTab === 'low-stock' && (
           <>
             <DropdownMenuItem 
+              onClick={() => exportLowStock('pdf')}
+              disabled={itemCount === 0}
+            >
+              <FileText className="w-4 h-4 mr-2" />
+              View & Print
+            </DropdownMenuItem>
+            <DropdownMenuItem 
               onClick={() => exportLowStock('xlsx')}
               disabled={itemCount === 0}
             >
               <FileSpreadsheet className="w-4 h-4 mr-2" />
               Export to XLSX
-            </DropdownMenuItem>
-            <DropdownMenuItem 
-              onClick={() => exportLowStock('pdf')}
-              disabled={itemCount === 0}
-            >
-              <FileText className="w-4 h-4 mr-2" />
-              Export to PDF
             </DropdownMenuItem>
           </>
         )}
@@ -366,18 +366,18 @@ export default function ExportDropdown({ products, activeTab, stockSubTab, stock
         {activeTab === 'stock' && stockSubTab === 'out-of-stock' && (
           <>
             <DropdownMenuItem 
+              onClick={() => exportOutOfStock('pdf')}
+              disabled={itemCount === 0}
+            >
+              <FileText className="w-4 h-4 mr-2" />
+              View & Print
+            </DropdownMenuItem>
+            <DropdownMenuItem 
               onClick={() => exportOutOfStock('xlsx')}
               disabled={itemCount === 0}
             >
               <FileSpreadsheet className="w-4 h-4 mr-2" />
               Export to XLSX
-            </DropdownMenuItem>
-            <DropdownMenuItem 
-              onClick={() => exportOutOfStock('pdf')}
-              disabled={itemCount === 0}
-            >
-              <FileText className="w-4 h-4 mr-2" />
-              Export to PDF
             </DropdownMenuItem>
           </>
         )}

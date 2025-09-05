@@ -6,8 +6,10 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { TrendingUp, TrendingDown, Package, Activity, AlertTriangle, History, Search } from "lucide-react";
+import { TrendingUp, TrendingDown, Package, Activity, AlertTriangle, History, Search, Filter, ChevronDown, X } from "lucide-react";
 import { Skeleton } from "@/components/ui/skeleton";
+import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
+import { Checkbox } from "@/components/ui/checkbox";
 import { format } from "date-fns";
 
 export default function StockTab({ products, loading, canEdit, currentUser, onRefresh, onStockSubTabChange }) {
@@ -21,6 +23,12 @@ export default function StockTab({ products, loading, canEdit, currentUser, onRe
   const [movementsFilter, setMovementsFilter] = useState("");
   const [lowStockFilter, setLowStockFilter] = useState("");
   const [outOfStockFilter, setOutOfStockFilter] = useState("");
+
+  // Advanced filter states for current stock
+  const [selectedStockBrands, setSelectedStockBrands] = useState([]);
+  const [selectedStockSizes, setSelectedStockSizes] = useState([]);
+  const [selectedStockStatus, setSelectedStockStatus] = useState([]);
+  const [stockLevelFilter, setStockLevelFilter] = useState({ min: "", max: "" });
 
   // Pagination states for each tab
   const [currentStockPage, setCurrentStockPage] = useState(1);
@@ -97,6 +105,10 @@ export default function StockTab({ products, loading, canEdit, currentUser, onRe
 
   const outOfStockProducts = products.filter(p => (p.stockQuantity || 0) === 0);
 
+  // Get unique values for filters
+  const uniqueStockBrands = [...new Set(products.map(p => p.brandName).filter(Boolean))].sort();
+  const uniqueStockSizes = [...new Set(products.map(p => p.size).filter(Boolean))].sort();
+
   // Filter functions
   const filterProducts = (productList, searchTerm) => {
     if (!searchTerm) return productList;
@@ -107,6 +119,62 @@ export default function StockTab({ products, loading, canEdit, currentUser, onRe
       (product.brandName || '').toLowerCase().includes(term) ||
       (product.description || '').toLowerCase().includes(term)
     );
+  };
+
+  // Advanced filter function for current stock
+  const applyAdvancedStockFilters = (productList, searchTerm, selectedBrands, selectedSizes, selectedStatus, stockLevelRange) => {
+    let filtered = productList;
+
+    // Text search filter
+    if (searchTerm) {
+      const term = searchTerm.toLowerCase();
+      filtered = filtered.filter(product => 
+        (product.name || '').toLowerCase().includes(term) ||
+        (product.sku || '').toLowerCase().includes(term) ||
+        (product.brandName || '').toLowerCase().includes(term) ||
+        (product.description || '').toLowerCase().includes(term)
+      );
+    }
+
+    // Brand filter
+    if (selectedBrands.length > 0) {
+      filtered = filtered.filter(product => selectedBrands.includes(product.brandName));
+    }
+
+    // Size filter
+    if (selectedSizes.length > 0) {
+      filtered = filtered.filter(product => selectedSizes.includes(product.size));
+    }
+
+    // Stock level filter
+    if (stockLevelRange.min !== "" || stockLevelRange.max !== "") {
+      const min = stockLevelRange.min !== "" ? parseInt(stockLevelRange.min) : 0;
+      const max = stockLevelRange.max !== "" ? parseInt(stockLevelRange.max) : Infinity;
+      filtered = filtered.filter(product => {
+        const stock = product.stockQuantity || 0;
+        return stock >= min && stock <= max;
+      });
+    }
+
+    // Status filter (in stock, low stock, out of stock)
+    if (selectedStatus.length > 0) {
+      const lowStockThreshold = companySettings?.lowStockThreshold || 6;
+      filtered = filtered.filter(product => {
+        const stock = product.stockQuantity || 0;
+        const isInStock = stock > lowStockThreshold;
+        const isLowStock = stock > 0 && stock <= lowStockThreshold;
+        const isOutOfStock = stock === 0;
+
+        return selectedStatus.some(status => {
+          if (status === 'in-stock' && isInStock) return true;
+          if (status === 'low-stock' && isLowStock) return true;
+          if (status === 'out-of-stock' && isOutOfStock) return true;
+          return false;
+        });
+      });
+    }
+
+    return filtered;
   };
 
   const filterMovements = (movementList, searchTerm) => {
@@ -121,7 +189,14 @@ export default function StockTab({ products, loading, canEdit, currentUser, onRe
   };
 
   // Apply filters
-  const filteredProducts = filterProducts(products, currentStockFilter);
+  const filteredProducts = applyAdvancedStockFilters(
+    products, 
+    currentStockFilter, 
+    selectedStockBrands, 
+    selectedStockSizes, 
+    selectedStockStatus, 
+    stockLevelFilter
+  );
   const filteredLowStockProducts = filterProducts(lowStockProducts, lowStockFilter);
   const filteredOutOfStockProducts = filterProducts(outOfStockProducts, outOfStockFilter);
   const filteredStockMovements = filterMovements(stockMovements, movementsFilter);
@@ -308,65 +383,73 @@ export default function StockTab({ products, loading, canEdit, currentUser, onRe
   return (
     <div className="space-y-6">
       {/* Stock Summary Cards */}
-      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-5 gap-4">
-        <Card>
-          <CardContent className="pt-6">
-            <div className="flex items-center">
-              <Package className="h-8 w-8 text-blue-600" />
-              <div className="ml-4">
-                <p className="text-sm font-medium text-gray-600">Total Products</p>
-                <p className="text-2xl font-bold">{stockSummary.totalProducts}</p>
+      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-4">
+        <Card className="hover:shadow-md transition-shadow">
+          <CardContent className="p-4">
+            <div className="flex items-center justify-between">
+              <div className="flex-1 min-w-0">
+                <p className="text-xs font-medium text-gray-500 uppercase tracking-wide truncate">Total Products</p>
+                <p className="text-xl font-bold text-gray-900 mt-1">{stockSummary.totalProducts}</p>
+              </div>
+              <Package className="h-6 w-6 text-blue-500 flex-shrink-0 ml-2" />
+            </div>
+          </CardContent>
+        </Card>
+
+        <Card className="hover:shadow-md transition-shadow">
+          <CardContent className="p-4">
+            <div className="flex items-center justify-between">
+              <div className="flex-1 min-w-0">
+                <p className="text-xs font-medium text-gray-500 uppercase tracking-wide truncate">Total Units</p>
+                <p className="text-xl font-bold text-gray-900 mt-1">{stockSummary.totalQuantity.toLocaleString()}</p>
+              </div>
+              <TrendingUp className="h-6 w-6 text-green-500 flex-shrink-0 ml-2" />
+            </div>
+          </CardContent>
+        </Card>
+
+        <Card className="hover:shadow-md transition-shadow">
+          <CardContent className="p-4">
+            <div className="flex items-center justify-between">
+              <div className="flex-1 min-w-0">
+                <p className="text-xs font-medium text-gray-500 uppercase tracking-wide truncate">Stock Value</p>
+                <p className="text-lg font-bold text-gray-900 mt-1 truncate" title={`AED ${stockSummary.totalValue.toLocaleString('en-AE', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`}>
+                  AED {stockSummary.totalValue > 999999 
+                    ? `${(stockSummary.totalValue / 1000000).toFixed(1)}M`
+                    : stockSummary.totalValue > 9999 
+                    ? `${(stockSummary.totalValue / 1000).toFixed(1)}K`
+                    : stockSummary.totalValue.toLocaleString('en-AE', { minimumFractionDigits: 0, maximumFractionDigits: 0 })}
+                </p>
+              </div>
+              <div className="h-6 w-6 bg-green-100 rounded-full flex items-center justify-center flex-shrink-0 ml-2">
+                <span className="text-green-600 text-xs font-bold">$</span>
               </div>
             </div>
           </CardContent>
         </Card>
 
-        <Card>
-          <CardContent className="pt-6">
-            <div className="flex items-center">
-              <TrendingUp className="h-8 w-8 text-green-600" />
-              <div className="ml-4">
-                <p className="text-sm font-medium text-gray-600">Total Stock</p>
-                <p className="text-2xl font-bold">{stockSummary.totalQuantity.toLocaleString()}</p>
+        <Card className="hover:shadow-md transition-shadow">
+          <CardContent className="p-4">
+            <div className="flex items-center justify-between">
+              <div className="flex-1 min-w-0">
+                <p className="text-xs font-medium text-gray-500 uppercase tracking-wide truncate">Low Stock</p>
+                <p className="text-xl font-bold text-amber-600 mt-1">{stockSummary.lowStock}</p>
+                <p className="text-xs text-gray-400 truncate">≤{companySettings?.lowStockThreshold || 6} units</p>
               </div>
+              <AlertTriangle className="h-6 w-6 text-amber-500 flex-shrink-0 ml-2" />
             </div>
           </CardContent>
         </Card>
 
-        <Card>
-          <CardContent className="pt-6">
-            <div className="flex items-center">
-              <TrendingUp className="h-8 w-8 text-green-600" />
-              <div className="ml-4">
-                <p className="text-sm font-medium text-gray-600">Stock Value</p>
-                <p className="text-2xl font-bold">AED {stockSummary.totalValue.toLocaleString('en-AE', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</p>
+        <Card className="hover:shadow-md transition-shadow">
+          <CardContent className="p-4">
+            <div className="flex items-center justify-between">
+              <div className="flex-1 min-w-0">
+                <p className="text-xs font-medium text-gray-500 uppercase tracking-wide truncate">Out of Stock</p>
+                <p className="text-xl font-bold text-red-600 mt-1">{stockSummary.outOfStock}</p>
               </div>
-            </div>
-          </CardContent>
-        </Card>
-
-        <Card>
-          <CardContent className="pt-6">
-            <div className="flex items-center">
-              <AlertTriangle className="h-8 w-8 text-amber-600" />
-              <div className="ml-4">
-                <p className="text-sm font-medium text-gray-600">Low Stock</p>
-                <p className="text-2xl font-bold text-amber-600">{stockSummary.lowStock}</p>
-                <p className="text-xs text-gray-500">≤{companySettings?.lowStockThreshold || 6} units</p>
-              </div>
-            </div>
-          </CardContent>
-        </Card>
-
-        <Card>
-          <CardContent className="pt-6">
-            <div className="flex items-center">
-              <div className="h-8 w-8 bg-red-100 rounded-full flex items-center justify-center">
-                <span className="text-red-600 font-bold">!</span>
-              </div>
-              <div className="ml-4">
-                <p className="text-sm font-medium text-gray-600">Out of Stock</p>
-                <p className="text-2xl font-bold text-red-600">{stockSummary.outOfStock}</p>
+              <div className="h-6 w-6 bg-red-100 rounded-full flex items-center justify-center flex-shrink-0 ml-2">
+                <span className="text-red-600 font-bold text-xs">!</span>
               </div>
             </div>
           </CardContent>
@@ -394,17 +477,262 @@ export default function StockTab({ products, loading, canEdit, currentUser, onRe
               <p className="text-sm text-gray-600">Real-time stock quantities updated automatically</p>
             </CardHeader>
             <CardContent>
-              <div className="flex items-center gap-2 mb-4">
-                <Search className="w-4 h-4 text-gray-400" />
-                <Input
-                  placeholder="Filter by product name, SKU, brand, or size..."
-                  value={currentStockFilter}
-                  onChange={(e) => {
-                    setCurrentStockFilter(e.target.value);
-                    resetPagination('current-stock');
-                  }}
-                  className="max-w-sm"
-                />
+              {/* Search and Filters */}
+              <div className="space-y-4 mb-6">
+                {/* Search Bar */}
+                <div className="flex items-center gap-2">
+                  <Search className="w-4 h-4 text-gray-400" />
+                  <Input
+                    placeholder="Search by product name, SKU, or brand..."
+                    value={currentStockFilter}
+                    onChange={(e) => {
+                      setCurrentStockFilter(e.target.value);
+                      resetPagination('current-stock');
+                    }}
+                    className="max-w-sm"
+                  />
+                </div>
+
+                {/* Advanced Filters */}
+                <div className="flex items-center gap-3 flex-wrap">
+                  <Filter className="w-4 h-4 text-gray-400" />
+                  
+                  {/* Brand Filter */}
+                  <Popover>
+                    <PopoverTrigger asChild>
+                      <Button variant="outline" className="justify-between w-40">
+                        {selectedStockBrands.length === 0 ? "All Brands" : `${selectedStockBrands.length} selected`}
+                        <ChevronDown className="ml-2 h-4 w-4" />
+                      </Button>
+                    </PopoverTrigger>
+                    <PopoverContent className="w-60 p-4">
+                      <div className="space-y-3">
+                        <h4 className="font-medium leading-none">Select Brands</h4>
+                        <div className="space-y-2 max-h-60 overflow-y-auto">
+                          {uniqueStockBrands.map(brand => (
+                            <div key={brand} className="flex items-center space-x-2">
+                              <Checkbox
+                                id={`stock-brand-${brand}`}
+                                checked={selectedStockBrands.includes(brand)}
+                                onCheckedChange={(checked) => {
+                                  if (checked) {
+                                    setSelectedStockBrands(prev => [...prev, brand]);
+                                  } else {
+                                    setSelectedStockBrands(prev => prev.filter(b => b !== brand));
+                                  }
+                                  resetPagination('current-stock');
+                                }}
+                              />
+                              <label
+                                htmlFor={`stock-brand-${brand}`}
+                                className="text-sm leading-none peer-disabled:cursor-not-allowed peer-disabled:opacity-70 cursor-pointer"
+                              >
+                                {brand}
+                              </label>
+                            </div>
+                          ))}
+                        </div>
+                      </div>
+                    </PopoverContent>
+                  </Popover>
+                  
+                  {/* Size Filter */}
+                  <Popover>
+                    <PopoverTrigger asChild>
+                      <Button variant="outline" className="justify-between w-40">
+                        {selectedStockSizes.length === 0 ? "All Sizes" : `${selectedStockSizes.length} selected`}
+                        <ChevronDown className="ml-2 h-4 w-4" />
+                      </Button>
+                    </PopoverTrigger>
+                    <PopoverContent className="w-60 p-4">
+                      <div className="space-y-3">
+                        <h4 className="font-medium leading-none">Select Sizes</h4>
+                        <div className="space-y-2 max-h-60 overflow-y-auto">
+                          {uniqueStockSizes.map(size => (
+                            <div key={size} className="flex items-center space-x-2">
+                              <Checkbox
+                                id={`stock-size-${size}`}
+                                checked={selectedStockSizes.includes(size)}
+                                onCheckedChange={(checked) => {
+                                  if (checked) {
+                                    setSelectedStockSizes(prev => [...prev, size]);
+                                  } else {
+                                    setSelectedStockSizes(prev => prev.filter(s => s !== size));
+                                  }
+                                  resetPagination('current-stock');
+                                }}
+                              />
+                              <label
+                                htmlFor={`stock-size-${size}`}
+                                className="text-sm leading-none peer-disabled:cursor-not-allowed peer-disabled:opacity-70 cursor-pointer"
+                              >
+                                {size}
+                              </label>
+                            </div>
+                          ))}
+                        </div>
+                      </div>
+                    </PopoverContent>
+                  </Popover>
+
+                  {/* Status Filter */}
+                  <Popover>
+                    <PopoverTrigger asChild>
+                      <Button variant="outline" className="justify-between w-40">
+                        {selectedStockStatus.length === 0 ? "All Status" : `${selectedStockStatus.length} selected`}
+                        <ChevronDown className="ml-2 h-4 w-4" />
+                      </Button>
+                    </PopoverTrigger>
+                    <PopoverContent className="w-60 p-4">
+                      <div className="space-y-3">
+                        <h4 className="font-medium leading-none">Select Status</h4>
+                        <div className="space-y-2">
+                          {[
+                            { value: 'in-stock', label: 'In Stock' },
+                            { value: 'low-stock', label: 'Low Stock' },
+                            { value: 'out-of-stock', label: 'Out of Stock' }
+                          ].map(status => (
+                            <div key={status.value} className="flex items-center space-x-2">
+                              <Checkbox
+                                id={`stock-status-${status.value}`}
+                                checked={selectedStockStatus.includes(status.value)}
+                                onCheckedChange={(checked) => {
+                                  if (checked) {
+                                    setSelectedStockStatus(prev => [...prev, status.value]);
+                                  } else {
+                                    setSelectedStockStatus(prev => prev.filter(s => s !== status.value));
+                                  }
+                                  resetPagination('current-stock');
+                                }}
+                              />
+                              <label
+                                htmlFor={`stock-status-${status.value}`}
+                                className="text-sm leading-none peer-disabled:cursor-not-allowed peer-disabled:opacity-70 cursor-pointer"
+                              >
+                                {status.label}
+                              </label>
+                            </div>
+                          ))}
+                        </div>
+                      </div>
+                    </PopoverContent>
+                  </Popover>
+
+                  {/* Stock Level Range */}
+                  <Popover>
+                    <PopoverTrigger asChild>
+                      <Button variant="outline" className="justify-between w-44">
+                        {stockLevelFilter.min || stockLevelFilter.max ? 
+                          `${stockLevelFilter.min || '0'} - ${stockLevelFilter.max || '∞'}` : 
+                          "Stock Level Range"
+                        }
+                        <ChevronDown className="ml-2 h-4 w-4" />
+                      </Button>
+                    </PopoverTrigger>
+                    <PopoverContent className="w-60 p-4">
+                      <div className="space-y-3">
+                        <h4 className="font-medium leading-none">Stock Level Range</h4>
+                        <div className="flex items-center gap-2">
+                          <Input
+                            placeholder="Min"
+                            type="number"
+                            min="0"
+                            value={stockLevelFilter.min}
+                            onChange={(e) => {
+                              setStockLevelFilter(prev => ({ ...prev, min: e.target.value }));
+                              resetPagination('current-stock');
+                            }}
+                            className="w-20"
+                          />
+                          <span className="text-gray-500">to</span>
+                          <Input
+                            placeholder="Max"
+                            type="number"
+                            min="0"
+                            value={stockLevelFilter.max}
+                            onChange={(e) => {
+                              setStockLevelFilter(prev => ({ ...prev, max: e.target.value }));
+                              resetPagination('current-stock');
+                            }}
+                            className="w-20"
+                          />
+                        </div>
+                      </div>
+                    </PopoverContent>
+                  </Popover>
+                  
+                  {/* Clear Filters Button */}
+                  {(selectedStockBrands.length > 0 || selectedStockSizes.length > 0 || selectedStockStatus.length > 0 || stockLevelFilter.min || stockLevelFilter.max) && (
+                    <Button 
+                      variant="ghost" 
+                      size="sm" 
+                      onClick={() => {
+                        setSelectedStockBrands([]);
+                        setSelectedStockSizes([]);
+                        setSelectedStockStatus([]);
+                        setStockLevelFilter({ min: "", max: "" });
+                        resetPagination('current-stock');
+                      }}
+                    >
+                      Clear Filters
+                    </Button>
+                  )}
+                </div>
+
+                {/* Active Filter Badges */}
+                {(selectedStockBrands.length > 0 || selectedStockSizes.length > 0 || selectedStockStatus.length > 0 || stockLevelFilter.min || stockLevelFilter.max) && (
+                  <div className="flex items-center gap-2 flex-wrap">
+                    <span className="text-sm text-gray-600">Active filters:</span>
+                    {selectedStockBrands.map(brand => (
+                      <Badge key={brand} variant="secondary" className="gap-1">
+                        Brand: {brand}
+                        <X 
+                          className="h-3 w-3 cursor-pointer" 
+                          onClick={() => {
+                            setSelectedStockBrands(prev => prev.filter(b => b !== brand));
+                            resetPagination('current-stock');
+                          }}
+                        />
+                      </Badge>
+                    ))}
+                    {selectedStockSizes.map(size => (
+                      <Badge key={size} variant="secondary" className="gap-1">
+                        Size: {size}
+                        <X 
+                          className="h-3 w-3 cursor-pointer" 
+                          onClick={() => {
+                            setSelectedStockSizes(prev => prev.filter(s => s !== size));
+                            resetPagination('current-stock');
+                          }}
+                        />
+                      </Badge>
+                    ))}
+                    {selectedStockStatus.map(status => (
+                      <Badge key={status} variant="secondary" className="gap-1">
+                        Status: {status.replace('-', ' ')}
+                        <X 
+                          className="h-3 w-3 cursor-pointer" 
+                          onClick={() => {
+                            setSelectedStockStatus(prev => prev.filter(s => s !== status));
+                            resetPagination('current-stock');
+                          }}
+                        />
+                      </Badge>
+                    ))}
+                    {(stockLevelFilter.min || stockLevelFilter.max) && (
+                      <Badge variant="secondary" className="gap-1">
+                        Stock: {stockLevelFilter.min || '0'} - {stockLevelFilter.max || '∞'}
+                        <X 
+                          className="h-3 w-3 cursor-pointer" 
+                          onClick={() => {
+                            setStockLevelFilter({ min: "", max: "" });
+                            resetPagination('current-stock');
+                          }}
+                        />
+                      </Badge>
+                    )}
+                  </div>
+                )}
               </div>
               <Table>
                 <TableHeader>
