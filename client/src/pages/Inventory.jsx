@@ -163,111 +163,113 @@ export default function Inventory() {
       </div>
 
       {/* Search and Filters */}
-      <div className="flex flex-col sm:flex-row gap-4 items-start sm:items-center">
-        <div className="relative max-w-md">
-          <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 w-4 h-4" />
-          <Input
-            placeholder="Search product code, brand, name..."
-            value={searchTerm}
-            onChange={(e) => setSearchTerm(e.target.value)}
-            className="pl-10"
-          />
-        </div>
-        
-        {activeTab === "products" && (
-          <div className="flex items-center gap-3 flex-wrap">
-            <Filter className="w-4 h-4 text-gray-400" />
-            
-            {/* Brand Filter */}
-            <Popover>
-              <PopoverTrigger asChild>
-                <Button variant="outline" className="justify-between w-40">
-                  {selectedBrands.length === 0 ? "All Brands" : `${selectedBrands.length} selected`}
-                  <ChevronDown className="ml-2 h-4 w-4" />
-                </Button>
-              </PopoverTrigger>
-              <PopoverContent className="w-60 p-4">
-                <div className="space-y-3">
-                  <h4 className="font-medium leading-none">Select Brands</h4>
-                  <div className="space-y-2 max-h-60 overflow-y-auto">
-                    {uniqueBrands.map(brand => (
-                      <div key={brand} className="flex items-center space-x-2">
-                        <Checkbox
-                          id={`brand-${brand}`}
-                          checked={selectedBrands.includes(brand)}
-                          onCheckedChange={(checked) => {
-                            if (checked) {
-                              setSelectedBrands(prev => [...prev, brand]);
-                            } else {
-                              setSelectedBrands(prev => prev.filter(b => b !== brand));
-                            }
-                          }}
-                        />
-                        <label
-                          htmlFor={`brand-${brand}`}
-                          className="text-sm leading-none peer-disabled:cursor-not-allowed peer-disabled:opacity-70 cursor-pointer"
-                        >
-                          {brand}
-                        </label>
-                      </div>
-                    ))}
-                  </div>
-                </div>
-              </PopoverContent>
-            </Popover>
-            
-            {/* Size Filter */}
-            <Popover>
-              <PopoverTrigger asChild>
-                <Button variant="outline" className="justify-between w-40">
-                  {selectedSizes.length === 0 ? "All Sizes" : `${selectedSizes.length} selected`}
-                  <ChevronDown className="ml-2 h-4 w-4" />
-                </Button>
-              </PopoverTrigger>
-              <PopoverContent className="w-60 p-4">
-                <div className="space-y-3">
-                  <h4 className="font-medium leading-none">Select Sizes</h4>
-                  <div className="space-y-2 max-h-60 overflow-y-auto">
-                    {uniqueSizes.map(size => (
-                      <div key={size} className="flex items-center space-x-2">
-                        <Checkbox
-                          id={`size-${size}`}
-                          checked={selectedSizes.includes(size)}
-                          onCheckedChange={(checked) => {
-                            if (checked) {
-                              setSelectedSizes(prev => [...prev, size]);
-                            } else {
-                              setSelectedSizes(prev => prev.filter(s => s !== size));
-                            }
-                          }}
-                        />
-                        <label
-                          htmlFor={`size-${size}`}
-                          className="text-sm leading-none peer-disabled:cursor-not-allowed peer-disabled:opacity-70 cursor-pointer"
-                        >
-                          {size}
-                        </label>
-                      </div>
-                    ))}
-                  </div>
-                </div>
-              </PopoverContent>
-            </Popover>
-            
-            {(selectedBrands.length > 0 || selectedSizes.length > 0) && (
-              <Button 
-                variant="ghost" 
-                size="sm" 
-                onClick={() => {
-                  setSelectedBrands([]);
-                  setSelectedSizes([]);
-                }}
-              >
-                Clear Filters
-              </Button>
-            )}
+      <div className="space-y-4">
+        <div className="flex flex-col sm:flex-row gap-4 items-start sm:items-center">
+          <div className="relative max-w-md">
+            <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 w-4 h-4" />
+            <Input
+              placeholder="Search product code, brand, name..."
+              value={searchTerm}
+              onChange={(e) => setSearchTerm(e.target.value)}
+              className="pl-10"
+            />
           </div>
-        )}
+          
+          {activeTab === "products" && (
+            <div className="flex items-center gap-3">
+              <Filter className="w-4 h-4 text-gray-400" />
+              
+              {/* Brand Filter */}
+              <Popover>
+                <PopoverTrigger asChild>
+                  <Button variant="outline" className="justify-between w-40">
+                    {selectedBrands.length === 0 ? "All Brands" : `${selectedBrands.length} selected`}
+                    <ChevronDown className="ml-2 h-4 w-4" />
+                  </Button>
+                </PopoverTrigger>
+                <PopoverContent className="w-60 p-4">
+                  <div className="space-y-3">
+                    <h4 className="font-medium leading-none">Select Brands</h4>
+                    <div className="space-y-2 max-h-60 overflow-y-auto">
+                      {uniqueBrands.map(brand => (
+                        <div key={brand} className="flex items-center space-x-2">
+                          <Checkbox
+                            id={`brand-${brand}`}
+                            checked={selectedBrands.includes(brand)}
+                            onCheckedChange={(checked) => {
+                              if (checked) {
+                                setSelectedBrands(prev => [...prev, brand]);
+                              } else {
+                                setSelectedBrands(prev => prev.filter(b => b !== brand));
+                              }
+                            }}
+                          />
+                          <label
+                            htmlFor={`brand-${brand}`}
+                            className="text-sm leading-none peer-disabled:cursor-not-allowed peer-disabled:opacity-70 cursor-pointer"
+                          >
+                            {brand}
+                          </label>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                </PopoverContent>
+              </Popover>
+              
+              {/* Size Filter */}
+              <Popover>
+                <PopoverTrigger asChild>
+                  <Button variant="outline" className="justify-between w-40">
+                    {selectedSizes.length === 0 ? "All Sizes" : `${selectedSizes.length} selected`}
+                    <ChevronDown className="ml-2 h-4 w-4" />
+                  </Button>
+                </PopoverTrigger>
+                <PopoverContent className="w-60 p-4">
+                  <div className="space-y-3">
+                    <h4 className="font-medium leading-none">Select Sizes</h4>
+                    <div className="space-y-2 max-h-60 overflow-y-auto">
+                      {uniqueSizes.map(size => (
+                        <div key={size} className="flex items-center space-x-2">
+                          <Checkbox
+                            id={`size-${size}`}
+                            checked={selectedSizes.includes(size)}
+                            onCheckedChange={(checked) => {
+                              if (checked) {
+                                setSelectedSizes(prev => [...prev, size]);
+                              } else {
+                                setSelectedSizes(prev => prev.filter(s => s !== size));
+                              }
+                            }}
+                          />
+                          <label
+                            htmlFor={`size-${size}`}
+                            className="text-sm leading-none peer-disabled:cursor-not-allowed peer-disabled:opacity-70 cursor-pointer"
+                          >
+                            {size}
+                          </label>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                </PopoverContent>
+              </Popover>
+              
+              {(selectedBrands.length > 0 || selectedSizes.length > 0) && (
+                <Button 
+                  variant="ghost" 
+                  size="sm" 
+                  onClick={() => {
+                    setSelectedBrands([]);
+                    setSelectedSizes([]);
+                  }}
+                >
+                  Clear Filters
+                </Button>
+              )}
+            </div>
+          )}
+        </div>
         
         {/* Active Filter Badges */}
         {(selectedBrands.length > 0 || selectedSizes.length > 0) && (
