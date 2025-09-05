@@ -164,12 +164,12 @@ export default function ProductsTab({ products, loading, canEdit, canDelete, onR
       {/* Delete Confirmation Dialog */}
       <SimpleConfirmDialog
         open={dialogOpen}
-        onOpenChange={setDialogOpen}
+        onClose={() => setDialogOpen(false)}
         onConfirm={handleDeleteConfirm}
         title="Delete Product"
         description={productToDelete ? `Are you sure you want to delete "${productToDelete.name}"? This action cannot be undone.` : ''}
         confirmText="Delete"
-        cancelText="Cancel"
+        confirmVariant="destructive"
       />
     </>
   );
