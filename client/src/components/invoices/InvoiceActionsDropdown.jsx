@@ -8,7 +8,7 @@ import {
   DropdownMenuSeparator,
 } from "@/components/ui/dropdown-menu";
 import { Button } from "@/components/ui/button";
-import { MoreHorizontal, Edit2, FileText, Download, Trash2 } from "lucide-react";
+import { MoreHorizontal, Edit2, FileText, Download, Trash2, Printer } from "lucide-react";
 import { useToast } from "@/components/ui/use-toast";
 import { exportToCsv } from "../utils/export";
 import { format } from 'date-fns';
@@ -122,8 +122,8 @@ export default function InvoiceActionsDropdown({ invoice, canEdit, onEdit, onRef
     exportToCsv(exportData, `Tax_Invoice_${invoice.invoice_number}`);
   };
 
-  const handleExportPDF = () => {
-    window.open(`/print?type=invoice&id=${invoice.id}`, '_blank');
+  const handleViewPrint = () => {
+    window.open(`/invoices/${invoice.id}/print`, '_blank');
   };
 
   const handleDelete = async () => { // Removed 'reason' parameter
@@ -187,9 +187,9 @@ export default function InvoiceActionsDropdown({ invoice, canEdit, onEdit, onRef
               Edit
             </DropdownMenuItem>
           )}
-          <DropdownMenuItem onClick={handleExportPDF}>
-            <FileText className="w-4 h-4 mr-2" />
-            Export to PDF
+          <DropdownMenuItem onClick={handleViewPrint}>
+            <Printer className="w-4 h-4 mr-2" />
+            View & Print
           </DropdownMenuItem>
           <DropdownMenuItem onClick={handleExportXLSX}>
             <Download className="w-4 h-4 mr-2" />

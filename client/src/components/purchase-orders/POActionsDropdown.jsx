@@ -212,10 +212,6 @@ export default function POActionsDropdown({ po, canEdit, onEdit, onRefresh }) {
               Edit
             </DropdownMenuItem>
           )}
-          <DropdownMenuItem onClick={handleExportPDF}>
-            <FileText className="w-4 h-4 mr-2" />
-            Export to PDF
-          </DropdownMenuItem>
           <DropdownMenuItem onClick={handleExportXLSX}>
             <Download className="w-4 h-4 mr-2" />
             Export to XLSX
