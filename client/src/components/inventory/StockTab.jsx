@@ -939,7 +939,7 @@ export default function StockTab({ products, loading, canEdit, currentUser, onRe
                   {/* Movement Type Filter */}
                   <Popover>
                     <PopoverTrigger asChild>
-                      <Button variant="outline" className="justify-between w-44">
+                      <Button variant="outline" className="justify-between w-52">
                         {selectedMovementTypes.length === 0 ? "All Movement Types" : `${selectedMovementTypes.length} selected`}
                         <ChevronDown className="ml-2 h-4 w-4" />
                       </Button>
@@ -1305,7 +1305,10 @@ export default function StockTab({ products, loading, canEdit, currentUser, onRe
               <Table>
                 <TableHeader>
                   <TableRow>
-                    <TableHead>Product</TableHead>
+                    <TableHead>Brand</TableHead>
+                    <TableHead>Product Code</TableHead>
+                    <TableHead>Product Name</TableHead>
+                    <TableHead>Size</TableHead>
                     <TableHead>Current Stock</TableHead>
                     <TableHead>Reorder Needed</TableHead>
                   </TableRow>
@@ -1315,15 +1318,13 @@ export default function StockTab({ products, loading, canEdit, currentUser, onRe
                     const reorderQty = (product.maxStockLevel || 50) - (product.stockQuantity || 0);
                     return (
                       <TableRow key={product.id}>
-                        <TableCell>
-                          <div>
-                            <p className="font-medium">{product.name}</p>
-                            <p className="text-xs text-gray-500">{product.sku} • {product.brandName}</p>
-                          </div>
-                        </TableCell>
+                        <TableCell>{product.brandName || '-'}</TableCell>
+                        <TableCell>{product.sku}</TableCell>
+                        <TableCell>{product.name}</TableCell>
+                        <TableCell>{product.description || '-'}</TableCell>
                         <TableCell>
                           <Badge variant="secondary" className="text-amber-600">
-                            {product.stockQuantity || 0}
+                            {(product.stockQuantity || 0).toLocaleString()}
                           </Badge>
                         </TableCell>
                         <TableCell>
