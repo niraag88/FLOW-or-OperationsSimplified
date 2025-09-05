@@ -79,7 +79,6 @@ export default function QuotationPrintView() {
             <div className="print-company-details">
               <div className="print-company-name">{companySettings.companyName}</div>
               {companySettings.address && <div>{companySettings.address}</div>}
-              {companySettings.contactPerson && <div>Contact: {companySettings.contactPerson}</div>}
               {companySettings.email && <div>Email: {companySettings.email}</div>}
               {companySettings.phone && <div>Phone: {companySettings.phone}</div>}
             </div>

@@ -84,9 +84,9 @@ export default function POPrintView() {
         {/* Header with Logo and Title */}
         <div className="print-header">
           <div className="header-content">
-            {companyData?.logo && (
+            {companyData?.logo_url && (
               <div className="header-logo">
-                <img src={companyData.logo} alt="Company Logo" />
+                <img src={companyData.logo_url} alt="Company Logo" />
               </div>
             )}
             <h1 className="print-title">PURCHASE ORDER</h1>
@@ -97,22 +97,16 @@ export default function POPrintView() {
         <div className="print-info-section">
           {/* Left Column - Company Info */}
           <div className="print-company-info">
-            <div className="company-name">{companyData?.companyName || 'SUPERNATURE LLC'}</div>
-            <div className="company-address">
-              {companyData?.address || 'Al Rukhaimi Building, Sheikh Zayed Road'}
-            </div>
-            <div className="company-address">
-              Dubai, U.A.E.
-            </div>
-            <div className="company-contact">
-              Tel: {companyData?.phone || '+971 4 4582211'}
-            </div>
-            <div className="company-contact">
-              Email: {companyData?.email || 'info@supernaturellc.com'}
-            </div>
-            <div className="company-contact">
-              TRN: {companyData?.taxNumber || '100042339000003'}
-            </div>
+            <div className="company-name">{companyData?.companyName}</div>
+            {companyData?.address && (
+              <div className="company-address">{companyData.address}</div>
+            )}
+            {companyData?.phone && (
+              <div className="company-contact">Tel: {companyData.phone}</div>
+            )}
+            {companyData?.email && (
+              <div className="company-contact">Email: {companyData.email}</div>
+            )}
           </div>
 
           {/* Right Column - PO Info */}
