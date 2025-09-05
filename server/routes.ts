@@ -2183,6 +2183,10 @@ export async function registerRoutes(app: Express): Promise<Server> {
         totalAmount: purchaseOrders.totalAmount,
         notes: purchaseOrders.notes,
         supplierName: brands.name, // Since supplierId is actually brandId
+        supplierAddress: brands.description, // Address is stored in description field
+        supplierContactPerson: brands.contactPerson,
+        supplierEmail: brands.contactEmail,
+        supplierPhone: brands.contactPhone,
       }).from(purchaseOrders)
         .leftJoin(brands, eq(purchaseOrders.supplierId, brands.id)) // Join to brands instead
         .where(eq(purchaseOrders.id, parseInt(poId as string)));

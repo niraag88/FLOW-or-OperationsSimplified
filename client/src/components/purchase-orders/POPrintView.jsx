@@ -137,9 +137,6 @@ export default function POPrintView() {
           {poData.supplierAddress && (
             <div className="supplier-address">{poData.supplierAddress}</div>
           )}
-          {poData.supplierCountry && (
-            <div className="supplier-address">{poData.supplierCountry}</div>
-          )}
           {poData.supplierContactPerson && (
             <div className="supplier-contact">Contact: {poData.supplierContactPerson}</div>
           )}
