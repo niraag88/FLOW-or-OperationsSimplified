@@ -13,13 +13,16 @@ import {
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
 import { Skeleton } from "@/components/ui/skeleton";
+import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
+import { Textarea } from "@/components/ui/textarea";
+import { Label } from "@/components/ui/label";
 import { format } from "date-fns";
 import { PurchaseOrder } from "@/api/entities";
 import { GoodsReceipt } from "@/api/entities";
 import { InventoryLot } from "@/api/entities";
 import { InventoryAudit } from "@/api/entities";
 import { Brand } from "@/api/entities";
-import { useToast } from "@/components/ui/use-toast";
+import { useToast } from "@/hooks/use-toast";
 import { logStatusChange, logAuditAction } from "../utils/auditLogger";
 import SimpleConfirmDialog from "../common/SimpleConfirmDialog";
 
@@ -29,6 +32,9 @@ export default function GoodsReceiptsTab({ purchaseOrders, products, goodsReceip
   const [processingPO, setProcessingPO] = useState(null);
   const [showCloseConfirm, setShowCloseConfirm] = useState(false);
   const [closingPO, setClosingPO] = useState(null);
+  const [selectedPOForReceive, setSelectedPOForReceive] = useState(null);
+  const [receiveQuantities, setReceiveQuantities] = useState({});
+  const [receiveNotes, setReceiveNotes] = useState('');
   const { toast } = useToast();
 
   React.useEffect(() => {
@@ -67,6 +73,86 @@ export default function GoodsReceiptsTab({ purchaseOrders, products, goodsReceip
       ...prev,
       [`${poId}-${itemIndex}`]: parseInt(quantity) || 0
     }));
+  };
+
+  const handleReceiveQuantityChange = (itemId, value) => {
+    setReceiveQuantities(prev => ({
+      ...prev,
+      [itemId]: value === '' ? '' : Math.max(0, parseInt(value) || 0)
+    }));
+  };
+
+  const handleSaveReceive = async (forceClose = false) => {
+    if (!selectedPOForReceive) return;
+
+    try {
+      setProcessingPO(selectedPOForReceive.id);
+
+      const items = selectedPOForReceive.items?.map(item => {
+        const receivedQuantity = receiveQuantities[item.id] || 0;
+        return {
+          poItemId: item.id,
+          productId: item.product_id,
+          orderedQuantity: item.quantity,
+          receivedQuantity: receivedQuantity,
+          unitPrice: item.unit_price
+        };
+      }) || [];
+
+      if (items.every(item => item.receivedQuantity === 0) && !forceClose) {
+        toast({
+          title: "No quantities entered",
+          description: "Please enter at least one quantity to receive or use 'Save & Close' to close the PO.",
+          variant: "destructive"
+        });
+        return;
+      }
+
+      const response = await fetch('/api/goods-receipts', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          poId: selectedPOForReceive.id,
+          items: items,
+          notes: receiveNotes,
+          forceClose: forceClose
+        }),
+      });
+
+      if (!response.ok) {
+        throw new Error('Failed to create goods receipt');
+      }
+
+      const result = await response.json();
+
+      toast({
+        title: "Goods received successfully",
+        description: result.message,
+        variant: "default"
+      });
+
+      // Reset form state
+      setSelectedPOForReceive(null);
+      setReceiveQuantities({});
+      setReceiveNotes('');
+      
+      // Refresh the data
+      if (onRefresh) {
+        onRefresh();
+      }
+
+    } catch (error) {
+      console.error('Error creating goods receipt:', error);
+      toast({
+        title: "Error",
+        description: "Failed to receive goods. Please try again.",
+        variant: "destructive"
+      });
+    } finally {
+      setProcessingPO(null);
+    }
   };
 
   const getReceivedQuantityForItem = (poId, productId) => {
@@ -367,33 +453,15 @@ export default function GoodsReceiptsTab({ purchaseOrders, products, goodsReceip
                       </Table>
                     </div>
                   </CardContent>
-                  <CardFooter className="bg-gray-50 p-4 border-t flex items-center justify-between">
+                  <CardFooter className="bg-gray-50 p-4 border-t flex items-center justify-end">
                     <Button
                       size="sm"
-                      onClick={() => handleReceiveItems(po)}
-                      disabled={!canEdit || processingPO === po.id || po.items?.every(item => item.quantity - getReceivedQuantityForItem(po.id, item.product_id) <= 0)}
+                      onClick={() => setSelectedPOForReceive(po)}
+                      disabled={!canEdit || processingPO === po.id}
                       className="bg-emerald-600 hover:bg-emerald-700"
                     >
-                      {processingPO === po.id ? "Processing..." : "Receive Items"}
+                      {processingPO === po.id ? "Processing..." : "Receive"}
                     </Button>
-
-                    <DropdownMenu>
-                      <DropdownMenuTrigger asChild>
-                        <Button variant="ghost" size="icon" disabled={processingPO === po.id}>
-                          <MoreHorizontal className="w-5 h-5" />
-                        </Button>
-                      </DropdownMenuTrigger>
-                      <DropdownMenuContent align="end">
-                        <DropdownMenuItem
-                          onClick={() => handleForceCloseClick(po)}
-                          disabled={!canEdit}
-                          className="text-red-500 focus:text-red-600 cursor-pointer"
-                        >
-                          <XCircle className="w-4 h-4 mr-2" />
-                          Force Close PO
-                        </DropdownMenuItem>
-                      </DropdownMenuContent>
-                    </DropdownMenu>
                   </CardFooter>
                 </Card>
               ))}
@@ -401,6 +469,130 @@ export default function GoodsReceiptsTab({ purchaseOrders, products, goodsReceip
           )}
         </CardContent>
       </Card>
+      {/* Receive Goods Dialog */}
+      <Dialog open={!!selectedPOForReceive} onOpenChange={() => setSelectedPOForReceive(null)}>
+        <DialogContent className="max-w-4xl max-h-[80vh] overflow-y-auto">
+          <DialogHeader>
+            <DialogTitle>Receive Goods - PO #{selectedPOForReceive?.po_number}</DialogTitle>
+            <DialogDescription>
+              Enter the quantities received for each product. You can receive partial quantities and continue receiving more later.
+            </DialogDescription>
+          </DialogHeader>
+
+          <div className="space-y-4">
+            <Table>
+              <TableHeader>
+                <TableRow>
+                  <TableHead>Product</TableHead>
+                  <TableHead>Ordered</TableHead>
+                  <TableHead>Already Received</TableHead>
+                  <TableHead>Remaining</TableHead>
+                  <TableHead>Receiving Now</TableHead>
+                </TableRow>
+              </TableHeader>
+              <TableBody>
+                {selectedPOForReceive?.items?.map((item, index) => {
+                  const product = getProductInfo(item.product_id);
+                  const totalReceived = getReceivedQuantityForItem(selectedPOForReceive.id, item.product_id);
+                  const remaining = item.quantity - totalReceived;
+                  
+                  return (
+                    <TableRow key={index}>
+                      <TableCell>
+                        <div>
+                          <p className="font-medium">{product.product_name}</p>
+                          <p className="text-sm text-gray-500">{product.sku} • {product.size}</p>
+                        </div>
+                      </TableCell>
+                      <TableCell>{item.quantity}</TableCell>
+                      <TableCell>{totalReceived}</TableCell>
+                      <TableCell>
+                        <Badge variant={remaining > 0 ? "secondary" : "default"}>
+                          {remaining}
+                        </Badge>
+                      </TableCell>
+                      <TableCell>
+                        <Input
+                          type="number"
+                          min="0"
+                          max={remaining}
+                          placeholder="0"
+                          value={receiveQuantities[item.id] || ''}
+                          onChange={(e) => handleReceiveQuantityChange(item.id, e.target.value)}
+                          disabled={remaining <= 0}
+                          className="w-24"
+                        />
+                      </TableCell>
+                    </TableRow>
+                  );
+                })}
+              </TableBody>
+            </Table>
+
+            <div className="space-y-2">
+              <Label htmlFor="receive-notes">Notes (optional)</Label>
+              <Textarea
+                id="receive-notes"
+                placeholder="Add any notes about this goods receipt..."
+                value={receiveNotes}
+                onChange={(e) => setReceiveNotes(e.target.value)}
+                rows={3}
+              />
+            </div>
+          </div>
+
+          <DialogFooter className="flex gap-2">
+            <Button variant="outline" onClick={() => setSelectedPOForReceive(null)}>
+              Cancel
+            </Button>
+            
+            {/* Dynamic button logic based on whether all quantities match */}
+            {(() => {
+              const allItemsFullyReceived = selectedPOForReceive?.items?.every(item => {
+                const totalReceived = getReceivedQuantityForItem(selectedPOForReceive.id, item.product_id);
+                const currentReceiving = receiveQuantities[item.id] || 0;
+                return (totalReceived + currentReceiving) >= item.quantity;
+              });
+
+              const hasQuantitiesToReceive = selectedPOForReceive?.items?.some(item => receiveQuantities[item.id] > 0);
+
+              if (allItemsFullyReceived && hasQuantitiesToReceive) {
+                // All quantities match - only show "Save & Close"
+                return (
+                  <Button 
+                    onClick={() => handleSaveReceive(true)}
+                    disabled={processingPO === selectedPOForReceive?.id}
+                    className="bg-emerald-600 hover:bg-emerald-700"
+                  >
+                    {processingPO === selectedPOForReceive?.id ? "Processing..." : "Save & Close"}
+                  </Button>
+                );
+              } else {
+                // Not all quantities match - show both options
+                return (
+                  <>
+                    <Button 
+                      variant="outline"
+                      onClick={() => handleSaveReceive(false)}
+                      disabled={processingPO === selectedPOForReceive?.id || !hasQuantitiesToReceive}
+                    >
+                      {processingPO === selectedPOForReceive?.id ? "Processing..." : "Save"}
+                    </Button>
+                    <Button 
+                      onClick={() => handleSaveReceive(true)}
+                      disabled={processingPO === selectedPOForReceive?.id}
+                      variant="destructive"
+                    >
+                      {processingPO === selectedPOForReceive?.id ? "Processing..." : "Save & Close"}
+                    </Button>
+                  </>
+                );
+              }
+            })()}
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
       <SimpleConfirmDialog
         open={showCloseConfirm}
         onOpenChange={setShowCloseConfirm}

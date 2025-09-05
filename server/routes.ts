@@ -1275,7 +1275,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   // Create goods receipt from purchase order
   app.post('/api/goods-receipts', requireAuth(['Admin', 'Manager']), async (req: AuthenticatedRequest, res) => {
     try {
-      const { poId, items, notes } = req.body;
+      const { poId, items, notes, forceClose } = req.body;
       
       if (!poId || !items || !Array.isArray(items)) {
         return res.status(400).json({ error: 'Purchase Order ID and items are required' });
@@ -1304,48 +1304,54 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
       // Process each item and update stock
       for (const item of items) {
-        // Create receipt item
-        await db.insert(goodsReceiptItems).values({
-          receiptId: receipt.id,
-          poItemId: item.poItemId,
-          productId: item.productId,
-          orderedQuantity: item.orderedQuantity,
-          receivedQuantity: item.receivedQuantity,
-          unitPrice: item.unitPrice.toString()
-        });
+        if (item.receivedQuantity > 0) { // Only process items with received quantity
+          // Create receipt item
+          await db.insert(goodsReceiptItems).values({
+            receiptId: receipt.id,
+            poItemId: item.poItemId,
+            productId: item.productId,
+            orderedQuantity: item.orderedQuantity,
+            receivedQuantity: item.receivedQuantity,
+            unitPrice: item.unitPrice.toString()
+          });
 
-        // Update product stock automatically
-        await updateProductStock(
-          item.productId,
-          item.receivedQuantity, // Add to stock
-          'goods_receipt',
-          receipt.id,
-          'goods_receipt',
-          parseFloat(item.unitPrice),
-          `Goods received from PO ${po.poNumber}`,
-          req.user!.id
-        );
+          // Update product stock automatically
+          await updateProductStock(
+            item.productId,
+            item.receivedQuantity, // Add to stock
+            'goods_receipt',
+            receipt.id,
+            'goods_receipt',
+            parseFloat(item.unitPrice),
+            `Goods received from PO ${po.poNumber}`,
+            req.user!.id
+          );
+        }
 
-        // Update PO item received quantity
+        // Update PO item received quantity (cumulative)
+        const currentItem = await db.select().from(purchaseOrderItems).where(eq(purchaseOrderItems.id, item.poItemId)).limit(1);
+        const newReceivedQuantity = (currentItem[0]?.receivedQuantity || 0) + item.receivedQuantity;
+        
         await db.update(purchaseOrderItems)
-          .set({ receivedQuantity: item.receivedQuantity })
+          .set({ receivedQuantity: newReceivedQuantity })
           .where(eq(purchaseOrderItems.id, item.poItemId));
       }
 
-      // Update PO status to received if all items are fully received
+      // Update PO status logic
       const poItems = await db.select().from(purchaseOrderItems).where(eq(purchaseOrderItems.poId, poId));
       const allReceived = poItems.every(item => (item.receivedQuantity ?? 0) >= item.quantity);
       
-      if (allReceived) {
+      if (allReceived || forceClose) {
         await db.update(purchaseOrders)
-          .set({ status: 'received', updatedAt: new Date() })
+          .set({ status: 'closed', updatedAt: new Date() })
           .where(eq(purchaseOrders.id, poId));
       }
 
       res.status(201).json({
         id: receipt.id,
         receiptNumber: receipt.receiptNumber,
-        message: `Goods receipt ${receipt.receiptNumber} created and stock updated for ${items.length} products`
+        poStatus: (allReceived || forceClose) ? 'closed' : 'submitted',
+        message: `Goods receipt ${receipt.receiptNumber} created and stock updated for ${items.filter(i => i.receivedQuantity > 0).length} products`
       });
       
     } catch (error) {
