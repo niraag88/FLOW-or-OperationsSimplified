@@ -293,18 +293,18 @@ export default function ExportDropdown({ products, activeTab, stockSubTab, stock
         {activeTab === 'products' && (
           <>
             <DropdownMenuItem 
-              onClick={() => exportProducts('xlsx')}
-              disabled={itemCount === 0}
-            >
-              <FileSpreadsheet className="w-4 h-4 mr-2" />
-              Export to XLSX
-            </DropdownMenuItem>
-            <DropdownMenuItem 
               onClick={() => exportProducts('pdf')}
               disabled={itemCount === 0}
             >
               <FileText className="w-4 h-4 mr-2" />
               View & Print
+            </DropdownMenuItem>
+            <DropdownMenuItem 
+              onClick={() => exportProducts('xlsx')}
+              disabled={itemCount === 0}
+            >
+              <FileSpreadsheet className="w-4 h-4 mr-2" />
+              Export to XLSX
             </DropdownMenuItem>
           </>
         )}
