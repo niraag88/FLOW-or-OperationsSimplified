@@ -315,7 +315,10 @@ export default function GoodsReceiptsTab({ purchaseOrders, products, goodsReceip
                           {po.status?.toUpperCase()}
                         </Badge>
                         <span className="text-sm text-gray-500">
-                          {format(new Date(po.order_date), 'MMM dd, yyyy')}
+                          {po.order_date && !isNaN(new Date(po.order_date)) ? 
+                            format(new Date(po.order_date), 'MMM dd, yyyy') : 
+                            'Invalid Date'
+                          }
                         </span>
                       </div>
                     </div>
