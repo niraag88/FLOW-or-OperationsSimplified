@@ -5,7 +5,7 @@ import { Button } from "@/components/ui/button";
 import { Filter, X } from "lucide-react";
 import { Brand } from "@/api/entities"; // Changed from Supplier
 
-export default function POFilters({ filters, onFiltersChange }) {
+export default function POFilters({ filters, onFiltersChange, onFilterChange }) {
   const [brands, setBrands] = useState([]); // Changed from suppliers
 
   useEffect(() => {
@@ -26,6 +26,7 @@ export default function POFilters({ filters, onFiltersChange }) {
       ...prev,
       [field]: value
     }));
+    if (onFilterChange) onFilterChange();
   };
 
   const clearFilters = () => {
@@ -34,6 +35,7 @@ export default function POFilters({ filters, onFiltersChange }) {
       supplier: "all", // This filter field name remains 'supplier' as per outline, but now holds brand IDs
       dateRange: "all"
     });
+    if (onFilterChange) onFilterChange();
   };
 
   const hasActiveFilters = filters.status !== "all" || filters.supplier !== "all" || filters.dateRange !== "all";

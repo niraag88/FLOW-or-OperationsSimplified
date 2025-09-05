@@ -2,6 +2,7 @@
 import React, { useState, useEffect } from "react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Plus, Search, FileText } from "lucide-react";
 import { Invoice } from "@/api/entities";
 import { User } from "@/api/entities";
@@ -27,6 +28,10 @@ export default function Invoices() {
   });
   const [showCreateFromExistingDialog, setShowCreateFromExistingDialog] = useState(false);
   const [refreshTrigger, setRefreshTrigger] = useState(0);
+
+  // Pagination state
+  const [currentPage, setCurrentPage] = useState(1);
+  const [itemsPerPage, setItemsPerPage] = useState(50);
 
   useEffect(() => {
     loadData();

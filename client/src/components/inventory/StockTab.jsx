@@ -5,6 +5,7 @@ import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { TrendingUp, TrendingDown, Package, Activity, AlertTriangle, History, Search } from "lucide-react";
 import { Skeleton } from "@/components/ui/skeleton";
 import { format } from "date-fns";
@@ -20,6 +21,13 @@ export default function StockTab({ products, loading, canEdit, currentUser, onRe
   const [movementsFilter, setMovementsFilter] = useState("");
   const [lowStockFilter, setLowStockFilter] = useState("");
   const [outOfStockFilter, setOutOfStockFilter] = useState("");
+
+  // Pagination states for each tab
+  const [currentStockPage, setCurrentStockPage] = useState(1);
+  const [movementsPage, setMovementsPage] = useState(1);
+  const [lowStockPage, setLowStockPage] = useState(1);
+  const [outOfStockPage, setOutOfStockPage] = useState(1);
+  const [itemsPerPage, setItemsPerPage] = useState(50);
 
   useEffect(() => {
     loadStockMovements();
@@ -117,6 +125,129 @@ export default function StockTab({ products, loading, canEdit, currentUser, onRe
   const filteredLowStockProducts = filterProducts(lowStockProducts, lowStockFilter);
   const filteredOutOfStockProducts = filterProducts(outOfStockProducts, outOfStockFilter);
   const filteredStockMovements = filterMovements(stockMovements, movementsFilter);
+
+  // Pagination logic for each tab
+  const paginateData = (data, page, perPage) => {
+    const startIndex = (page - 1) * perPage;
+    const endIndex = startIndex + perPage;
+    return {
+      data: data.slice(startIndex, endIndex),
+      totalPages: Math.ceil(data.length / perPage),
+      startIndex,
+      endIndex: Math.min(endIndex, data.length),
+      totalItems: data.length
+    };
+  };
+
+  // Paginated data for each tab
+  const paginatedCurrentStock = paginateData(filteredProducts, currentStockPage, itemsPerPage);
+  const paginatedMovements = paginateData(filteredStockMovements, movementsPage, itemsPerPage);
+  const paginatedLowStock = paginateData(filteredLowStockProducts, lowStockPage, itemsPerPage);
+  const paginatedOutOfStock = paginateData(filteredOutOfStockProducts, outOfStockPage, itemsPerPage);
+
+  // Reset pagination when filters change
+  const resetPagination = (type) => {
+    switch(type) {
+      case 'current-stock':
+        setCurrentStockPage(1);
+        break;
+      case 'movements':
+        setMovementsPage(1);
+        break;
+      case 'low-stock':
+        setLowStockPage(1);
+        break;
+      case 'out-of-stock':
+        setOutOfStockPage(1);
+        break;
+    }
+  };
+
+  // Reusable pagination controls component
+  const PaginationControls = ({ paginationData, currentPage, setPage, type, itemName }) => {
+    if (paginationData.totalItems === 0) return null;
+
+    return (
+      <div className="flex items-center justify-between mt-6 pt-4 border-t">
+        <div className="flex items-center gap-2">
+          <span className="text-sm text-gray-700">
+            Showing {paginationData.startIndex + 1} to {paginationData.endIndex} of {paginationData.totalItems} {itemName}
+          </span>
+        </div>
+        
+        <div className="flex items-center gap-4">
+          {/* Items per page selector */}
+          <div className="flex items-center gap-2">
+            <span className="text-sm text-gray-700">Show:</span>
+            <Select value={itemsPerPage.toString()} onValueChange={(value) => {
+              setItemsPerPage(Number(value));
+              setPage(1);
+            }}>
+              <SelectTrigger className="w-20">
+                <SelectValue />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="20">20</SelectItem>
+                <SelectItem value="50">50</SelectItem>
+                <SelectItem value="100">100</SelectItem>
+                <SelectItem value={paginationData.totalItems.toString()}>All</SelectItem>
+              </SelectContent>
+            </Select>
+          </div>
+          
+          {/* Page navigation */}
+          {paginationData.totalPages > 1 && (
+            <div className="flex items-center gap-2">
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={() => setPage(prev => Math.max(1, prev - 1))}
+                disabled={currentPage === 1}
+              >
+                Previous
+              </Button>
+              
+              <div className="flex items-center gap-1">
+                {Array.from({ length: Math.min(5, paginationData.totalPages) }, (_, i) => {
+                  let pageNumber;
+                  if (paginationData.totalPages <= 5) {
+                    pageNumber = i + 1;
+                  } else if (currentPage <= 3) {
+                    pageNumber = i + 1;
+                  } else if (currentPage >= paginationData.totalPages - 2) {
+                    pageNumber = paginationData.totalPages - 4 + i;
+                  } else {
+                    pageNumber = currentPage - 2 + i;
+                  }
+                  
+                  return (
+                    <Button
+                      key={pageNumber}
+                      variant={currentPage === pageNumber ? "default" : "outline"}
+                      size="sm"
+                      className="w-8 h-8 p-0"
+                      onClick={() => setPage(pageNumber)}
+                    >
+                      {pageNumber}
+                    </Button>
+                  );
+                })}
+              </div>
+              
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={() => setPage(prev => Math.min(paginationData.totalPages, prev + 1))}
+                disabled={currentPage === paginationData.totalPages}
+              >
+                Next
+              </Button>
+            </div>
+          )}
+        </div>
+      </div>
+    );
+  };
 
   // Initialize stock sub-tab data after computed values are available
   useEffect(() => {
@@ -268,7 +399,10 @@ export default function StockTab({ products, loading, canEdit, currentUser, onRe
                 <Input
                   placeholder="Filter by product name, SKU, brand, or size..."
                   value={currentStockFilter}
-                  onChange={(e) => setCurrentStockFilter(e.target.value)}
+                  onChange={(e) => {
+                    setCurrentStockFilter(e.target.value);
+                    resetPagination('current-stock');
+                  }}
                   className="max-w-sm"
                 />
               </div>
@@ -284,7 +418,7 @@ export default function StockTab({ products, loading, canEdit, currentUser, onRe
                   </TableRow>
                 </TableHeader>
                 <TableBody>
-                  {filteredProducts.map((product) => {
+                  {paginatedCurrentStock.data.map((product) => {
                     const stock = product.stockQuantity || 0;
                     const lowStockThreshold = companySettings?.lowStockThreshold || 6;
                     const status = stock === 0 ? 'out' : stock <= lowStockThreshold ? 'low' : 'ok';
@@ -313,6 +447,14 @@ export default function StockTab({ products, loading, canEdit, currentUser, onRe
                   })}
                 </TableBody>
               </Table>
+              
+              <PaginationControls
+                paginationData={paginatedCurrentStock}
+                currentPage={currentStockPage}
+                setPage={setCurrentStockPage}
+                type="current-stock"
+                itemName="products"
+              />
             </CardContent>
           </Card>
         </TabsContent>
@@ -332,7 +474,10 @@ export default function StockTab({ products, loading, canEdit, currentUser, onRe
                 <Input
                   placeholder="Filter by product, movement type, or notes..."
                   value={movementsFilter}
-                  onChange={(e) => setMovementsFilter(e.target.value)}
+                  onChange={(e) => {
+                    setMovementsFilter(e.target.value);
+                    resetPagination('movements');
+                  }}
                   className="max-w-sm"
                 />
               </div>
@@ -356,7 +501,7 @@ export default function StockTab({ products, loading, canEdit, currentUser, onRe
                     </TableRow>
                   </TableHeader>
                   <TableBody>
-                    {filteredStockMovements.map((movement) => (
+                    {paginatedMovements.data.map((movement) => (
                       <TableRow key={movement.id}>
                         <TableCell className="text-sm">
                           {format(new Date(movement.createdAt), 'MMM dd, yyyy h:mm a')}
@@ -389,12 +534,22 @@ export default function StockTab({ products, loading, canEdit, currentUser, onRe
                 </Table>
               )}
 
-              {filteredStockMovements.length === 0 && !loadingMovements && (
+              {paginatedMovements.totalItems === 0 && !loadingMovements && (
                 <div className="text-center py-12 text-gray-500">
                   <History className="w-12 h-12 mx-auto mb-4 opacity-50" />
                   <p>No stock movements recorded yet</p>
                   <p className="text-sm mt-2">Stock changes will appear here automatically</p>
                 </div>
+              )}
+              
+              {!loadingMovements && (
+                <PaginationControls
+                  paginationData={paginatedMovements}
+                  currentPage={movementsPage}
+                  setPage={setMovementsPage}
+                  type="movements"
+                  itemName="movements"
+                />
               )}
             </CardContent>
           </Card>
@@ -405,7 +560,7 @@ export default function StockTab({ products, loading, canEdit, currentUser, onRe
             <CardHeader>
               <CardTitle className="flex items-center gap-2 text-amber-600">
                 <AlertTriangle className="w-5 h-5" />
-                Low Stock Products ({filteredLowStockProducts.length})
+                Low Stock Products ({paginatedLowStock.totalItems})
               </CardTitle>
               <p className="text-sm text-gray-600">Products at or below minimum stock level</p>
             </CardHeader>
@@ -415,7 +570,10 @@ export default function StockTab({ products, loading, canEdit, currentUser, onRe
                 <Input
                   placeholder="Filter by product name, SKU, or brand..."
                   value={lowStockFilter}
-                  onChange={(e) => setLowStockFilter(e.target.value)}
+                  onChange={(e) => {
+                    setLowStockFilter(e.target.value);
+                    resetPagination('low-stock');
+                  }}
                   className="max-w-sm"
                 />
               </div>
@@ -428,7 +586,7 @@ export default function StockTab({ products, loading, canEdit, currentUser, onRe
                   </TableRow>
                 </TableHeader>
                 <TableBody>
-                  {filteredLowStockProducts.map((product) => {
+                  {paginatedLowStock.data.map((product) => {
                     const reorderQty = (product.maxStockLevel || 50) - (product.stockQuantity || 0);
                     return (
                       <TableRow key={product.id}>
@@ -454,13 +612,21 @@ export default function StockTab({ products, loading, canEdit, currentUser, onRe
                 </TableBody>
               </Table>
 
-              {filteredLowStockProducts.length === 0 && (
+              {paginatedLowStock.totalItems === 0 && (
                 <div className="text-center py-12 text-gray-500">
                   <Package className="w-12 h-12 mx-auto mb-4 opacity-50" />
                   <p>No products with low stock</p>
                   <p className="text-sm mt-2">All products are above minimum stock levels</p>
                 </div>
               )}
+              
+              <PaginationControls
+                paginationData={paginatedLowStock}
+                currentPage={lowStockPage}
+                setPage={setLowStockPage}
+                type="low-stock"
+                itemName="products"
+              />
             </CardContent>
           </Card>
         </TabsContent>
@@ -470,7 +636,7 @@ export default function StockTab({ products, loading, canEdit, currentUser, onRe
             <CardHeader>
               <CardTitle className="flex items-center gap-2 text-red-600">
                 <AlertTriangle className="w-5 h-5" />
-                Out of Stock Products ({filteredOutOfStockProducts.length})
+                Out of Stock Products ({paginatedOutOfStock.totalItems})
               </CardTitle>
               <p className="text-sm text-gray-600">Products with zero stock quantity</p>
             </CardHeader>
@@ -480,7 +646,10 @@ export default function StockTab({ products, loading, canEdit, currentUser, onRe
                 <Input
                   placeholder="Filter by product name, SKU, or brand..."
                   value={outOfStockFilter}
-                  onChange={(e) => setOutOfStockFilter(e.target.value)}
+                  onChange={(e) => {
+                    setOutOfStockFilter(e.target.value);
+                    resetPagination('out-of-stock');
+                  }}
                   className="max-w-sm"
                 />
               </div>
@@ -496,7 +665,7 @@ export default function StockTab({ products, loading, canEdit, currentUser, onRe
                   </TableRow>
                 </TableHeader>
                 <TableBody>
-                  {filteredOutOfStockProducts.map((product) => {
+                  {paginatedOutOfStock.data.map((product) => {
                     return (
                       <TableRow key={product.id}>
                         <TableCell>{product.brandName || '-'}</TableCell>
@@ -517,13 +686,21 @@ export default function StockTab({ products, loading, canEdit, currentUser, onRe
                 </TableBody>
               </Table>
 
-              {filteredOutOfStockProducts.length === 0 && (
+              {paginatedOutOfStock.totalItems === 0 && (
                 <div className="text-center py-12 text-gray-500">
                   <Package className="w-12 h-12 mx-auto mb-4 opacity-50" />
                   <p>No products out of stock</p>
                   <p className="text-sm mt-2">All products have stock available</p>
                 </div>
               )}
+              
+              <PaginationControls
+                paginationData={paginatedOutOfStock}
+                currentPage={outOfStockPage}
+                setPage={setOutOfStockPage}
+                type="out-of-stock"
+                itemName="products"
+              />
             </CardContent>
           </Card>
         </TabsContent>

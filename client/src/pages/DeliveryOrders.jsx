@@ -2,6 +2,7 @@
 import React, { useState, useEffect } from "react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Plus, Search, FileText } from "lucide-react"; // Added FileText
 import { DeliveryOrder } from "@/api/entities";
 import { User } from "@/api/entities";
@@ -24,7 +25,11 @@ export default function DeliveryOrders() {
     tax_treatment: "all"
   });
   const [refreshTrigger, setRefreshTrigger] = useState(0);
-  const [showCreateFromExistingDialog, setShowCreateFromExistingDialog] = useState(false); // New state
+  const [showCreateFromExistingDialog, setShowCreateFromExistingDialog] = useState(false);
+
+  // Pagination state
+  const [currentPage, setCurrentPage] = useState(1);
+  const [itemsPerPage, setItemsPerPage] = useState(50); // New state
 
   useEffect(() => {
     loadData();

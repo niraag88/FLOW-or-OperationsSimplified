@@ -3,6 +3,7 @@ import React, { useState, useEffect } from "react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Plus, Search } from "lucide-react";
 import { PurchaseOrder } from "@/api/entities";
 import { GoodsReceipt } from "@/api/entities";
@@ -27,6 +28,10 @@ export default function PurchaseOrders() {
     dateRange: "all"
   });
   const [refreshTrigger, setRefreshTrigger] = useState(0);
+
+  // Pagination state
+  const [currentPage, setCurrentPage] = useState(1);
+  const [itemsPerPage, setItemsPerPage] = useState(50);
 
   useEffect(() => {
     loadData();
@@ -83,6 +88,17 @@ export default function PurchaseOrders() {
     return matchesSearch && matchesStatus && matchesSupplier;
   });
 
+  // Calculate pagination for POs
+  const totalPagesPos = Math.ceil(filteredPOs.length / itemsPerPage);
+  const startIndexPos = (currentPage - 1) * itemsPerPage;
+  const endIndexPos = startIndexPos + itemsPerPage;
+  const paginatedPOs = filteredPOs.slice(startIndexPos, endIndexPos);
+
+  // Reset pagination when filters/search change
+  const resetPagination = () => {
+    setCurrentPage(1);
+  };
+
   const filteredGRNs = goodsReceipts.filter(grn =>
     grn.grn_number?.toLowerCase().includes(searchTerm.toLowerCase()) ||
     grn.delivery_note_ref?.toLowerCase().includes(searchTerm.toLowerCase())
@@ -117,12 +133,19 @@ export default function PurchaseOrders() {
           <Input
             placeholder="Search PO numbers, notes..."
             value={searchTerm}
-            onChange={(e) => setSearchTerm(e.target.value)}
+            onChange={(e) => {
+              setSearchTerm(e.target.value);
+              resetPagination();
+            }}
             className="pl-10"
           />
         </div>
         
-        <POFilters filters={filters} onFiltersChange={setFilters} />
+        <POFilters 
+          filters={filters} 
+          onFiltersChange={setFilters}
+          onFilterChange={resetPagination}
+        />
       </div>
 
       {/* Tabs */}
@@ -134,13 +157,96 @@ export default function PurchaseOrders() {
 
         <TabsContent value="purchase-orders" className="mt-6">
           <POList 
-            purchaseOrders={filteredPOs}
+            purchaseOrders={paginatedPOs}
+            totalCount={filteredPOs.length}
             loading={loading}
             canEdit={canEdit}
             currentUser={currentUser}
             onEdit={handleEditPO}
             onRefresh={handleRefresh}
           />
+
+          {/* Pagination Controls for POs */}
+          {!loading && activeTab === "purchase-orders" && filteredPOs.length > 0 && (
+            <div className="flex items-center justify-between mt-6 pt-4 border-t">
+              <div className="flex items-center gap-2">
+                <span className="text-sm text-gray-700">
+                  Showing {startIndexPos + 1} to {Math.min(endIndexPos, filteredPOs.length)} of {filteredPOs.length} purchase orders
+                </span>
+              </div>
+              
+              <div className="flex items-center gap-4">
+                {/* Items per page selector */}
+                <div className="flex items-center gap-2">
+                  <span className="text-sm text-gray-700">Show:</span>
+                  <Select value={itemsPerPage.toString()} onValueChange={(value) => {
+                    setItemsPerPage(Number(value));
+                    setCurrentPage(1);
+                  }}>
+                    <SelectTrigger className="w-20">
+                      <SelectValue />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="20">20</SelectItem>
+                      <SelectItem value="50">50</SelectItem>
+                      <SelectItem value="100">100</SelectItem>
+                      <SelectItem value={filteredPOs.length.toString()}>All</SelectItem>
+                    </SelectContent>
+                  </Select>
+                </div>
+                
+                {/* Page navigation */}
+                {totalPagesPos > 1 && (
+                  <div className="flex items-center gap-2">
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      onClick={() => setCurrentPage(prev => Math.max(1, prev - 1))}
+                      disabled={currentPage === 1}
+                    >
+                      Previous
+                    </Button>
+                    
+                    <div className="flex items-center gap-1">
+                      {Array.from({ length: Math.min(5, totalPagesPos) }, (_, i) => {
+                        let pageNumber;
+                        if (totalPagesPos <= 5) {
+                          pageNumber = i + 1;
+                        } else if (currentPage <= 3) {
+                          pageNumber = i + 1;
+                        } else if (currentPage >= totalPagesPos - 2) {
+                          pageNumber = totalPagesPos - 4 + i;
+                        } else {
+                          pageNumber = currentPage - 2 + i;
+                        }
+                        
+                        return (
+                          <Button
+                            key={pageNumber}
+                            variant={currentPage === pageNumber ? "default" : "outline"}
+                            size="sm"
+                            className="w-8 h-8 p-0"
+                            onClick={() => setCurrentPage(pageNumber)}
+                          >
+                            {pageNumber}
+                          </Button>
+                        );
+                      })}
+                    </div>
+                    
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      onClick={() => setCurrentPage(prev => Math.min(totalPagesPos, prev + 1))}
+                      disabled={currentPage === totalPagesPos}
+                    >
+                      Next
+                    </Button>
+                  </div>
+                )}
+              </div>
+            </div>
+          )}
         </TabsContent>
 
         <TabsContent value="goods-receipts" className="mt-6">

@@ -5,7 +5,7 @@ import { Button } from "@/components/ui/button";
 import { Filter, X } from "lucide-react";
 import { Customer } from "@/api/entities";
 
-export default function QuotationFilters({ filters, onFiltersChange }) {
+export default function QuotationFilters({ filters, onFiltersChange, onFilterChange }) {
   const [customers, setCustomers] = useState([]);
 
   useEffect(() => {
@@ -26,6 +26,7 @@ export default function QuotationFilters({ filters, onFiltersChange }) {
       ...prev,
       [field]: value
     }));
+    if (onFilterChange) onFilterChange();
   };
 
   const clearFilters = () => {
@@ -34,6 +35,7 @@ export default function QuotationFilters({ filters, onFiltersChange }) {
       customer: "all",
       dateRange: "all",
     });
+    if (onFilterChange) onFilterChange();
   };
 
   const hasActiveFilters = filters.status !== "all" || filters.customer !== "all" || filters.dateRange !== "all";

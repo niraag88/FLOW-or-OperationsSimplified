@@ -9,7 +9,7 @@ import { format, isValid, parseISO } from "date-fns";
 import { Customer } from "@/api/entities";
 import QuotationActionsDropdown from "./QuotationActionsDropdown";
 
-export default function QuotationList({ quotations, loading, canEdit, canOverride, currentUser, onEdit, onRefresh }) {
+export default function QuotationList({ quotations, totalCount, loading, canEdit, canOverride, currentUser, onEdit, onRefresh }) {
   const [customers, setCustomers] = useState([]);
 
   React.useEffect(() => {
@@ -95,7 +95,7 @@ export default function QuotationList({ quotations, loading, canEdit, canOverrid
         <CardHeader>
           <CardTitle className="flex items-center gap-2">
             <FileText className="w-5 h-5" />
-            Quotations ({quotations.length})
+            Quotations ({totalCount || quotations.length})
           </CardTitle>
         </CardHeader>
         <CardContent>

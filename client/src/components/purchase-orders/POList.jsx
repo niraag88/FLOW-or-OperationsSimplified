@@ -16,7 +16,7 @@ import {
 import ReceiveGoodsDialog from "./ReceiveGoodsDialog";
 import POActionsDropdown from "./POActionsDropdown";
 
-export default function POList({ purchaseOrders, loading, canEdit, currentUser, onEdit, onRefresh }) {
+export default function POList({ purchaseOrders, totalCount, loading, canEdit, currentUser, onEdit, onRefresh }) {
   const [showReceiveDialog, setShowReceiveDialog] = useState(false);
   const [selectedPO, setSelectedPO] = useState(null);
 
@@ -94,7 +94,7 @@ export default function POList({ purchaseOrders, loading, canEdit, currentUser, 
         <CardHeader>
           <CardTitle className="flex items-center gap-2">
             <ShoppingCart className="w-5 h-5" />
-            Purchase Orders ({purchaseOrders.length})
+            Purchase Orders ({totalCount || purchaseOrders.length})
           </CardTitle>
         </CardHeader>
         <CardContent>
