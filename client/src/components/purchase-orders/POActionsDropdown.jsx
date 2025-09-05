@@ -202,16 +202,16 @@ export default function POActionsDropdown({ po, canEdit, onEdit, onRefresh }) {
           </Button>
         </DropdownMenuTrigger>
         <DropdownMenuContent align="end">
-          <DropdownMenuItem onClick={handleViewPrint}>
-            <Eye className="w-4 h-4 mr-2" />
-            View & Print
-          </DropdownMenuItem>
           {canEdit && (
             <DropdownMenuItem onClick={() => onEdit(po)}>
               <Edit2 className="w-4 h-4 mr-2" />
               Edit
             </DropdownMenuItem>
           )}
+          <DropdownMenuItem onClick={handleViewPrint}>
+            <Eye className="w-4 h-4 mr-2" />
+            View & Print
+          </DropdownMenuItem>
           <DropdownMenuItem onClick={handleExportXLSX}>
             <Download className="w-4 h-4 mr-2" />
             Export to XLSX
