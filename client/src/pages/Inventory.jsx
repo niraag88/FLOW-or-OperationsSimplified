@@ -6,7 +6,10 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { Plus, Search, Filter } from "lucide-react";
+import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
+import { Checkbox } from "@/components/ui/checkbox";
+import { Badge } from "@/components/ui/badge";
+import { Plus, Search, Filter, ChevronDown, X } from "lucide-react";
 import { Product } from "@/api/entities";
 import { StockCount } from "@/api/entities"; // Changed from InventoryLot
 import ProductsTab from "../components/inventory/ProductsTab";
@@ -20,8 +23,8 @@ export default function Inventory() {
   const [loading, setLoading] = useState(true);
   const [searchTerm, setSearchTerm] = useState("");
   const [activeTab, setActiveTab] = useState("products");
-  const [brandFilter, setBrandFilter] = useState("");
-  const [sizeFilter, setSizeFilter] = useState("");
+  const [selectedBrands, setSelectedBrands] = useState([]);
+  const [selectedSizes, setSelectedSizes] = useState([]);
   const [refreshTrigger, setRefreshTrigger] = useState(0);
   const [stockSubTab, setStockSubTab] = useState("stock-levels");
   const [stockSubTabData, setStockSubTabData] = useState({
@@ -92,8 +95,8 @@ export default function Inventory() {
                          product.name?.toLowerCase().includes(searchTerm.toLowerCase()) ||
                          product.description?.toLowerCase().includes(searchTerm.toLowerCase());
     
-    const matchesBrand = !brandFilter || brandFilter === "__all__" || product.brandName === brandFilter;
-    const matchesSize = !sizeFilter || sizeFilter === "__all__" || product.description === sizeFilter;
+    const matchesBrand = selectedBrands.length === 0 || selectedBrands.includes(product.brandName);
+    const matchesSize = selectedSizes.length === 0 || selectedSizes.includes(product.description);
     
     return matchesSearch && matchesBrand && matchesSize;
   });
@@ -172,45 +175,122 @@ export default function Inventory() {
         </div>
         
         {activeTab === "products" && (
-          <div className="flex items-center gap-3">
+          <div className="flex items-center gap-3 flex-wrap">
             <Filter className="w-4 h-4 text-gray-400" />
             
-            <Select value={brandFilter} onValueChange={setBrandFilter}>
-              <SelectTrigger className="w-40">
-                <SelectValue placeholder="All Brands" />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="__all__">All Brands</SelectItem>
-                {uniqueBrands.map(brand => (
-                  <SelectItem key={brand} value={brand}>{brand}</SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
+            {/* Brand Filter */}
+            <Popover>
+              <PopoverTrigger asChild>
+                <Button variant="outline" className="justify-between w-40">
+                  {selectedBrands.length === 0 ? "All Brands" : `${selectedBrands.length} selected`}
+                  <ChevronDown className="ml-2 h-4 w-4" />
+                </Button>
+              </PopoverTrigger>
+              <PopoverContent className="w-60 p-4">
+                <div className="space-y-3">
+                  <h4 className="font-medium leading-none">Select Brands</h4>
+                  <div className="space-y-2 max-h-60 overflow-y-auto">
+                    {uniqueBrands.map(brand => (
+                      <div key={brand} className="flex items-center space-x-2">
+                        <Checkbox
+                          id={`brand-${brand}`}
+                          checked={selectedBrands.includes(brand)}
+                          onCheckedChange={(checked) => {
+                            if (checked) {
+                              setSelectedBrands(prev => [...prev, brand]);
+                            } else {
+                              setSelectedBrands(prev => prev.filter(b => b !== brand));
+                            }
+                          }}
+                        />
+                        <label
+                          htmlFor={`brand-${brand}`}
+                          className="text-sm leading-none peer-disabled:cursor-not-allowed peer-disabled:opacity-70 cursor-pointer"
+                        >
+                          {brand}
+                        </label>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              </PopoverContent>
+            </Popover>
             
-            <Select value={sizeFilter} onValueChange={setSizeFilter}>
-              <SelectTrigger className="w-40">
-                <SelectValue placeholder="All Sizes" />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="__all__">All Sizes</SelectItem>
-                {uniqueSizes.map(size => (
-                  <SelectItem key={size} value={size}>{size}</SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
+            {/* Size Filter */}
+            <Popover>
+              <PopoverTrigger asChild>
+                <Button variant="outline" className="justify-between w-40">
+                  {selectedSizes.length === 0 ? "All Sizes" : `${selectedSizes.length} selected`}
+                  <ChevronDown className="ml-2 h-4 w-4" />
+                </Button>
+              </PopoverTrigger>
+              <PopoverContent className="w-60 p-4">
+                <div className="space-y-3">
+                  <h4 className="font-medium leading-none">Select Sizes</h4>
+                  <div className="space-y-2 max-h-60 overflow-y-auto">
+                    {uniqueSizes.map(size => (
+                      <div key={size} className="flex items-center space-x-2">
+                        <Checkbox
+                          id={`size-${size}`}
+                          checked={selectedSizes.includes(size)}
+                          onCheckedChange={(checked) => {
+                            if (checked) {
+                              setSelectedSizes(prev => [...prev, size]);
+                            } else {
+                              setSelectedSizes(prev => prev.filter(s => s !== size));
+                            }
+                          }}
+                        />
+                        <label
+                          htmlFor={`size-${size}`}
+                          className="text-sm leading-none peer-disabled:cursor-not-allowed peer-disabled:opacity-70 cursor-pointer"
+                        >
+                          {size}
+                        </label>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              </PopoverContent>
+            </Popover>
             
-            {(brandFilter && brandFilter !== "__all__") || (sizeFilter && sizeFilter !== "__all__") ? (
+            {(selectedBrands.length > 0 || selectedSizes.length > 0) && (
               <Button 
                 variant="ghost" 
                 size="sm" 
                 onClick={() => {
-                  setBrandFilter("");
-                  setSizeFilter("");
+                  setSelectedBrands([]);
+                  setSelectedSizes([]);
                 }}
               >
                 Clear Filters
               </Button>
-            ) : null}
+            )}
+          </div>
+        )}
+        
+        {/* Active Filter Badges */}
+        {(selectedBrands.length > 0 || selectedSizes.length > 0) && (
+          <div className="flex items-center gap-2 flex-wrap">
+            <span className="text-sm text-gray-600">Active filters:</span>
+            {selectedBrands.map(brand => (
+              <Badge key={brand} variant="secondary" className="gap-1">
+                {brand}
+                <X 
+                  className="h-3 w-3 cursor-pointer" 
+                  onClick={() => setSelectedBrands(prev => prev.filter(b => b !== brand))}
+                />
+              </Badge>
+            ))}
+            {selectedSizes.map(size => (
+              <Badge key={size} variant="secondary" className="gap-1">
+                {size}
+                <X 
+                  className="h-3 w-3 cursor-pointer" 
+                  onClick={() => setSelectedSizes(prev => prev.filter(s => s !== size))}
+                />
+              </Badge>
+            ))}
           </div>
         )}
       </div>
