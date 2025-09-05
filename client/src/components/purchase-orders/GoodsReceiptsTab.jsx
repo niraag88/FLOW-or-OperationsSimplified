@@ -216,7 +216,7 @@ export default function GoodsReceiptsTab({ purchaseOrders, products, goodsReceip
       const grnData = {
         grn_number: grnNumber,
         purchase_order_id: po.id,
-        supplier_id: po.supplier_id,
+        supplier_id: po.supplierId,
         receipt_date: new Date().toISOString().split('T')[0],
         received_by: currentUser.email,
         notes: `Received via goods receipt tab`,
@@ -250,8 +250,8 @@ export default function GoodsReceiptsTab({ purchaseOrders, products, goodsReceip
           previous_qty: 0,
           adjusted_qty: item.received_quantity,
           difference: item.received_quantity,
-          reason: `Goods received via PO ${po.po_number}`,
-          reference_document: po.po_number,
+          reason: `Goods received via PO ${po.poNumber}`,
+          reference_document: po.poNumber,
           adjusted_by: currentUser.email,
           adjustment_date: new Date().toISOString()
         });
@@ -282,7 +282,7 @@ export default function GoodsReceiptsTab({ purchaseOrders, products, goodsReceip
 
         toast({
           title: "Purchase Order Closed",
-          description: `${po.po_number} has been automatically closed as all items are received.`
+          description: `${po.poNumber} has been automatically closed as all items are received.`
         });
       } else {
         toast({
@@ -331,7 +331,7 @@ export default function GoodsReceiptsTab({ purchaseOrders, products, goodsReceip
         'closed',
         { reason: 'Manual force close by user.' }
       );
-      toast({ title: "Success", description: `PO #${closingPO.po_number} has been closed.` });
+      toast({ title: "Success", description: `PO #${closingPO.poNumber} has been closed.` });
       onRefresh();
     } catch (error) {
       console.error("Error force closing PO:", error);
@@ -393,16 +393,16 @@ export default function GoodsReceiptsTab({ purchaseOrders, products, goodsReceip
                   <CardHeader className="bg-gray-50 p-4 border-b">
                     <div className="flex flex-col sm:flex-row justify-between sm:items-center gap-2">
                       <div className="min-w-0">
-                        <h3 className="font-semibold text-lg text-gray-800">{po.po_number}</h3>
-                        <p className="text-sm text-gray-600">{getBrandName(po.supplier_id)}</p>
+                        <h3 className="font-semibold text-lg text-gray-800">{po.poNumber}</h3>
+                        <p className="text-sm text-gray-600">{getBrandName(po.supplierId)}</p>
                       </div>
                       <div className="flex items-center gap-2">
                         <Badge variant="outline" className="border-blue-300 text-blue-800 bg-blue-50">
                           {po.status?.toUpperCase()}
                         </Badge>
                         <span className="text-sm text-gray-500">
-                          {po.order_date && !isNaN(new Date(po.order_date)) ? 
-                            format(new Date(po.order_date), 'MMM dd, yyyy') : 
+                          {po.orderDate && !isNaN(new Date(po.orderDate)) ? 
+                            format(new Date(po.orderDate), 'MMM dd, yyyy') : 
                             'Invalid Date'
                           }
                         </span>
@@ -473,7 +473,7 @@ export default function GoodsReceiptsTab({ purchaseOrders, products, goodsReceip
       <Dialog open={!!selectedPOForReceive} onOpenChange={() => setSelectedPOForReceive(null)}>
         <DialogContent className="max-w-4xl max-h-[80vh] overflow-y-auto">
           <DialogHeader>
-            <DialogTitle>Receive Goods - PO #{selectedPOForReceive?.po_number}</DialogTitle>
+            <DialogTitle>Receive Goods - PO #{selectedPOForReceive?.poNumber}</DialogTitle>
             <DialogDescription>
               Enter the quantities received for each product. You can receive partial quantities and continue receiving more later.
             </DialogDescription>
@@ -597,7 +597,7 @@ export default function GoodsReceiptsTab({ purchaseOrders, products, goodsReceip
         open={showCloseConfirm}
         onOpenChange={setShowCloseConfirm}
         title="Force Close Purchase Order"
-        description={`Are you sure you want to manually close PO #${closingPO?.po_number}? This should only be done if you are not expecting any more items. This action cannot be undone.`}
+        description={`Are you sure you want to manually close PO #${closingPO?.poNumber}? This should only be done if you are not expecting any more items. This action cannot be undone.`}
         onConfirm={handleConfirmForceClose}
         confirmText="Yes, Close PO"
         variant="destructive"
