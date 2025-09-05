@@ -61,9 +61,9 @@ export default function DOPrintView() {
         {/* Header with Logo and Title */}
         <div className="print-header">
           <div className="print-logo-container">
-            {companySettings.logo_url && (
+            {companySettings.logo && (
               <img 
-                src={companySettings.logo_url} 
+                src={companySettings.logo} 
                 alt="Company Logo" 
                 className="print-logo"
               />

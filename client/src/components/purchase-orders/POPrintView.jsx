@@ -84,9 +84,9 @@ export default function POPrintView() {
         {/* Header with Logo and Title */}
         <div className="print-header">
           <div className="header-content">
-            {companyData?.logo_url && (
+            {companyData?.logo && (
               <div className="header-logo">
-                <img src={companyData.logo_url} alt="Company Logo" />
+                <img src={companyData.logo} alt="Company Logo" />
               </div>
             )}
             <h1 className="print-title">PURCHASE ORDER</h1>
