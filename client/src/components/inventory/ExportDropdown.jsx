@@ -16,16 +16,13 @@ export default function ExportDropdown({ products, activeTab, stockSubTab, stock
   // Helper function to prepare product export data
   const getProductExportData = () => {
     return products.map(product => ({
-      SKU: product.sku,
+      Brand: product.brandName || '-',
+      'Product Code': product.sku,
       'Product Name': product.name,
-      Description: product.description || '',
-      'Brand ID': product.brandId,
-      'Unit Price': product.unitPrice,
-      'Cost Price': product.costPrice || 0,
-      'Stock Quantity': product.stockQuantity || 0,
-      'Min Stock Level': product.minStockLevel || 0,
-      'Max Stock Level': product.maxStockLevel || null,
-      'Created Date': new Date(product.createdAt).toLocaleDateString()
+      Size: product.description || '-',
+      'Cost Price': `£${product.costPrice}`,
+      'Sale Price': `AED ${product.unitPrice}`,
+      Status: product.isActive ? 'Active' : 'Inactive'
     }));
   };
 
