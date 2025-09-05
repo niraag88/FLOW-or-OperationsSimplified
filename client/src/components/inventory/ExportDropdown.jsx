@@ -38,7 +38,83 @@ export default function ExportDropdown({ products, activeTab, stockSubTab, stock
       if (format === 'xlsx') {
         exportToXLSX(exportData, filename, 'Products');
       } else if (format === 'pdf') {
-        exportToPDF(exportData, filename, 'Product Inventory Report');
+        // Open print view in new tab for PDF printing
+        const printWindow = window.open('', '_blank');
+        printWindow.document.write(`
+          <!DOCTYPE html>
+          <html>
+          <head>
+            <title>Product Inventory Report</title>
+            <style>
+              body { font-family: Arial, sans-serif; margin: 20px; }
+              .print-header { text-align: center; margin-bottom: 30px; }
+              .print-header h1 { font-size: 24px; margin-bottom: 5px; }
+              .print-header h2 { font-size: 18px; color: #666; margin-top: 0; }
+              .print-table { width: 100%; border-collapse: collapse; margin-bottom: 30px; }
+              .print-table th, .print-table td { border: 1px solid #ddd; padding: 8px; text-align: left; }
+              .print-table th { background-color: #f5f5f5; font-weight: bold; }
+              .print-table td { font-size: 12px; }
+              .print-footer { margin-top: 30px; font-size: 10px; color: #666; text-align: center; }
+              @media print {
+                body { margin: 0; }
+                .print-table { font-size: 10px; }
+              }
+            </style>
+          </head>
+          <body>
+            <div class="print-header">
+              <h1>Inventory Management</h1>
+              <h2>Products</h2>
+            </div>
+            
+            <table class="print-table">
+              <thead>
+                <tr>
+                  <th>Brand</th>
+                  <th>Product Code</th>
+                  <th>Product Name</th>
+                  <th>Size</th>
+                  <th>Cost Price</th>
+                  <th>Unit Price</th>
+                  <th>Stock Quantity</th>
+                  <th>Status</th>
+                </tr>
+              </thead>
+              <tbody>
+                ${products.map(product => `
+                  <tr>
+                    <td>${product.brandName || '-'}</td>
+                    <td>${product.sku || '-'}</td>
+                    <td>${product.name || '-'}</td>
+                    <td>${product.size || '-'}</td>
+                    <td>GBP ${parseFloat(product.costPrice || 0).toFixed(2)}</td>
+                    <td>GBP ${parseFloat(product.unitPrice || 0).toFixed(2)}</td>
+                    <td>${product.stockQuantity || 0}</td>
+                    <td>${product.isActive ? 'Active' : 'Inactive'}</td>
+                  </tr>
+                `).join('')}
+              </tbody>
+            </table>
+            
+            <div class="print-footer">
+              <p>Generated on: ${new Date().toLocaleDateString('en-GB')} at ${new Date().toLocaleTimeString('en-GB')}</p>
+              <p>Total Products: ${products.length}</p>
+            </div>
+            
+            <script>
+              window.onload = function() {
+                setTimeout(function() {
+                  window.print();
+                  window.onafterprint = function() {
+                    window.close();
+                  };
+                }, 500);
+              };
+            </script>
+          </body>
+          </html>
+        `);
+        printWindow.document.close();
       } else {
         exportToCsv(exportData, filename);
       }
@@ -240,7 +316,7 @@ export default function ExportDropdown({ products, activeTab, stockSubTab, stock
               disabled={itemCount === 0}
             >
               <FileText className="w-4 h-4 mr-2" />
-              Export to PDF
+              Print to PDF
             </DropdownMenuItem>
           </>
         )}
