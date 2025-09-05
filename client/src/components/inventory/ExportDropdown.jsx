@@ -75,7 +75,7 @@ export default function ExportDropdown({ products, activeTab, stockSubTab, stock
                   <th>Product Name</th>
                   <th>Size</th>
                   <th>Cost Price</th>
-                  <th>Unit Price</th>
+                  <th>Sale Price</th>
                   <th>Status</th>
                 </tr>
               </thead>
@@ -86,8 +86,8 @@ export default function ExportDropdown({ products, activeTab, stockSubTab, stock
                     <td>${product.sku || '-'}</td>
                     <td>${product.name || '-'}</td>
                     <td>${product.size || '-'}</td>
-                    <td>GBP ${parseFloat(product.costPrice || 0).toFixed(2)}</td>
-                    <td>GBP ${parseFloat(product.unitPrice || 0).toFixed(2)}</td>
+                    <td>£${parseFloat(product.costPrice || 0).toFixed(2)}</td>
+                    <td>AED ${(parseFloat(product.unitPrice || 0) * 5.0).toFixed(2)}</td>
                     <td>${product.isActive ? 'Active' : 'Inactive'}</td>
                   </tr>
                 `).join('')}
