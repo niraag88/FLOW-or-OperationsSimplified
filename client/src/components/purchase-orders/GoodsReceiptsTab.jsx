@@ -5,7 +5,7 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import { ShoppingCart, CheckCircle2, Package, Truck, MoreHorizontal, XCircle } from "lucide-react";
+import { ShoppingCart, CheckCircle2, Package, Truck, MoreHorizontal, XCircle, ChevronDown, ChevronRight } from "lucide-react";
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -13,6 +13,7 @@ import {
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
 import { Skeleton } from "@/components/ui/skeleton";
+import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible";
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Textarea } from "@/components/ui/textarea";
 import { Label } from "@/components/ui/label";
@@ -33,6 +34,7 @@ export default function GoodsReceiptsTab({ purchaseOrders, products, goodsReceip
   const [selectedPOForReceive, setSelectedPOForReceive] = useState(null);
   const [receiveQuantities, setReceiveQuantities] = useState({});
   const [receiveNotes, setReceiveNotes] = useState('');
+  const [showClosedReceipts, setShowClosedReceipts] = useState(false);
   const { toast } = useToast();
 
 
@@ -67,6 +69,68 @@ export default function GoodsReceiptsTab({ purchaseOrders, products, goodsReceip
   const getLineItemsCount = (po) => po.lineItems || 0;
   const getTotalOrderedQuantity = (po) => po.orderedQty || 0;
   const getTotalReceivedQuantity = (po) => po.receivedQty || 0;
+
+  // Helper function to render purchase order table
+  const renderPOTable = (pos, showActions = true) => (
+    <Table>
+      <TableHeader>
+        <TableRow>
+          <TableHead>PO Number</TableHead>
+          <TableHead>Brand</TableHead>
+          <TableHead>Order Date</TableHead>
+          <TableHead>Total (GBP)</TableHead>
+          <TableHead>Total (AED)</TableHead>
+          <TableHead>Line Items</TableHead>
+          <TableHead>Ordered</TableHead>
+          <TableHead>Received</TableHead>
+          <TableHead>Status</TableHead>
+          {showActions && <TableHead>Actions</TableHead>}
+        </TableRow>
+      </TableHeader>
+      <TableBody>
+        {pos.map((po) => (
+          <TableRow key={po.id}>
+            <TableCell className="font-medium">{po.poNumber}</TableCell>
+            <TableCell>{po.brandName || 'Unknown Brand'}</TableCell>
+            <TableCell>
+              {po.orderDate && !isNaN(new Date(po.orderDate)) ? 
+                format(new Date(po.orderDate), 'dd/MM/yy') : 
+                '-'
+              }
+            </TableCell>
+            <TableCell>GBP {parseFloat(po.totalAmount || 0).toFixed(2)}</TableCell>
+            <TableCell>AED {parseFloat(po.grandTotal || 0).toFixed(2)}</TableCell>
+            <TableCell>{getLineItemsCount(po)}</TableCell>
+            <TableCell>{getTotalOrderedQuantity(po)}</TableCell>
+            <TableCell>{getTotalReceivedQuantity(po)}</TableCell>
+            <TableCell>
+              <Badge 
+                variant="outline" 
+                className={po.status === 'closed' 
+                  ? "border-gray-300 text-gray-700 bg-gray-50" 
+                  : "border-blue-300 text-blue-800 bg-blue-50"
+                }
+              >
+                {po.status?.toUpperCase()}
+              </Badge>
+            </TableCell>
+            {showActions && (
+              <TableCell>
+                <Button
+                  size="sm"
+                  onClick={() => openReceiveDialog(po)}
+                  disabled={!canEdit || processingPO === po.id}
+                  className="bg-emerald-600 hover:bg-emerald-700"
+                >
+                  {processingPO === po.id ? "Processing..." : "Receive"}
+                </Button>
+              </TableCell>
+            )}
+          </TableRow>
+        ))}
+      </TableBody>
+    </Table>
+  );
 
   const openReceiveDialog = async (po) => {
     try {
@@ -384,6 +448,7 @@ export default function GoodsReceiptsTab({ purchaseOrders, products, goodsReceip
   }
 
   const openPOs = purchaseOrders.filter(po => po.status === 'submitted');
+  const closedPOs = purchaseOrders.filter(po => po.status === 'closed');
 
   return (
     <>
@@ -398,67 +463,50 @@ export default function GoodsReceiptsTab({ purchaseOrders, products, goodsReceip
           </p>
         </CardHeader>
         <CardContent>
-          {openPOs.length === 0 ? (
-            <div className="text-center py-12 text-gray-500">
-              <ShoppingCart className="w-12 h-12 mx-auto mb-4 opacity-50" />
-              <p className="font-semibold">No Submitted Purchase Orders</p>
-              <p>There are no purchase orders awaiting goods receipt.</p>
-            </div>
-          ) : (
-            <div className="overflow-x-auto">
-              <Table>
-                <TableHeader>
-                  <TableRow>
-                    <TableHead>PO Number</TableHead>
-                    <TableHead>Brand</TableHead>
-                    <TableHead>Order Date</TableHead>
-                    <TableHead>Total (GBP)</TableHead>
-                    <TableHead>Total (AED)</TableHead>
-                    <TableHead>Line Items</TableHead>
-                    <TableHead>Ordered</TableHead>
-                    <TableHead>Received</TableHead>
-                    <TableHead>Status</TableHead>
-                    <TableHead>Actions</TableHead>
-                  </TableRow>
-                </TableHeader>
-                <TableBody>
-                  {openPOs.map((po) => {
-                    return (
-                      <TableRow key={po.id}>
-                        <TableCell className="font-medium">{po.poNumber}</TableCell>
-                        <TableCell>{po.brandName || 'Unknown Brand'}</TableCell>
-                        <TableCell>
-                          {po.orderDate && !isNaN(new Date(po.orderDate)) ? 
-                            format(new Date(po.orderDate), 'dd/MM/yy') : 
-                            '-'
-                          }
-                        </TableCell>
-                        <TableCell>GBP {parseFloat(po.totalAmount || 0).toFixed(2)}</TableCell>
-                        <TableCell>AED {parseFloat(po.grandTotal || 0).toFixed(2)}</TableCell>
-                        <TableCell>{getLineItemsCount(po)}</TableCell>
-                        <TableCell>{getTotalOrderedQuantity(po)}</TableCell>
-                        <TableCell>{getTotalReceivedQuantity(po)}</TableCell>
-                        <TableCell>
-                          <Badge variant="outline" className="border-blue-300 text-blue-800 bg-blue-50">
-                            {po.status?.toUpperCase()}
-                          </Badge>
-                        </TableCell>
-                        <TableCell>
-                          <Button
-                            size="sm"
-                            onClick={() => openReceiveDialog(po)}
-                            disabled={!canEdit || processingPO === po.id}
-                            className="bg-emerald-600 hover:bg-emerald-700"
-                          >
-                            {processingPO === po.id ? "Processing..." : "Receive"}
-                          </Button>
-                        </TableCell>
-                      </TableRow>
-                    );
-                  })}
-                </TableBody>
-              </Table>
-            </div>
+          {/* Open Purchase Orders Section */}
+          <div className="mb-6">
+            <h3 className="text-lg font-semibold mb-3 flex items-center gap-2">
+              <Package className="w-5 h-5 text-blue-600" />
+              Open Purchase Orders ({openPOs.length})
+            </h3>
+            {openPOs.length === 0 ? (
+              <div className="text-center py-8 text-gray-500 border-2 border-dashed border-gray-200 rounded-lg">
+                <ShoppingCart className="w-12 h-12 mx-auto mb-4 opacity-50" />
+                <p className="font-semibold">No Submitted Purchase Orders</p>
+                <p>There are no purchase orders awaiting goods receipt.</p>
+              </div>
+            ) : (
+              <div className="overflow-x-auto border rounded-lg">
+                {renderPOTable(openPOs, true)}
+              </div>
+            )}
+          </div>
+
+          {/* Closed Purchase Orders Section - Collapsible */}
+          {closedPOs.length > 0 && (
+            <Collapsible open={showClosedReceipts} onOpenChange={setShowClosedReceipts}>
+              <CollapsibleTrigger asChild>
+                <Button 
+                  variant="outline" 
+                  className="w-full justify-between text-left h-auto p-4 border-gray-300"
+                >
+                  <div className="flex items-center gap-2">
+                    <CheckCircle2 className="w-5 h-5 text-green-600" />
+                    <span className="font-semibold">Closed Goods Receipts ({closedPOs.length})</span>
+                  </div>
+                  {showClosedReceipts ? (
+                    <ChevronDown className="w-4 h-4" />
+                  ) : (
+                    <ChevronRight className="w-4 h-4" />
+                  )}
+                </Button>
+              </CollapsibleTrigger>
+              <CollapsibleContent className="mt-3">
+                <div className="overflow-x-auto border rounded-lg">
+                  {renderPOTable(closedPOs, false)}
+                </div>
+              </CollapsibleContent>
+            </Collapsible>
           )}
         </CardContent>
       </Card>
