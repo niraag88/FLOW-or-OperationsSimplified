@@ -39,15 +39,23 @@ export default function ExportDropdown({
   };
 
   const handleExport = async (format = 'xlsx') => {
-    if (!data || data.length === 0) return;
+    console.log('Export clicked:', { data, type, filename, format, columns });
+    
+    if (!data || data.length === 0) {
+      console.warn('No data to export');
+      alert('No data available to export');
+      return;
+    }
     
     setIsExporting(true);
     try {
       const exportData = getExportData();
+      console.log('Export data prepared:', exportData);
       const timestamp = new Date().toISOString().split('T')[0];
       const exportFilename = `${filename}-${timestamp}`;
       
       if (format === 'xlsx') {
+        console.log('Exporting to XLSX...');
         exportToXLSX(exportData, exportFilename, type);
       } else if (format === 'pdf') {
         // Create a simple print view for PDF
