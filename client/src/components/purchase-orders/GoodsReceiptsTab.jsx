@@ -5,7 +5,7 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import { ShoppingCart, CheckCircle2, Package, Truck, MoreHorizontal, XCircle, ChevronDown, ChevronRight } from "lucide-react";
+import { ShoppingCart, CheckCircle2, Package, Truck, MoreHorizontal, XCircle, ChevronDown, ChevronRight, FileText, FileSpreadsheet } from "lucide-react";
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -71,26 +71,60 @@ export default function GoodsReceiptsTab({ purchaseOrders, products, goodsReceip
   const getTotalReceivedQuantity = (po) => po.receivedQty || 0;
 
   // Handler functions for closed PO actions
-  const handleViewPO = (po) => {
-    // TODO: Implement view functionality
-    toast({
-      title: "View Purchase Order",
-      description: `Viewing PO ${po.poNumber}`,
-      variant: "default"
-    });
+  const handleViewAndPrint = (po) => {
+    // Open print view in new tab for PDF printing
+    const printWindow = window.open('', '_blank');
+    printWindow.document.write(`
+      <!DOCTYPE html>
+      <html>
+      <head>
+        <title>Purchase Order ${po.poNumber}</title>
+        <style>
+          body { font-family: Arial, sans-serif; margin: 20px; }
+          .print-header { text-align: center; margin-bottom: 30px; }
+          .print-header h1 { font-size: 24px; margin-bottom: 5px; }
+          .print-header h2 { font-size: 18px; color: #666; margin-top: 0; }
+          .print-table { width: 100%; border-collapse: collapse; margin-bottom: 30px; }
+          .print-table th, .print-table td { border: 1px solid #ddd; padding: 8px; text-align: left; }
+          .print-table th { background-color: #f5f5f5; font-weight: bold; }
+          .print-table td { font-size: 12px; }
+          .print-footer { margin-top: 30px; font-size: 10px; color: #666; text-align: center; }
+          @media print {
+            body { margin: 0; }
+            .print-table { font-size: 10px; }
+          }
+        </style>
+      </head>
+      <body>
+        <div class="print-header">
+          <h1>Purchase Order</h1>
+          <h2>${po.poNumber}</h2>
+        </div>
+        
+        <table class="print-table">
+          <tr><th>PO Number:</th><td>${po.poNumber}</td></tr>
+          <tr><th>Brand:</th><td>${po.brandName || 'Unknown Brand'}</td></tr>
+          <tr><th>Order Date:</th><td>${po.orderDate ? new Date(po.orderDate).toLocaleDateString('en-GB') : '-'}</td></tr>
+          <tr><th>Total (GBP):</th><td>GBP ${parseFloat(po.totalAmount || 0).toFixed(2)}</td></tr>
+          <tr><th>Total (AED):</th><td>AED ${parseFloat(po.grandTotal || 0).toFixed(2)}</td></tr>
+          <tr><th>Line Items:</th><td>${po.lineItems || 0}</td></tr>
+          <tr><th>Ordered Quantity:</th><td>${po.orderedQty || 0}</td></tr>
+          <tr><th>Received Quantity:</th><td>${po.receivedQty || 0}</td></tr>
+          <tr><th>Status:</th><td>${po.status?.toUpperCase()}</td></tr>
+        </table>
+        
+        <div class="print-footer">
+          <p>Generated on: ${new Date().toLocaleDateString('en-GB')} at ${new Date().toLocaleTimeString('en-GB')}</p>
+        </div>
+        
+      </body>
+      </html>
+    `);
+    printWindow.document.close();
   };
 
-  const handlePrintPO = (po) => {
-    // TODO: Implement print functionality
-    toast({
-      title: "Print Purchase Order",
-      description: `Printing PO ${po.poNumber}`,
-      variant: "default"
-    });
-  };
-
-  const handleExportPO = (po) => {
-    // TODO: Implement export functionality
+  const handleExportToXLSX = (po) => {
+    // TODO: Implement XLSX export functionality
     toast({
       title: "Export to XLSX",
       description: `Exporting PO ${po.poNumber} to Excel`,
@@ -160,13 +194,12 @@ export default function GoodsReceiptsTab({ purchaseOrders, products, goodsReceip
                     </Button>
                   </DropdownMenuTrigger>
                   <DropdownMenuContent align="end">
-                    <DropdownMenuItem onClick={() => handleViewPO(po)}>
-                      View
+                    <DropdownMenuItem onClick={() => handleViewAndPrint(po)}>
+                      <FileText className="w-4 h-4 mr-2" />
+                      View & Print
                     </DropdownMenuItem>
-                    <DropdownMenuItem onClick={() => handlePrintPO(po)}>
-                      Print
-                    </DropdownMenuItem>
-                    <DropdownMenuItem onClick={() => handleExportPO(po)}>
+                    <DropdownMenuItem onClick={() => handleExportToXLSX(po)}>
+                      <FileSpreadsheet className="w-4 h-4 mr-2" />
                       Export to XLSX
                     </DropdownMenuItem>
                     <DropdownMenuItem 
