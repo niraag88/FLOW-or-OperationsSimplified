@@ -49,17 +49,20 @@ Preferred communication style: Simple, everyday language.
 
 # Document Format Standards
 
-## Internal Documents
-- **Usage**: Inventory reports, Purchase Orders management, internal reports, goods receipts
+## Internal Documents Format
+- **Usage**: Inventory reports, Purchase Orders listing, internal reports, goods receipts listing
+- **When to use**: When user says "internal document" or for listing/reporting multiple items
 - **Implementation**: Uses ExportDropdown component's View & Print functionality (`client/src/components/common/ExportDropdown.jsx`)
 - **Format Structure**:
   - Header: "Business Operations" + document type
   - Simple bordered data table with consistent styling
   - Footer with generation timestamp and record count
 - **Styling**: Clean, minimal table format optimized for internal use
+- **Example**: Export function on Purchase Orders page that lists all POs
 
-## External Documents  
+## External Documents Format  
 - **Usage**: Individual Purchase Orders, Quotations, Invoices, Delivery Orders (customer-facing documents)
+- **When to use**: When user says "external document" or for individual professional documents
 - **Implementation**: Uses POTemplate component pattern (`attached_assets/src/components/print/POTemplate.jsx`)
 - **Format Structure**:
   - Professional header with company branding/logo
@@ -69,6 +72,7 @@ Preferred communication style: Simple, everyday language.
   - Detailed line items table with totals
   - Professional styling with proper spacing and print optimization
 - **Print Styles**: A4 portrait format with proper margins and print-specific CSS
+- **Example**: Individual Purchase Order View & Print functionality
 
 # External Dependencies
 
