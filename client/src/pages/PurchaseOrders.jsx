@@ -105,11 +105,23 @@ export default function PurchaseOrders() {
     grn.delivery_note_ref?.toLowerCase().includes(searchTerm.toLowerCase())
   );
 
-  // For Goods Receipts export - get context-aware data based on the purchase orders
+  // For Goods Receipts export - we'll manage the export state here 
+  const [showOpenReceipts, setShowOpenReceipts] = useState(true);
+  const [showClosedReceipts, setShowClosedReceipts] = useState(false);
+  
   const getGoodsReceiptsExportData = () => {
     const openPOs = purchaseOrders.filter(po => po.status === 'submitted');
     const closedPOs = purchaseOrders.filter(po => po.status === 'closed');
-    return [...openPOs, ...closedPOs]; // Export all for now, can be made more context-aware later
+    
+    // Context-aware export based on expanded sections
+    if (showOpenReceipts && !showClosedReceipts) {
+      return openPOs; // Only open
+    } else if (!showOpenReceipts && showClosedReceipts) {
+      return closedPOs; // Only closed  
+    } else if (showOpenReceipts && showClosedReceipts) {
+      return [...openPOs, ...closedPOs]; // Both
+    }
+    return []; // Neither expanded
   };
 
   const goodsReceiptsColumns = {
@@ -307,6 +319,10 @@ export default function PurchaseOrders() {
             canEdit={canEdit}
             currentUser={currentUser}
             onRefresh={handleRefresh}
+            showOpenReceipts={showOpenReceipts}
+            setShowOpenReceipts={setShowOpenReceipts}
+            showClosedReceipts={showClosedReceipts}
+            setShowClosedReceipts={setShowClosedReceipts}
           />
         </TabsContent>
       </Tabs>

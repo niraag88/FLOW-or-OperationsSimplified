@@ -31,7 +31,19 @@ import { RecycleBin } from "@/api/entities";
 import { AuditLog } from "@/api/entities";
 import { User } from "@/api/entities";
 
-export default function GoodsReceiptsTab({ purchaseOrders, products, goodsReceipts, loading, canEdit, currentUser, onRefresh }) {
+export default function GoodsReceiptsTab({ 
+  purchaseOrders, 
+  products, 
+  goodsReceipts, 
+  loading, 
+  canEdit, 
+  currentUser, 
+  onRefresh,
+  showOpenReceipts,
+  setShowOpenReceipts,
+  showClosedReceipts,
+  setShowClosedReceipts
+}) {
   const [receivingQuantities, setReceivingQuantities] = useState({});
   const [processingPO, setProcessingPO] = useState(null);
   const [showCloseConfirm, setShowCloseConfirm] = useState(false);
@@ -39,8 +51,7 @@ export default function GoodsReceiptsTab({ purchaseOrders, products, goodsReceip
   const [selectedPOForReceive, setSelectedPOForReceive] = useState(null);
   const [receiveQuantities, setReceiveQuantities] = useState({});
   const [receiveNotes, setReceiveNotes] = useState('');
-  const [showClosedReceipts, setShowClosedReceipts] = useState(false);
-  const [showOpenReceipts, setShowOpenReceipts] = useState(true);
+  // State is now managed by parent component for context-aware export
   const [showDeleteDialog, setShowDeleteDialog] = useState(false);
   const [deletingPO, setDeletingPO] = useState(null);
   const { toast } = useToast();
