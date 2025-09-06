@@ -894,6 +894,29 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  // Optimized endpoint for stock analysis with pre-calculated summaries
+  app.get('/api/products/stock-analysis', requireAuth(), async (req: AuthenticatedRequest, res) => {
+    try {
+      const lowStockThreshold = req.query.threshold ? parseInt(String(req.query.threshold)) : 6;
+      const stockData = await businessStorage.getProductsWithStockAnalysis(lowStockThreshold);
+      res.json(stockData);
+    } catch (error) {
+      console.error('Error fetching stock analysis:', error);
+      res.status(500).json({ error: 'Failed to fetch stock analysis' });
+    }
+  });
+
+  // Dashboard aggregation endpoint - replaces 9+ individual API calls
+  app.get('/api/dashboard', requireAuth(), async (req: AuthenticatedRequest, res) => {
+    try {
+      const dashboardData = await businessStorage.getDashboardData();
+      res.json(dashboardData);
+    } catch (error) {
+      console.error('Error fetching dashboard data:', error);
+      res.status(500).json({ error: 'Failed to fetch dashboard data' });
+    }
+  });
+
   app.get('/api/products/:id', requireAuth(), async (req: AuthenticatedRequest, res) => {
     try {
       const productId = parseInt(req.params.id);

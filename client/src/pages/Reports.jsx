@@ -58,38 +58,23 @@ export default function Reports() {
   const loadAllData = async () => {
     setLoading(true);
     try {
-      const [
-        productsData,
-        lotsData,
-        posData,
-        grnsData,
-        invoicesData,
-        customersData,
-        suppliersData,
-        booksData,
-        settingsData
-      ] = await Promise.all([
-        Product.list("-updated_date"),
-        InventoryLot.list("-updated_date"),
-        PurchaseOrder.list("-updated_date"),
-        GoodsReceipt.list("-updated_date"),
-        Invoice.list("-updated_date"),
-        Customer.list("-updated_date"),
-        Supplier.list("-updated_date"),
-        Books.list(),
-        CompanySettings.list(),
-      ]);
+      // Use single optimized dashboard endpoint instead of 9+ individual calls
+      const response = await fetch('/api/dashboard', { credentials: 'include' });
+      if (!response.ok) {
+        throw new Error('Failed to fetch dashboard data');
+      }
+      const dashboardData = await response.json();
 
       setData({
-        products: productsData,
-        lots: lotsData,
-        purchaseOrders: posData,
-        goodsReceipts: grnsData,
-        invoices: invoicesData,
-        customers: customersData,
-        suppliers: suppliersData,
-        books: booksData,
-        companySettings: settingsData[0] || null,
+        products: dashboardData.products,
+        lots: dashboardData.lots,
+        purchaseOrders: dashboardData.purchaseOrders,
+        goodsReceipts: dashboardData.goodsReceipts,
+        invoices: dashboardData.invoices,
+        customers: dashboardData.customers,
+        suppliers: dashboardData.suppliers,
+        books: [], // Books not implemented in dashboard yet
+        companySettings: dashboardData.companySettings,
       });
     } catch (error) {
       console.error("Error loading reporting data:", error);

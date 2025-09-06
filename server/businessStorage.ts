@@ -453,6 +453,119 @@ export class BusinessStorage {
     await db.delete(stockCounts).where(eq(stockCounts.id, id));
     return true;
   }
+
+  // Dashboard aggregation for reports - single API call for all data
+  async getDashboardData() {
+    try {
+      // Fetch all data in parallel for maximum efficiency
+      const [
+        productsData,
+        lotsData,
+        posData,
+        grnsData,
+        invoicesData,
+        customersData,
+        suppliersData,
+        settingsData
+      ] = await Promise.all([
+        this.getProducts(),
+        this.getStockCounts(),
+        this.getPurchaseOrders(),
+        db.select().from(goodsReceipts).orderBy(desc(goodsReceipts.createdAt)), // Basic GRN data
+        // Note: Invoices would go here when implemented
+        Promise.resolve([]), // Placeholder for invoices
+        this.getCustomers(),
+        this.getSuppliers(),
+        this.getCompanySettings()
+      ]);
+
+      return {
+        products: productsData,
+        lots: lotsData,
+        purchaseOrders: posData,
+        goodsReceipts: grnsData,
+        invoices: invoicesData,
+        customers: customersData,
+        suppliers: suppliersData,
+        companySettings: settingsData,
+        // Pre-calculated summaries for instant dashboard loading
+        summary: {
+          totalProducts: productsData.length,
+          totalSuppliers: suppliersData.length,
+          totalCustomers: customersData.length,
+          totalPurchaseOrders: posData.length,
+          totalGoodsReceipts: grnsData.length,
+          lastUpdated: new Date().toISOString()
+        }
+      };
+    } catch (error) {
+      console.error('Error fetching dashboard data:', error);
+      throw error;
+    }
+  }
+
+  // Optimized method to get products with stock analysis
+  async getProductsWithStockAnalysis(lowStockThreshold: number = 6) {
+    // Get all products with their brand names using proper join
+    const allProducts = await db.select({
+      id: products.id,
+      sku: products.sku,
+      name: products.name,
+      description: products.description,
+      brandId: products.brandId,
+      brandName: brands.name,
+      category: products.category,
+      size: products.size,
+      unitPrice: products.unitPrice,
+      stockQuantity: products.stockQuantity,
+      costPrice: products.costPrice,
+      unit: products.unit,
+      minStockLevel: products.minStockLevel,
+      maxStockLevel: products.maxStockLevel,
+      isActive: products.isActive,
+      createdAt: products.createdAt,
+      updatedAt: products.updatedAt
+    }).from(products)
+      .leftJoin(brands, eq(products.brandId, brands.id))
+      .where(eq(products.isActive, true))
+      .orderBy(desc(products.updatedAt));
+
+    // Calculate stock summary aggregations server-side
+    let totalItems = 0;
+    let totalValue = 0; // GBP
+    let lowStockCount = 0;
+    let outOfStockCount = 0;
+    const lowStockProducts: typeof allProducts = [];
+    const outOfStockProducts: typeof allProducts = [];
+
+    allProducts.forEach(product => {
+      const stock = product.stockQuantity || 0;
+      const costPrice = parseFloat(String(product.costPrice) || '0');
+      
+      totalItems += stock;
+      totalValue += stock * costPrice; // Use cost price for proper inventory valuation
+
+      if (stock === 0) {
+        outOfStockCount++;
+        outOfStockProducts.push(product);
+      } else if (stock <= lowStockThreshold) {
+        lowStockCount++;
+        lowStockProducts.push(product);
+      }
+    });
+
+    return {
+      products: allProducts,
+      stockSummary: {
+        totalItems,
+        totalValue,
+        lowStockCount,
+        outOfStockCount
+      },
+      lowStockProducts,
+      outOfStockProducts
+    };
+  }
 }
 
 export const businessStorage = new BusinessStorage();

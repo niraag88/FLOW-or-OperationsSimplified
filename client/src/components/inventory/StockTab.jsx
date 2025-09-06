@@ -13,7 +13,9 @@ import { Checkbox } from "@/components/ui/checkbox";
 import { format } from "date-fns";
 
 export default function StockTab({ products, loading, canEdit, currentUser, onRefresh, onStockSubTabChange }) {
+  const [stockData, setStockData] = useState(null);
   const [stockMovements, setStockMovements] = useState([]);
+  const [loadingStock, setLoadingStock] = useState(true);
   const [loadingMovements, setLoadingMovements] = useState(true);
   const [companySettings, setCompanySettings] = useState(null);
   const [activeStockTab, setActiveStockTab] = useState("stock-levels");
@@ -55,6 +57,13 @@ export default function StockTab({ products, loading, canEdit, currentUser, onRe
     loadCompanySettings();
   }, []);
 
+  // Reload stock data when company settings change (especially low stock threshold)
+  useEffect(() => {
+    if (companySettings) {
+      loadStockData(companySettings.lowStockThreshold);
+    }
+  }, [companySettings]);
+
   const loadCompanySettings = async () => {
     try {
       const response = await fetch('/api/company-settings', { credentials: 'include' });
@@ -64,6 +73,22 @@ export default function StockTab({ products, loading, canEdit, currentUser, onRe
     } catch (error) {
       console.error("Error loading company settings:", error);
       setCompanySettings({ lowStockThreshold: 6, fxGbpToAed: 4.85 });
+    }
+  };
+
+  const loadStockData = async (threshold) => {
+    setLoadingStock(true);
+    try {
+      const lowStockThreshold = threshold || companySettings?.lowStockThreshold || 6;
+      const response = await fetch(`/api/products/stock-analysis?threshold=${lowStockThreshold}`, { credentials: 'include' });
+      if (!response.ok) throw new Error('Failed to fetch stock analysis');
+      const data = await response.json();
+      setStockData(data);
+    } catch (error) {
+      console.error("Error loading stock data:", error);
+      setStockData(null);
+    } finally {
+      setLoadingStock(false);
     }
   };
 
@@ -82,45 +107,28 @@ export default function StockTab({ products, loading, canEdit, currentUser, onRe
     }
   };
 
-  // Calculate stock summary with configurable threshold and AED conversion
-  const stockSummary = products.reduce((acc, product) => {
-    const stock = product.stockQuantity || 0;
-    const lowStockThreshold = companySettings?.lowStockThreshold || 6;
-    const fxRate = parseFloat(companySettings?.fxGbpToAed || 4.85);
-    
-    if (stock === 0) {
-      acc.outOfStock++;
-    } else if (stock <= lowStockThreshold) {
-      acc.lowStock++;
-    }
-    
-    // Convert cost price to AED if needed
-    const costPrice = parseFloat(product.costPrice) || 0;
-    const costPriceAed = costPrice * fxRate; // Assuming cost price is in GBP
-    
-    acc.totalValue += stock * costPriceAed;
-    acc.totalProducts++;
-    acc.totalQuantity += stock;
-    
-    return acc;
-  }, {
+  // Use server-provided stock analysis data
+  const stockSummary = stockData ? {
+    totalProducts: stockData.products.length,
+    totalQuantity: stockData.stockSummary.totalItems,
+    totalValue: stockData.stockSummary.totalValue * parseFloat(companySettings?.fxGbpToAed || 4.85), // Convert to AED
+    lowStock: stockData.stockSummary.lowStockCount,
+    outOfStock: stockData.stockSummary.outOfStockCount,
+  } : {
     totalProducts: 0,
     totalQuantity: 0,
     totalValue: 0,
     lowStock: 0,
-    outOfStock: 0
-  });
+    outOfStock: 0,
+  };
 
-  const lowStockProducts = products.filter(p => {
-    const lowStockThreshold = companySettings?.lowStockThreshold || 6;
-    return (p.stockQuantity || 0) > 0 && (p.stockQuantity || 0) <= lowStockThreshold;
-  });
+  const lowStockProducts = stockData?.lowStockProducts || [];
+  const outOfStockProducts = stockData?.outOfStockProducts || [];
+  const allProducts = stockData?.products || products;
 
-  const outOfStockProducts = products.filter(p => (p.stockQuantity || 0) === 0);
-
-  // Get unique values for filters
-  const uniqueStockBrands = [...new Set(products.map(p => p.brandName).filter(Boolean))].sort();
-  const uniqueStockSizes = [...new Set(products.map(p => p.size).filter(Boolean))].sort();
+  // Get unique values for filters from server data
+  const uniqueStockBrands = [...new Set(allProducts.map(p => p.brandName).filter(Boolean))].sort();
+  const uniqueStockSizes = [...new Set(allProducts.map(p => p.size).filter(Boolean))].sort();
   const uniqueMovementBrands = [...new Set(stockMovements.map(m => m.productName?.split(' ')[0]).filter(Boolean))].sort();
   const uniqueMovementTypes = [...new Set(stockMovements.map(m => m.movementType).filter(Boolean))].sort();
 
