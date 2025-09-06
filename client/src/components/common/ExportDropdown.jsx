@@ -118,7 +118,7 @@ export default function ExportDropdown({
   };
 
   const itemCount = data?.length || 0;
-  const disabled = isLoading || isExporting || itemCount === 0;
+  const disabled = isLoading || isExporting;
 
   return (
     <DropdownMenu>
