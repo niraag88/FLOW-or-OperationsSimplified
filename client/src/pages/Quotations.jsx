@@ -9,6 +9,7 @@ import { User } from "@/api/entities"; // Keep import for User entity, though Us
 import QuotationList from "../components/quotations/QuotationList";
 import QuotationForm from "../components/quotations/QuotationForm";
 import QuotationFilters from "../components/quotations/QuotationFilters";
+import ExportDropdown from "../components/common/ExportDropdown";
 
 export default function Quotations() {
   const [quotations, setQuotations] = useState([]);
@@ -102,6 +103,24 @@ export default function Quotations() {
         </div>
         
         <div className="flex items-center gap-3">
+          <ExportDropdown 
+            data={filteredQuotations}
+            type="Quotations"
+            filename="quotations"
+            columns={{
+              quotation_number: 'Quotation Number',
+              customer_name: 'Customer',
+              quotation_date: { label: 'Quotation Date', transform: (date) => date ? new Date(date).toLocaleDateString('en-GB') : '' },
+              reference: 'Reference',
+              status: 'Status',
+              subtotal: { label: 'Subtotal (AED)', transform: (val) => `${val || 0}` },
+              tax_amount: { label: 'VAT (AED)', transform: (val) => `${val || 0}` },
+              total_amount: { label: 'Total (AED)', transform: (val) => `${val || 0}` },
+              currency: 'Currency'
+            }}
+            isLoading={loading}
+          />
+          
           {canEdit && (
             <Button 
               onClick={handleNewQuotation}

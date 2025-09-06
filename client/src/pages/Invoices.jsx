@@ -11,6 +11,7 @@ import InvoiceForm from "../components/invoices/InvoiceForm";
 import InvoiceFilters from "../components/invoices/InvoiceFilters";
 import CreateFromExistingDialog from "../components/invoices/CreateFromExistingDialog";
 import { getDerivedInvoiceStatus } from "../components/invoices/invoiceUtils";
+import ExportDropdown from "../components/common/ExportDropdown";
 
 export default function Invoices() {
   const [invoices, setInvoices] = useState([]);
@@ -168,6 +169,25 @@ export default function Invoices() {
         </div>
         
         <div className="flex items-center gap-3">
+          <ExportDropdown 
+            data={filteredInvoices}
+            type="Invoices"
+            filename="invoices"
+            columns={{
+              invoice_number: 'Invoice Number',
+              customer_name: 'Customer',
+              invoice_date: { label: 'Invoice Date', transform: (date) => date ? new Date(date).toLocaleDateString('en-GB') : '' },
+              reference: 'Reference',
+              status: 'Status',
+              subtotal: { label: 'Subtotal (AED)', transform: (val) => `${val || 0}` },
+              tax_amount: { label: 'VAT (AED)', transform: (val) => `${val || 0}` },
+              total_amount: { label: 'Total (AED)', transform: (val) => `${val || 0}` },
+              paid_amount: { label: 'Paid (AED)', transform: (val) => `${val || 0}` },
+              currency: 'Currency'
+            }}
+            isLoading={loading}
+          />
+          
           {canEdit && (
             <>
               <Button 

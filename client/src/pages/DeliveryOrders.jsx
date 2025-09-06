@@ -10,6 +10,7 @@ import DOList from "../components/delivery-orders/DOList";
 import DOForm from "../components/delivery-orders/DOForm";
 import DOFilters from "../components/delivery-orders/DOFilters";
 import CreateFromExistingDialog from "../components/delivery-orders/CreateFromExistingDialog"; // New import
+import ExportDropdown from "../components/common/ExportDropdown";
 
 export default function DeliveryOrders() {
   const [deliveryOrders, setDeliveryOrders] = useState([]);
@@ -147,6 +148,24 @@ export default function DeliveryOrders() {
         </div>
         
         <div className="flex items-center gap-3">
+          <ExportDropdown 
+            data={filteredDOs}
+            type="Delivery Orders"
+            filename="delivery-orders"
+            columns={{
+              do_number: 'DO Number',
+              customer_name: 'Customer',
+              order_date: { label: 'Order Date', transform: (date) => date ? new Date(date).toLocaleDateString('en-GB') : '' },
+              reference: 'Reference',
+              status: 'Status',
+              subtotal: { label: 'Subtotal (AED)', transform: (val) => `${val || 0}` },
+              tax_amount: { label: 'VAT (AED)', transform: (val) => `${val || 0}` },
+              total_amount: { label: 'Total (AED)', transform: (val) => `${val || 0}` },
+              currency: 'Currency'
+            }}
+            isLoading={loading}
+          />
+          
           {canEdit && (
             <>
               <Button 

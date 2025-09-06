@@ -7,7 +7,7 @@ import {
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
 import { Button } from "@/components/ui/button";
-import { Download, FileSpreadsheet, FileText } from "lucide-react";
+import { Download, Eye } from "lucide-react";
 import { exportToCsv, exportToXLSX, exportToPDF } from "../utils/export";
 
 export default function ExportDropdown({ products, activeTab, stockSubTab, stockMovements, lowStockProducts, outOfStockProducts }) {
@@ -293,14 +293,14 @@ export default function ExportDropdown({ products, activeTab, stockSubTab, stock
               onClick={() => exportProducts('pdf')}
               disabled={itemCount === 0}
             >
-              <FileText className="w-4 h-4 mr-2" />
+              <Eye className="w-4 h-4 mr-2" />
               View & Print
             </DropdownMenuItem>
             <DropdownMenuItem 
               onClick={() => exportProducts('xlsx')}
               disabled={itemCount === 0}
             >
-              <FileSpreadsheet className="w-4 h-4 mr-2" />
+              <Download className="w-4 h-4 mr-2" />
               Export to XLSX
             </DropdownMenuItem>
           </>
@@ -312,14 +312,14 @@ export default function ExportDropdown({ products, activeTab, stockSubTab, stock
               onClick={() => exportCurrentStock('pdf')}
               disabled={itemCount === 0}
             >
-              <FileText className="w-4 h-4 mr-2" />
+              <Eye className="w-4 h-4 mr-2" />
               View & Print
             </DropdownMenuItem>
             <DropdownMenuItem 
               onClick={() => exportCurrentStock('xlsx')}
               disabled={itemCount === 0}
             >
-              <FileSpreadsheet className="w-4 h-4 mr-2" />
+              <Download className="w-4 h-4 mr-2" />
               Export to XLSX
             </DropdownMenuItem>
           </>
@@ -331,14 +331,14 @@ export default function ExportDropdown({ products, activeTab, stockSubTab, stock
               onClick={() => exportStockMovements('pdf')}
               disabled={itemCount === 0}
             >
-              <FileText className="w-4 h-4 mr-2" />
+              <Eye className="w-4 h-4 mr-2" />
               View & Print
             </DropdownMenuItem>
             <DropdownMenuItem 
               onClick={() => exportStockMovements('xlsx')}
               disabled={itemCount === 0}
             >
-              <FileSpreadsheet className="w-4 h-4 mr-2" />
+              <Download className="w-4 h-4 mr-2" />
               Export to XLSX
             </DropdownMenuItem>
           </>
@@ -350,14 +350,14 @@ export default function ExportDropdown({ products, activeTab, stockSubTab, stock
               onClick={() => exportLowStock('pdf')}
               disabled={itemCount === 0}
             >
-              <FileText className="w-4 h-4 mr-2" />
+              <Eye className="w-4 h-4 mr-2" />
               View & Print
             </DropdownMenuItem>
             <DropdownMenuItem 
               onClick={() => exportLowStock('xlsx')}
               disabled={itemCount === 0}
             >
-              <FileSpreadsheet className="w-4 h-4 mr-2" />
+              <Download className="w-4 h-4 mr-2" />
               Export to XLSX
             </DropdownMenuItem>
           </>
@@ -369,14 +369,14 @@ export default function ExportDropdown({ products, activeTab, stockSubTab, stock
               onClick={() => exportOutOfStock('pdf')}
               disabled={itemCount === 0}
             >
-              <FileText className="w-4 h-4 mr-2" />
+              <Eye className="w-4 h-4 mr-2" />
               View & Print
             </DropdownMenuItem>
             <DropdownMenuItem 
               onClick={() => exportOutOfStock('xlsx')}
               disabled={itemCount === 0}
             >
-              <FileSpreadsheet className="w-4 h-4 mr-2" />
+              <Download className="w-4 h-4 mr-2" />
               Export to XLSX
             </DropdownMenuItem>
           </>
