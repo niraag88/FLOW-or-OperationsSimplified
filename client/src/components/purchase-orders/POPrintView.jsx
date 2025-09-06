@@ -23,29 +23,20 @@ export default function POPrintView() {
 
   const loadPrintData = async (poId) => {
     try {
-      // OPTIMIZED: Single API call to get all print data
-      const response = await fetch(`/api/purchase-orders/${poId}/print-data`);
-      const result = await response.json();
+      // Load PO data and company settings
+      const [poResponse, companyResponse] = await Promise.all([
+        fetch(`/api/export/po?poId=${poId}`),
+        fetch('/api/company-settings')
+      ]);
 
-      if (result.success) {
-        // Extract the structured data from the optimized response
-        const { data } = result;
-        
-        // Set PO data (adapting to existing component structure)
-        setPOData({
-          ...data,
-          supplierName: data.supplier?.name,
-          supplierAddress: data.supplier?.address,
-          supplierContactPerson: data.supplier?.contactPerson,
-          supplierEmail: data.supplier?.email,
-          supplierPhone: data.supplier?.phone,
-          supplierWebsite: data.supplier?.website
-        });
-        
-        // Set company data
-        setCompanyData(data.company);
+      const poResult = await poResponse.json();
+      const companyResult = await companyResponse.json();
+
+      if (poResult.success) {
+        setPOData(poResult.data);
+        setCompanyData(companyResult);
       } else {
-        console.error('Error loading PO data:', result.error);
+        console.error('Error loading PO data:', poResult.error);
         navigate('/PurchaseOrders');
       }
     } catch (error) {
