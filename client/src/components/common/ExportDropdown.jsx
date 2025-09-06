@@ -58,7 +58,7 @@ export default function ExportDropdown({
         console.log('Exporting to XLSX...');
         exportToXLSX(exportData, exportFilename, type);
       } else if (format === 'pdf') {
-        // Create a simple print view for PDF
+        // Create a simple print view for PDF following inventory format
         const printWindow = window.open('', '_blank');
         if (!printWindow) {
           alert('Please allow popups to view the PDF export');
@@ -69,8 +69,17 @@ export default function ExportDropdown({
           typeof col === 'string' ? col : col.label
         );
         
-        // Generate HTML content for the PDF
-        const htmlContent = `
+        // Generate table rows
+        const tableRows = exportData.map(item => {
+          const cells = tableHeaders.map(header => {
+            const value = item[header] || '';
+            return `<td>${value}</td>`;
+          }).join('');
+          return `<tr>${cells}</tr>`;
+        }).join('');
+        
+        // Generate complete HTML document
+        printWindow.document.write(`
           <!DOCTYPE html>
           <html>
           <head>
@@ -93,8 +102,8 @@ export default function ExportDropdown({
           </head>
           <body>
             <div class="print-header">
-              <h1>${type} Report</h1>
-              <h2>Generated on ${format(new Date(), 'dd/MM/yyyy')}</h2>
+              <h1>Business Operations</h1>
+              <h2>${type}</h2>
             </div>
             
             <table class="print-table">
@@ -104,11 +113,7 @@ export default function ExportDropdown({
                 </tr>
               </thead>
               <tbody>
-                ${exportData.map(item => `
-                  <tr>
-                    ${tableHeaders.map(header => `<td>${item[header] || ''}</td>`).join('')}
-                  </tr>
-                `).join('')}
+                ${tableRows}
               </tbody>
             </table>
             
@@ -118,9 +123,7 @@ export default function ExportDropdown({
             </div>
           </body>
           </html>
-        `;
-        
-        printWindow.document.write(htmlContent);
+        `);
         printWindow.document.close();
       } else {
         exportToCsv(exportData, exportFilename);
