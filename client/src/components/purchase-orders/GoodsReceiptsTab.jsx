@@ -70,8 +70,45 @@ export default function GoodsReceiptsTab({ purchaseOrders, products, goodsReceip
   const getTotalOrderedQuantity = (po) => po.orderedQty || 0;
   const getTotalReceivedQuantity = (po) => po.receivedQty || 0;
 
+  // Handler functions for closed PO actions
+  const handleViewPO = (po) => {
+    // TODO: Implement view functionality
+    toast({
+      title: "View Purchase Order",
+      description: `Viewing PO ${po.poNumber}`,
+      variant: "default"
+    });
+  };
+
+  const handlePrintPO = (po) => {
+    // TODO: Implement print functionality
+    toast({
+      title: "Print Purchase Order",
+      description: `Printing PO ${po.poNumber}`,
+      variant: "default"
+    });
+  };
+
+  const handleExportPO = (po) => {
+    // TODO: Implement export functionality
+    toast({
+      title: "Export to XLSX",
+      description: `Exporting PO ${po.poNumber} to Excel`,
+      variant: "default"
+    });
+  };
+
+  const handleDeletePO = (po) => {
+    // TODO: Implement delete functionality with confirmation
+    toast({
+      title: "Delete Purchase Order",
+      description: `This would delete PO ${po.poNumber}`,
+      variant: "destructive"
+    });
+  };
+
   // Helper function to render purchase order table
-  const renderPOTable = (pos, showActions = true) => (
+  const renderPOTable = (pos, isClosedSection = false) => (
     <Table>
       <TableHeader>
         <TableRow>
@@ -84,7 +121,7 @@ export default function GoodsReceiptsTab({ purchaseOrders, products, goodsReceip
           <TableHead>Ordered</TableHead>
           <TableHead>Received</TableHead>
           <TableHead>Status</TableHead>
-          {showActions && <TableHead>Actions</TableHead>}
+          <TableHead>Actions</TableHead>
         </TableRow>
       </TableHeader>
       <TableBody>
@@ -107,15 +144,40 @@ export default function GoodsReceiptsTab({ purchaseOrders, products, goodsReceip
               <Badge 
                 variant="outline" 
                 className={po.status === 'closed' 
-                  ? "border-gray-300 text-gray-700 bg-gray-50" 
+                  ? "border-green-300 text-green-800 bg-green-50" 
                   : "border-blue-300 text-blue-800 bg-blue-50"
                 }
               >
                 {po.status?.toUpperCase()}
               </Badge>
             </TableCell>
-            {showActions && (
-              <TableCell>
+            <TableCell>
+              {isClosedSection ? (
+                <DropdownMenu>
+                  <DropdownMenuTrigger asChild>
+                    <Button variant="ghost" size="sm" className="h-8 w-8 p-0">
+                      <MoreHorizontal className="h-4 w-4" />
+                    </Button>
+                  </DropdownMenuTrigger>
+                  <DropdownMenuContent align="end">
+                    <DropdownMenuItem onClick={() => handleViewPO(po)}>
+                      View
+                    </DropdownMenuItem>
+                    <DropdownMenuItem onClick={() => handlePrintPO(po)}>
+                      Print
+                    </DropdownMenuItem>
+                    <DropdownMenuItem onClick={() => handleExportPO(po)}>
+                      Export to XLSX
+                    </DropdownMenuItem>
+                    <DropdownMenuItem 
+                      onClick={() => handleDeletePO(po)}
+                      className="text-red-600"
+                    >
+                      Delete
+                    </DropdownMenuItem>
+                  </DropdownMenuContent>
+                </DropdownMenu>
+              ) : (
                 <Button
                   size="sm"
                   onClick={() => openReceiveDialog(po)}
@@ -124,8 +186,8 @@ export default function GoodsReceiptsTab({ purchaseOrders, products, goodsReceip
                 >
                   {processingPO === po.id ? "Processing..." : "Receive"}
                 </Button>
-              </TableCell>
-            )}
+              )}
+            </TableCell>
           </TableRow>
         ))}
       </TableBody>
@@ -477,7 +539,7 @@ export default function GoodsReceiptsTab({ purchaseOrders, products, goodsReceip
               </div>
             ) : (
               <div className="overflow-x-auto border rounded-lg">
-                {renderPOTable(openPOs, true)}
+                {renderPOTable(openPOs, false)}
               </div>
             )}
           </div>
@@ -503,7 +565,7 @@ export default function GoodsReceiptsTab({ purchaseOrders, products, goodsReceip
               </CollapsibleTrigger>
               <CollapsibleContent className="mt-3">
                 <div className="overflow-x-auto border rounded-lg">
-                  {renderPOTable(closedPOs, false)}
+                  {renderPOTable(closedPOs, true)}
                 </div>
               </CollapsibleContent>
             </Collapsible>
