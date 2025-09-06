@@ -60,11 +60,17 @@ export default function ExportDropdown({
       } else if (format === 'pdf') {
         // Create a simple print view for PDF
         const printWindow = window.open('', '_blank');
+        if (!printWindow) {
+          alert('Please allow popups to view the PDF export');
+          return;
+        }
+        
         const tableHeaders = Object.values(columns).map(col => 
           typeof col === 'string' ? col : col.label
         );
         
-        printWindow.document.write(`
+        // Generate HTML content for the PDF
+        const htmlContent = `
           <!DOCTYPE html>
           <html>
           <head>
@@ -108,11 +114,13 @@ export default function ExportDropdown({
             
             <div class="print-footer">
               <p>Generated on: ${new Date().toLocaleDateString('en-GB')} at ${new Date().toLocaleTimeString('en-GB')}</p>
-              <p>Total Records: ${data.length}</p>
+              <p>Total Records: ${exportData.length}</p>
             </div>
           </body>
           </html>
-        `);
+        `;
+        
+        printWindow.document.write(htmlContent);
         printWindow.document.close();
       } else {
         exportToCsv(exportData, exportFilename);
