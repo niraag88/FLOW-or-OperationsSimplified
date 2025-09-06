@@ -105,6 +105,37 @@ export default function PurchaseOrders() {
     grn.delivery_note_ref?.toLowerCase().includes(searchTerm.toLowerCase())
   );
 
+  // For Goods Receipts export - get context-aware data based on the purchase orders
+  const getGoodsReceiptsExportData = () => {
+    const openPOs = purchaseOrders.filter(po => po.status === 'submitted');
+    const closedPOs = purchaseOrders.filter(po => po.status === 'closed');
+    return [...openPOs, ...closedPOs]; // Export all for now, can be made more context-aware later
+  };
+
+  const goodsReceiptsColumns = {
+    poNumber: "PO Number",
+    brandName: "Brand",
+    orderDate: {
+      label: "Order Date",
+      transform: (date) => date && !isNaN(new Date(date)) ? new Date(date).toLocaleDateString('en-GB') : ''
+    },
+    totalAmount: {
+      label: "Total (GBP)",
+      transform: (amount) => `GBP ${parseFloat(amount || 0).toFixed(2)}`
+    },
+    grandTotal: {
+      label: "Total (AED)", 
+      transform: (amount) => `AED ${parseFloat(amount || 0).toFixed(2)}`
+    },
+    lineItems: "Line Items",
+    orderedQty: "Ordered",
+    receivedQty: "Received",
+    status: {
+      label: "Status",
+      transform: (status) => status?.toUpperCase() || ''
+    }
+  };
+
   return (
     <div className="space-y-6">
       {/* Header */}
@@ -115,24 +146,22 @@ export default function PurchaseOrders() {
         </div>
         
         <div className="flex items-center gap-3">
-          {activeTab === 'purchase-orders' && (
-            <ExportDropdown 
-              data={filteredPOs}
-              type="Purchase Orders"
-              filename="purchase-orders"
-              columns={{
-                po_number: 'PO Number',
-                supplier_name: 'Supplier',
-                order_date: { label: 'Order Date', transform: (date) => date ? new Date(date).toLocaleDateString('en-GB') : '' },
-                status: 'Status',
-                subtotal: { label: 'Subtotal', transform: (val) => `${val || 0}` },
-                tax_amount: { label: 'VAT', transform: (val) => `${val || 0}` },
-                total_amount: { label: 'Total', transform: (val) => `${val || 0}` },
-                currency: 'Currency'
-              }}
-              isLoading={loading}
-            />
-          )}
+          <ExportDropdown 
+            data={activeTab === 'purchase-orders' ? filteredPOs : getGoodsReceiptsExportData()}
+            type={activeTab === 'purchase-orders' ? 'Purchase Orders' : 'Goods Receipts'}
+            filename={activeTab === 'purchase-orders' ? 'purchase-orders' : 'goods-receipts'}
+            columns={activeTab === 'purchase-orders' ? {
+              po_number: 'PO Number',
+              supplier_name: 'Supplier',
+              order_date: { label: 'Order Date', transform: (date) => date ? new Date(date).toLocaleDateString('en-GB') : '' },
+              status: 'Status',
+              subtotal: { label: 'Subtotal', transform: (val) => `${val || 0}` },
+              tax_amount: { label: 'VAT', transform: (val) => `${val || 0}` },
+              total_amount: { label: 'Total', transform: (val) => `${val || 0}` },
+              currency: 'Currency'
+            } : goodsReceiptsColumns}
+            isLoading={loading}
+          />
           
           {canEdit && activeTab === "purchase-orders" && (
             <Button 

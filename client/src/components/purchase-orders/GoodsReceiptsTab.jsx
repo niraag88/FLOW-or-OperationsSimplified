@@ -669,24 +669,13 @@ export default function GoodsReceiptsTab({ purchaseOrders, products, goodsReceip
     <>
       <Card className="border-0 shadow-lg">
         <CardHeader>
-          <div className="flex items-center justify-between">
-            <div>
-              <CardTitle className="flex items-center gap-2">
-                <Truck className="w-5 h-5" />
-                Goods Receipts
-              </CardTitle>
-              <p className="text-sm text-gray-500 mt-1">
-                Receive items from submitted purchase orders.
-              </p>
-            </div>
-            <ExportDropdown
-              data={contextExportData}
-              type={exportType}
-              filename="goods-receipts"
-              columns={goodsReceiptsColumns}
-              isLoading={loading}
-            />
-          </div>
+          <CardTitle className="flex items-center gap-2">
+            <Truck className="w-5 h-5" />
+            Goods Receipts
+          </CardTitle>
+          <p className="text-sm text-gray-500 mt-1">
+            Receive items from submitted purchase orders.
+          </p>
         </CardHeader>
         <CardContent>
           {/* Open Purchase Orders Section - Collapsible */}
