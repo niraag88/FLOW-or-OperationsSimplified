@@ -614,7 +614,7 @@ export default function GoodsReceiptsTab({ purchaseOrders, products, goodsReceip
   // Context-aware export data function
   const getContextAwareExportData = () => {
     let exportData = [];
-    let exportType = "";
+    let exportType = "Goods Receipts";
     let itemCount = 0;
 
     if (showOpenReceipts && !showClosedReceipts) {
@@ -633,6 +633,17 @@ export default function GoodsReceiptsTab({ purchaseOrders, products, goodsReceip
       exportType = "All Goods Receipts";
       itemCount = openPOs.length + closedPOs.length;
     }
+
+    // Debug log to see what data we're exporting
+    console.log('Export data context:', { 
+      showOpenReceipts, 
+      showClosedReceipts, 
+      openPOsCount: openPOs.length, 
+      closedPOsCount: closedPOs.length,
+      exportType,
+      exportDataLength: exportData.length,
+      sampleData: exportData[0] || 'No data'
+    });
 
     return { exportData, exportType, itemCount };
   };

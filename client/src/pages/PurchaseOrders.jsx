@@ -139,7 +139,7 @@ export default function PurchaseOrders() {
             isLoading={loading}
           />
           
-          {canEdit && (
+          {canEdit && activeTab === "purchase-orders" && (
             <Button 
               onClick={handleNewPO}
               className="bg-emerald-600 hover:bg-emerald-700"
