@@ -18,6 +18,7 @@ import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/component
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Textarea } from "@/components/ui/textarea";
 import { Label } from "@/components/ui/label";
+import ExportDropdown from "../common/ExportDropdown";
 import { format } from "date-fns";
 import { PurchaseOrder } from "@/api/entities";
 import { GoodsReceipt } from "@/api/entities";
@@ -39,6 +40,7 @@ export default function GoodsReceiptsTab({ purchaseOrders, products, goodsReceip
   const [receiveQuantities, setReceiveQuantities] = useState({});
   const [receiveNotes, setReceiveNotes] = useState('');
   const [showClosedReceipts, setShowClosedReceipts] = useState(false);
+  const [showOpenReceipts, setShowOpenReceipts] = useState(true);
   const [showDeleteDialog, setShowDeleteDialog] = useState(false);
   const [deletingPO, setDeletingPO] = useState(null);
   const { toast } = useToast();
@@ -609,88 +611,168 @@ export default function GoodsReceiptsTab({ purchaseOrders, products, goodsReceip
   const openPOs = purchaseOrders.filter(po => po.status === 'submitted');
   const closedPOs = purchaseOrders.filter(po => po.status === 'closed');
 
+  // Context-aware export data function
+  const getContextAwareExportData = () => {
+    let exportData = [];
+    let exportType = "";
+    let itemCount = 0;
+
+    if (showOpenReceipts && !showClosedReceipts) {
+      // Export only open goods receipts
+      exportData = openPOs;
+      exportType = "Open Goods Receipts";
+      itemCount = openPOs.length;
+    } else if (!showOpenReceipts && showClosedReceipts) {
+      // Export only closed goods receipts
+      exportData = closedPOs;
+      exportType = "Closed Goods Receipts";
+      itemCount = closedPOs.length;
+    } else if (showOpenReceipts && showClosedReceipts) {
+      // Export all goods receipts
+      exportData = [...openPOs, ...closedPOs];
+      exportType = "All Goods Receipts";
+      itemCount = openPOs.length + closedPOs.length;
+    }
+
+    return { exportData, exportType, itemCount };
+  };
+
+  const { exportData: contextExportData, exportType, itemCount } = getContextAwareExportData();
+
+  // Define columns for goods receipts export
+  const goodsReceiptsColumns = {
+    poNumber: "PO Number",
+    brandName: "Brand",
+    orderDate: {
+      label: "Order Date",
+      transform: (date) => date && !isNaN(new Date(date)) ? format(new Date(date), 'dd/MM/yyyy') : ''
+    },
+    totalAmount: {
+      label: "Total (GBP)",
+      transform: (amount) => `GBP ${parseFloat(amount || 0).toFixed(2)}`
+    },
+    grandTotal: {
+      label: "Total (AED)", 
+      transform: (amount) => `AED ${parseFloat(amount || 0).toFixed(2)}`
+    },
+    lineItems: "Line Items",
+    orderedQty: "Ordered",
+    receivedQty: "Received",
+    status: {
+      label: "Status",
+      transform: (status) => status?.toUpperCase() || ''
+    }
+  };
+
   return (
     <>
       <Card className="border-0 shadow-lg">
         <CardHeader>
-          <CardTitle className="flex items-center gap-2">
-            <Truck className="w-5 h-5" />
-            Goods Receipts
-          </CardTitle>
-          <p className="text-sm text-gray-500 mt-1">
-            Receive items from submitted purchase orders.
-          </p>
+          <div className="flex items-center justify-between">
+            <div>
+              <CardTitle className="flex items-center gap-2">
+                <Truck className="w-5 h-5" />
+                Goods Receipts
+              </CardTitle>
+              <p className="text-sm text-gray-500 mt-1">
+                Receive items from submitted purchase orders.
+              </p>
+            </div>
+            <ExportDropdown
+              data={contextExportData}
+              type={exportType}
+              filename="goods-receipts"
+              columns={goodsReceiptsColumns}
+              isLoading={loading}
+            />
+          </div>
         </CardHeader>
         <CardContent>
-          {/* Open Purchase Orders Section */}
+          {/* Open Purchase Orders Section - Collapsible */}
           <div className="mb-6">
-            <h3 className="text-lg font-semibold mb-3 flex items-center gap-2">
-              <Package className="w-5 h-5 text-blue-600" />
-              Open ({openPOs.length})
-            </h3>
-            {openPOs.length === 0 ? (
-              <div className="text-center py-8 text-gray-500 border-2 border-dashed border-gray-200 rounded-lg">
-                <ShoppingCart className="w-12 h-12 mx-auto mb-4 opacity-50" />
-                <p className="font-semibold">No Submitted Purchase Orders</p>
-                <p>There are no purchase orders awaiting goods receipt.</p>
-              </div>
-            ) : (
-              <div className="overflow-x-auto border rounded-lg">
-                <table className="w-full text-sm" style={{tableLayout: 'fixed'}}>
-                  <thead>
-                    <tr className="border-b bg-muted/50">
-                      <th className="h-10 px-2 text-left align-middle font-medium text-muted-foreground" style={{width: '120px'}}>PO Number</th>
-                      <th className="h-10 px-2 text-left align-middle font-medium text-muted-foreground" style={{width: '140px'}}>Brand</th>
-                      <th className="h-10 px-2 text-left align-middle font-medium text-muted-foreground" style={{width: '100px'}}>Order Date</th>
-                      <th className="h-10 px-2 text-left align-middle font-medium text-muted-foreground" style={{width: '110px'}}>Total (GBP)</th>
-                      <th className="h-10 px-2 text-left align-middle font-medium text-muted-foreground" style={{width: '110px'}}>Total (AED)</th>
-                      <th className="h-10 px-2 text-left align-middle font-medium text-muted-foreground" style={{width: '90px'}}>Line Items</th>
-                      <th className="h-10 px-2 text-left align-middle font-medium text-muted-foreground" style={{width: '80px'}}>Ordered</th>
-                      <th className="h-10 px-2 text-left align-middle font-medium text-muted-foreground" style={{width: '80px'}}>Received</th>
-                      <th className="h-10 px-2 text-left align-middle font-medium text-muted-foreground" style={{width: '90px'}}>Status</th>
-                      <th className="h-10 px-2 text-left align-middle font-medium text-muted-foreground" style={{width: '90px'}}>Actions</th>
-                    </tr>
-                  </thead>
-                  <tbody>
-                    {openPOs.map((po) => (
-                      <tr key={po.id} className="border-b transition-colors hover:bg-muted/50">
-                        <td className="p-2 align-middle font-medium" style={{width: '120px'}}>{po.poNumber}</td>
-                        <td className="p-2 align-middle" style={{width: '140px'}}>{po.brandName || 'Unknown Brand'}</td>
-                        <td className="p-2 align-middle" style={{width: '100px'}}>
-                          {po.orderDate && !isNaN(new Date(po.orderDate)) ? 
-                            format(new Date(po.orderDate), 'dd/MM/yy') : 
-                            '-'
-                          }
-                        </td>
-                        <td className="p-2 align-middle" style={{width: '110px'}}>GBP {parseFloat(po.totalAmount || 0).toFixed(2)}</td>
-                        <td className="p-2 align-middle" style={{width: '110px'}}>AED {parseFloat(po.grandTotal || 0).toFixed(2)}</td>
-                        <td className="p-2 align-middle" style={{width: '90px'}}>{getLineItemsCount(po)}</td>
-                        <td className="p-2 align-middle" style={{width: '80px'}}>{getTotalOrderedQuantity(po)}</td>
-                        <td className="p-2 align-middle" style={{width: '80px'}}>{getTotalReceivedQuantity(po)}</td>
-                        <td className="p-2 align-middle" style={{width: '90px'}}>
-                          <Badge 
-                            variant="outline" 
-                            className="border-blue-300 text-blue-800 bg-blue-50"
-                          >
-                            {po.status?.toUpperCase()}
-                          </Badge>
-                        </td>
-                        <td className="p-2 align-middle" style={{width: '90px'}}>
-                          <Button
-                            size="sm"
-                            onClick={() => openReceiveDialog(po)}
-                            disabled={!canEdit || processingPO === po.id}
-                            className="bg-emerald-600 hover:bg-emerald-700"
-                          >
-                            {processingPO === po.id ? "Processing..." : "Receive"}
-                          </Button>
-                        </td>
-                      </tr>
-                    ))}
-                  </tbody>
-                </table>
-              </div>
-            )}
+            <Collapsible open={showOpenReceipts} onOpenChange={setShowOpenReceipts}>
+              <CollapsibleTrigger asChild>
+                <Button 
+                  variant="outline" 
+                  className="w-full justify-between text-left h-auto p-4 border-gray-300 mb-3"
+                >
+                  <div className="flex items-center gap-2">
+                    <Package className="w-5 h-5 text-blue-600" />
+                    <span className="font-semibold">Open ({openPOs.length})</span>
+                  </div>
+                  {showOpenReceipts ? (
+                    <ChevronDown className="w-4 h-4" />
+                  ) : (
+                    <ChevronRight className="w-4 h-4" />
+                  )}
+                </Button>
+              </CollapsibleTrigger>
+              <CollapsibleContent>
+                {openPOs.length === 0 ? (
+                  <div className="text-center py-8 text-gray-500 border-2 border-dashed border-gray-200 rounded-lg">
+                    <ShoppingCart className="w-12 h-12 mx-auto mb-4 opacity-50" />
+                    <p className="font-semibold">No Submitted Purchase Orders</p>
+                    <p>There are no purchase orders awaiting goods receipt.</p>
+                  </div>
+                ) : (
+                  <div className="overflow-x-auto border rounded-lg">
+                    <table className="w-full text-sm" style={{tableLayout: 'fixed'}}>
+                      <thead>
+                        <tr className="border-b bg-muted/50">
+                          <th className="h-10 px-2 text-left align-middle font-medium text-muted-foreground" style={{width: '120px'}}>PO Number</th>
+                          <th className="h-10 px-2 text-left align-middle font-medium text-muted-foreground" style={{width: '140px'}}>Brand</th>
+                          <th className="h-10 px-2 text-left align-middle font-medium text-muted-foreground" style={{width: '100px'}}>Order Date</th>
+                          <th className="h-10 px-2 text-left align-middle font-medium text-muted-foreground" style={{width: '110px'}}>Total (GBP)</th>
+                          <th className="h-10 px-2 text-left align-middle font-medium text-muted-foreground" style={{width: '110px'}}>Total (AED)</th>
+                          <th className="h-10 px-2 text-left align-middle font-medium text-muted-foreground" style={{width: '90px'}}>Line Items</th>
+                          <th className="h-10 px-2 text-left align-middle font-medium text-muted-foreground" style={{width: '80px'}}>Ordered</th>
+                          <th className="h-10 px-2 text-left align-middle font-medium text-muted-foreground" style={{width: '80px'}}>Received</th>
+                          <th className="h-10 px-2 text-left align-middle font-medium text-muted-foreground" style={{width: '90px'}}>Status</th>
+                          <th className="h-10 px-2 text-left align-middle font-medium text-muted-foreground" style={{width: '90px'}}>Actions</th>
+                        </tr>
+                      </thead>
+                      <tbody>
+                        {openPOs.map((po) => (
+                          <tr key={po.id} className="border-b transition-colors hover:bg-muted/50">
+                            <td className="p-2 align-middle font-medium" style={{width: '120px'}}>{po.poNumber}</td>
+                            <td className="p-2 align-middle" style={{width: '140px'}}>{po.brandName || 'Unknown Brand'}</td>
+                            <td className="p-2 align-middle" style={{width: '100px'}}>
+                              {po.orderDate && !isNaN(new Date(po.orderDate)) ? 
+                                format(new Date(po.orderDate), 'dd/MM/yy') : 
+                                '-'
+                              }
+                            </td>
+                            <td className="p-2 align-middle" style={{width: '110px'}}>GBP {parseFloat(po.totalAmount || 0).toFixed(2)}</td>
+                            <td className="p-2 align-middle" style={{width: '110px'}}>AED {parseFloat(po.grandTotal || 0).toFixed(2)}</td>
+                            <td className="p-2 align-middle" style={{width: '90px'}}>{getLineItemsCount(po)}</td>
+                            <td className="p-2 align-middle" style={{width: '80px'}}>{getTotalOrderedQuantity(po)}</td>
+                            <td className="p-2 align-middle" style={{width: '80px'}}>{getTotalReceivedQuantity(po)}</td>
+                            <td className="p-2 align-middle" style={{width: '90px'}}>
+                              <Badge 
+                                variant="outline" 
+                                className="border-blue-300 text-blue-800 bg-blue-50"
+                              >
+                                {po.status?.toUpperCase()}
+                              </Badge>
+                            </td>
+                            <td className="p-2 align-middle" style={{width: '90px'}}>
+                              <Button
+                                size="sm"
+                                onClick={() => openReceiveDialog(po)}
+                                disabled={!canEdit || processingPO === po.id}
+                                className="bg-emerald-600 hover:bg-emerald-700"
+                              >
+                                {processingPO === po.id ? "Processing..." : "Receive"}
+                              </Button>
+                            </td>
+                          </tr>
+                        ))}
+                      </tbody>
+                    </table>
+                  </div>
+                )}
+              </CollapsibleContent>
+            </Collapsible>
           </div>
 
           {/* Closed Purchase Orders Section - Collapsible */}
