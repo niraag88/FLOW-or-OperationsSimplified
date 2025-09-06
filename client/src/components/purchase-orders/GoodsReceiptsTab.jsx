@@ -409,7 +409,7 @@ export default function GoodsReceiptsTab({ purchaseOrders, products, goodsReceip
         'closed',
         { reason: 'Manual force close by user.' }
       );
-      toast({ title: "Success", description: `PO #${closingPO.poNumber} has been closed.` });
+      toast({ title: "Success", description: `${closingPO.poNumber} has been closed.` });
       onRefresh();
     } catch (error) {
       console.error("Error force closing PO:", error);
@@ -534,7 +534,12 @@ export default function GoodsReceiptsTab({ purchaseOrders, products, goodsReceip
       }}>
         <DialogContent className="max-w-4xl max-h-[80vh] overflow-y-auto">
           <DialogHeader>
-            <DialogTitle>Receive Goods - PO #{selectedPOForReceive?.poNumber}</DialogTitle>
+            <DialogTitle>
+              Receive Goods - {selectedPOForReceive?.poNumber}
+              {selectedPOForReceive?.orderDate && !isNaN(new Date(selectedPOForReceive.orderDate)) && 
+                ` - ${format(new Date(selectedPOForReceive.orderDate), 'dd/MM/yyyy')}`
+              }
+            </DialogTitle>
             <DialogDescription>
               Enter the quantities received for each product. You can receive partial quantities and continue receiving more later.
             </DialogDescription>
@@ -661,7 +666,7 @@ export default function GoodsReceiptsTab({ purchaseOrders, products, goodsReceip
         open={showCloseConfirm}
         onOpenChange={setShowCloseConfirm}
         title="Force Close Purchase Order"
-        description={`Are you sure you want to manually close PO #${closingPO?.poNumber}? This should only be done if you are not expecting any more items. This action cannot be undone.`}
+        description={`Are you sure you want to manually close ${closingPO?.poNumber}? This should only be done if you are not expecting any more items. This action cannot be undone.`}
         onConfirm={handleConfirmForceClose}
         confirmText="Yes, Close PO"
         variant="destructive"
