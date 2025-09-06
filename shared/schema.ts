@@ -408,6 +408,21 @@ export const stockMovements = pgTable("stock_movements", {
   createdAt: timestamp("created_at").defaultNow().notNull(),
 });
 
+// Recycle Bin table for soft deletes
+export const recycleBin = pgTable("recycle_bin", {
+  id: serial("id").primaryKey(),
+  documentType: text("document_type").notNull(), // "PurchaseOrder", "Invoice", "Quotation", etc.
+  documentId: text("document_id").notNull(), // ID of the deleted document
+  documentNumber: text("document_number").notNull(), // Human-readable number (PO-001, etc.)
+  documentData: text("document_data").notNull(), // JSON string of the original document
+  deletedBy: text("deleted_by").notNull(), // Email of user who deleted it
+  deletedDate: timestamp("deleted_date").defaultNow().notNull(),
+  reason: text("reason"), // Optional deletion reason
+  originalStatus: text("original_status"), // Status before deletion
+  canRestore: boolean("can_restore").default(true).notNull(),
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+});
+
 // Create all the insert schemas for new tables
 export const insertBrandSchema = createInsertSchema(brands).pick({
   name: true,
@@ -540,6 +555,17 @@ export const insertStockMovementSchema = createInsertSchema(stockMovements).pick
   createdBy: true,
 });
 
+export const insertRecycleBinSchema = createInsertSchema(recycleBin).pick({
+  documentType: true,
+  documentId: true,
+  documentNumber: true,
+  documentData: true,
+  deletedBy: true,
+  reason: true,
+  originalStatus: true,
+  canRestore: true,
+});
+
 // Type exports
 export type Brand = typeof brands.$inferSelect;
 export type InsertBrand = z.infer<typeof insertBrandSchema>;
@@ -573,6 +599,9 @@ export type InsertGoodsReceiptItem = z.infer<typeof insertGoodsReceiptItemSchema
 
 export type StockMovement = typeof stockMovements.$inferSelect;
 export type InsertStockMovement = z.infer<typeof insertStockMovementSchema>;
+
+export type RecycleBin = typeof recycleBin.$inferSelect;
+export type InsertRecycleBin = z.infer<typeof insertRecycleBinSchema>;
 
 export type VatReturn = typeof vatReturns.$inferSelect;
 export type CompanySettings = typeof companySettings.$inferSelect;

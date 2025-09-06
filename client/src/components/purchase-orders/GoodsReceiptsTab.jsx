@@ -25,6 +25,9 @@ import { InventoryAudit } from "@/api/entities";
 import { useToast } from "@/hooks/use-toast";
 import { logStatusChange, logAuditAction } from "../utils/auditLogger";
 import SimpleConfirmDialog from "../common/SimpleConfirmDialog";
+import { RecycleBin } from "@/api/entities";
+import { AuditLog } from "@/api/entities";
+import { User } from "@/api/entities";
 
 export default function GoodsReceiptsTab({ purchaseOrders, products, goodsReceipts, loading, canEdit, currentUser, onRefresh }) {
   const [receivingQuantities, setReceivingQuantities] = useState({});
@@ -35,6 +38,8 @@ export default function GoodsReceiptsTab({ purchaseOrders, products, goodsReceip
   const [receiveQuantities, setReceiveQuantities] = useState({});
   const [receiveNotes, setReceiveNotes] = useState('');
   const [showClosedReceipts, setShowClosedReceipts] = useState(false);
+  const [showDeleteDialog, setShowDeleteDialog] = useState(false);
+  const [deletingPO, setDeletingPO] = useState(null);
   const { toast } = useToast();
 
 
@@ -133,12 +138,70 @@ export default function GoodsReceiptsTab({ purchaseOrders, products, goodsReceip
   };
 
   const handleDeletePO = (po) => {
-    // TODO: Implement delete functionality with confirmation
-    toast({
-      title: "Delete Purchase Order",
-      description: `This would delete PO ${po.poNumber}`,
-      variant: "destructive"
-    });
+    setDeletingPO(po);
+    setShowDeleteDialog(true);
+  };
+
+  const confirmDeletePO = async () => {
+    if (!deletingPO) return;
+    
+    try {
+      // Move to recycle bin
+      await RecycleBin.create({
+        document_type: 'PurchaseOrder',
+        document_id: deletingPO.id,
+        document_number: deletingPO.poNumber,
+        document_data: deletingPO,
+        deleted_by: currentUser?.email || 'unknown',
+        deleted_date: new Date().toISOString(),
+        reason: 'Deleted from Goods Receipts',
+        original_status: deletingPO.status,
+        can_restore: true
+      });
+
+      // Log the deletion
+      await AuditLog.create({
+        entity_type: 'PurchaseOrder',
+        entity_id: deletingPO.id,
+        action: 'deleted',
+        user_email: currentUser?.email || 'unknown',
+        changes: { 
+          document_number: deletingPO.poNumber,
+          deletion_reason: 'Deleted from Goods Receipts UI',
+          moved_to_recycle_bin: true
+        },
+        timestamp: new Date().toISOString()
+      });
+
+      // Delete from main table (this will remove it from the UI)
+      const response = await fetch(`/api/purchase-orders/${deletingPO.id}`, {
+        method: 'DELETE'
+      });
+      
+      if (!response.ok) {
+        throw new Error('Failed to delete purchase order');
+      }
+
+      toast({
+        title: 'Purchase Order Deleted',
+        description: `${deletingPO.poNumber} has been moved to the recycle bin.`
+      });
+
+      setShowDeleteDialog(false);
+      setDeletingPO(null);
+      
+      // Refresh the data
+      if (onRefresh) {
+        onRefresh();
+      }
+    } catch (error) {
+      console.error('Error deleting purchase order:', error);
+      toast({
+        title: 'Delete Failed',
+        description: 'Failed to delete the purchase order. Please try again.',
+        variant: 'destructive'
+      });
+    }
   };
 
   // Helper function to render purchase order table
@@ -605,6 +668,22 @@ export default function GoodsReceiptsTab({ purchaseOrders, products, goodsReceip
           )}
         </CardContent>
       </Card>
+      
+      {/* Delete Confirmation Dialog */}
+      <SimpleConfirmDialog
+        open={showDeleteDialog}
+        onClose={() => {
+          setShowDeleteDialog(false);
+          setDeletingPO(null);
+        }}
+        onConfirm={confirmDeletePO}
+        title="Delete Purchase Order"
+        description={`Are you sure you want to delete purchase order ${deletingPO?.poNumber}? This action will move it to the recycle bin where it can be restored later.`}
+        confirmText="Yes, Delete"
+        cancelText="No, Cancel"
+        confirmVariant="destructive"
+      />
+      
       {/* Receive Goods Dialog */}
       <Dialog open={!!selectedPOForReceive} onOpenChange={() => {
         setSelectedPOForReceive(null);
