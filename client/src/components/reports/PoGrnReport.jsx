@@ -65,7 +65,7 @@ export default function PoGrnReport({ purchaseOrders, goodsReceipts, canExport }
       date: formatDate(po.orderDate || po.order_date),
       brand_supplier: getBrandName(po.supplierId || po.supplier_id),
       currency: po.currency,
-      total_amount: (po.totalAmount || po.total_amount || 0).toFixed(2),
+      total_amount: Number(po.totalAmount || po.total_amount || 0).toFixed(2),
       status: po.status
     })),
     // Add GRN data
@@ -83,7 +83,7 @@ export default function PoGrnReport({ purchaseOrders, goodsReceipts, canExport }
   const totals = {
     pos: filteredPOs.length,
     grns: filteredGRNs.length,
-    totalValueOriginal: filteredPOs.reduce((sum, po) => sum + (po.totalAmount || po.total_amount || 0), 0)
+    totalValueOriginal: filteredPOs.reduce((sum, po) => sum + Number(po.totalAmount || po.total_amount || 0), 0)
   };
 
   return (
@@ -183,7 +183,7 @@ export default function PoGrnReport({ purchaseOrders, goodsReceipts, canExport }
                     <TableCell>
                       <Badge variant="outline">{po.currency}</Badge>
                     </TableCell>
-                    <TableCell>{(po.totalAmount || po.total_amount || 0).toFixed(2)}</TableCell>
+                    <TableCell>{Number(po.totalAmount || po.total_amount || 0).toFixed(2)}</TableCell>
                     <TableCell>
                       <Badge variant={po.status === 'closed' ? 'default' : 'secondary'}>
                         {po.status}

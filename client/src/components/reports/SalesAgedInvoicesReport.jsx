@@ -24,8 +24,8 @@ export default function SalesAgedInvoicesReport({ invoices, customers, canExport
     submittedInvoices
       .filter(inv => inv.status !== 'cancelled')
       .forEach(inv => {
-        const totalAmount = inv.totalAmount || inv.total_amount || 0;
-        const paidAmount = inv.paidAmount || inv.paid_amount || 0;
+        const totalAmount = Number(inv.totalAmount || inv.total_amount || 0);
+        const paidAmount = Number(inv.paidAmount || inv.paid_amount || 0);
         const outstanding = totalAmount - paidAmount;
         if (outstanding <= 0) return;
 
@@ -58,8 +58,8 @@ export default function SalesAgedInvoicesReport({ invoices, customers, canExport
       if (!sales[month]) {
         sales[month] = { total: 0, paid: 0 };
       }
-      sales[month].total += inv.totalAmount || inv.total_amount || 0;
-      const paidAmount = inv.paidAmount || inv.paid_amount || 0;
+      sales[month].total += Number(inv.totalAmount || inv.total_amount || 0);
+      const paidAmount = Number(inv.paidAmount || inv.paid_amount || 0);
       if (paidAmount > 0) {
         sales[month].paid += paidAmount;
       }

@@ -35,13 +35,13 @@ export default function PurchasesReport({ purchaseOrders, suppliers, canExport }
         };
       }
       
-      const amount = po.totalAmount || po.total_amount || 0;
+      const amount = Number(po.totalAmount || po.total_amount || 0);
       purchases[month].total += amount;
       purchases[month].count += 1;
       
       if (po.currency === 'GBP') {
         purchases[month].gbpAmount += amount;
-        purchases[month].totalAED += amount * (po.fxRateToAed || po.fx_rate_to_aed || 4.85);
+        purchases[month].totalAED += amount * Number(po.fxRateToAed || po.fx_rate_to_aed || 4.85);
       } else {
         purchases[month].aedAmount += amount;
         purchases[month].totalAED += amount;
@@ -74,10 +74,10 @@ export default function PurchasesReport({ purchaseOrders, suppliers, canExport }
   // Calculate totals
   const totals = allPurchaseOrders.reduce((acc, po) => {
     acc.totalOrders += 1;
-    const amount = po.totalAmount || po.total_amount || 0;
+    const amount = Number(po.totalAmount || po.total_amount || 0);
     if (po.currency === 'GBP') {
       acc.totalGBP += amount;
-      acc.totalAED += amount * (po.fxRateToAed || po.fx_rate_to_aed || 4.85);
+      acc.totalAED += amount * Number(po.fxRateToAed || po.fx_rate_to_aed || 4.85);
     } else {
       acc.totalAED += amount;
     }
