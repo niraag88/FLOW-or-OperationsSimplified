@@ -467,7 +467,7 @@ export default function GoodsReceiptsTab({ purchaseOrders, products, goodsReceip
           <div className="mb-6">
             <h3 className="text-lg font-semibold mb-3 flex items-center gap-2">
               <Package className="w-5 h-5 text-blue-600" />
-              Open Purchase Orders ({openPOs.length})
+              Open ({openPOs.length})
             </h3>
             {openPOs.length === 0 ? (
               <div className="text-center py-8 text-gray-500 border-2 border-dashed border-gray-200 rounded-lg">
@@ -492,7 +492,7 @@ export default function GoodsReceiptsTab({ purchaseOrders, products, goodsReceip
                 >
                   <div className="flex items-center gap-2">
                     <CheckCircle2 className="w-5 h-5 text-green-600" />
-                    <span className="font-semibold">Closed Goods Receipts ({closedPOs.length})</span>
+                    <span className="font-semibold">Closed ({closedPOs.length})</span>
                   </div>
                   {showClosedReceipts ? (
                     <ChevronDown className="w-4 h-4" />
