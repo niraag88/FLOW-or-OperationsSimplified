@@ -115,29 +115,24 @@ export default function PurchaseOrders() {
         </div>
         
         <div className="flex items-center gap-3">
-          <ExportDropdown 
-            data={activeTab === 'purchase-orders' ? filteredPOs : filteredGRNs}
-            type={activeTab === 'purchase-orders' ? 'Purchase Orders' : 'Goods Receipts'}
-            filename={activeTab === 'purchase-orders' ? 'purchase-orders' : 'goods-receipts'}
-            columns={activeTab === 'purchase-orders' ? {
-              po_number: 'PO Number',
-              supplier_name: 'Supplier',
-              order_date: { label: 'Order Date', transform: (date) => date ? new Date(date).toLocaleDateString('en-GB') : '' },
-              status: 'Status',
-              subtotal: { label: 'Subtotal', transform: (val) => `${val || 0}` },
-              tax_amount: { label: 'VAT', transform: (val) => `${val || 0}` },
-              total_amount: { label: 'Total', transform: (val) => `${val || 0}` },
-              currency: 'Currency'
-            } : {
-              grn_number: 'GRN Number',
-              po_number: 'PO Number',  
-              supplier_name: 'Supplier',
-              delivery_date: { label: 'Delivery Date', transform: (date) => date ? new Date(date).toLocaleDateString('en-GB') : '' },
-              delivery_note_ref: 'Delivery Note Ref',
-              status: 'Status'
-            }}
-            isLoading={loading}
-          />
+          {activeTab === 'purchase-orders' && (
+            <ExportDropdown 
+              data={filteredPOs}
+              type="Purchase Orders"
+              filename="purchase-orders"
+              columns={{
+                po_number: 'PO Number',
+                supplier_name: 'Supplier',
+                order_date: { label: 'Order Date', transform: (date) => date ? new Date(date).toLocaleDateString('en-GB') : '' },
+                status: 'Status',
+                subtotal: { label: 'Subtotal', transform: (val) => `${val || 0}` },
+                tax_amount: { label: 'VAT', transform: (val) => `${val || 0}` },
+                total_amount: { label: 'Total', transform: (val) => `${val || 0}` },
+                currency: 'Currency'
+              }}
+              isLoading={loading}
+            />
+          )}
           
           {canEdit && activeTab === "purchase-orders" && (
             <Button 

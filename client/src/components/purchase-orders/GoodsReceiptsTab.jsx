@@ -634,16 +634,6 @@ export default function GoodsReceiptsTab({ purchaseOrders, products, goodsReceip
       itemCount = openPOs.length + closedPOs.length;
     }
 
-    // Debug log to see what data we're exporting
-    console.log('Export data context:', { 
-      showOpenReceipts, 
-      showClosedReceipts, 
-      openPOsCount: openPOs.length, 
-      closedPOsCount: closedPOs.length,
-      exportType,
-      exportDataLength: exportData.length,
-      sampleData: exportData[0] || 'No data'
-    });
 
     return { exportData, exportType, itemCount };
   };
