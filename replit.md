@@ -47,6 +47,29 @@ Preferred communication style: Simple, everyday language.
 - **Logging**: Structured request/response logging for API endpoints
 - **TypeScript**: Strict type checking across the entire codebase
 
+# Document Format Standards
+
+## Internal Documents
+- **Usage**: Inventory reports, Purchase Orders management, internal reports, goods receipts
+- **Implementation**: Uses ExportDropdown component's View & Print functionality (`client/src/components/common/ExportDropdown.jsx`)
+- **Format Structure**:
+  - Header: "Business Operations" + document type
+  - Simple bordered data table with consistent styling
+  - Footer with generation timestamp and record count
+- **Styling**: Clean, minimal table format optimized for internal use
+
+## External Documents  
+- **Usage**: Quotations, Invoices, Delivery Orders (customer-facing documents)
+- **Implementation**: Uses POTemplate component pattern (`attached_assets/src/components/print/POTemplate.jsx`)
+- **Format Structure**:
+  - Professional header with company branding/logo
+  - Formal document title (e.g., "PURCHASE ORDER", "INVOICE")
+  - Company details and contact information section
+  - Supplier/customer information in grid layout
+  - Detailed line items table with totals
+  - Professional styling with proper spacing and print optimization
+- **Print Styles**: A4 portrait format with proper margins and print-specific CSS
+
 # External Dependencies
 
 ## Database Services
