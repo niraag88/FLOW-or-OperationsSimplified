@@ -77,6 +77,11 @@ function PagesContent() {
           <Layout currentPageName="Purchase Orders"><PurchaseOrders /></Layout>
         </ProtectedRoute>
       } />
+      <Route path="/purchase-orders" element={
+        <ProtectedRoute requiredRoles={['Admin', 'Manager']}>
+          <Layout currentPageName="Purchase Orders"><PurchaseOrders /></Layout>
+        </ProtectedRoute>
+      } />
       <Route path="/DeliveryOrders" element={
         <ProtectedRoute>
           <Layout currentPageName="Delivery Orders"><DeliveryOrders /></Layout>
