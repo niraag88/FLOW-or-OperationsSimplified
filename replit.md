@@ -59,7 +59,7 @@ Preferred communication style: Simple, everyday language.
 - **Styling**: Clean, minimal table format optimized for internal use
 
 ## External Documents  
-- **Usage**: Quotations, Invoices, Delivery Orders (customer-facing documents)
+- **Usage**: Individual Purchase Orders, Quotations, Invoices, Delivery Orders (customer-facing documents)
 - **Implementation**: Uses POTemplate component pattern (`attached_assets/src/components/print/POTemplate.jsx`)
 - **Format Structure**:
   - Professional header with company branding/logo
