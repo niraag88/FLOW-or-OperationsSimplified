@@ -635,38 +635,38 @@ export default function GoodsReceiptsTab({ purchaseOrders, products, goodsReceip
               </div>
             ) : (
               <div className="overflow-x-auto border rounded-lg">
-                <table className="w-full" style={{tableLayout: 'fixed'}}>
+                <table className="w-full text-sm" style={{tableLayout: 'fixed'}}>
                   <thead>
                     <tr className="border-b bg-muted/50">
-                      <th className="h-12 px-4 text-left align-middle font-medium text-muted-foreground" style={{width: '120px'}}>PO Number</th>
-                      <th className="h-12 px-4 text-left align-middle font-medium text-muted-foreground" style={{width: '140px'}}>Brand</th>
-                      <th className="h-12 px-4 text-left align-middle font-medium text-muted-foreground" style={{width: '100px'}}>Order Date</th>
-                      <th className="h-12 px-4 text-left align-middle font-medium text-muted-foreground" style={{width: '110px'}}>Total (GBP)</th>
-                      <th className="h-12 px-4 text-left align-middle font-medium text-muted-foreground" style={{width: '110px'}}>Total (AED)</th>
-                      <th className="h-12 px-4 text-left align-middle font-medium text-muted-foreground" style={{width: '90px'}}>Line Items</th>
-                      <th className="h-12 px-4 text-left align-middle font-medium text-muted-foreground" style={{width: '80px'}}>Ordered</th>
-                      <th className="h-12 px-4 text-left align-middle font-medium text-muted-foreground" style={{width: '80px'}}>Received</th>
-                      <th className="h-12 px-4 text-left align-middle font-medium text-muted-foreground" style={{width: '90px'}}>Status</th>
-                      <th className="h-12 px-4 text-left align-middle font-medium text-muted-foreground" style={{width: '90px'}}>Actions</th>
+                      <th className="h-10 px-2 text-left align-middle font-medium text-muted-foreground" style={{width: '120px'}}>PO Number</th>
+                      <th className="h-10 px-2 text-left align-middle font-medium text-muted-foreground" style={{width: '140px'}}>Brand</th>
+                      <th className="h-10 px-2 text-left align-middle font-medium text-muted-foreground" style={{width: '100px'}}>Order Date</th>
+                      <th className="h-10 px-2 text-left align-middle font-medium text-muted-foreground" style={{width: '110px'}}>Total (GBP)</th>
+                      <th className="h-10 px-2 text-left align-middle font-medium text-muted-foreground" style={{width: '110px'}}>Total (AED)</th>
+                      <th className="h-10 px-2 text-left align-middle font-medium text-muted-foreground" style={{width: '90px'}}>Line Items</th>
+                      <th className="h-10 px-2 text-left align-middle font-medium text-muted-foreground" style={{width: '80px'}}>Ordered</th>
+                      <th className="h-10 px-2 text-left align-middle font-medium text-muted-foreground" style={{width: '80px'}}>Received</th>
+                      <th className="h-10 px-2 text-left align-middle font-medium text-muted-foreground" style={{width: '90px'}}>Status</th>
+                      <th className="h-10 px-2 text-left align-middle font-medium text-muted-foreground" style={{width: '90px'}}>Actions</th>
                     </tr>
                   </thead>
                   <tbody>
                     {openPOs.map((po) => (
                       <tr key={po.id} className="border-b transition-colors hover:bg-muted/50">
-                        <td className="p-4 align-middle font-medium" style={{width: '120px'}}>{po.poNumber}</td>
-                        <td className="p-4 align-middle" style={{width: '140px'}}>{po.brandName || 'Unknown Brand'}</td>
-                        <td className="p-4 align-middle" style={{width: '100px'}}>
+                        <td className="p-2 align-middle font-medium" style={{width: '120px'}}>{po.poNumber}</td>
+                        <td className="p-2 align-middle" style={{width: '140px'}}>{po.brandName || 'Unknown Brand'}</td>
+                        <td className="p-2 align-middle" style={{width: '100px'}}>
                           {po.orderDate && !isNaN(new Date(po.orderDate)) ? 
                             format(new Date(po.orderDate), 'dd/MM/yy') : 
                             '-'
                           }
                         </td>
-                        <td className="p-4 align-middle" style={{width: '110px'}}>GBP {parseFloat(po.totalAmount || 0).toFixed(2)}</td>
-                        <td className="p-4 align-middle" style={{width: '110px'}}>AED {parseFloat(po.grandTotal || 0).toFixed(2)}</td>
-                        <td className="p-4 align-middle" style={{width: '90px'}}>{getLineItemsCount(po)}</td>
-                        <td className="p-4 align-middle" style={{width: '80px'}}>{getTotalOrderedQuantity(po)}</td>
-                        <td className="p-4 align-middle" style={{width: '80px'}}>{getTotalReceivedQuantity(po)}</td>
-                        <td className="p-4 align-middle" style={{width: '90px'}}>
+                        <td className="p-2 align-middle" style={{width: '110px'}}>GBP {parseFloat(po.totalAmount || 0).toFixed(2)}</td>
+                        <td className="p-2 align-middle" style={{width: '110px'}}>AED {parseFloat(po.grandTotal || 0).toFixed(2)}</td>
+                        <td className="p-2 align-middle" style={{width: '90px'}}>{getLineItemsCount(po)}</td>
+                        <td className="p-2 align-middle" style={{width: '80px'}}>{getTotalOrderedQuantity(po)}</td>
+                        <td className="p-2 align-middle" style={{width: '80px'}}>{getTotalReceivedQuantity(po)}</td>
+                        <td className="p-2 align-middle" style={{width: '90px'}}>
                           <Badge 
                             variant="outline" 
                             className="border-blue-300 text-blue-800 bg-blue-50"
@@ -674,7 +674,7 @@ export default function GoodsReceiptsTab({ purchaseOrders, products, goodsReceip
                             {po.status?.toUpperCase()}
                           </Badge>
                         </td>
-                        <td className="p-4 align-middle" style={{width: '90px'}}>
+                        <td className="p-2 align-middle" style={{width: '90px'}}>
                           <Button
                             size="sm"
                             onClick={() => openReceiveDialog(po)}
@@ -713,38 +713,38 @@ export default function GoodsReceiptsTab({ purchaseOrders, products, goodsReceip
               </CollapsibleTrigger>
               <CollapsibleContent className="mt-3">
                 <div className="overflow-x-auto border rounded-lg">
-                  <table className="w-full" style={{tableLayout: 'fixed'}}>
+                  <table className="w-full text-sm" style={{tableLayout: 'fixed'}}>
                     <thead>
                       <tr className="border-b bg-muted/50">
-                        <th className="h-12 px-4 text-left align-middle font-medium text-muted-foreground" style={{width: '120px'}}>PO Number</th>
-                        <th className="h-12 px-4 text-left align-middle font-medium text-muted-foreground" style={{width: '140px'}}>Brand</th>
-                        <th className="h-12 px-4 text-left align-middle font-medium text-muted-foreground" style={{width: '100px'}}>Order Date</th>
-                        <th className="h-12 px-4 text-left align-middle font-medium text-muted-foreground" style={{width: '110px'}}>Total (GBP)</th>
-                        <th className="h-12 px-4 text-left align-middle font-medium text-muted-foreground" style={{width: '110px'}}>Total (AED)</th>
-                        <th className="h-12 px-4 text-left align-middle font-medium text-muted-foreground" style={{width: '90px'}}>Line Items</th>
-                        <th className="h-12 px-4 text-left align-middle font-medium text-muted-foreground" style={{width: '80px'}}>Ordered</th>
-                        <th className="h-12 px-4 text-left align-middle font-medium text-muted-foreground" style={{width: '80px'}}>Received</th>
-                        <th className="h-12 px-4 text-left align-middle font-medium text-muted-foreground" style={{width: '90px'}}>Status</th>
-                        <th className="h-12 px-4 text-left align-middle font-medium text-muted-foreground" style={{width: '90px'}}>Actions</th>
+                        <th className="h-10 px-2 text-left align-middle font-medium text-muted-foreground" style={{width: '120px'}}>PO Number</th>
+                        <th className="h-10 px-2 text-left align-middle font-medium text-muted-foreground" style={{width: '140px'}}>Brand</th>
+                        <th className="h-10 px-2 text-left align-middle font-medium text-muted-foreground" style={{width: '100px'}}>Order Date</th>
+                        <th className="h-10 px-2 text-left align-middle font-medium text-muted-foreground" style={{width: '110px'}}>Total (GBP)</th>
+                        <th className="h-10 px-2 text-left align-middle font-medium text-muted-foreground" style={{width: '110px'}}>Total (AED)</th>
+                        <th className="h-10 px-2 text-left align-middle font-medium text-muted-foreground" style={{width: '90px'}}>Line Items</th>
+                        <th className="h-10 px-2 text-left align-middle font-medium text-muted-foreground" style={{width: '80px'}}>Ordered</th>
+                        <th className="h-10 px-2 text-left align-middle font-medium text-muted-foreground" style={{width: '80px'}}>Received</th>
+                        <th className="h-10 px-2 text-left align-middle font-medium text-muted-foreground" style={{width: '90px'}}>Status</th>
+                        <th className="h-10 px-2 text-left align-middle font-medium text-muted-foreground" style={{width: '90px'}}>Actions</th>
                       </tr>
                     </thead>
                     <tbody>
                       {closedPOs.map((po) => (
                         <tr key={po.id} className="border-b transition-colors hover:bg-muted/50">
-                          <td className="p-4 align-middle font-medium" style={{width: '120px'}}>{po.poNumber}</td>
-                          <td className="p-4 align-middle" style={{width: '140px'}}>{po.brandName || 'Unknown Brand'}</td>
-                          <td className="p-4 align-middle" style={{width: '100px'}}>
+                          <td className="p-2 align-middle font-medium" style={{width: '120px'}}>{po.poNumber}</td>
+                          <td className="p-2 align-middle" style={{width: '140px'}}>{po.brandName || 'Unknown Brand'}</td>
+                          <td className="p-2 align-middle" style={{width: '100px'}}>
                             {po.orderDate && !isNaN(new Date(po.orderDate)) ? 
                               format(new Date(po.orderDate), 'dd/MM/yy') : 
                               '-'
                             }
                           </td>
-                          <td className="p-4 align-middle" style={{width: '110px'}}>GBP {parseFloat(po.totalAmount || 0).toFixed(2)}</td>
-                          <td className="p-4 align-middle" style={{width: '110px'}}>AED {parseFloat(po.grandTotal || 0).toFixed(2)}</td>
-                          <td className="p-4 align-middle" style={{width: '90px'}}>{getLineItemsCount(po)}</td>
-                          <td className="p-4 align-middle" style={{width: '80px'}}>{getTotalOrderedQuantity(po)}</td>
-                          <td className="p-4 align-middle" style={{width: '80px'}}>{getTotalReceivedQuantity(po)}</td>
-                          <td className="p-4 align-middle" style={{width: '90px'}}>
+                          <td className="p-2 align-middle" style={{width: '110px'}}>GBP {parseFloat(po.totalAmount || 0).toFixed(2)}</td>
+                          <td className="p-2 align-middle" style={{width: '110px'}}>AED {parseFloat(po.grandTotal || 0).toFixed(2)}</td>
+                          <td className="p-2 align-middle" style={{width: '90px'}}>{getLineItemsCount(po)}</td>
+                          <td className="p-2 align-middle" style={{width: '80px'}}>{getTotalOrderedQuantity(po)}</td>
+                          <td className="p-2 align-middle" style={{width: '80px'}}>{getTotalReceivedQuantity(po)}</td>
+                          <td className="p-2 align-middle" style={{width: '90px'}}>
                             <Badge 
                               variant="outline" 
                               className="border-green-300 text-green-800 bg-green-50"
@@ -752,7 +752,7 @@ export default function GoodsReceiptsTab({ purchaseOrders, products, goodsReceip
                               {po.status?.toUpperCase()}
                             </Badge>
                           </td>
-                          <td className="p-4 align-middle" style={{width: '90px'}}>
+                          <td className="p-2 align-middle" style={{width: '90px'}}>
                             <DropdownMenu>
                               <DropdownMenuTrigger asChild>
                                 <Button variant="ghost" size="sm" className="h-8 w-8 p-0">
