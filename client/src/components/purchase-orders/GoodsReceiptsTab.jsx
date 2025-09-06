@@ -47,7 +47,10 @@ export default function GoodsReceiptsTab({ purchaseOrders, products, goodsReceip
     // Fetch PO items for all submitted purchase orders
     const fetchPOItemsData = async () => {
       const submittedPOs = purchaseOrders.filter(po => po.status === 'submitted');
-      if (submittedPOs.length === 0) return;
+      if (submittedPOs.length === 0) {
+        setItemsLoading(false);
+        return;
+      }
       
       setItemsLoading(true);
       const itemsData = {};
@@ -81,10 +84,10 @@ export default function GoodsReceiptsTab({ purchaseOrders, products, goodsReceip
       }
     };
 
-    if (purchaseOrders.length > 0 && brands.length > 0) {
+    if (purchaseOrders.length > 0) {
       fetchPOItemsData();
     }
-  }, [purchaseOrders, brands]);
+  }, [purchaseOrders]);
 
   const loadBrands = async () => {
     try {
@@ -96,9 +99,6 @@ export default function GoodsReceiptsTab({ purchaseOrders, products, goodsReceip
   };
 
   const getBrandName = (brandId) => {
-    // Return loading indicator if brands are still being fetched
-    if (brands.length === 0) return '...';
-    
     const brand = brands.find(b => b.id === brandId);
     return brand?.name || 'Unknown Brand';
   };
