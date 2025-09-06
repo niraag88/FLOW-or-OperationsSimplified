@@ -82,6 +82,38 @@ export default function GoodsReceiptsTab({ purchaseOrders, products, goodsReceip
     }));
   };
 
+  const openReceiveDialog = async (po) => {
+    try {
+      // Fetch the purchase order items
+      const response = await fetch(`/api/purchase-orders/${po.id}/items`);
+      if (!response.ok) {
+        throw new Error('Failed to fetch purchase order items');
+      }
+      const items = await response.json();
+      
+      // Set the selected PO with items
+      setSelectedPOForReceive({
+        ...po,
+        items: items
+      });
+      
+      // Initialize receive quantities to 0 for all items
+      const initialQuantities = {};
+      items.forEach(item => {
+        initialQuantities[item.id] = '';
+      });
+      setReceiveQuantities(initialQuantities);
+      
+    } catch (error) {
+      console.error('Error fetching PO items:', error);
+      toast({
+        title: "Error",
+        description: "Failed to load purchase order items. Please try again.",
+        variant: "destructive"
+      });
+    }
+  };
+
   const handleSaveReceive = async (forceClose = false) => {
     if (!selectedPOForReceive) return;
 
@@ -92,10 +124,10 @@ export default function GoodsReceiptsTab({ purchaseOrders, products, goodsReceip
         const receivedQuantity = receiveQuantities[item.id] || 0;
         return {
           poItemId: item.id,
-          productId: item.product_id,
+          productId: item.productId,
           orderedQuantity: item.quantity,
           receivedQuantity: receivedQuantity,
-          unitPrice: item.unit_price
+          unitPrice: item.unitPrice
         };
       }) || [];
 
@@ -456,7 +488,7 @@ export default function GoodsReceiptsTab({ purchaseOrders, products, goodsReceip
                   <CardFooter className="bg-gray-50 p-4 border-t flex items-center justify-end">
                     <Button
                       size="sm"
-                      onClick={() => setSelectedPOForReceive(po)}
+                      onClick={() => openReceiveDialog(po)}
                       disabled={!canEdit || processingPO === po.id}
                       className="bg-emerald-600 hover:bg-emerald-700"
                     >
@@ -470,7 +502,11 @@ export default function GoodsReceiptsTab({ purchaseOrders, products, goodsReceip
         </CardContent>
       </Card>
       {/* Receive Goods Dialog */}
-      <Dialog open={!!selectedPOForReceive} onOpenChange={() => setSelectedPOForReceive(null)}>
+      <Dialog open={!!selectedPOForReceive} onOpenChange={() => {
+        setSelectedPOForReceive(null);
+        setReceiveQuantities({});
+        setReceiveNotes('');
+      }}>
         <DialogContent className="max-w-4xl max-h-[80vh] overflow-y-auto">
           <DialogHeader>
             <DialogTitle>Receive Goods - PO #{selectedPOForReceive?.poNumber}</DialogTitle>
@@ -492,16 +528,15 @@ export default function GoodsReceiptsTab({ purchaseOrders, products, goodsReceip
               </TableHeader>
               <TableBody>
                 {selectedPOForReceive?.items?.map((item, index) => {
-                  const product = getProductInfo(item.product_id);
-                  const totalReceived = getReceivedQuantityForItem(selectedPOForReceive.id, item.product_id);
+                  const totalReceived = getReceivedQuantityForItem(selectedPOForReceive.id, item.productId);
                   const remaining = item.quantity - totalReceived;
                   
                   return (
                     <TableRow key={index}>
                       <TableCell>
                         <div>
-                          <p className="font-medium">{product.product_name}</p>
-                          <p className="text-sm text-gray-500">{product.sku} • {product.size}</p>
+                          <p className="font-medium">{item.productName}</p>
+                          <p className="text-sm text-gray-500">{item.productSku} • {item.size}</p>
                         </div>
                       </TableCell>
                       <TableCell>{item.quantity}</TableCell>
@@ -542,14 +577,18 @@ export default function GoodsReceiptsTab({ purchaseOrders, products, goodsReceip
           </div>
 
           <DialogFooter className="flex gap-2">
-            <Button variant="outline" onClick={() => setSelectedPOForReceive(null)}>
+            <Button variant="outline" onClick={() => {
+              setSelectedPOForReceive(null);
+              setReceiveQuantities({});
+              setReceiveNotes('');
+            }}>
               Cancel
             </Button>
             
             {/* Dynamic button logic based on whether all quantities match */}
             {(() => {
               const allItemsFullyReceived = selectedPOForReceive?.items?.every(item => {
-                const totalReceived = getReceivedQuantityForItem(selectedPOForReceive.id, item.product_id);
+                const totalReceived = getReceivedQuantityForItem(selectedPOForReceive.id, item.productId);
                 const currentReceiving = receiveQuantities[item.id] || 0;
                 return (totalReceived + currentReceiving) >= item.quantity;
               });
