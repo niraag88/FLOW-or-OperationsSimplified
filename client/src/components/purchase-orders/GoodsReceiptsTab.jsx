@@ -36,6 +36,7 @@ export default function GoodsReceiptsTab({ purchaseOrders, products, goodsReceip
   const [receiveQuantities, setReceiveQuantities] = useState({});
   const [receiveNotes, setReceiveNotes] = useState('');
   const [poItemsData, setPOItemsData] = useState({});
+  const [itemsLoading, setItemsLoading] = useState(false);
   const { toast } = useToast();
 
   React.useEffect(() => {
@@ -46,27 +47,44 @@ export default function GoodsReceiptsTab({ purchaseOrders, products, goodsReceip
     // Fetch PO items for all submitted purchase orders
     const fetchPOItemsData = async () => {
       const submittedPOs = purchaseOrders.filter(po => po.status === 'submitted');
+      if (submittedPOs.length === 0) return;
+      
+      setItemsLoading(true);
       const itemsData = {};
       
-      for (const po of submittedPOs) {
-        try {
-          const response = await fetch(`/api/purchase-orders/${po.id}/items`);
-          if (response.ok) {
-            const items = await response.json();
-            itemsData[po.id] = items;
+      try {
+        // Use Promise.all for parallel fetching instead of sequential
+        const promises = submittedPOs.map(async (po) => {
+          try {
+            const response = await fetch(`/api/purchase-orders/${po.id}/items`);
+            if (response.ok) {
+              const items = await response.json();
+              return { poId: po.id, items };
+            }
+          } catch (error) {
+            console.error(`Error fetching items for PO ${po.id}:`, error);
           }
-        } catch (error) {
-          console.error(`Error fetching items for PO ${po.id}:`, error);
-        }
+          return null;
+        });
+
+        const results = await Promise.all(promises);
+        results.forEach(result => {
+          if (result) {
+            itemsData[result.poId] = result.items;
+          }
+        });
+      } catch (error) {
+        console.error('Error fetching PO items:', error);
+      } finally {
+        setPOItemsData(itemsData);
+        setItemsLoading(false);
       }
-      
-      setPOItemsData(itemsData);
     };
 
-    if (purchaseOrders.length > 0) {
+    if (purchaseOrders.length > 0 && brands.length > 0) {
       fetchPOItemsData();
     }
-  }, [purchaseOrders]);
+  }, [purchaseOrders, brands]);
 
   const loadBrands = async () => {
     try {
@@ -78,6 +96,9 @@ export default function GoodsReceiptsTab({ purchaseOrders, products, goodsReceip
   };
 
   const getBrandName = (brandId) => {
+    // Return loading indicator if brands are still being fetched
+    if (brands.length === 0) return '...';
+    
     const brand = brands.find(b => b.id === brandId);
     return brand?.name || 'Unknown Brand';
   };
@@ -110,6 +131,7 @@ export default function GoodsReceiptsTab({ purchaseOrders, products, goodsReceip
   };
 
   const calculateTotalOrderedQuantity = (poId) => {
+    if (itemsLoading) return "...";
     const items = poItemsData[poId];
     if (!items) return "-";
     
@@ -117,6 +139,7 @@ export default function GoodsReceiptsTab({ purchaseOrders, products, goodsReceip
   };
 
   const calculateTotalReceivedQuantity = (poId) => {
+    if (itemsLoading) return "...";
     const items = poItemsData[poId];
     if (!items) return 0;
     
@@ -129,6 +152,7 @@ export default function GoodsReceiptsTab({ purchaseOrders, products, goodsReceip
   };
 
   const calculateLineItemsCount = (poId) => {
+    if (itemsLoading) return "...";
     const items = poItemsData[poId];
     return items ? items.length : "-";
   };
