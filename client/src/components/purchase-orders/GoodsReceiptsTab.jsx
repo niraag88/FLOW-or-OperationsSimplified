@@ -535,7 +535,7 @@ export default function GoodsReceiptsTab({ purchaseOrders, products, goodsReceip
         <DialogContent className="max-w-4xl max-h-[80vh] overflow-y-auto">
           <DialogHeader>
             <DialogTitle>
-              Receive Goods - {selectedPOForReceive?.poNumber}
+              Receive Goods - {getBrandName(selectedPOForReceive?.supplierId)} - {selectedPOForReceive?.poNumber}
               {selectedPOForReceive?.orderDate && !isNaN(new Date(selectedPOForReceive.orderDate)) && 
                 ` - ${format(new Date(selectedPOForReceive.orderDate), 'dd/MM/yyyy')}`
               }
