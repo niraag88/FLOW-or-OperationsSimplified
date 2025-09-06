@@ -112,35 +112,35 @@ export default function GoodsReceiptsTab({ purchaseOrders, products, goodsReceip
     <Table>
       <TableHeader>
         <TableRow>
-          <TableHead>PO Number</TableHead>
-          <TableHead>Brand</TableHead>
-          <TableHead>Order Date</TableHead>
-          <TableHead>Total (GBP)</TableHead>
-          <TableHead>Total (AED)</TableHead>
-          <TableHead>Line Items</TableHead>
-          <TableHead>Ordered</TableHead>
-          <TableHead>Received</TableHead>
-          <TableHead>Status</TableHead>
-          <TableHead>Actions</TableHead>
+          <TableHead className="w-[120px]">PO Number</TableHead>
+          <TableHead className="w-[140px]">Brand</TableHead>
+          <TableHead className="w-[100px]">Order Date</TableHead>
+          <TableHead className="w-[110px]">Total (GBP)</TableHead>
+          <TableHead className="w-[110px]">Total (AED)</TableHead>
+          <TableHead className="w-[90px]">Line Items</TableHead>
+          <TableHead className="w-[80px]">Ordered</TableHead>
+          <TableHead className="w-[80px]">Received</TableHead>
+          <TableHead className="w-[90px]">Status</TableHead>
+          <TableHead className="w-[90px]">Actions</TableHead>
         </TableRow>
       </TableHeader>
       <TableBody>
         {pos.map((po) => (
           <TableRow key={po.id}>
-            <TableCell className="font-medium">{po.poNumber}</TableCell>
-            <TableCell>{po.brandName || 'Unknown Brand'}</TableCell>
-            <TableCell>
+            <TableCell className="font-medium w-[120px]">{po.poNumber}</TableCell>
+            <TableCell className="w-[140px]">{po.brandName || 'Unknown Brand'}</TableCell>
+            <TableCell className="w-[100px]">
               {po.orderDate && !isNaN(new Date(po.orderDate)) ? 
                 format(new Date(po.orderDate), 'dd/MM/yy') : 
                 '-'
               }
             </TableCell>
-            <TableCell>GBP {parseFloat(po.totalAmount || 0).toFixed(2)}</TableCell>
-            <TableCell>AED {parseFloat(po.grandTotal || 0).toFixed(2)}</TableCell>
-            <TableCell>{getLineItemsCount(po)}</TableCell>
-            <TableCell>{getTotalOrderedQuantity(po)}</TableCell>
-            <TableCell>{getTotalReceivedQuantity(po)}</TableCell>
-            <TableCell>
+            <TableCell className="w-[110px]">GBP {parseFloat(po.totalAmount || 0).toFixed(2)}</TableCell>
+            <TableCell className="w-[110px]">AED {parseFloat(po.grandTotal || 0).toFixed(2)}</TableCell>
+            <TableCell className="w-[90px]">{getLineItemsCount(po)}</TableCell>
+            <TableCell className="w-[80px]">{getTotalOrderedQuantity(po)}</TableCell>
+            <TableCell className="w-[80px]">{getTotalReceivedQuantity(po)}</TableCell>
+            <TableCell className="w-[90px]">
               <Badge 
                 variant="outline" 
                 className={po.status === 'closed' 
@@ -151,7 +151,7 @@ export default function GoodsReceiptsTab({ purchaseOrders, products, goodsReceip
                 {po.status?.toUpperCase()}
               </Badge>
             </TableCell>
-            <TableCell>
+            <TableCell className="w-[90px]">
               {isClosedSection ? (
                 <DropdownMenu>
                   <DropdownMenuTrigger asChild>
