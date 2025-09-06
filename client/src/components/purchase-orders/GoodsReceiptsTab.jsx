@@ -5,7 +5,7 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import { ShoppingCart, CheckCircle2, Package, Truck, MoreHorizontal, XCircle, ChevronDown, ChevronRight, FileText, FileSpreadsheet } from "lucide-react";
+import { ShoppingCart, CheckCircle2, Package, Truck, MoreHorizontal, XCircle, ChevronDown, ChevronRight, Eye, Download } from "lucide-react";
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -761,11 +761,11 @@ export default function GoodsReceiptsTab({ purchaseOrders, products, goodsReceip
                               </DropdownMenuTrigger>
                               <DropdownMenuContent align="end">
                                 <DropdownMenuItem onClick={() => handleViewAndPrint(po)}>
-                                  <FileText className="w-4 h-4 mr-2" />
+                                  <Eye className="w-4 h-4 mr-2" />
                                   View & Print
                                 </DropdownMenuItem>
                                 <DropdownMenuItem onClick={() => handleExportToXLSX(po)}>
-                                  <FileSpreadsheet className="w-4 h-4 mr-2" />
+                                  <Download className="w-4 h-4 mr-2" />
                                   Export to XLSX
                                 </DropdownMenuItem>
                                 <DropdownMenuItem 

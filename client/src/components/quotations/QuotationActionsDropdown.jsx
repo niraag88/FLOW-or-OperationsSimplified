@@ -8,7 +8,7 @@ import {
   DropdownMenuSeparator,
 } from "@/components/ui/dropdown-menu";
 import { Button } from "@/components/ui/button";
-import { MoreHorizontal, Edit2, FileText, Download, Trash2, Printer } from "lucide-react";
+import { MoreHorizontal, Edit2, Download, Trash2, Eye } from "lucide-react";
 import { exportToCsv } from "../utils/export";
 import { format, isValid, parseISO } from 'date-fns';
 import { useToast } from "@/components/ui/use-toast";
@@ -173,7 +173,7 @@ export default function QuotationActionsDropdown({ quotation, canEdit, onEdit, o
             </DropdownMenuItem>
           )}
           <DropdownMenuItem onClick={handleViewPrint}>
-            <Printer className="w-4 h-4 mr-2" />
+            <Eye className="w-4 h-4 mr-2" />
             View & Print
           </DropdownMenuItem>
           <DropdownMenuItem onClick={handleExportXLSX}>
