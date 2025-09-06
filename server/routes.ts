@@ -2373,8 +2373,10 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  // GET /api/purchase-orders/:id/print-data - Optimized endpoint for PO print view
-  // Combines PO data, items, supplier info, and company settings in one response
+  // Cache for company settings (refresh every 5 minutes)
+  let companySettingsCache = { data: null, expires: 0 };
+
+  // GET /api/purchase-orders/:id/print-data - Ultra-optimized endpoint for PO print view
   app.get('/api/purchase-orders/:id/print-data', requireAuth(), async (req, res) => {
     try {
       const poId = parseInt(req.params.id);
@@ -2383,53 +2385,66 @@ export async function registerRoutes(app: Express): Promise<Server> {
         return res.status(400).json({ error: 'Valid purchase order ID is required' });
       }
 
-      // Single optimized query to get all PO data with joins
-      const [purchaseOrder] = await db.select({
-        id: purchaseOrders.id,
-        poNumber: purchaseOrders.poNumber,
-        supplierId: purchaseOrders.supplierId,
-        status: purchaseOrders.status,
-        orderDate: purchaseOrders.orderDate,
-        expectedDelivery: purchaseOrders.expectedDelivery,
-        totalAmount: purchaseOrders.totalAmount,
-        vatAmount: purchaseOrders.vatAmount,
-        grandTotal: purchaseOrders.grandTotal,
-        notes: purchaseOrders.notes,
-        // Supplier/Brand data
-        supplierName: brands.name,
-        supplierAddress: brands.description,
-        supplierContactPerson: brands.contactPerson,
-        supplierEmail: brands.contactEmail,
-        supplierPhone: brands.contactPhone,
-        supplierWebsite: brands.website
-      }).from(purchaseOrders)
-        .leftJoin(brands, eq(purchaseOrders.supplierId, brands.id))
-        .where(eq(purchaseOrders.id, poId));
+      // Use cached company settings (5 min TTL)
+      const now = Date.now();
+      if (!companySettingsCache.data || companySettingsCache.expires < now) {
+        try {
+          companySettingsCache.data = await businessStorage.getCompanySettings();
+          companySettingsCache.expires = now + (5 * 60 * 1000); // 5 minutes
+        } catch (error) {
+          companySettingsCache.data = null;
+        }
+      }
+
+      // Execute both queries in parallel for maximum speed
+      const [purchaseOrderResult, itemsResult] = await Promise.all([
+        // PO with supplier data in one query
+        db.select({
+          id: purchaseOrders.id,
+          poNumber: purchaseOrders.poNumber,
+          supplierId: purchaseOrders.supplierId,
+          status: purchaseOrders.status,
+          orderDate: purchaseOrders.orderDate,
+          expectedDelivery: purchaseOrders.expectedDelivery,
+          totalAmount: purchaseOrders.totalAmount,
+          vatAmount: purchaseOrders.vatAmount,
+          grandTotal: purchaseOrders.grandTotal,
+          notes: purchaseOrders.notes,
+          // Supplier/Brand data joined
+          supplierName: brands.name,
+          supplierAddress: brands.description,
+          supplierContactPerson: brands.contactPerson,
+          supplierEmail: brands.contactEmail,
+          supplierPhone: brands.contactPhone,
+          supplierWebsite: brands.website
+        }).from(purchaseOrders)
+          .leftJoin(brands, eq(purchaseOrders.supplierId, brands.id))
+          .where(eq(purchaseOrders.id, poId))
+          .limit(1),
+        
+        // PO items in parallel
+        db.select({
+          productCode: products.sku,
+          description: products.name,
+          size: products.size,
+          quantity: purchaseOrderItems.quantity,
+          unitPrice: purchaseOrderItems.unitPrice,
+          lineTotal: purchaseOrderItems.lineTotal
+        }).from(purchaseOrderItems)
+          .leftJoin(products, eq(purchaseOrderItems.productId, products.id))
+          .where(eq(purchaseOrderItems.poId, poId))
+      ]);
+
+      const [purchaseOrder] = purchaseOrderResult;
       
       if (!purchaseOrder) {
         return res.status(404).json({ error: 'Purchase order not found' });
       }
 
-      // Get PO items in a separate optimized query
-      const items = await db.select({
-        productCode: products.sku,
-        description: products.name,
-        size: products.size,
-        quantity: purchaseOrderItems.quantity,
-        unitPrice: purchaseOrderItems.unitPrice,
-        lineTotal: purchaseOrderItems.lineTotal
-      }).from(purchaseOrderItems)
-        .leftJoin(products, eq(purchaseOrderItems.productId, products.id))
-        .where(eq(purchaseOrderItems.poId, poId));
-
-      // Get company settings directly from business storage (lightweight query)
-      const companySettings = await businessStorage.getCompanySettings().catch(() => null);
-
-      // Format the complete response with all needed data
-      const response = {
+      // Pre-built optimized response structure
+      res.json({
         success: true,
         data: {
-          // PO basic info
           id: purchaseOrder.id,
           poNumber: purchaseOrder.poNumber,
           orderDate: purchaseOrder.orderDate,
@@ -2439,8 +2454,6 @@ export async function registerRoutes(app: Express): Promise<Server> {
           totalAmount: purchaseOrder.totalAmount,
           vatAmount: purchaseOrder.vatAmount,
           grandTotal: purchaseOrder.grandTotal,
-          
-          // Supplier info
           supplier: {
             name: purchaseOrder.supplierName,
             address: purchaseOrder.supplierAddress,
@@ -2449,9 +2462,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
             phone: purchaseOrder.supplierPhone,
             website: purchaseOrder.supplierWebsite
           },
-          
-          // Line items
-          items: items.map(item => ({
+          items: itemsResult.map(item => ({
             product_code: item.productCode,
             description: item.description,
             size: item.size,
@@ -2459,13 +2470,9 @@ export async function registerRoutes(app: Express): Promise<Server> {
             unit_price: item.unitPrice,
             line_total: item.lineTotal
           })),
-          
-          // Company settings for branding
-          company: companySettings
+          company: companySettingsCache.data
         }
-      };
-
-      res.json(response);
+      });
       
     } catch (error) {
       console.error('Error fetching PO print data:', error);
