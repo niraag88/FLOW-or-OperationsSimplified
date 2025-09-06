@@ -35,11 +35,38 @@ export default function GoodsReceiptsTab({ purchaseOrders, products, goodsReceip
   const [selectedPOForReceive, setSelectedPOForReceive] = useState(null);
   const [receiveQuantities, setReceiveQuantities] = useState({});
   const [receiveNotes, setReceiveNotes] = useState('');
+  const [poItemsData, setPOItemsData] = useState({});
   const { toast } = useToast();
 
   React.useEffect(() => {
     loadBrands();
   }, []);
+
+  React.useEffect(() => {
+    // Fetch PO items for all submitted purchase orders
+    const fetchPOItemsData = async () => {
+      const submittedPOs = purchaseOrders.filter(po => po.status === 'submitted');
+      const itemsData = {};
+      
+      for (const po of submittedPOs) {
+        try {
+          const response = await fetch(`/api/purchase-orders/${po.id}/items`);
+          if (response.ok) {
+            const items = await response.json();
+            itemsData[po.id] = items;
+          }
+        } catch (error) {
+          console.error(`Error fetching items for PO ${po.id}:`, error);
+        }
+      }
+      
+      setPOItemsData(itemsData);
+    };
+
+    if (purchaseOrders.length > 0) {
+      fetchPOItemsData();
+    }
+  }, [purchaseOrders]);
 
   const loadBrands = async () => {
     try {
@@ -82,36 +109,55 @@ export default function GoodsReceiptsTab({ purchaseOrders, products, goodsReceip
     }));
   };
 
-  const openReceiveDialog = async (po) => {
-    try {
-      // Fetch the purchase order items
-      const response = await fetch(`/api/purchase-orders/${po.id}/items`);
-      if (!response.ok) {
-        throw new Error('Failed to fetch purchase order items');
-      }
-      const items = await response.json();
-      
-      // Set the selected PO with items
-      setSelectedPOForReceive({
-        ...po,
-        items: items
-      });
-      
-      // Initialize receive quantities to 0 for all items
-      const initialQuantities = {};
-      items.forEach(item => {
-        initialQuantities[item.id] = '';
-      });
-      setReceiveQuantities(initialQuantities);
-      
-    } catch (error) {
-      console.error('Error fetching PO items:', error);
+  const calculateTotalOrderedQuantity = (poId) => {
+    const items = poItemsData[poId];
+    if (!items) return "-";
+    
+    return items.reduce((total, item) => total + (item.quantity || 0), 0);
+  };
+
+  const calculateTotalReceivedQuantity = (poId) => {
+    const items = poItemsData[poId];
+    if (!items) return 0;
+    
+    // Calculate total received for each item using the existing function
+    let totalReceived = 0;
+    items.forEach(item => {
+      totalReceived += getReceivedQuantityForItem(poId, item.productId);
+    });
+    return totalReceived;
+  };
+
+  const calculateLineItemsCount = (poId) => {
+    const items = poItemsData[poId];
+    return items ? items.length : "-";
+  };
+
+  const openReceiveDialog = (po) => {
+    // Use the pre-fetched items data
+    const items = poItemsData[po.id];
+    
+    if (!items) {
       toast({
         title: "Error",
-        description: "Failed to load purchase order items. Please try again.",
+        description: "Purchase order items not loaded. Please try again.",
         variant: "destructive"
       });
+      return;
     }
+    
+    // Set the selected PO with items
+    setSelectedPOForReceive({
+      ...po,
+      items: items
+    });
+    
+    // Initialize receive quantities to 0 for all items
+    const initialQuantities = {};
+    items.forEach(item => {
+      initialQuantities[item.id] = '';
+    });
+    setReceiveQuantities(initialQuantities);
   };
 
   const handleSaveReceive = async (forceClose = false) => {
@@ -419,84 +465,63 @@ export default function GoodsReceiptsTab({ purchaseOrders, products, goodsReceip
               <p>There are no purchase orders awaiting goods receipt.</p>
             </div>
           ) : (
-            <div className="space-y-6">
-              {openPOs.map((po) => (
-                <Card key={po.id} className="overflow-hidden">
-                  <CardHeader className="bg-gray-50 p-4 border-b">
-                    <div className="flex flex-col sm:flex-row justify-between sm:items-center gap-2">
-                      <div className="min-w-0">
-                        <h3 className="font-semibold text-lg text-gray-800">{po.poNumber}</h3>
-                        <p className="text-sm text-gray-600">{getBrandName(po.supplierId)}</p>
-                      </div>
-                      <div className="flex items-center gap-2">
-                        <Badge variant="outline" className="border-blue-300 text-blue-800 bg-blue-50">
-                          {po.status?.toUpperCase()}
-                        </Badge>
-                        <span className="text-sm text-gray-500">
+            <div className="overflow-x-auto">
+              <Table>
+                <TableHeader>
+                  <TableRow>
+                    <TableHead>PO Number</TableHead>
+                    <TableHead>Brand</TableHead>
+                    <TableHead>Order Date</TableHead>
+                    <TableHead>Total (GBP)</TableHead>
+                    <TableHead>Total (AED)</TableHead>
+                    <TableHead>Line Items</TableHead>
+                    <TableHead>Ordered</TableHead>
+                    <TableHead>Received</TableHead>
+                    <TableHead>Status</TableHead>
+                    <TableHead>Actions</TableHead>
+                  </TableRow>
+                </TableHeader>
+                <TableBody>
+                  {openPOs.map((po) => {
+                    const totalOrderedQty = calculateTotalOrderedQuantity(po.id);
+                    const totalReceivedQty = calculateTotalReceivedQuantity(po.id);
+                    const lineItemsCount = calculateLineItemsCount(po.id);
+                    
+                    return (
+                      <TableRow key={po.id}>
+                        <TableCell className="font-medium">{po.poNumber}</TableCell>
+                        <TableCell>{getBrandName(po.supplierId)}</TableCell>
+                        <TableCell>
                           {po.orderDate && !isNaN(new Date(po.orderDate)) ? 
-                            format(new Date(po.orderDate), 'MMM dd, yyyy') : 
-                            'Invalid Date'
+                            format(new Date(po.orderDate), 'dd/MM/yy') : 
+                            '-'
                           }
-                        </span>
-                      </div>
-                    </div>
-                  </CardHeader>
-                  <CardContent className="p-0">
-                    <div className="overflow-x-auto">
-                      <Table>
-                        <TableHeader>
-                          <TableRow>
-                            <TableHead className="min-w-[200px]">Product</TableHead>
-                            <TableHead>Ordered</TableHead>
-                            <TableHead>Received</TableHead>
-                            <TableHead>Receiving Now</TableHead>
-                          </TableRow>
-                        </TableHeader>
-                        <TableBody>
-                          {po.items?.map((item, index) => {
-                            const product = getProductInfo(item.product_id);
-                            const totalReceived = getReceivedQuantityForItem(po.id, item.product_id);
-                            const remaining = item.quantity - totalReceived;
-                            
-                            return (
-                              <TableRow key={index} className="bg-white">
-                                <TableCell>
-                                  <p className="font-medium text-gray-800 truncate">{product.product_name}</p>
-                                  <p className="text-sm text-gray-500">{product.size}</p>
-                                </TableCell>
-                                <TableCell>{item.quantity}</TableCell>
-                                <TableCell>{totalReceived}</TableCell>
-                                <TableCell>
-                                  <Input
-                                    type="number"
-                                    min="0"
-                                    max={remaining}
-                                    placeholder="0"
-                                    value={receivingQuantities[`${po.id}-${index}`] || ''}
-                                    onChange={(e) => handleQuantityChange(po.id, index, e.target.value)}
-                                    disabled={!canEdit || remaining <= 0}
-                                    className="w-24"
-                                  />
-                                </TableCell>
-                              </TableRow>
-                            );
-                          })}
-                        </TableBody>
-                      </Table>
-                    </div>
-                  </CardContent>
-                  <CardFooter className="bg-gray-50 p-4 border-t flex items-center justify-end">
-                    <Button
-                      size="sm"
-                      onClick={() => openReceiveDialog(po)}
-                      disabled={!canEdit || processingPO === po.id}
-                      className="bg-emerald-600 hover:bg-emerald-700"
-                    >
-                      {processingPO === po.id ? "Processing..." : "Receive"}
-                    </Button>
-                  </CardFooter>
-                </Card>
-              ))}
+                        </TableCell>
+                        <TableCell>GBP {parseFloat(po.totalAmount || 0).toFixed(2)}</TableCell>
+                        <TableCell>AED {parseFloat(po.grandTotal || 0).toFixed(2)}</TableCell>
+                        <TableCell>{lineItemsCount}</TableCell>
+                        <TableCell>{totalOrderedQty}</TableCell>
+                        <TableCell>{totalReceivedQty}</TableCell>
+                        <TableCell>
+                          <Badge variant="outline" className="border-blue-300 text-blue-800 bg-blue-50">
+                            {po.status?.toUpperCase()}
+                          </Badge>
+                        </TableCell>
+                        <TableCell>
+                          <Button
+                            size="sm"
+                            onClick={() => openReceiveDialog(po)}
+                            disabled={!canEdit || processingPO === po.id}
+                            className="bg-emerald-600 hover:bg-emerald-700"
+                          >
+                            {processingPO === po.id ? "Processing..." : "Receive"}
+                          </Button>
+                        </TableCell>
+                      </TableRow>
+                    );
+                  })}
+                </TableBody>
+              </Table>
             </div>
           )}
         </CardContent>
