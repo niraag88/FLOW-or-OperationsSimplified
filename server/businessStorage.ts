@@ -1,9 +1,9 @@
 import { db } from "./db";
-import { eq, desc, like, and, gte, lte } from "drizzle-orm";
+import { eq, desc, like, and, gte, lte, sql } from "drizzle-orm";
 import {
   brands, suppliers, customers, products, purchaseOrders, quotations,
   vatReturns, companySettings, purchaseOrderItems, quotationItems,
-  stockCounts, stockCountItems, users,
+  stockCounts, stockCountItems, users, goodsReceipts, goodsReceiptItems,
   type Brand, type Supplier, type Customer, type Product, 
   type PurchaseOrder, type Quotation, type VatReturn, type CompanySettings,
   type StockCount, type StockCountItem,
@@ -166,6 +166,23 @@ export class BusinessStorage {
 
   // Purchase Order operations
   async getPurchaseOrders() {
+    // Create subqueries for aggregated data
+    const itemsAgg = db.select({
+      poId: purchaseOrderItems.poId,
+      lineItems: sql<number>`count(*)`.as('lineItems'),
+      orderedQty: sql<number>`sum(${purchaseOrderItems.quantity})`.as('orderedQty')
+    }).from(purchaseOrderItems)
+      .groupBy(purchaseOrderItems.poId)
+      .as('itemsAgg');
+
+    const receivedAgg = db.select({
+      poId: goodsReceipts.poId,
+      receivedQty: sql<number>`sum(${goodsReceiptItems.receivedQuantity})`.as('receivedQty')
+    }).from(goodsReceiptItems)
+      .innerJoin(goodsReceipts, eq(goodsReceiptItems.receiptId, goodsReceipts.id))
+      .groupBy(goodsReceipts.poId)
+      .as('receivedAgg');
+
     return await db.select({
       id: purchaseOrders.id,
       poNumber: purchaseOrders.poNumber,
@@ -183,8 +200,14 @@ export class BusinessStorage {
       updatedAt: purchaseOrders.updatedAt,
       supplierName: brands.name, // Since supplierId is actually brandId from the form
       brandName: brands.name,
+      // Aggregated data for efficient loading
+      lineItems: sql<number>`coalesce(${itemsAgg.lineItems}, 0)`.as('lineItems'),
+      orderedQty: sql<number>`coalesce(${itemsAgg.orderedQty}, 0)`.as('orderedQty'),
+      receivedQty: sql<number>`coalesce(${receivedAgg.receivedQty}, 0)`.as('receivedQty')
     }).from(purchaseOrders)
       .leftJoin(brands, eq(purchaseOrders.supplierId, brands.id)) // Join directly to brands since supplierId is brandId
+      .leftJoin(itemsAgg, eq(itemsAgg.poId, purchaseOrders.id))
+      .leftJoin(receivedAgg, eq(receivedAgg.poId, purchaseOrders.id))
       .orderBy(desc(purchaseOrders.createdAt));
   }
 

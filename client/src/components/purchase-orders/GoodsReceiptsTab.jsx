@@ -21,13 +21,11 @@ import { PurchaseOrder } from "@/api/entities";
 import { GoodsReceipt } from "@/api/entities";
 import { InventoryLot } from "@/api/entities";
 import { InventoryAudit } from "@/api/entities";
-import { Brand } from "@/api/entities";
 import { useToast } from "@/hooks/use-toast";
 import { logStatusChange, logAuditAction } from "../utils/auditLogger";
 import SimpleConfirmDialog from "../common/SimpleConfirmDialog";
 
 export default function GoodsReceiptsTab({ purchaseOrders, products, goodsReceipts, loading, canEdit, currentUser, onRefresh }) {
-  const [brands, setBrands] = useState([]);
   const [receivingQuantities, setReceivingQuantities] = useState({});
   const [processingPO, setProcessingPO] = useState(null);
   const [showCloseConfirm, setShowCloseConfirm] = useState(false);
@@ -35,73 +33,8 @@ export default function GoodsReceiptsTab({ purchaseOrders, products, goodsReceip
   const [selectedPOForReceive, setSelectedPOForReceive] = useState(null);
   const [receiveQuantities, setReceiveQuantities] = useState({});
   const [receiveNotes, setReceiveNotes] = useState('');
-  const [poItemsData, setPOItemsData] = useState({});
-  const [itemsLoading, setItemsLoading] = useState(false);
   const { toast } = useToast();
 
-  React.useEffect(() => {
-    loadBrands();
-  }, []);
-
-  React.useEffect(() => {
-    // Fetch PO items for all submitted purchase orders
-    const fetchPOItemsData = async () => {
-      const submittedPOs = purchaseOrders.filter(po => po.status === 'submitted');
-      if (submittedPOs.length === 0) {
-        setItemsLoading(false);
-        return;
-      }
-      
-      setItemsLoading(true);
-      const itemsData = {};
-      
-      try {
-        // Use Promise.all for parallel fetching instead of sequential
-        const promises = submittedPOs.map(async (po) => {
-          try {
-            const response = await fetch(`/api/purchase-orders/${po.id}/items`);
-            if (response.ok) {
-              const items = await response.json();
-              return { poId: po.id, items };
-            }
-          } catch (error) {
-            console.error(`Error fetching items for PO ${po.id}:`, error);
-          }
-          return null;
-        });
-
-        const results = await Promise.all(promises);
-        results.forEach(result => {
-          if (result) {
-            itemsData[result.poId] = result.items;
-          }
-        });
-      } catch (error) {
-        console.error('Error fetching PO items:', error);
-      } finally {
-        setPOItemsData(itemsData);
-        setItemsLoading(false);
-      }
-    };
-
-    if (purchaseOrders.length > 0) {
-      fetchPOItemsData();
-    }
-  }, [purchaseOrders]);
-
-  const loadBrands = async () => {
-    try {
-      const brandsData = await Brand.list();
-      setBrands(brandsData);
-    } catch (error) {
-      console.error("Error loading brands:", error);
-    }
-  };
-
-  const getBrandName = (brandId) => {
-    const brand = brands.find(b => b.id === brandId);
-    return brand?.name || 'Unknown Brand';
-  };
 
   const getProductInfo = (productId) => {
     return products.find(p => p.id === productId) || {};
@@ -130,58 +63,41 @@ export default function GoodsReceiptsTab({ purchaseOrders, products, goodsReceip
     }));
   };
 
-  const calculateTotalOrderedQuantity = (poId) => {
-    if (itemsLoading) return "...";
-    const items = poItemsData[poId];
-    if (!items) return "-";
-    
-    return items.reduce((total, item) => total + (item.quantity || 0), 0);
-  };
+  // These functions now simply return the server-provided data
+  const getLineItemsCount = (po) => po.lineItems || 0;
+  const getTotalOrderedQuantity = (po) => po.orderedQty || 0;
+  const getTotalReceivedQuantity = (po) => po.receivedQty || 0;
 
-  const calculateTotalReceivedQuantity = (poId) => {
-    if (itemsLoading) return "...";
-    const items = poItemsData[poId];
-    if (!items) return 0;
-    
-    // Calculate total received for each item using the existing function
-    let totalReceived = 0;
-    items.forEach(item => {
-      totalReceived += getReceivedQuantityForItem(poId, item.productId);
-    });
-    return totalReceived;
-  };
-
-  const calculateLineItemsCount = (poId) => {
-    if (itemsLoading) return "...";
-    const items = poItemsData[poId];
-    return items ? items.length : "-";
-  };
-
-  const openReceiveDialog = (po) => {
-    // Use the pre-fetched items data
-    const items = poItemsData[po.id];
-    
-    if (!items) {
+  const openReceiveDialog = async (po) => {
+    try {
+      // Fetch the purchase order items only when opening the dialog
+      const response = await fetch(`/api/purchase-orders/${po.id}/items`);
+      if (!response.ok) {
+        throw new Error('Failed to fetch purchase order items');
+      }
+      const items = await response.json();
+      
+      // Set the selected PO with items
+      setSelectedPOForReceive({
+        ...po,
+        items: items
+      });
+      
+      // Initialize receive quantities to 0 for all items
+      const initialQuantities = {};
+      items.forEach(item => {
+        initialQuantities[item.id] = '';
+      });
+      setReceiveQuantities(initialQuantities);
+      
+    } catch (error) {
+      console.error('Error fetching PO items:', error);
       toast({
         title: "Error",
-        description: "Purchase order items not loaded. Please try again.",
+        description: "Failed to load purchase order items. Please try again.",
         variant: "destructive"
       });
-      return;
     }
-    
-    // Set the selected PO with items
-    setSelectedPOForReceive({
-      ...po,
-      items: items
-    });
-    
-    // Initialize receive quantities to 0 for all items
-    const initialQuantities = {};
-    items.forEach(item => {
-      initialQuantities[item.id] = '';
-    });
-    setReceiveQuantities(initialQuantities);
   };
 
   const handleSaveReceive = async (forceClose = false) => {
@@ -507,14 +423,10 @@ export default function GoodsReceiptsTab({ purchaseOrders, products, goodsReceip
                 </TableHeader>
                 <TableBody>
                   {openPOs.map((po) => {
-                    const totalOrderedQty = calculateTotalOrderedQuantity(po.id);
-                    const totalReceivedQty = calculateTotalReceivedQuantity(po.id);
-                    const lineItemsCount = calculateLineItemsCount(po.id);
-                    
                     return (
                       <TableRow key={po.id}>
                         <TableCell className="font-medium">{po.poNumber}</TableCell>
-                        <TableCell>{getBrandName(po.supplierId)}</TableCell>
+                        <TableCell>{po.brandName || 'Unknown Brand'}</TableCell>
                         <TableCell>
                           {po.orderDate && !isNaN(new Date(po.orderDate)) ? 
                             format(new Date(po.orderDate), 'dd/MM/yy') : 
@@ -523,9 +435,9 @@ export default function GoodsReceiptsTab({ purchaseOrders, products, goodsReceip
                         </TableCell>
                         <TableCell>GBP {parseFloat(po.totalAmount || 0).toFixed(2)}</TableCell>
                         <TableCell>AED {parseFloat(po.grandTotal || 0).toFixed(2)}</TableCell>
-                        <TableCell>{lineItemsCount}</TableCell>
-                        <TableCell>{totalOrderedQty}</TableCell>
-                        <TableCell>{totalReceivedQty}</TableCell>
+                        <TableCell>{getLineItemsCount(po)}</TableCell>
+                        <TableCell>{getTotalOrderedQuantity(po)}</TableCell>
+                        <TableCell>{getTotalReceivedQuantity(po)}</TableCell>
                         <TableCell>
                           <Badge variant="outline" className="border-blue-300 text-blue-800 bg-blue-50">
                             {po.status?.toUpperCase()}
@@ -559,7 +471,7 @@ export default function GoodsReceiptsTab({ purchaseOrders, products, goodsReceip
         <DialogContent className="max-w-4xl max-h-[80vh] overflow-y-auto">
           <DialogHeader>
             <DialogTitle>
-              Receive Goods - {getBrandName(selectedPOForReceive?.supplierId)} - {selectedPOForReceive?.poNumber}
+              Receive Goods - {selectedPOForReceive?.brandName || 'Unknown Brand'} - {selectedPOForReceive?.poNumber}
               {selectedPOForReceive?.orderDate && !isNaN(new Date(selectedPOForReceive.orderDate)) && 
                 ` - ${format(new Date(selectedPOForReceive.orderDate), 'dd/MM/yyyy')}`
               }
