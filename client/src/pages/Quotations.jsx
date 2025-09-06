@@ -80,7 +80,37 @@ export default function Quotations() {
     const matchesStatus = filters.status === "all" || quotation.status === filters.status;
     const matchesCustomer = filters.customer === "all" || quotation.customer_id === filters.customer;
     
-    return matchesSearch && matchesStatus && matchesCustomer;
+    // Date range filtering
+    let matchesDateRange = true;
+    if (filters.dateRange !== "all") {
+      const quotationDate = new Date(quotation.quotation_date);
+      const today = new Date();
+      const startOfToday = new Date(today.getFullYear(), today.getMonth(), today.getDate());
+      
+      if (filters.dateRange === "today") {
+        const endOfToday = new Date(today.getFullYear(), today.getMonth(), today.getDate(), 23, 59, 59);
+        matchesDateRange = quotationDate >= startOfToday && quotationDate <= endOfToday;
+      } else if (filters.dateRange === "week") {
+        const startOfWeek = new Date(today);
+        startOfWeek.setDate(today.getDate() - today.getDay());
+        startOfWeek.setHours(0, 0, 0, 0);
+        matchesDateRange = quotationDate >= startOfWeek;
+      } else if (filters.dateRange === "month") {
+        const startOfMonth = new Date(today.getFullYear(), today.getMonth(), 1);
+        matchesDateRange = quotationDate >= startOfMonth;
+      } else if (filters.dateRange === "quarter") {
+        const quarter = Math.floor(today.getMonth() / 3);
+        const startOfQuarter = new Date(today.getFullYear(), quarter * 3, 1);
+        matchesDateRange = quotationDate >= startOfQuarter;
+      } else if (typeof filters.dateRange === "object" && filters.dateRange.type === "custom") {
+        const startDate = new Date(filters.dateRange.startDate);
+        const endDate = new Date(filters.dateRange.endDate);
+        endDate.setHours(23, 59, 59, 999); // Include the entire end date
+        matchesDateRange = quotationDate >= startDate && quotationDate <= endDate;
+      }
+    }
+    
+    return matchesSearch && matchesStatus && matchesCustomer && matchesDateRange;
   });
 
   // Calculate pagination

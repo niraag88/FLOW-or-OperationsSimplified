@@ -143,12 +143,42 @@ export default function Invoices() {
     if (filters.status !== 'all') {
       matchesStatus = invoice.status === filters.status;
     }
-
+    
     const matchesCustomer = filters.customer === "all" || invoice.customer_id === filters.customer;
     const matchesCurrency = filters.currency === "all" || invoice.currency === filters.currency;
     const matchesTaxTreatment = filters.tax_treatment === "all" || invoice.tax_treatment === filters.tax_treatment;
     
-    return matchesSearch && matchesStatus && matchesCustomer && matchesCurrency && matchesTaxTreatment;
+    // Date range filtering
+    let matchesDateRange = true;
+    if (filters.dateRange !== "all") {
+      const invoiceDate = new Date(invoice.invoice_date);
+      const today = new Date();
+      const startOfToday = new Date(today.getFullYear(), today.getMonth(), today.getDate());
+      
+      if (filters.dateRange === "today") {
+        const endOfToday = new Date(today.getFullYear(), today.getMonth(), today.getDate(), 23, 59, 59);
+        matchesDateRange = invoiceDate >= startOfToday && invoiceDate <= endOfToday;
+      } else if (filters.dateRange === "week") {
+        const startOfWeek = new Date(today);
+        startOfWeek.setDate(today.getDate() - today.getDay());
+        startOfWeek.setHours(0, 0, 0, 0);
+        matchesDateRange = invoiceDate >= startOfWeek;
+      } else if (filters.dateRange === "month") {
+        const startOfMonth = new Date(today.getFullYear(), today.getMonth(), 1);
+        matchesDateRange = invoiceDate >= startOfMonth;
+      } else if (filters.dateRange === "quarter") {
+        const quarter = Math.floor(today.getMonth() / 3);
+        const startOfQuarter = new Date(today.getFullYear(), quarter * 3, 1);
+        matchesDateRange = invoiceDate >= startOfQuarter;
+      } else if (typeof filters.dateRange === "object" && filters.dateRange.type === "custom") {
+        const startDate = new Date(filters.dateRange.startDate);
+        const endDate = new Date(filters.dateRange.endDate);
+        endDate.setHours(23, 59, 59, 999); // Include the entire end date
+        matchesDateRange = invoiceDate >= startDate && invoiceDate <= endDate;
+      }
+    }
+    
+    return matchesSearch && matchesStatus && matchesCustomer && matchesCurrency && matchesTaxTreatment && matchesDateRange;
   });
 
   // Calculate totals - since all invoices are in AED, simpler calculation

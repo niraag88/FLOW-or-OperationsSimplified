@@ -135,7 +135,37 @@ export default function DeliveryOrders() {
     const matchesCustomer = filters.customer === "all" || doOrder.customer_id === filters.customer;
     const matchesTaxTreatment = filters.tax_treatment === "all" || doOrder.tax_treatment === filters.tax_treatment;
     
-    return matchesSearch && matchesStatus && matchesCustomer && matchesTaxTreatment;
+    // Date range filtering
+    let matchesDateRange = true;
+    if (filters.dateRange !== "all") {
+      const doDate = new Date(doOrder.order_date);
+      const today = new Date();
+      const startOfToday = new Date(today.getFullYear(), today.getMonth(), today.getDate());
+      
+      if (filters.dateRange === "today") {
+        const endOfToday = new Date(today.getFullYear(), today.getMonth(), today.getDate(), 23, 59, 59);
+        matchesDateRange = doDate >= startOfToday && doDate <= endOfToday;
+      } else if (filters.dateRange === "week") {
+        const startOfWeek = new Date(today);
+        startOfWeek.setDate(today.getDate() - today.getDay());
+        startOfWeek.setHours(0, 0, 0, 0);
+        matchesDateRange = doDate >= startOfWeek;
+      } else if (filters.dateRange === "month") {
+        const startOfMonth = new Date(today.getFullYear(), today.getMonth(), 1);
+        matchesDateRange = doDate >= startOfMonth;
+      } else if (filters.dateRange === "quarter") {
+        const quarter = Math.floor(today.getMonth() / 3);
+        const startOfQuarter = new Date(today.getFullYear(), quarter * 3, 1);
+        matchesDateRange = doDate >= startOfQuarter;
+      } else if (typeof filters.dateRange === "object" && filters.dateRange.type === "custom") {
+        const startDate = new Date(filters.dateRange.startDate);
+        const endDate = new Date(filters.dateRange.endDate);
+        endDate.setHours(23, 59, 59, 999); // Include the entire end date
+        matchesDateRange = doDate >= startDate && doDate <= endDate;
+      }
+    }
+    
+    return matchesSearch && matchesStatus && matchesCustomer && matchesTaxTreatment && matchesDateRange;
   });
 
   return (
