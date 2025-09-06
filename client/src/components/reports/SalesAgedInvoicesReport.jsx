@@ -2,9 +2,8 @@
 import React, { useMemo } from "react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
-import { Button } from "@/components/ui/button";
-import { Download, FileText, BarChart2 } from "lucide-react";
-import { exportToCsv } from "../utils/export";
+import { FileText, BarChart2 } from "lucide-react";
+import ExportDropdown from "../common/ExportDropdown";
 import { format } from 'date-fns';
 import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer } from 'recharts';
 
@@ -25,10 +24,14 @@ export default function SalesAgedInvoicesReport({ invoices, customers, canExport
     submittedInvoices
       .filter(inv => inv.status !== 'cancelled')
       .forEach(inv => {
-        const outstanding = (inv.total_amount || 0) - (inv.paid_amount || 0);
+        const totalAmount = inv.totalAmount || inv.total_amount || 0;
+        const paidAmount = inv.paidAmount || inv.paid_amount || 0;
+        const outstanding = totalAmount - paidAmount;
         if (outstanding <= 0) return;
 
-        const dueDate = new Date(inv.invoice_date);
+        const dateValue = inv.invoiceDate || inv.invoice_date;
+        if (!dateValue) return;
+        const dueDate = new Date(dateValue);
         // Add 30 days to invoice date for due date calculation
         dueDate.setDate(dueDate.getDate() + 30);
         const daysOverdue = Math.floor((today - dueDate) / (1000 * 60 * 60 * 24));
@@ -49,13 +52,16 @@ export default function SalesAgedInvoicesReport({ invoices, customers, canExport
   const salesByMonth = useMemo(() => {
     const sales = {};
     submittedInvoices.forEach(inv => {
-      const month = format(new Date(inv.invoice_date), 'yyyy-MM');
+      const dateValue = inv.invoiceDate || inv.invoice_date;
+      if (!dateValue) return;
+      const month = format(new Date(dateValue), 'yyyy-MM');
       if (!sales[month]) {
         sales[month] = { total: 0, paid: 0 };
       }
-      sales[month].total += inv.total_amount || 0;
-      if (inv.paid_amount > 0) {
-        sales[month].paid += inv.paid_amount || 0;
+      sales[month].total += inv.totalAmount || inv.total_amount || 0;
+      const paidAmount = inv.paidAmount || inv.paid_amount || 0;
+      if (paidAmount > 0) {
+        sales[month].paid += paidAmount;
       }
     });
     return Object.entries(sales).sort(([a], [b]) => b.localeCompare(a)).slice(0, 12);
@@ -69,24 +75,19 @@ export default function SalesAgedInvoicesReport({ invoices, customers, canExport
     outstanding: values.total - values.paid
   })).reverse(); // Show chronologically
 
-  const handleAgingExport = () => {
-    const data = Object.entries(agingData).map(([bucket, values]) => ({
-      'Aging Bucket': bucket,
-      'Outstanding Amount (AED)': values.total.toFixed(2),
-      'Invoice Count': values.count,
-    }));
-    exportToCsv(data, "aged_invoices_report");
-  };
+  // Prepare data for standardized export formats
+  const agingExportData = Object.entries(agingData).map(([bucket, values]) => ({
+    aging_bucket: bucket,
+    outstanding_amount: values.total.toFixed(2),
+    invoice_count: values.count,
+  }));
   
-  const handleSalesExport = () => {
-    const data = salesByMonth.map(([month, values]) => ({
-        'Month': format(new Date(month), 'MMMM yyyy'),
-        'Total Invoiced (AED)': values.total.toFixed(2),
-        'Total Paid (AED)': values.paid.toFixed(2),
-        'Outstanding (AED)': (values.total - values.paid).toFixed(2)
-    }));
-    exportToCsv(data, "monthly_sales_report");
-  };
+  const salesExportData = salesByMonth.map(([month, values]) => ({
+    month: format(new Date(month + '-01'), 'MMMM yyyy'),
+    total_invoiced: values.total.toFixed(2),
+    total_paid: values.paid.toFixed(2),
+    outstanding: (values.total - values.paid).toFixed(2)
+  }));
 
   return (
     <div className="space-y-6">
@@ -100,7 +101,19 @@ export default function SalesAgedInvoicesReport({ invoices, customers, canExport
                 </CardTitle>
                 <p className="text-sm text-gray-500 mt-1">Total invoiced and paid amounts per month.</p>
             </div>
-            {canExport && <Button onClick={handleSalesExport} variant="outline" size="sm"><Download className="w-4 h-4 mr-2" />Export CSV</Button>}
+            {canExport && (
+              <ExportDropdown 
+                data={salesExportData}
+                type="Monthly Sales Report"
+                filename="monthly_sales_report"
+                columns={{
+                  month: 'Month',
+                  total_invoiced: 'Total Invoiced (AED)',
+                  total_paid: 'Total Paid (AED)',
+                  outstanding: 'Outstanding (AED)'
+                }}
+              />
+            )}
         </CardHeader>
         <CardContent>
             <div className="overflow-x-auto">
@@ -116,7 +129,7 @@ export default function SalesAgedInvoicesReport({ invoices, customers, canExport
                     <TableBody>
                         {salesByMonth.map(([month, data]) => (
                             <TableRow key={month}>
-                                <TableCell className="font-medium">{format(new Date(month), 'MMMM yyyy')}</TableCell>
+                                <TableCell className="font-medium">{format(new Date(month + '-01'), 'MMMM yyyy')}</TableCell>
                                 <TableCell>{data.total.toFixed(2)}</TableCell>
                                 <TableCell className="text-green-600">{data.paid.toFixed(2)}</TableCell>
                                 <TableCell className="text-amber-600">{(data.total - data.paid).toFixed(2)}</TableCell>
@@ -164,7 +177,18 @@ export default function SalesAgedInvoicesReport({ invoices, customers, canExport
             </CardTitle>
             <p className="text-sm text-gray-500 mt-1">Outstanding amounts by aging buckets.</p>
           </div>
-          {canExport && <Button onClick={handleAgingExport} variant="outline" size="sm"><Download className="w-4 h-4 mr-2" />Export CSV</Button>}
+          {canExport && (
+            <ExportDropdown 
+              data={agingExportData}
+              type="Aged Invoices Report"
+              filename="aged_invoices_report"
+              columns={{
+                aging_bucket: 'Aging Bucket',
+                outstanding_amount: 'Outstanding Amount (AED)',
+                invoice_count: 'Invoice Count'
+              }}
+            />
+          )}
         </CardHeader>
         <CardContent>
             <div className="overflow-x-auto">

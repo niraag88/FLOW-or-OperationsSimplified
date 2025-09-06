@@ -2,9 +2,8 @@
 import React, { useMemo } from "react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
-import { Button } from "@/components/ui/button";
-import { Download, ShoppingCart, BarChart2 } from "lucide-react";
-import { exportToCsv } from "../utils/export";
+import { ShoppingCart, BarChart2 } from "lucide-react";
+import ExportDropdown from "../common/ExportDropdown";
 import { format } from 'date-fns';
 import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer } from 'recharts';
 
@@ -20,7 +19,12 @@ export default function PurchasesReport({ purchaseOrders, suppliers, canExport }
   const purchasesByMonth = useMemo(() => {
     const purchases = {};
     allPurchaseOrders.forEach(po => {
-      const month = format(new Date(po.order_date), 'yyyy-MM');
+      // Handle potential date field variations and null values
+      const dateValue = po.orderDate || po.order_date;
+      if (!dateValue) return; // Skip if no date
+      
+      try {
+        const month = format(new Date(dateValue), 'yyyy-MM');
       if (!purchases[month]) {
         purchases[month] = { 
           total: 0, 
@@ -31,16 +35,20 @@ export default function PurchasesReport({ purchaseOrders, suppliers, canExport }
         };
       }
       
-      const amount = po.total_amount || 0;
+      const amount = po.totalAmount || po.total_amount || 0;
       purchases[month].total += amount;
       purchases[month].count += 1;
       
       if (po.currency === 'GBP') {
         purchases[month].gbpAmount += amount;
-        purchases[month].totalAED += amount * (po.fx_rate_to_aed || 4.85);
+        purchases[month].totalAED += amount * (po.fxRateToAed || po.fx_rate_to_aed || 4.85);
       } else {
         purchases[month].aedAmount += amount;
         purchases[month].totalAED += amount;
+      }
+      } catch (error) {
+        console.warn('Invalid date in purchase order:', po.poNumber || po.po_number, dateValue);
+        return; // Skip this PO if date is invalid
       }
     });
     return Object.entries(purchases).sort(([a], [b]) => b.localeCompare(a)).slice(0, 12);
@@ -48,30 +56,28 @@ export default function PurchasesReport({ purchaseOrders, suppliers, canExport }
 
   // Prepare chart data
   const chartData = purchasesByMonth.map(([month, values]) => ({
-    month: format(new Date(month), 'MMM yyyy'),
+    month: format(new Date(month + '-01'), 'MMM yyyy'),
     totalAED: values.totalAED,
     gbpAmount: values.gbpAmount * 4.85, // Convert to AED for chart
     aedAmount: values.aedAmount,
     count: values.count
   })).reverse(); // Show chronologically
 
-  const handleExport = () => {
-    const data = purchasesByMonth.map(([month, values]) => ({
-      'Month': format(new Date(month), 'MMMM yyyy'),
-      'Total Orders': values.count,
-      'Total (GBP)': values.gbpAmount.toFixed(2),
-      'Total (AED)': values.totalAED.toFixed(2)
-    }));
-    exportToCsv(data, "monthly_purchases_report");
-  };
+  // Prepare data for export in standard internal document format
+  const exportData = purchasesByMonth.map(([month, values]) => ({
+    month: format(new Date(month + '-01'), 'MMMM yyyy'),
+    total_orders: values.count,
+    total_gbp: values.gbpAmount.toFixed(2),
+    total_aed: values.totalAED.toFixed(2)
+  }));
 
   // Calculate totals
   const totals = allPurchaseOrders.reduce((acc, po) => {
     acc.totalOrders += 1;
-    const amount = po.total_amount || 0;
+    const amount = po.totalAmount || po.total_amount || 0;
     if (po.currency === 'GBP') {
       acc.totalGBP += amount;
-      acc.totalAED += amount * (po.fx_rate_to_aed || 4.85);
+      acc.totalAED += amount * (po.fxRateToAed || po.fx_rate_to_aed || 4.85);
     } else {
       acc.totalAED += amount;
     }
@@ -112,7 +118,19 @@ export default function PurchasesReport({ purchaseOrders, suppliers, canExport }
             </CardTitle>
             <p className="text-sm text-gray-500 mt-1">Purchase orders breakdown by month and currency.</p>
           </div>
-          {canExport && <Button onClick={handleExport} variant="outline" size="sm"><Download className="w-4 h-4 mr-2" />Export CSV</Button>}
+          {canExport && (
+            <ExportDropdown 
+              data={exportData}
+              type="Monthly Purchases Report"
+              filename="monthly_purchases_report"
+              columns={{
+                month: 'Month',
+                total_orders: 'Total Orders',
+                total_gbp: 'Total (GBP)',
+                total_aed: 'Total (AED)'
+              }}
+            />
+          )}
         </CardHeader>
         <CardContent>
           <div className="overflow-x-auto">
@@ -128,7 +146,9 @@ export default function PurchasesReport({ purchaseOrders, suppliers, canExport }
               <TableBody>
                 {purchasesByMonth.map(([month, data]) => (
                   <TableRow key={month}>
-                    <TableCell className="font-medium">{format(new Date(month), 'MMMM yyyy')}</TableCell>
+                    <TableCell className="font-medium">
+                      {format(new Date(month + '-01'), 'MMMM yyyy')}
+                    </TableCell>
                     <TableCell>{data.count}</TableCell>
                     <TableCell className="text-blue-600">{data.gbpAmount.toFixed(2)}</TableCell>
                     <TableCell className="font-semibold">{data.totalAED.toFixed(2)}</TableCell>

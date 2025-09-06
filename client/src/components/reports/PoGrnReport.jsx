@@ -1,13 +1,12 @@
 import React, { useState, useEffect } from "react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Badge } from "@/components/ui/badge";
-import { Download, FileText } from "lucide-react";
+import { FileText } from "lucide-react";
 import { format, startOfMonth, endOfMonth, isValid, parseISO } from "date-fns";
-import { exportToCsv } from "../utils/export";
+import ExportDropdown from "../common/ExportDropdown";
 import { Brand } from "@/api/entities";
 
 export default function PoGrnReport({ purchaseOrders, goodsReceipts, canExport }) {
@@ -44,63 +43,47 @@ export default function PoGrnReport({ purchaseOrders, goodsReceipts, canExport }
   };
 
   const filteredPOs = purchaseOrders.filter(po => {
-    const orderDate = new Date(po.order_date);
+    const dateValue = po.orderDate || po.order_date;
+    if (!dateValue) return false;
+    const orderDate = new Date(dateValue);
     return orderDate >= new Date(dateFrom) && orderDate <= new Date(dateTo);
   });
 
   const filteredGRNs = goodsReceipts.filter(grn => {
-    const receiptDate = new Date(grn.receipt_date);
+    const dateValue = grn.receiptDate || grn.receipt_date;
+    if (!dateValue) return false;
+    const receiptDate = new Date(dateValue);
     return receiptDate >= new Date(dateFrom) && receiptDate <= new Date(dateTo);
   });
 
-  const exportData = () => {
-    const data = [];
-    
-    // Header - Removed AED column
-    data.push({
-      'Type': 'TYPE',
-      'Document Number': 'DOCUMENT NUMBER',
-      'Date': 'DATE',
-      'Brand/Supplier': 'BRAND/SUPPLIER',
-      'Currency': 'CURRENCY',
-      'Total Amount': 'TOTAL AMOUNT',
-      'Status': 'STATUS'
-    });
-
-    // Add PO data - Removed AED references
-    filteredPOs.forEach(po => {
-      data.push({
-        'Type': 'Purchase Order',
-        'Document Number': po.po_number,
-        'Date': formatDate(po.order_date),
-        'Brand/Supplier': getBrandName(po.supplier_id),
-        'Currency': po.currency,
-        'Total Amount': (po.total_amount || 0).toFixed(2),
-        'Status': po.status
-      });
-    });
-
+  // Prepare data for standardized export format
+  const exportData = [
+    // Add PO data
+    ...filteredPOs.map(po => ({
+      type: 'Purchase Order',
+      document_number: po.poNumber || po.po_number,
+      date: formatDate(po.orderDate || po.order_date),
+      brand_supplier: getBrandName(po.supplierId || po.supplier_id),
+      currency: po.currency,
+      total_amount: (po.totalAmount || po.total_amount || 0).toFixed(2),
+      status: po.status
+    })),
     // Add GRN data
-    filteredGRNs.forEach(grn => {
-      data.push({
-        'Type': 'Goods Receipt',
-        'Document Number': grn.grn_number,
-        'Date': formatDate(grn.receipt_date),
-        'Brand/Supplier': getBrandName(grn.supplier_id),
-        'Currency': '-',
-        'Total Amount': '-',
-        'Status': 'Received'
-      });
-    });
-
-    exportToCsv(data, `PO_GRN_Report_${dateFrom}_to_${dateTo}`);
-  };
+    ...filteredGRNs.map(grn => ({
+      type: 'Goods Receipt',
+      document_number: grn.grnNumber || grn.grn_number,
+      date: formatDate(grn.receiptDate || grn.receipt_date),
+      brand_supplier: getBrandName(grn.supplierId || grn.supplier_id),
+      currency: '-',
+      total_amount: '-',
+      status: 'Received'
+    }))
+  ];
 
   const totals = {
     pos: filteredPOs.length,
     grns: filteredGRNs.length,
-    totalValueOriginal: filteredPOs.reduce((sum, po) => sum + (po.total_amount || 0), 0)
-    // Removed totalValueAED calculation
+    totalValueOriginal: filteredPOs.reduce((sum, po) => sum + (po.totalAmount || po.total_amount || 0), 0)
   };
 
   return (
@@ -112,10 +95,20 @@ export default function PoGrnReport({ purchaseOrders, goodsReceipts, canExport }
             <p className="text-sm text-gray-500">Compare PO creation with actual goods receipts.</p>
           </div>
           {canExport && (
-            <Button onClick={exportData} variant="outline">
-              <Download className="w-4 h-4 mr-2" />
-              Export CSV
-            </Button>
+            <ExportDropdown 
+              data={exportData}
+              type="PO vs GRN Report"
+              filename={`PO_GRN_Report_${dateFrom}_to_${dateTo}`}
+              columns={{
+                type: 'Type',
+                document_number: 'Document Number',
+                date: 'Date',
+                brand_supplier: 'Brand/Supplier',
+                currency: 'Currency',
+                total_amount: 'Total Amount',
+                status: 'Status'
+              }}
+            />
           )}
         </CardHeader>
         <CardContent className="space-y-4">
@@ -184,13 +177,13 @@ export default function PoGrnReport({ purchaseOrders, goodsReceipts, canExport }
               <TableBody>
                 {filteredPOs.map((po) => (
                   <TableRow key={po.id}>
-                    <TableCell className="font-medium">{po.po_number}</TableCell>
-                    <TableCell>{formatDate(po.order_date)}</TableCell>
-                    <TableCell>{getBrandName(po.supplier_id)}</TableCell>
+                    <TableCell className="font-medium">{po.poNumber || po.po_number}</TableCell>
+                    <TableCell>{formatDate(po.orderDate || po.order_date)}</TableCell>
+                    <TableCell>{getBrandName(po.supplierId || po.supplier_id)}</TableCell>
                     <TableCell>
                       <Badge variant="outline">{po.currency}</Badge>
                     </TableCell>
-                    <TableCell>{(po.total_amount || 0).toFixed(2)}</TableCell>
+                    <TableCell>{(po.totalAmount || po.total_amount || 0).toFixed(2)}</TableCell>
                     <TableCell>
                       <Badge variant={po.status === 'closed' ? 'default' : 'secondary'}>
                         {po.status}
@@ -226,17 +219,17 @@ export default function PoGrnReport({ purchaseOrders, goodsReceipts, canExport }
                   const relatedPO = purchaseOrders.find(po => po.id === grn.purchase_order_id);
                   return (
                     <TableRow key={grn.id}>
-                      <TableCell className="font-medium">{grn.grn_number}</TableCell>
-                      <TableCell>{formatDate(grn.receipt_date)}</TableCell>
-                      <TableCell>{getBrandName(grn.supplier_id)}</TableCell>
+                      <TableCell className="font-medium">{grn.grnNumber || grn.grn_number}</TableCell>
+                      <TableCell>{formatDate(grn.receiptDate || grn.receipt_date)}</TableCell>
+                      <TableCell>{getBrandName(grn.supplierId || grn.supplier_id)}</TableCell>
                       <TableCell>
                         {relatedPO ? (
-                          <Badge variant="outline">{relatedPO.po_number}</Badge>
+                          <Badge variant="outline">{relatedPO.poNumber || relatedPO.po_number}</Badge>
                         ) : (
                           '-'
                         )}
                       </TableCell>
-                      <TableCell>{grn.received_by}</TableCell>
+                      <TableCell>{grn.receivedBy || grn.received_by}</TableCell>
                     </TableRow>
                   );
                 })}

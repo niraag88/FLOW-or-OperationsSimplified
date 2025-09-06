@@ -3,11 +3,10 @@ import React, { useState, useMemo } from "react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Badge } from "@/components/ui/badge";
-import { Button } from "@/components/ui/button";
 import { Switch } from "@/components/ui/switch";
 import { Label } from "@/components/ui/label";
-import { Download, Package, AlertTriangle, MapPin } from "lucide-react";
-import { exportToCsv } from "../utils/export"; // Changed path from "../../utils/export" to "../utils/export"
+import { Package, AlertTriangle, MapPin } from "lucide-react";
+import ExportDropdown from "../common/ExportDropdown";
 
 export default function StockOnHandReport({ products, lots, canExport }) {
   const [showLowStockOnly, setShowLowStockOnly] = useState(false);
@@ -43,20 +42,18 @@ export default function StockOnHandReport({ products, lots, canExport }) {
     return data;
   }, [products, lots, showLowStockOnly]);
 
-  const handleExport = () => {
-    const exportableData = stockData.map(item => ({
-      'Product SKU': item.product_sku,
-      'Product Name': item.product_name,
-      'Location': item.location,
-      'Batch No': item.batch_no,
-      'Qty on Hand': item.qty_on_hand,
-      'Expiry Date': item.expiry_date ? new Date(item.expiry_date).toLocaleDateString() : 'N/A',
-      'Cost Per Unit': item.cost_per_unit,
-      'Currency': item.currency,
-      'Status': item.is_low_stock ? 'Low Stock' : 'In Stock'
-    }));
-    exportToCsv(exportableData, "stock_on_hand_report");
-  };
+  // Prepare data for standardized export format
+  const exportData = stockData.map(item => ({
+    product_sku: item.product_sku,
+    product_name: item.product_name,
+    location: item.location,
+    batch_no: item.batch_no,
+    qty_on_hand: item.qty_on_hand,
+    expiry_date: item.expiry_date ? new Date(item.expiry_date).toLocaleDateString('en-GB') : 'N/A',
+    cost_per_unit: item.cost_per_unit,
+    currency: item.currency,
+    status: item.is_low_stock ? 'Low Stock' : 'In Stock'
+  }));
 
   return (
     <Card className="border-0 shadow-lg">
@@ -80,10 +77,22 @@ export default function StockOnHandReport({ products, lots, canExport }) {
                 <Label htmlFor="low-stock-filter">Show Low Stock Only</Label>
             </div>
             {canExport && (
-                <Button onClick={handleExport} variant="outline" size="sm">
-                    <Download className="w-4 h-4 mr-2" />
-                    Export CSV
-                </Button>
+                <ExportDropdown 
+                  data={exportData}
+                  type="Stock on Hand Report"
+                  filename="stock_on_hand_report"
+                  columns={{
+                    product_sku: 'Product SKU',
+                    product_name: 'Product Name',
+                    location: 'Location',
+                    batch_no: 'Batch No',
+                    qty_on_hand: 'Qty on Hand',
+                    expiry_date: 'Expiry Date',
+                    cost_per_unit: 'Cost Per Unit',
+                    currency: 'Currency',
+                    status: 'Status'
+                  }}
+                />
             )}
         </div>
       </CardHeader>
