@@ -621,126 +621,138 @@ export default function GoodsReceiptsTab({ purchaseOrders, products, goodsReceip
           </p>
         </CardHeader>
         <CardContent>
-          {openPOs.length === 0 && closedPOs.length === 0 ? (
-            <div className="text-center py-12 text-gray-500">
-              <ShoppingCart className="w-12 h-12 mx-auto mb-4 opacity-50" />
-              <p className="font-semibold">No Purchase Orders</p>
-              <p>There are no purchase orders to display.</p>
-            </div>
-          ) : (
-            <div className="overflow-x-auto border rounded-lg">
-              <Table>
-                <TableHeader>
-                  <TableRow>
-                    <TableHead className="w-[120px]">PO Number</TableHead>
-                    <TableHead className="w-[140px]">Brand</TableHead>
-                    <TableHead className="w-[100px]">Order Date</TableHead>
-                    <TableHead className="w-[110px]">Total (GBP)</TableHead>
-                    <TableHead className="w-[110px]">Total (AED)</TableHead>
-                    <TableHead className="w-[90px]">Line Items</TableHead>
-                    <TableHead className="w-[80px]">Ordered</TableHead>
-                    <TableHead className="w-[80px]">Received</TableHead>
-                    <TableHead className="w-[90px]">Status</TableHead>
-                    <TableHead className="w-[90px]">Actions</TableHead>
-                  </TableRow>
-                </TableHeader>
-                <TableBody>
-                  {/* Open Purchase Orders */}
-                  {openPOs.length > 0 && (
-                    <TableRow className="bg-blue-50/30">
-                      <TableCell colSpan={10} className="py-2 font-semibold text-blue-800">
-                        <div className="flex items-center gap-2">
-                          <Package className="w-4 h-4" />
-                          Open ({openPOs.length})
-                        </div>
-                      </TableCell>
-                    </TableRow>
+          {/* Open Purchase Orders Section */}
+          <div className="mb-6">
+            <h3 className="text-lg font-semibold mb-3 flex items-center gap-2">
+              <Package className="w-5 h-5 text-blue-600" />
+              Open ({openPOs.length})
+            </h3>
+            {openPOs.length === 0 ? (
+              <div className="text-center py-8 text-gray-500 border-2 border-dashed border-gray-200 rounded-lg">
+                <ShoppingCart className="w-12 h-12 mx-auto mb-4 opacity-50" />
+                <p className="font-semibold">No Submitted Purchase Orders</p>
+                <p>There are no purchase orders awaiting goods receipt.</p>
+              </div>
+            ) : (
+              <div className="overflow-x-auto border rounded-lg">
+                <table className="w-full" style={{tableLayout: 'fixed'}}>
+                  <thead>
+                    <tr className="border-b bg-muted/50">
+                      <th className="h-12 px-4 text-left align-middle font-medium text-muted-foreground" style={{width: '120px'}}>PO Number</th>
+                      <th className="h-12 px-4 text-left align-middle font-medium text-muted-foreground" style={{width: '140px'}}>Brand</th>
+                      <th className="h-12 px-4 text-left align-middle font-medium text-muted-foreground" style={{width: '100px'}}>Order Date</th>
+                      <th className="h-12 px-4 text-left align-middle font-medium text-muted-foreground" style={{width: '110px'}}>Total (GBP)</th>
+                      <th className="h-12 px-4 text-left align-middle font-medium text-muted-foreground" style={{width: '110px'}}>Total (AED)</th>
+                      <th className="h-12 px-4 text-left align-middle font-medium text-muted-foreground" style={{width: '90px'}}>Line Items</th>
+                      <th className="h-12 px-4 text-left align-middle font-medium text-muted-foreground" style={{width: '80px'}}>Ordered</th>
+                      <th className="h-12 px-4 text-left align-middle font-medium text-muted-foreground" style={{width: '80px'}}>Received</th>
+                      <th className="h-12 px-4 text-left align-middle font-medium text-muted-foreground" style={{width: '90px'}}>Status</th>
+                      <th className="h-12 px-4 text-left align-middle font-medium text-muted-foreground" style={{width: '90px'}}>Actions</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {openPOs.map((po) => (
+                      <tr key={po.id} className="border-b transition-colors hover:bg-muted/50">
+                        <td className="p-4 align-middle font-medium" style={{width: '120px'}}>{po.poNumber}</td>
+                        <td className="p-4 align-middle" style={{width: '140px'}}>{po.brandName || 'Unknown Brand'}</td>
+                        <td className="p-4 align-middle" style={{width: '100px'}}>
+                          {po.orderDate && !isNaN(new Date(po.orderDate)) ? 
+                            format(new Date(po.orderDate), 'dd/MM/yy') : 
+                            '-'
+                          }
+                        </td>
+                        <td className="p-4 align-middle" style={{width: '110px'}}>GBP {parseFloat(po.totalAmount || 0).toFixed(2)}</td>
+                        <td className="p-4 align-middle" style={{width: '110px'}}>AED {parseFloat(po.grandTotal || 0).toFixed(2)}</td>
+                        <td className="p-4 align-middle" style={{width: '90px'}}>{getLineItemsCount(po)}</td>
+                        <td className="p-4 align-middle" style={{width: '80px'}}>{getTotalOrderedQuantity(po)}</td>
+                        <td className="p-4 align-middle" style={{width: '80px'}}>{getTotalReceivedQuantity(po)}</td>
+                        <td className="p-4 align-middle" style={{width: '90px'}}>
+                          <Badge 
+                            variant="outline" 
+                            className="border-blue-300 text-blue-800 bg-blue-50"
+                          >
+                            {po.status?.toUpperCase()}
+                          </Badge>
+                        </td>
+                        <td className="p-4 align-middle" style={{width: '90px'}}>
+                          <Button
+                            size="sm"
+                            onClick={() => openReceiveDialog(po)}
+                            disabled={!canEdit || processingPO === po.id}
+                            className="bg-emerald-600 hover:bg-emerald-700"
+                          >
+                            {processingPO === po.id ? "Processing..." : "Receive"}
+                          </Button>
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            )}
+          </div>
+
+          {/* Closed Purchase Orders Section - Collapsible */}
+          {closedPOs.length > 0 && (
+            <Collapsible open={showClosedReceipts} onOpenChange={setShowClosedReceipts}>
+              <CollapsibleTrigger asChild>
+                <Button 
+                  variant="outline" 
+                  className="w-full justify-between text-left h-auto p-4 border-gray-300"
+                >
+                  <div className="flex items-center gap-2">
+                    <CheckCircle2 className="w-5 h-5 text-green-600" />
+                    <span className="font-semibold">Closed ({closedPOs.length})</span>
+                  </div>
+                  {showClosedReceipts ? (
+                    <ChevronDown className="w-4 h-4" />
+                  ) : (
+                    <ChevronRight className="w-4 h-4" />
                   )}
-                  {openPOs.map((po) => (
-                    <TableRow key={po.id}>
-                      <TableCell className="font-medium w-[120px]">{po.poNumber}</TableCell>
-                      <TableCell className="w-[140px]">{po.brandName || 'Unknown Brand'}</TableCell>
-                      <TableCell className="w-[100px]">
-                        {po.orderDate && !isNaN(new Date(po.orderDate)) ? 
-                          format(new Date(po.orderDate), 'dd/MM/yy') : 
-                          '-'
-                        }
-                      </TableCell>
-                      <TableCell className="w-[110px]">GBP {parseFloat(po.totalAmount || 0).toFixed(2)}</TableCell>
-                      <TableCell className="w-[110px]">AED {parseFloat(po.grandTotal || 0).toFixed(2)}</TableCell>
-                      <TableCell className="w-[90px]">{getLineItemsCount(po)}</TableCell>
-                      <TableCell className="w-[80px]">{getTotalOrderedQuantity(po)}</TableCell>
-                      <TableCell className="w-[80px]">{getTotalReceivedQuantity(po)}</TableCell>
-                      <TableCell className="w-[90px]">
-                        <Badge 
-                          variant="outline" 
-                          className="border-blue-300 text-blue-800 bg-blue-50"
-                        >
-                          {po.status?.toUpperCase()}
-                        </Badge>
-                      </TableCell>
-                      <TableCell className="w-[90px]">
-                        <Button
-                          size="sm"
-                          onClick={() => openReceiveDialog(po)}
-                          disabled={!canEdit || processingPO === po.id}
-                          className="bg-emerald-600 hover:bg-emerald-700"
-                        >
-                          {processingPO === po.id ? "Processing..." : "Receive"}
-                        </Button>
-                      </TableCell>
-                    </TableRow>
-                  ))}
-                  
-                  {/* Closed Purchase Orders - Collapsible */}
-                  {closedPOs.length > 0 && (
-                    <>
-                      <TableRow className="bg-green-50/30">
-                        <TableCell colSpan={10} className="py-0 border-b-0">
-                          <Collapsible open={showClosedReceipts} onOpenChange={setShowClosedReceipts}>
-                            <CollapsibleTrigger asChild>
-                              <Button 
-                                variant="ghost" 
-                                className="w-full justify-between text-left h-auto p-2 hover:bg-transparent"
-                              >
-                                <div className="flex items-center gap-2 font-semibold text-green-800">
-                                  <CheckCircle2 className="w-4 h-4" />
-                                  <span>Closed ({closedPOs.length})</span>
-                                </div>
-                                {showClosedReceipts ? (
-                                  <ChevronDown className="w-4 h-4" />
-                                ) : (
-                                  <ChevronRight className="w-4 h-4" />
-                                )}
-                              </Button>
-                            </CollapsibleTrigger>
-                          </Collapsible>
-                        </TableCell>
-                      </TableRow>
-                      {showClosedReceipts && closedPOs.map((po) => (
-                        <TableRow key={po.id}>
-                          <TableCell className="font-medium w-[120px]">{po.poNumber}</TableCell>
-                          <TableCell className="w-[140px]">{po.brandName || 'Unknown Brand'}</TableCell>
-                          <TableCell className="w-[100px]">
+                </Button>
+              </CollapsibleTrigger>
+              <CollapsibleContent className="mt-3">
+                <div className="overflow-x-auto border rounded-lg">
+                  <table className="w-full" style={{tableLayout: 'fixed'}}>
+                    <thead>
+                      <tr className="border-b bg-muted/50">
+                        <th className="h-12 px-4 text-left align-middle font-medium text-muted-foreground" style={{width: '120px'}}>PO Number</th>
+                        <th className="h-12 px-4 text-left align-middle font-medium text-muted-foreground" style={{width: '140px'}}>Brand</th>
+                        <th className="h-12 px-4 text-left align-middle font-medium text-muted-foreground" style={{width: '100px'}}>Order Date</th>
+                        <th className="h-12 px-4 text-left align-middle font-medium text-muted-foreground" style={{width: '110px'}}>Total (GBP)</th>
+                        <th className="h-12 px-4 text-left align-middle font-medium text-muted-foreground" style={{width: '110px'}}>Total (AED)</th>
+                        <th className="h-12 px-4 text-left align-middle font-medium text-muted-foreground" style={{width: '90px'}}>Line Items</th>
+                        <th className="h-12 px-4 text-left align-middle font-medium text-muted-foreground" style={{width: '80px'}}>Ordered</th>
+                        <th className="h-12 px-4 text-left align-middle font-medium text-muted-foreground" style={{width: '80px'}}>Received</th>
+                        <th className="h-12 px-4 text-left align-middle font-medium text-muted-foreground" style={{width: '90px'}}>Status</th>
+                        <th className="h-12 px-4 text-left align-middle font-medium text-muted-foreground" style={{width: '90px'}}>Actions</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {closedPOs.map((po) => (
+                        <tr key={po.id} className="border-b transition-colors hover:bg-muted/50">
+                          <td className="p-4 align-middle font-medium" style={{width: '120px'}}>{po.poNumber}</td>
+                          <td className="p-4 align-middle" style={{width: '140px'}}>{po.brandName || 'Unknown Brand'}</td>
+                          <td className="p-4 align-middle" style={{width: '100px'}}>
                             {po.orderDate && !isNaN(new Date(po.orderDate)) ? 
                               format(new Date(po.orderDate), 'dd/MM/yy') : 
                               '-'
                             }
-                          </TableCell>
-                          <TableCell className="w-[110px]">GBP {parseFloat(po.totalAmount || 0).toFixed(2)}</TableCell>
-                          <TableCell className="w-[110px]">AED {parseFloat(po.grandTotal || 0).toFixed(2)}</TableCell>
-                          <TableCell className="w-[90px]">{getLineItemsCount(po)}</TableCell>
-                          <TableCell className="w-[80px]">{getTotalOrderedQuantity(po)}</TableCell>
-                          <TableCell className="w-[80px]">{getTotalReceivedQuantity(po)}</TableCell>
-                          <TableCell className="w-[90px]">
+                          </td>
+                          <td className="p-4 align-middle" style={{width: '110px'}}>GBP {parseFloat(po.totalAmount || 0).toFixed(2)}</td>
+                          <td className="p-4 align-middle" style={{width: '110px'}}>AED {parseFloat(po.grandTotal || 0).toFixed(2)}</td>
+                          <td className="p-4 align-middle" style={{width: '90px'}}>{getLineItemsCount(po)}</td>
+                          <td className="p-4 align-middle" style={{width: '80px'}}>{getTotalOrderedQuantity(po)}</td>
+                          <td className="p-4 align-middle" style={{width: '80px'}}>{getTotalReceivedQuantity(po)}</td>
+                          <td className="p-4 align-middle" style={{width: '90px'}}>
                             <Badge 
                               variant="outline" 
                               className="border-green-300 text-green-800 bg-green-50"
                             >
                               {po.status?.toUpperCase()}
                             </Badge>
-                          </TableCell>
-                          <TableCell className="w-[90px]">
+                          </td>
+                          <td className="p-4 align-middle" style={{width: '90px'}}>
                             <DropdownMenu>
                               <DropdownMenuTrigger asChild>
                                 <Button variant="ghost" size="sm" className="h-8 w-8 p-0">
@@ -764,14 +776,14 @@ export default function GoodsReceiptsTab({ purchaseOrders, products, goodsReceip
                                 </DropdownMenuItem>
                               </DropdownMenuContent>
                             </DropdownMenu>
-                          </TableCell>
-                        </TableRow>
+                          </td>
+                        </tr>
                       ))}
-                    </>
-                  )}
-                </TableBody>
-              </Table>
-            </div>
+                    </tbody>
+                  </table>
+                </div>
+              </CollapsibleContent>
+            </Collapsible>
           )}
         </CardContent>
       </Card>
