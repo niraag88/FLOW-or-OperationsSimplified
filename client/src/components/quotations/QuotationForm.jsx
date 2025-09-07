@@ -139,8 +139,10 @@ export default function QuotationForm({ open, onClose, editingQuotation, current
 
       // Specific logic for customer_id
       if (field === 'customer_id') {
-        const customer = customers.find(c => c.id === value);
+        const customerId = parseInt(value);
+        const customer = customers.find(c => c.id === customerId);
         setSelectedCustomer(customer);
+        newState.customer_id = customerId;
         
         let taxTreatment = "StandardRated";
         let taxRate = 0.05;
@@ -347,13 +349,13 @@ export default function QuotationForm({ open, onClose, editingQuotation, current
             </div>
             <div className="space-y-2">
               <Label htmlFor="customer">Customer *</Label>
-              <Select value={formData.customer_id} onValueChange={(value) => handleInputChange('customer_id', value)} disabled={!isEditable}>
+              <Select value={formData.customer_id ? formData.customer_id.toString() : ''} onValueChange={(value) => handleInputChange('customer_id', value)} disabled={!isEditable}>
                 <SelectTrigger>
                   <SelectValue placeholder="Select customer" />
                 </SelectTrigger>
                 <SelectContent>
                   {customers.map(c => (
-                    <SelectItem key={c.id} value={c.id}>
+                    <SelectItem key={c.id} value={c.id.toString()}>
                       {c.name} ({c.vatTreatment})
                     </SelectItem>
                   ))}
