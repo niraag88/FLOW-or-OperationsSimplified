@@ -6,28 +6,11 @@ import { Badge } from "@/components/ui/badge";
 import { FileText } from "lucide-react";
 import { Skeleton } from "@/components/ui/skeleton";
 import { format, isValid, parseISO } from "date-fns";
-import { Customer } from "@/api/entities";
 import QuotationActionsDropdown from "./QuotationActionsDropdown";
 
 export default function QuotationList({ quotations, totalCount, loading, canEdit, canOverride, currentUser, onEdit, onRefresh }) {
-  const [customers, setCustomers] = useState([]);
-
-  React.useEffect(() => {
-    loadCustomers();
-  }, []);
-
-  const loadCustomers = async () => {
-    try {
-      const customersData = await Customer.list();
-      setCustomers(customersData);
-    } catch (error) {
-      console.error("Error loading customers:", error);
-    }
-  };
-
-  const getCustomerName = (customerId) => {
-    const customer = customers.find(c => c.id === customerId);
-    return customer?.customer_name || 'Unknown Customer';
+  const getCustomerName = (quotation) => {
+    return quotation.customerName || quotation.customer_name || 'Unknown Customer';
   };
 
   const formatDate = (dateString) => {
@@ -116,7 +99,7 @@ export default function QuotationList({ quotations, totalCount, loading, canEdit
                 {quotations.map((quotation) => (
                   <TableRow key={quotation.id} className="hover:bg-gray-50">
                     <TableCell className="font-medium">{quotation.quotation_number}</TableCell>
-                    <TableCell>{getCustomerName(quotation.customer_id)}</TableCell>
+                    <TableCell>{getCustomerName(quotation)}</TableCell>
                     <TableCell>{formatDate(quotation.quotation_date)}</TableCell>
                     <TableCell>{quotation.reference || '-'}</TableCell>
                     <TableCell>
@@ -148,7 +131,7 @@ export default function QuotationList({ quotations, totalCount, loading, canEdit
                 <div className="flex items-start justify-between mb-3">
                   <div>
                     <h3 className="font-semibold text-gray-900">{quotation.quotation_number}</h3>
-                    <p className="text-sm text-gray-600">{getCustomerName(quotation.customer_id)}</p>
+                    <p className="text-sm text-gray-600">{getCustomerName(quotation)}</p>
                   </div>
                   <Badge className={`${getStatusColor(quotation.status)} border`}>
                     {quotation.status?.toUpperCase()}

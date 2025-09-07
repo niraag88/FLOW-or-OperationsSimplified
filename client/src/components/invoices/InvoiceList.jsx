@@ -7,32 +7,16 @@ import { Button } from "@/components/ui/button";
 import { FileText, CreditCard } from "lucide-react";
 import { Skeleton } from "@/components/ui/skeleton";
 import { format, isValid, parseISO } from "date-fns";
-import { Customer } from "@/api/entities";
 import InvoiceActionsDropdown from "./InvoiceActionsDropdown";
 import MarkPaidDialog from "./MarkPaidDialog";
 import { getDerivedInvoiceStatus } from "./invoiceUtils";
 
 export default function InvoiceList({ invoices, loading, canEdit, canOverride, currentUser, onEdit, onRefresh }) {
-  const [customers, setCustomers] = useState([]);
   const [showMarkPaidDialog, setShowMarkPaidDialog] = useState(false);
   const [selectedInvoice, setSelectedInvoice] = useState(null);
 
-  React.useEffect(() => {
-    loadCustomers();
-  }, []);
-
-  const loadCustomers = async () => {
-    try {
-      const customersData = await Customer.list();
-      setCustomers(customersData);
-    } catch (error) {
-      console.error("Error loading customers:", error);
-    }
-  };
-
-  const getCustomerName = (customerId) => {
-    const customer = customers.find(c => c.id === customerId);
-    return customer?.customer_name || 'Unknown Customer';
+  const getCustomerName = (invoice) => {
+    return invoice.customer_name || invoice.customerName || 'Unknown Customer';
   };
 
   const formatDate = (dateString) => {
@@ -162,7 +146,7 @@ export default function InvoiceList({ invoices, loading, canEdit, canOverride, c
                   return (
                     <TableRow key={invoice.id} className="hover:bg-gray-50">
                       <TableCell className="font-medium">{invoice.invoice_number}</TableCell>
-                      <TableCell>{getCustomerName(invoice.customer_id)}</TableCell>
+                      <TableCell>{getCustomerName(invoice)}</TableCell>
                       <TableCell>{formatDate(invoice.invoice_date)}</TableCell>
                       <TableCell>{invoice.reference || '-'}</TableCell>
                       <TableCell>
@@ -225,7 +209,7 @@ export default function InvoiceList({ invoices, loading, canEdit, canOverride, c
                   <div className="flex items-start justify-between mb-3">
                     <div>
                       <h3 className="font-semibold text-gray-900">{invoice.invoice_number}</h3>
-                      <p className="text-sm text-gray-600">{getCustomerName(invoice.customer_id)}</p>
+                      <p className="text-sm text-gray-600">{getCustomerName(invoice)}</p>
                     </div>
                     <div className="flex flex-col gap-2">
                       <Badge className={`${getStatusColor(derivedStatus)} border`}>

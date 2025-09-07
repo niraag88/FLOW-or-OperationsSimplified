@@ -6,28 +6,11 @@ import { Badge } from "@/components/ui/badge";
 import { Truck } from "lucide-react";
 import { Skeleton } from "@/components/ui/skeleton";
 import { format, isValid, parseISO } from "date-fns";
-import { Customer } from "@/api/entities";
 import DOActionsDropdown from "./DOActionsDropdown";
 
 export default function DOList({ deliveryOrders, loading, canEdit, currentUser, onEdit, onRefresh }) {
-  const [customers, setCustomers] = useState([]);
-
-  React.useEffect(() => {
-    loadCustomers();
-  }, []);
-
-  const loadCustomers = async () => {
-    try {
-      const customersData = await Customer.list();
-      setCustomers(customersData);
-    } catch (error) {
-      console.error("Error loading customers:", error);
-    }
-  };
-
-  const getCustomerName = (customerId) => {
-    const customer = customers.find(c => c.id === customerId);
-    return customer?.customer_name || 'Unknown Customer';
+  const getCustomerName = (doOrder) => {
+    return doOrder.customer_name || doOrder.customerName || 'Unknown Customer';
   };
   
   const formatDate = (dateString) => {
@@ -126,7 +109,7 @@ export default function DOList({ deliveryOrders, loading, canEdit, currentUser, 
               {deliveryOrders.map((doOrder) => (
                 <TableRow key={doOrder.id} className="hover:bg-gray-50">
                   <TableCell className="font-medium">{doOrder.do_number}</TableCell>
-                  <TableCell>{getCustomerName(doOrder.customer_id)}</TableCell>
+                  <TableCell>{getCustomerName(doOrder)}</TableCell>
                   <TableCell>{formatDate(doOrder.order_date)}</TableCell>
                   <TableCell>{doOrder.reference || '-'}</TableCell>
                   <TableCell>
@@ -161,7 +144,7 @@ export default function DOList({ deliveryOrders, loading, canEdit, currentUser, 
               <div className="flex items-start justify-between mb-3">
                 <div>
                   <h3 className="font-semibold text-gray-900">{doOrder.do_number}</h3>
-                  <p className="text-sm text-gray-600">{getCustomerName(doOrder.customer_id)}</p>
+                  <p className="text-sm text-gray-600">{getCustomerName(doOrder)}</p>
                 </div>
                 <div className="flex flex-col gap-2">
                   <Badge className={`${getStatusColor(doOrder.status)} border`}>
