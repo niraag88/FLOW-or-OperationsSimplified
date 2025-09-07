@@ -20,13 +20,11 @@ export default function Invoices() {
   const [showInvoiceForm, setShowInvoiceForm] = useState(false);
   const [editingInvoice, setEditingInvoice] = useState(null);
   const [currentUser, setCurrentUser] = useState(null);
-  const [filters, setFilters] = useState({
-    status: "all",
-    customer: "all",
-    dateRange: "all",
-    currency: "all",
-    tax_treatment: "all"
-  });
+  const [selectedStatuses, setSelectedStatuses] = useState([]);
+  const [selectedCustomers, setSelectedCustomers] = useState([]);
+  const [selectedCurrencies, setSelectedCurrencies] = useState([]);
+  const [selectedTaxTreatments, setSelectedTaxTreatments] = useState([]);
+  const [dateRange, setDateRange] = useState("all");
   const [showCreateFromExistingDialog, setShowCreateFromExistingDialog] = useState(false);
   const [refreshTrigger, setRefreshTrigger] = useState(0);
 
@@ -137,42 +135,36 @@ export default function Invoices() {
     const matchesSearch = invoice.invoice_number?.toLowerCase().includes(searchTerm.toLowerCase()) ||
                          invoice.notes?.toLowerCase().includes(searchTerm.toLowerCase());
     
-    // Updated logic: Since filter only shows "draft" and "submitted", 
-    // we only filter by the actual status stored in the database
-    let matchesStatus = true;
-    if (filters.status !== 'all') {
-      matchesStatus = invoice.status === filters.status;
-    }
-    
-    const matchesCustomer = filters.customer === "all" || invoice.customer_id === filters.customer;
-    const matchesCurrency = filters.currency === "all" || invoice.currency === filters.currency;
-    const matchesTaxTreatment = filters.tax_treatment === "all" || invoice.tax_treatment === filters.tax_treatment;
+    const matchesStatus = selectedStatuses.length === 0 || selectedStatuses.includes(invoice.status);
+    const matchesCustomer = selectedCustomers.length === 0 || selectedCustomers.includes(invoice.customer_id);
+    const matchesCurrency = selectedCurrencies.length === 0 || selectedCurrencies.includes(invoice.currency);
+    const matchesTaxTreatment = selectedTaxTreatments.length === 0 || selectedTaxTreatments.includes(invoice.tax_treatment);
     
     // Date range filtering
     let matchesDateRange = true;
-    if (filters.dateRange !== "all") {
+    if (dateRange !== "all") {
       const invoiceDate = new Date(invoice.invoice_date);
       const today = new Date();
       const startOfToday = new Date(today.getFullYear(), today.getMonth(), today.getDate());
       
-      if (filters.dateRange === "today") {
+      if (dateRange === "today") {
         const endOfToday = new Date(today.getFullYear(), today.getMonth(), today.getDate(), 23, 59, 59);
         matchesDateRange = invoiceDate >= startOfToday && invoiceDate <= endOfToday;
-      } else if (filters.dateRange === "week") {
+      } else if (dateRange === "week") {
         const startOfWeek = new Date(today);
         startOfWeek.setDate(today.getDate() - today.getDay());
         startOfWeek.setHours(0, 0, 0, 0);
         matchesDateRange = invoiceDate >= startOfWeek;
-      } else if (filters.dateRange === "month") {
+      } else if (dateRange === "month") {
         const startOfMonth = new Date(today.getFullYear(), today.getMonth(), 1);
         matchesDateRange = invoiceDate >= startOfMonth;
-      } else if (filters.dateRange === "quarter") {
+      } else if (dateRange === "quarter") {
         const quarter = Math.floor(today.getMonth() / 3);
         const startOfQuarter = new Date(today.getFullYear(), quarter * 3, 1);
         matchesDateRange = invoiceDate >= startOfQuarter;
-      } else if (typeof filters.dateRange === "object" && filters.dateRange.type === "custom") {
-        const startDate = new Date(filters.dateRange.startDate);
-        const endDate = new Date(filters.dateRange.endDate);
+      } else if (typeof dateRange === "object" && dateRange.type === "custom") {
+        const startDate = new Date(dateRange.startDate);
+        const endDate = new Date(dateRange.endDate);
         endDate.setHours(23, 59, 59, 999); // Include the entire end date
         matchesDateRange = invoiceDate >= startDate && invoiceDate <= endDate;
       }
@@ -288,7 +280,19 @@ export default function Invoices() {
           />
         </div>
         
-        <InvoiceFilters filters={filters} onFiltersChange={setFilters} resetPagination={resetPagination} />
+        <InvoiceFilters 
+          selectedStatuses={selectedStatuses}
+          setSelectedStatuses={setSelectedStatuses}
+          selectedCustomers={selectedCustomers}
+          setSelectedCustomers={setSelectedCustomers}
+          selectedCurrencies={selectedCurrencies}
+          setSelectedCurrencies={setSelectedCurrencies}
+          selectedTaxTreatments={selectedTaxTreatments}
+          setSelectedTaxTreatments={setSelectedTaxTreatments}
+          dateRange={dateRange}
+          setDateRange={setDateRange}
+          resetPagination={resetPagination}
+        />
       </div>
 
       {/* Invoices List */}
