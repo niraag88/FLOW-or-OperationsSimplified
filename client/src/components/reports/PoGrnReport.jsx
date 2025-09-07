@@ -182,15 +182,24 @@ export default function PoGrnReport({ purchaseOrders, goodsReceipts, canExport }
     });
   }, [goodsReceipts, filters]);
 
-  // Calculate totals
+  // Calculate totals - fixed currency logic
   const totals = useMemo(() => {
     const poTotals = filteredPOs.reduce((acc, po) => {
-      const amount = Number(po.totalAmount || po.total_amount || 0);
-      if (po.currency === 'GBP') {
+      // Use grandTotal as the main total field, fallback to totalAmount
+      const amount = Number(po.grandTotal || po.grand_total || po.totalAmount || po.total_amount || 0);
+      
+      // Check if currency is explicitly set to GBP, otherwise assume AED
+      const currency = po.currency || 'AED'; // Default to AED based on the data we see
+      
+      if (currency === 'GBP') {
         acc.totalGBP += amount;
+        // Convert GBP to AED (using 5.0 as default exchange rate)
         acc.totalAED += amount * Number(po.fxRateToAed || po.fx_rate_to_aed || 5.0);
       } else {
+        // Assume AED currency
         acc.totalAED += amount;
+        // Convert AED to GBP (divide by exchange rate)
+        acc.totalGBP += amount / Number(po.fxRateToAed || po.fx_rate_to_aed || 5.0);
       }
       return acc;
     }, { totalGBP: 0, totalAED: 0 });
@@ -203,21 +212,25 @@ export default function PoGrnReport({ purchaseOrders, goodsReceipts, canExport }
     };
   }, [filteredPOs, filteredGRNs]);
 
-  // Prepare export data
+  // Prepare export data - fixed currency logic
   const exportData = [
     // Add PO data
-    ...filteredPOs.map(po => ({
-      type: 'Purchase Order',
-      document_number: po.poNumber || po.po_number,
-      date: formatDate(po.orderDate || po.order_date),
-      brand_supplier: getBrandName(po.supplierId || po.supplier_id),
-      currency: po.currency,
-      total_gbp: po.currency === 'GBP' ? Number(po.totalAmount || po.total_amount || 0).toFixed(2) : '0.00',
-      total_aed: po.currency === 'GBP' ? 
-        (Number(po.totalAmount || po.total_amount || 0) * Number(po.fxRateToAed || po.fx_rate_to_aed || 5.0)).toFixed(2) :
-        Number(po.totalAmount || po.total_amount || 0).toFixed(2),
-      status: po.status
-    })),
+    ...filteredPOs.map(po => {
+      const amount = Number(po.grandTotal || po.grand_total || po.totalAmount || po.total_amount || 0);
+      const currency = po.currency || 'AED';
+      const fxRate = Number(po.fxRateToAed || po.fx_rate_to_aed || 5.0);
+      
+      return {
+        type: 'Purchase Order',
+        document_number: po.poNumber || po.po_number,
+        date: formatDate(po.orderDate || po.order_date),
+        brand_supplier: getBrandName(po.supplierId || po.supplier_id),
+        currency: currency,
+        total_gbp: currency === 'GBP' ? amount.toFixed(2) : (amount / fxRate).toFixed(2),
+        total_aed: currency === 'AED' ? amount.toFixed(2) : (amount * fxRate).toFixed(2),
+        status: po.status
+      };
+    }),
     // Add GRN data
     ...filteredGRNs.map(grn => ({
       type: 'Goods Receipt',
@@ -419,16 +432,32 @@ export default function PoGrnReport({ purchaseOrders, goodsReceipts, canExport }
                     <TableCell>{getBrandName(po.supplierId || po.supplier_id)}</TableCell>
                     <TableCell>{formatDate(po.orderDate || po.order_date)}</TableCell>
                     <TableCell>
-                      {po.currency === 'GBP' ? 
-                        `GBP ${Number(po.totalAmount || po.total_amount || 0).toFixed(2)}` : 
-                        '-'
-                      }
+                      {(() => {
+                        const amount = Number(po.grandTotal || po.grand_total || po.totalAmount || po.total_amount || 0);
+                        const currency = po.currency || 'AED';
+                        const fxRate = Number(po.fxRateToAed || po.fx_rate_to_aed || 5.0);
+                        
+                        if (currency === 'GBP') {
+                          return `GBP ${amount.toFixed(2)}`;
+                        } else {
+                          // Convert AED to GBP
+                          return `GBP ${(amount / fxRate).toFixed(2)}`;
+                        }
+                      })()}
                     </TableCell>
                     <TableCell>
-                      {po.currency === 'GBP' ? 
-                        `AED ${(Number(po.totalAmount || po.total_amount || 0) * Number(po.fxRateToAed || po.fx_rate_to_aed || 5.0)).toFixed(2)}` :
-                        `AED ${Number(po.totalAmount || po.total_amount || 0).toFixed(2)}`
-                      }
+                      {(() => {
+                        const amount = Number(po.grandTotal || po.grand_total || po.totalAmount || po.total_amount || 0);
+                        const currency = po.currency || 'AED';
+                        const fxRate = Number(po.fxRateToAed || po.fx_rate_to_aed || 5.0);
+                        
+                        if (currency === 'AED') {
+                          return `AED ${amount.toFixed(2)}`;
+                        } else {
+                          // Convert GBP to AED
+                          return `AED ${(amount * fxRate).toFixed(2)}`;
+                        }
+                      })()}
                     </TableCell>
                     <TableCell>
                       <Badge variant="outline" className={
