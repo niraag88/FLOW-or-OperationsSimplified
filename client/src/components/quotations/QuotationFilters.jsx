@@ -4,12 +4,14 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Button } from "@/components/ui/button";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { Calendar } from "@/components/ui/calendar";
-import { Filter, X, Calendar as CalendarIcon } from "lucide-react";
+import { Filter, X, Calendar as CalendarIcon, ChevronDown } from "lucide-react";
+import { Checkbox } from "@/components/ui/checkbox";
+import { Badge } from "@/components/ui/badge";
 import { Customer } from "@/api/entities";
 import { format } from "date-fns";
 import { cn } from "@/lib/utils";
 
-export default function QuotationFilters({ filters, onFiltersChange, onFilterChange }) {
+export default function QuotationFilters({ selectedStatuses, setSelectedStatuses, selectedCustomers, setSelectedCustomers, dateRange, setDateRange, resetPagination }) {
   const [customers, setCustomers] = useState([]);
   const [dateRangeOpen, setDateRangeOpen] = useState(false);
   const [customStartDate, setCustomStartDate] = useState(null);
@@ -28,33 +30,27 @@ export default function QuotationFilters({ filters, onFiltersChange, onFilterCha
     }
   };
 
-  const handleFilterChange = (field, value) => {
-    onFiltersChange(prev => ({
-      ...prev,
-      [field]: value
-    }));
-    if (onFilterChange) onFilterChange();
-  };
-
   const clearFilters = () => {
-    onFiltersChange({
-      status: "all",
-      customer: "all",
-      dateRange: "all",
-    });
+    setSelectedStatuses([]);
+    setSelectedCustomers([]);
+    setDateRange("all");
     setCustomStartDate(null);
     setCustomEndDate(null);
-    if (onFilterChange) onFilterChange();
+    resetPagination();
   };
 
-  const hasActiveFilters = filters.status !== "all" || filters.customer !== "all" || filters.dateRange !== "all";
+  const hasActiveFilters = selectedStatuses.length > 0 || selectedCustomers.length > 0 || dateRange !== "all";
+
+  // Get unique statuses
+  const uniqueStatuses = ['draft', 'submitted'];
 
   const handleDateRangeChange = (value) => {
     if (value !== 'custom') {
       setCustomStartDate(null);
       setCustomEndDate(null);
     }
-    handleFilterChange('dateRange', value);
+    setDateRange(value);
+    resetPagination();
   };
 
   const handleCustomDateRange = () => {
@@ -64,7 +60,7 @@ export default function QuotationFilters({ filters, onFiltersChange, onFilterCha
         startDate: customStartDate,
         endDate: customEndDate
       };
-      handleFilterChange('dateRange', customRange);
+      setDateRange(customRange);
       setDateRangeOpen(false);
     }
   };
@@ -77,107 +73,195 @@ export default function QuotationFilters({ filters, onFiltersChange, onFilterCha
   };
 
   return (
-    <div className="flex items-center gap-3 flex-wrap">
-      <Filter className="w-4 h-4 text-gray-500" />
-      
-      <Select value={filters.status} onValueChange={(value) => handleFilterChange('status', value)}>
-        <SelectTrigger className="w-32">
-          <SelectValue placeholder="Status" />
-        </SelectTrigger>
-        <SelectContent>
-          <SelectItem value="all">All Status</SelectItem>
-          <SelectItem value="draft">DRAFT</SelectItem>
-          <SelectItem value="submitted">SUBMITTED</SelectItem>
-        </SelectContent>
-      </Select>
-
-      <Select value={filters.customer} onValueChange={(value) => handleFilterChange('customer', value)}>
-        <SelectTrigger className="w-48">
-          <SelectValue placeholder="Customer" />
-        </SelectTrigger>
-        <SelectContent>
-          <SelectItem value="all">All Customers</SelectItem>
-          {customers.map(customer => (
-            <SelectItem key={customer.id} value={customer.id}>
-              {customer.customer_name}
-            </SelectItem>
-          ))}
-        </SelectContent>
-      </Select>
-
-      <Select value={typeof filters.dateRange === 'object' ? 'custom' : filters.dateRange} onValueChange={handleDateRangeChange}>
-        <SelectTrigger className="w-32">
-          <SelectValue placeholder="Date" />
-        </SelectTrigger>
-        <SelectContent>
-          <SelectItem value="all">All Time</SelectItem>
-          <SelectItem value="today">Today</SelectItem>
-          <SelectItem value="week">This Week</SelectItem>
-          <SelectItem value="month">This Month</SelectItem>
-          <SelectItem value="quarter">This Quarter</SelectItem>
-          <SelectItem value="custom">Custom Range</SelectItem>
-        </SelectContent>
-      </Select>
-
-      {(filters.dateRange === 'custom' || typeof filters.dateRange === 'object') && (
-        <Popover open={dateRangeOpen} onOpenChange={setDateRangeOpen}>
+    <>
+      <div className="flex items-center gap-3 flex-wrap">
+        <Filter className="w-4 h-4 text-gray-500" />
+        
+        {/* Status Filter */}
+        <Popover>
           <PopoverTrigger asChild>
-            <Button
-              variant="outline"
-              className={cn(
-                "w-48 justify-start text-left font-normal",
-                !customStartDate && !customEndDate && "text-muted-foreground"
-              )}
-            >
-              <CalendarIcon className="mr-2 h-4 w-4" />
-              {formatCustomDateRange()}
+            <Button variant="outline" className="justify-between w-36">
+              {selectedStatuses.length === 0 ? "All Status" : `${selectedStatuses.length} selected`}
+              <ChevronDown className="ml-2 h-4 w-4" />
             </Button>
           </PopoverTrigger>
-          <PopoverContent className="w-auto p-4" align="start">
-            <div className="space-y-4">
-              <div className="text-sm font-medium">Select Date Range</div>
-              <div className="grid grid-cols-2 gap-4">
-                <div>
-                  <div className="text-xs text-gray-500 mb-2">Start Date</div>
-                  <Calendar
-                    mode="single"
-                    selected={customStartDate}
-                    onSelect={setCustomStartDate}
-                    disabled={(date) => date > new Date() || (customEndDate && date > customEndDate)}
-                    initialFocus
-                  />
-                </div>
-                <div>
-                  <div className="text-xs text-gray-500 mb-2">End Date</div>
-                  <Calendar
-                    mode="single"
-                    selected={customEndDate}
-                    onSelect={setCustomEndDate}
-                    disabled={(date) => date > new Date() || (customStartDate && date < customStartDate)}
-                    initialFocus
-                  />
-                </div>
-              </div>
-              <div className="flex justify-end gap-2 pt-2 border-t">
-                <Button variant="outline" size="sm" onClick={() => setDateRangeOpen(false)}>Cancel</Button>
-                <Button 
-                  size="sm" 
-                  onClick={handleCustomDateRange}
-                  disabled={!customStartDate || !customEndDate}
-                >
-                  Apply
-                </Button>
+          <PopoverContent className="w-60 p-4">
+            <div className="space-y-3">
+              <h4 className="font-medium leading-none">Select Status</h4>
+              <div className="space-y-2 max-h-60 overflow-y-auto">
+                {uniqueStatuses.map(status => (
+                  <div key={status} className="flex items-center space-x-2">
+                    <Checkbox
+                      id={`quotation-status-${status}`}
+                      checked={selectedStatuses.includes(status)}
+                      onCheckedChange={(checked) => {
+                        if (checked) {
+                          setSelectedStatuses(prev => [...prev, status]);
+                        } else {
+                          setSelectedStatuses(prev => prev.filter(s => s !== status));
+                        }
+                        resetPagination();
+                      }}
+                    />
+                    <label
+                      htmlFor={`quotation-status-${status}`}
+                      className="text-sm leading-none peer-disabled:cursor-not-allowed peer-disabled:opacity-70 cursor-pointer capitalize"
+                    >
+                      {status}
+                    </label>
+                  </div>
+                ))}
               </div>
             </div>
           </PopoverContent>
         </Popover>
-      )}
 
-      {hasActiveFilters && (
-        <Button variant="ghost" size="sm" onClick={clearFilters}>
-          <X className="w-4 h-4" />
-        </Button>
+        {/* Customer Filter */}
+        <Popover>
+          <PopoverTrigger asChild>
+            <Button variant="outline" className="justify-between w-48">
+              {selectedCustomers.length === 0 ? "All Customers" : `${selectedCustomers.length} selected`}
+              <ChevronDown className="ml-2 h-4 w-4" />
+            </Button>
+          </PopoverTrigger>
+          <PopoverContent className="w-60 p-4">
+            <div className="space-y-3">
+              <h4 className="font-medium leading-none">Select Customers</h4>
+              <div className="space-y-2 max-h-60 overflow-y-auto">
+                {customers.map(customer => (
+                  <div key={customer.id} className="flex items-center space-x-2">
+                    <Checkbox
+                      id={`quotation-customer-${customer.id}`}
+                      checked={selectedCustomers.includes(customer.id)}
+                      onCheckedChange={(checked) => {
+                        if (checked) {
+                          setSelectedCustomers(prev => [...prev, customer.id]);
+                        } else {
+                          setSelectedCustomers(prev => prev.filter(id => id !== customer.id));
+                        }
+                        resetPagination();
+                      }}
+                    />
+                    <label
+                      htmlFor={`quotation-customer-${customer.id}`}
+                      className="text-sm leading-none peer-disabled:cursor-not-allowed peer-disabled:opacity-70 cursor-pointer"
+                    >
+                      {customer.customer_name}
+                    </label>
+                  </div>
+                ))}
+              </div>
+            </div>
+          </PopoverContent>
+        </Popover>
+
+        <Select value={typeof dateRange === 'object' ? 'custom' : dateRange} onValueChange={handleDateRangeChange}>
+          <SelectTrigger className="w-32">
+            <SelectValue placeholder="Date" />
+          </SelectTrigger>
+          <SelectContent>
+            <SelectItem value="all">All Time</SelectItem>
+            <SelectItem value="today">Today</SelectItem>
+            <SelectItem value="week">This Week</SelectItem>
+            <SelectItem value="month">This Month</SelectItem>
+            <SelectItem value="quarter">This Quarter</SelectItem>
+            <SelectItem value="custom">Custom Range</SelectItem>
+          </SelectContent>
+        </Select>
+
+        {(dateRange === 'custom' || typeof dateRange === 'object') && (
+          <Popover open={dateRangeOpen} onOpenChange={setDateRangeOpen}>
+            <PopoverTrigger asChild>
+              <Button
+                variant="outline"
+                className={cn(
+                  "w-48 justify-start text-left font-normal",
+                  !customStartDate && !customEndDate && "text-muted-foreground"
+                )}
+              >
+                <CalendarIcon className="mr-2 h-4 w-4" />
+                {formatCustomDateRange()}
+              </Button>
+            </PopoverTrigger>
+            <PopoverContent className="w-auto p-4" align="start">
+              <div className="space-y-4">
+                <div className="text-sm font-medium">Select Date Range</div>
+                <div className="grid grid-cols-2 gap-4">
+                  <div>
+                    <div className="text-xs text-gray-500 mb-2">Start Date</div>
+                    <Calendar
+                      mode="single"
+                      selected={customStartDate}
+                      onSelect={setCustomStartDate}
+                      disabled={(date) => date > new Date() || (customEndDate && date > customEndDate)}
+                      initialFocus
+                    />
+                  </div>
+                  <div>
+                    <div className="text-xs text-gray-500 mb-2">End Date</div>
+                    <Calendar
+                      mode="single"
+                      selected={customEndDate}
+                      onSelect={setCustomEndDate}
+                      disabled={(date) => date > new Date() || (customStartDate && date < customStartDate)}
+                      initialFocus
+                    />
+                  </div>
+                </div>
+                <div className="flex justify-end gap-2 pt-2 border-t">
+                  <Button variant="outline" size="sm" onClick={() => setDateRangeOpen(false)}>Cancel</Button>
+                  <Button 
+                    size="sm" 
+                    onClick={handleCustomDateRange}
+                    disabled={!customStartDate || !customEndDate}
+                  >
+                    Apply
+                  </Button>
+                </div>
+              </div>
+            </PopoverContent>
+          </Popover>
+        )}
+
+        {hasActiveFilters && (
+          <Button variant="ghost" size="sm" onClick={clearFilters}>
+            <X className="w-4 h-4" />
+          </Button>
+        )}
+      </div>
+      
+      {/* Active filter badges */}
+      {(selectedStatuses.length > 0 || selectedCustomers.length > 0) && (
+        <div className="flex flex-wrap gap-2">
+          {selectedStatuses.map(status => (
+            <Badge key={status} variant="secondary" className="gap-1">
+              Status: {status}
+              <X 
+                className="h-3 w-3 cursor-pointer" 
+                onClick={() => {
+                  setSelectedStatuses(prev => prev.filter(s => s !== status));
+                  resetPagination();
+                }}
+              />
+            </Badge>
+          ))}
+          {selectedCustomers.map(customerId => {
+            const customer = customers.find(c => c.id === customerId);
+            return (
+              <Badge key={customerId} variant="secondary" className="gap-1">
+                Customer: {customer?.customer_name}
+                <X 
+                  className="h-3 w-3 cursor-pointer" 
+                  onClick={() => {
+                    setSelectedCustomers(prev => prev.filter(id => id !== customerId));
+                    resetPagination();
+                  }}
+                />
+              </Badge>
+            );
+          })}
+        </div>
       )}
-    </div>
+    </>
   );
 }
