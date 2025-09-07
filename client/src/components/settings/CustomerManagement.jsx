@@ -13,7 +13,7 @@ import { Plus, Edit2, Trash2, Save, X } from "lucide-react";
 import { Customer } from "@/api/entities";
 import { useToast } from "@/components/ui/use-toast";
 import { logAuditAction } from "../utils/auditLogger";
-import SimpleConfirmDialog from "../common/SimpleConfirmDialog"; // Added import
+import CustomerActionsDropdown from "./CustomerActionsDropdown";
 
 export default function CustomerManagement() {
   const [customers, setCustomers] = useState([]);
@@ -21,8 +21,6 @@ export default function CustomerManagement() {
   const [editingCustomer, setEditingCustomer] = useState(null);
   const [showForm, setShowForm] = useState(false);
   const { toast } = useToast();
-  const [dialogOpen, setDialogOpen] = useState(false); // Added state
-  const [customerToDelete, setCustomerToDelete] = useState(null); // Added state
 
   const [formData, setFormData] = useState({
     name: "",
@@ -110,36 +108,6 @@ export default function CustomerManagement() {
     setShowForm(true);
   };
   
-  // Renamed from handleDelete and modified to open dialog
-  const handleDeleteClick = (customer) => {
-    setCustomerToDelete(customer);
-    setDialogOpen(true);
-  };
-
-  // New function for confirming deletion
-  const handleDeleteConfirm = async () => {
-    if (!customerToDelete) return;
-
-    try {
-      await Customer.delete(customerToDelete.id);
-      await logAuditAction("Customer", customerToDelete.id, "delete", "admin@example.com", { name: customerToDelete.name });
-      toast({
-        title: "Success",
-        description: "Customer deleted successfully.",
-      });
-      loadCustomers();
-    } catch (error) {
-      console.error("Error deleting customer:", error);
-      toast({
-        title: "Error",
-        description: "Failed to delete customer.",
-        variant: "destructive",
-      });
-    } finally {
-      setDialogOpen(false);
-      setCustomerToDelete(null);
-    }
-  };
 
   const handleToggleActive = async (customer) => {
     try {
@@ -307,19 +275,11 @@ export default function CustomerManagement() {
                       </div>
                     </TableCell>
                     <TableCell>
-                      <div className="flex items-center gap-2">
-                        <Button variant="ghost" size="sm" onClick={() => handleEdit(customer)}>
-                          <Edit2 className="w-4 h-4" />
-                        </Button>
-                        <Button 
-                          variant="ghost" 
-                          size="sm" 
-                          onClick={() => handleDeleteClick(customer)}
-                          className="text-red-600 hover:text-red-800"
-                        >
-                          <Trash2 className="w-4 h-4" />
-                        </Button>
-                      </div>
+                      <CustomerActionsDropdown 
+                        customer={customer}
+                        onEdit={handleEdit}
+                        onRefresh={loadCustomers}
+                      />
                     </TableCell>
                   </TableRow>
                 ))}
@@ -334,17 +294,6 @@ export default function CustomerManagement() {
           )}
         </CardContent>
       </Card>
-      
-      {/* Added SimpleConfirmDialog */}
-      <SimpleConfirmDialog
-        open={dialogOpen}
-        onClose={() => setDialogOpen(false)}
-        onConfirm={handleDeleteConfirm}
-        title="Confirm Deletion"
-        description={`Do you wish to confirm deleting customer "${customerToDelete?.name}"?`}
-        confirmText="Yes, Delete"
-        confirmVariant="destructive"
-      />
     </div>
   );
 }
