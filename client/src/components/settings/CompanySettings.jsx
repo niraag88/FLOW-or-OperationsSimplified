@@ -23,16 +23,16 @@ export default function CompanySettingsComponent() {
     currency: "AED", // Changed from default_currency to match schema
     fxGbpToAed: 4.85, // Changed to camelCase to match schema
     // Note: Document numbering fields are not in the schema yet
-    po_number_prefix: "PO",
-    do_number_prefix: "DO",
-    invoice_number_prefix: "INV",
-    grn_number_prefix: "GRN",
-    quotation_number_prefix: "QUO",
-    next_po_number: 1,
-    next_do_number: 1,
-    next_invoice_number: 1,
-    next_grn_number: 1,
-    next_quotation_number: 1
+    poNumberPrefix: "PO",
+    doNumberPrefix: "DO",
+    invoiceNumberPrefix: "INV",
+    grnNumberPrefix: "GRN",
+    quotationNumberPrefix: "QUO",
+    nextPoNumber: 1,
+    nextDoNumber: 1,
+    nextInvoiceNumber: 1,
+    nextGrnNumber: 1,
+    nextQuotationNumber: 1
   });
   const [loading, setLoading] = useState(false);
   const [initialLoad, setInitialLoad] = useState(true);
@@ -428,8 +428,8 @@ export default function CompanySettingsComponent() {
               <Label htmlFor="po_prefix">PO Prefix</Label>
               <Input
                 id="po_prefix"
-                value={settings.po_number_prefix}
-                onChange={(e) => handleInputChange('po_number_prefix', e.target.value)}
+                value={settings.poNumberPrefix}
+                onChange={(e) => handleInputChange('poNumberPrefix', e.target.value)}
                 placeholder="PO"
                 readOnly={!isEditMode}
                 className={!isEditMode ? "bg-gray-50" : ""}
@@ -440,8 +440,8 @@ export default function CompanySettingsComponent() {
               <Label htmlFor="do_prefix">DO Prefix</Label>
               <Input
                 id="do_prefix"
-                value={settings.do_number_prefix}
-                onChange={(e) => handleInputChange('do_number_prefix', e.target.value)}
+                value={settings.doNumberPrefix}
+                onChange={(e) => handleInputChange('doNumberPrefix', e.target.value)}
                 placeholder="DO"
                 readOnly={!isEditMode}
                 className={!isEditMode ? "bg-gray-50" : ""}
@@ -452,8 +452,8 @@ export default function CompanySettingsComponent() {
               <Label htmlFor="inv_prefix">Invoice Prefix</Label>
               <Input
                 id="inv_prefix"
-                value={settings.invoice_number_prefix}
-                onChange={(e) => handleInputChange('invoice_number_prefix', e.target.value)}
+                value={settings.invoiceNumberPrefix}
+                onChange={(e) => handleInputChange('invoiceNumberPrefix', e.target.value)}
                 placeholder="INV"
                 readOnly={!isEditMode}
                 className={!isEditMode ? "bg-gray-50" : ""}
@@ -464,8 +464,8 @@ export default function CompanySettingsComponent() {
               <Label htmlFor="grn_prefix">GRN Prefix</Label>
               <Input
                 id="grn_prefix"
-                value={settings.grn_number_prefix}
-                onChange={(e) => handleInputChange('grn_number_prefix', e.target.value)}
+                value={settings.grnNumberPrefix}
+                onChange={(e) => handleInputChange('grnNumberPrefix', e.target.value)}
                 placeholder="GRN"
                 readOnly={!isEditMode}
                 className={!isEditMode ? "bg-gray-50" : ""}
@@ -476,8 +476,8 @@ export default function CompanySettingsComponent() {
               <Label htmlFor="quotation_prefix">Quotation Prefix</Label>
               <Input
                 id="quotation_prefix"
-                value={settings.quotation_number_prefix}
-                onChange={(e) => handleInputChange('quotation_number_prefix', e.target.value)}
+                value={settings.quotationNumberPrefix}
+                onChange={(e) => handleInputChange('quotationNumberPrefix', e.target.value)}
                 placeholder="QUO"
                 readOnly={!isEditMode}
                 className={!isEditMode ? "bg-gray-50" : ""}
@@ -492,8 +492,8 @@ export default function CompanySettingsComponent() {
                 id="next_po"
                 type="number"
                 min="1"
-                value={settings.next_po_number}
-                onChange={(e) => handleInputChange('next_po_number', parseInt(e.target.value) || 1)}
+                value={settings.nextPoNumber}
+                onChange={(e) => handleInputChange('nextPoNumber', parseInt(e.target.value) || 1)}
                 readOnly={!isEditMode}
                 className={!isEditMode ? "bg-gray-50" : ""}
               />
@@ -505,8 +505,8 @@ export default function CompanySettingsComponent() {
                 id="next_do"
                 type="number"
                 min="1"
-                value={settings.next_do_number}
-                onChange={(e) => handleInputChange('next_do_number', parseInt(e.target.value) || 1)}
+                value={settings.nextDoNumber}
+                onChange={(e) => handleInputChange('nextDoNumber', parseInt(e.target.value) || 1)}
                 readOnly={!isEditMode}
                 className={!isEditMode ? "bg-gray-50" : ""}
               />
@@ -518,8 +518,8 @@ export default function CompanySettingsComponent() {
                 id="next_inv"
                 type="number"
                 min="1"
-                value={settings.next_invoice_number}
-                onChange={(e) => handleInputChange('next_invoice_number', parseInt(e.target.value) || 1)}
+                value={settings.nextInvoiceNumber}
+                onChange={(e) => handleInputChange('nextInvoiceNumber', parseInt(e.target.value) || 1)}
                 readOnly={!isEditMode}
                 className={!isEditMode ? "bg-gray-50" : ""}
               />
@@ -531,8 +531,8 @@ export default function CompanySettingsComponent() {
                 id="next_grn"
                 type="number"
                 min="1"
-                value={settings.next_grn_number}
-                onChange={(e) => handleInputChange('next_grn_number', parseInt(e.target.value) || 1)}
+                value={settings.nextGrnNumber}
+                onChange={(e) => handleInputChange('nextGrnNumber', parseInt(e.target.value) || 1)}
                 readOnly={!isEditMode}
                 className={!isEditMode ? "bg-gray-50" : ""}
               />
@@ -544,8 +544,8 @@ export default function CompanySettingsComponent() {
                 id="next_quotation"
                 type="number"
                 min="1"
-                value={settings.next_quotation_number}
-                onChange={(e) => handleInputChange('next_quotation_number', parseInt(e.target.value) || 1)}
+                value={settings.nextQuotationNumber}
+                onChange={(e) => handleInputChange('nextQuotationNumber', parseInt(e.target.value) || 1)}
                 readOnly={!isEditMode}
                 className={!isEditMode ? "bg-gray-50" : ""}
               />
