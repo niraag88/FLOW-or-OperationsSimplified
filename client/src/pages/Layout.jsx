@@ -277,7 +277,7 @@ export default function Layout({ children, currentPageName }) {
               <img 
                 src="/flow-logo-new.png" 
                 alt="FLOW Logo" 
-                className="h-20 sm:h-24 w-auto object-contain"
+                className="h-24 sm:h-28 w-auto object-contain"
               />
             </div>
 
