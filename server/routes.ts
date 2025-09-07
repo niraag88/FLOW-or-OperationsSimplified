@@ -1113,7 +1113,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
   app.post('/api/quotations', requireAuth(['Admin', 'Manager']), async (req: AuthenticatedRequest, res) => {
     try {
-      const quoteNumber = await businessStorage.generateQuoteNumber();
+      const quoteNumber = await businessStorage.generateQuotationNumber();
       const validatedData = insertQuotationSchema.parse({
         ...req.body,
         quoteNumber,
@@ -1124,6 +1124,17 @@ export async function registerRoutes(app: Express): Promise<Server> {
     } catch (error) {
       console.error('Error creating quotation:', error);
       res.status(500).json({ error: 'Failed to create quotation' });
+    }
+  });
+
+  // Get next quotation number
+  app.get('/api/quotations/next-number', requireAuth(), async (req: AuthenticatedRequest, res) => {
+    try {
+      const nextNumber = await businessStorage.generateQuotationNumber();
+      res.json({ nextNumber });
+    } catch (error) {
+      console.error('Error generating next quotation number:', error);
+      res.status(500).json({ error: 'Failed to generate next quotation number' });
     }
   });
 
