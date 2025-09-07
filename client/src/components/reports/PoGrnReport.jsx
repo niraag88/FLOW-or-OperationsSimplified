@@ -273,7 +273,11 @@ export default function PoGrnReport({ purchaseOrders, goodsReceipts, canExport }
       return {
         type: 'Goods Receipt',
         document_number: `GRN-${po.poNumber || po.po_number}`,
-        date: formatDate(po.orderDate || po.order_date),
+        date: po.status === 'closed' 
+          ? formatDate(po.updatedAt || po.updated_at) 
+          : (po.expectedDelivery || po.expected_delivery 
+              ? formatDate(po.expectedDelivery || po.expected_delivery)
+              : 'Pending'),
         brand_supplier: getBrandName(po.supplierId || po.supplier_id),
         currency: 'GBP',
         total_gbp: gbpAmount.toFixed(2),
@@ -603,7 +607,14 @@ export default function PoGrnReport({ purchaseOrders, goodsReceipts, canExport }
                   <TableRow key={po.id}>
                     <TableCell className="font-medium">GRN-{po.poNumber || po.po_number}</TableCell>
                     <TableCell>{getBrandName(po.supplierId || po.supplier_id)}</TableCell>
-                    <TableCell>{formatDate(po.orderDate || po.order_date)}</TableCell>
+                    <TableCell>
+                      {po.status === 'closed' 
+                        ? formatDate(po.updatedAt || po.updated_at) 
+                        : po.expectedDelivery || po.expected_delivery 
+                          ? formatDate(po.expectedDelivery || po.expected_delivery)
+                          : 'Pending'
+                      }
+                    </TableCell>
                     <TableCell>
                       <Badge variant="outline">{po.poNumber || po.po_number}</Badge>
                     </TableCell>
