@@ -24,6 +24,8 @@ export default function PoGrnReport({ purchaseOrders, goodsReceipts, canExport }
   const [customEndDate, setCustomEndDate] = useState(null);
   const [currentPage, setCurrentPage] = useState(1);
   const [itemsPerPage, setItemsPerPage] = useState(20);
+  const [grnCurrentPage, setGrnCurrentPage] = useState(1);
+  const [grnItemsPerPage, setGrnItemsPerPage] = useState(20);
 
   useEffect(() => {
     loadBrands();
@@ -161,47 +163,52 @@ export default function PoGrnReport({ purchaseOrders, goodsReceipts, canExport }
     });
   }, [purchaseOrders, filters]);
 
-  // Filter goods receipts using the same date logic
+  // Filter goods receipts - combine submitted and closed POs (like Purchase Orders page)
   const filteredGRNs = useMemo(() => {
-    return goodsReceipts.filter(grn => {
-      const matchesSupplier = filters.supplier === "all" || (grn.supplierId || grn.supplier_id) === filters.supplier;
+    // Goods receipts are actually POs with submitted or closed status
+    const goodsReceiptPOs = purchaseOrders.filter(po => 
+      po.status === 'submitted' || po.status === 'closed'
+    );
+    
+    return goodsReceiptPOs.filter(po => {
+      const matchesSupplier = filters.supplier === "all" || (po.supplierId || po.supplier_id) === filters.supplier;
       
-      // Date range filtering
+      // Date range filtering using order date
       let matchesDateRange = true;
       if (filters.dateRange !== "all") {
-        const dateValue = grn.receiptDate || grn.receipt_date;
+        const dateValue = po.orderDate || po.order_date;
         if (!dateValue) return false;
         
-        const grnDate = new Date(dateValue);
+        const poDate = new Date(dateValue);
         const today = new Date();
         const startOfToday = new Date(today.getFullYear(), today.getMonth(), today.getDate());
         
         if (filters.dateRange === "today") {
           const endOfToday = new Date(today.getFullYear(), today.getMonth(), today.getDate(), 23, 59, 59);
-          matchesDateRange = grnDate >= startOfToday && grnDate <= endOfToday;
+          matchesDateRange = poDate >= startOfToday && poDate <= endOfToday;
         } else if (filters.dateRange === "week") {
           const startOfWeek = new Date(today);
           startOfWeek.setDate(today.getDate() - today.getDay());
           startOfWeek.setHours(0, 0, 0, 0);
-          matchesDateRange = grnDate >= startOfWeek;
+          matchesDateRange = poDate >= startOfWeek;
         } else if (filters.dateRange === "month") {
           const startOfMonth = new Date(today.getFullYear(), today.getMonth(), 1);
-          matchesDateRange = grnDate >= startOfMonth;
+          matchesDateRange = poDate >= startOfMonth;
         } else if (filters.dateRange === "quarter") {
           const quarter = Math.floor(today.getMonth() / 3);
           const startOfQuarter = new Date(today.getFullYear(), quarter * 3, 1);
-          matchesDateRange = grnDate >= startOfQuarter;
+          matchesDateRange = poDate >= startOfQuarter;
         } else if (typeof filters.dateRange === "object" && filters.dateRange.type === "custom") {
           const startDate = new Date(filters.dateRange.startDate);
           const endDate = new Date(filters.dateRange.endDate);
           endDate.setHours(23, 59, 59, 999);
-          matchesDateRange = grnDate >= startDate && grnDate <= endDate;
+          matchesDateRange = poDate >= startDate && poDate <= endDate;
         }
       }
       
       return matchesSupplier && matchesDateRange;
     });
-  }, [goodsReceipts, filters]);
+  }, [purchaseOrders, filters]);
 
   // Calculate totals - using POList logic exactly
   const totals = useMemo(() => {
@@ -223,14 +230,21 @@ export default function PoGrnReport({ purchaseOrders, goodsReceipts, canExport }
     };
   }, [filteredPOs, filteredGRNs]);
 
-  // Pagination logic
+  // Pagination logic for POs
   const startIndex = (currentPage - 1) * itemsPerPage;
   const endIndex = startIndex + itemsPerPage;
   const paginatedPOs = filteredPOs.slice(startIndex, endIndex);
   const totalPages = Math.ceil(filteredPOs.length / itemsPerPage);
 
+  // Pagination logic for GRNs
+  const grnStartIndex = (grnCurrentPage - 1) * grnItemsPerPage;
+  const grnEndIndex = grnStartIndex + grnItemsPerPage;
+  const paginatedGRNs = filteredGRNs.slice(grnStartIndex, grnEndIndex);
+  const grnTotalPages = Math.ceil(filteredGRNs.length / grnItemsPerPage);
+
   const resetPagination = () => {
     setCurrentPage(1);
+    setGrnCurrentPage(1);
   };
 
   // Prepare export data - using POList logic
@@ -251,17 +265,22 @@ export default function PoGrnReport({ purchaseOrders, goodsReceipts, canExport }
         status: po.status
       };
     }),
-    // Add GRN data
-    ...filteredGRNs.map(grn => ({
-      type: 'Goods Receipt',
-      document_number: grn.grnNumber || grn.grn_number,
-      date: formatDate(grn.receiptDate || grn.receipt_date),
-      brand_supplier: getBrandName(grn.supplierId || grn.supplier_id),
-      currency: '-',
-      total_gbp: '-',
-      total_aed: '-',
-      status: 'Received'
-    }))
+    // Add GRN data (submitted/closed POs)
+    ...filteredGRNs.map(po => {
+      const gbpAmount = Number(po.totalAmount || 0);
+      const aedAmount = calculateAEDAmount(gbpAmount);
+      
+      return {
+        type: 'Goods Receipt',
+        document_number: `GRN-${po.poNumber || po.po_number}`,
+        date: formatDate(po.orderDate || po.order_date),
+        brand_supplier: getBrandName(po.supplierId || po.supplier_id),
+        currency: 'GBP',
+        total_gbp: gbpAmount.toFixed(2),
+        total_aed: aedAmount.toFixed(2),
+        status: po.status === 'submitted' ? 'Open' : 'Closed'
+      };
+    })
   ];
 
   return (
@@ -580,24 +599,17 @@ export default function PoGrnReport({ purchaseOrders, goodsReceipts, canExport }
                 </TableRow>
               </TableHeader>
               <TableBody>
-                {filteredGRNs.map((grn) => {
-                  const relatedPO = purchaseOrders.find(po => po.id === (grn.purchaseOrderId || grn.purchase_order_id));
-                  return (
-                    <TableRow key={grn.id}>
-                      <TableCell className="font-medium">{grn.grnNumber || grn.grn_number}</TableCell>
-                      <TableCell>{formatDate(grn.receiptDate || grn.receipt_date)}</TableCell>
-                      <TableCell>{getBrandName(grn.supplierId || grn.supplier_id)}</TableCell>
-                      <TableCell>
-                        {relatedPO ? (
-                          <Badge variant="outline">{relatedPO.poNumber || relatedPO.po_number}</Badge>
-                        ) : (
-                          '-'
-                        )}
-                      </TableCell>
-                      <TableCell>{grn.receivedBy || grn.received_by}</TableCell>
-                    </TableRow>
-                  );
-                })}
+                {paginatedGRNs.map((po) => (
+                  <TableRow key={po.id}>
+                    <TableCell className="font-medium">GRN-{po.poNumber || po.po_number}</TableCell>
+                    <TableCell>{formatDate(po.orderDate || po.order_date)}</TableCell>
+                    <TableCell>{getBrandName(po.supplierId || po.supplier_id)}</TableCell>
+                    <TableCell>
+                      <Badge variant="outline">{po.poNumber || po.po_number}</Badge>
+                    </TableCell>
+                    <TableCell>{po.status === 'submitted' ? 'Pending Receipt' : 'Completed'}</TableCell>
+                  </TableRow>
+                ))}
               </TableBody>
             </Table>
           </div>
@@ -605,6 +617,88 @@ export default function PoGrnReport({ purchaseOrders, goodsReceipts, canExport }
             <div className="text-center py-12 text-gray-500">
               <FileText className="w-12 h-12 mx-auto mb-4 opacity-50" />
               <p>No goods receipts found for the selected filters</p>
+            </div>
+          )}
+
+          {/* Pagination Controls for GRNs */}
+          {filteredGRNs.length > 0 && (
+            <div className="flex items-center justify-between mt-6 pt-4 border-t">
+              <div className="flex items-center gap-2">
+                <span className="text-sm text-gray-700">
+                  Showing {grnStartIndex + 1} to {Math.min(grnEndIndex, filteredGRNs.length)} of {filteredGRNs.length} goods receipts
+                </span>
+              </div>
+              
+              <div className="flex items-center gap-4">
+                {/* Items per page selector */}
+                <div className="flex items-center gap-2">
+                  <span className="text-sm text-gray-700">Show:</span>
+                  <Select value={grnItemsPerPage.toString()} onValueChange={(value) => {
+                    setGrnItemsPerPage(Number(value));
+                    setGrnCurrentPage(1);
+                  }}>
+                    <SelectTrigger className="w-20">
+                      <SelectValue />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="20">20</SelectItem>
+                      <SelectItem value="50">50</SelectItem>
+                      <SelectItem value="100">100</SelectItem>
+                      <SelectItem value={filteredGRNs.length.toString()}>All</SelectItem>
+                    </SelectContent>
+                  </Select>
+                </div>
+                
+                {/* Page navigation */}
+                {grnTotalPages > 1 && (
+                  <div className="flex items-center gap-2">
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      onClick={() => setGrnCurrentPage(prev => Math.max(1, prev - 1))}
+                      disabled={grnCurrentPage === 1}
+                    >
+                      Previous
+                    </Button>
+                    
+                    <div className="flex items-center gap-1">
+                      {Array.from({ length: Math.min(5, grnTotalPages) }, (_, i) => {
+                        let pageNumber;
+                        if (grnTotalPages <= 5) {
+                          pageNumber = i + 1;
+                        } else if (grnCurrentPage <= 3) {
+                          pageNumber = i + 1;
+                        } else if (grnCurrentPage >= grnTotalPages - 2) {
+                          pageNumber = grnTotalPages - 4 + i;
+                        } else {
+                          pageNumber = grnCurrentPage - 2 + i;
+                        }
+                        
+                        return (
+                          <Button
+                            key={pageNumber}
+                            variant={grnCurrentPage === pageNumber ? "default" : "outline"}
+                            size="sm"
+                            className="w-8 h-8 p-0"
+                            onClick={() => setGrnCurrentPage(pageNumber)}
+                          >
+                            {pageNumber}
+                          </Button>
+                        );
+                      })}
+                    </div>
+                    
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      onClick={() => setGrnCurrentPage(prev => Math.min(grnTotalPages, prev + 1))}
+                      disabled={grnCurrentPage === grnTotalPages}
+                    >
+                      Next
+                    </Button>
+                  </div>
+                )}
+              </div>
             </div>
           )}
         </CardContent>
