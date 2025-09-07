@@ -763,9 +763,17 @@ export async function registerRoutes(app: Express): Promise<Server> {
   
   // Brand management routes
   app.get('/api/brands', requireAuth(), async (req: AuthenticatedRequest, res) => {
+    const startTime = Date.now();
     try {
+      console.log('🏷️ Starting brands fetch...');
+      const dbStartTime = Date.now();
       const brands = await businessStorage.getBrands();
+      const dbEndTime = Date.now();
+      console.log(`✅ Brands DB query completed in ${dbEndTime - dbStartTime}ms`);
+      
       res.json(brands);
+      const totalTime = Date.now() - startTime;
+      console.log(`🏁 Total brands fetch completed in ${totalTime}ms`);
     } catch (error) {
       console.error('Error fetching brands:', error);
       res.status(500).json({ error: 'Failed to fetch brands' });
@@ -876,18 +884,27 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
   // Product management routes
   app.get('/api/products', requireAuth(), async (req: AuthenticatedRequest, res) => {
+    const startTime = Date.now();
     try {
+      console.log('📦 Starting products fetch...');
+      const dbStartTime = Date.now();
       const products = await businessStorage.getProducts();
+      const dbEndTime = Date.now();
+      console.log(`✅ Products DB query completed in ${dbEndTime - dbStartTime}ms`);
       
       // Handle filtering by query parameters
       if (req.query.sku) {
         const filteredProducts = products.filter(product => 
           product.sku === req.query.sku
         );
+        const totalTime = Date.now() - startTime;
+        console.log(`🏁 Total products fetch (filtered) completed in ${totalTime}ms`);
         return res.json(filteredProducts);
       }
       
       res.json(products);
+      const totalTime = Date.now() - startTime;
+      console.log(`🏁 Total products fetch completed in ${totalTime}ms`);
     } catch (error) {
       console.error('Error fetching products:', error);
       res.status(500).json({ error: 'Failed to fetch products' });
@@ -1547,9 +1564,17 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
   // Company settings
   app.get('/api/company-settings', requireAuth(), async (req: AuthenticatedRequest, res) => {
+    const startTime = Date.now();
     try {
+      console.log('🏢 Starting company settings fetch...');
+      const dbStartTime = Date.now();
       const settings = await businessStorage.getCompanySettings();
+      const dbEndTime = Date.now();
+      console.log(`✅ Company settings DB query completed in ${dbEndTime - dbStartTime}ms`);
+      
       res.json(settings || {});
+      const totalTime = Date.now() - startTime;
+      console.log(`🏁 Total company settings fetch completed in ${totalTime}ms`);
     } catch (error) {
       console.error('Error fetching company settings:', error);
       res.status(500).json({ error: 'Failed to fetch company settings' });
