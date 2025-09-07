@@ -274,7 +274,7 @@ export default function PoGrnReport({ purchaseOrders, goodsReceipts, canExport }
         currency: 'GBP',
         total_gbp: gbpAmount.toFixed(2),
         total_aed: aedAmount.toFixed(2),
-        status: po.status === 'submitted' ? 'Open' : 'Closed'
+        status: po.status
       };
     })
   ];
