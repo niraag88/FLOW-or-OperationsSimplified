@@ -842,9 +842,17 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
   // Customer management routes
   app.get('/api/customers', requireAuth(), async (req: AuthenticatedRequest, res) => {
+    const startTime = Date.now();
     try {
+      console.log('🔍 Starting customer fetch...');
+      const dbStartTime = Date.now();
       const customers = await businessStorage.getCustomers();
+      const dbEndTime = Date.now();
+      console.log(`✅ Database query completed in ${dbEndTime - dbStartTime}ms`);
+      
       res.json(customers);
+      const totalTime = Date.now() - startTime;
+      console.log(`🏁 Total customer fetch completed in ${totalTime}ms`);
     } catch (error) {
       console.error('Error fetching customers:', error);
       res.status(500).json({ error: 'Failed to fetch customers' });
