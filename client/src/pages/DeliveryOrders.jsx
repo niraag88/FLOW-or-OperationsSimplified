@@ -19,12 +19,10 @@ export default function DeliveryOrders() {
   const [showDOForm, setShowDOForm] = useState(false);
   const [editingDO, setEditingDO] = useState(null);
   const [currentUser, setCurrentUser] = useState(null);
-  const [filters, setFilters] = useState({
-    status: "all",
-    customer: "all",
-    dateRange: "all",
-    tax_treatment: "all"
-  });
+  const [selectedStatuses, setSelectedStatuses] = useState([]);
+  const [selectedCustomers, setSelectedCustomers] = useState([]);
+  const [selectedTaxTreatments, setSelectedTaxTreatments] = useState([]);
+  const [dateRange, setDateRange] = useState("all");
   const [refreshTrigger, setRefreshTrigger] = useState(0);
   const [showCreateFromExistingDialog, setShowCreateFromExistingDialog] = useState(false);
 
@@ -131,35 +129,35 @@ export default function DeliveryOrders() {
     const matchesSearch = doOrder.do_number?.toLowerCase().includes(searchTerm.toLowerCase()) ||
                          doOrder.remarks?.toLowerCase().includes(searchTerm.toLowerCase());
     
-    const matchesStatus = filters.status === "all" || doOrder.status === filters.status;
-    const matchesCustomer = filters.customer === "all" || doOrder.customer_id === filters.customer;
-    const matchesTaxTreatment = filters.tax_treatment === "all" || doOrder.tax_treatment === filters.tax_treatment;
+    const matchesStatus = selectedStatuses.length === 0 || selectedStatuses.includes(doOrder.status);
+    const matchesCustomer = selectedCustomers.length === 0 || selectedCustomers.includes(doOrder.customer_id);
+    const matchesTaxTreatment = selectedTaxTreatments.length === 0 || selectedTaxTreatments.includes(doOrder.tax_treatment);
     
     // Date range filtering
     let matchesDateRange = true;
-    if (filters.dateRange !== "all") {
+    if (dateRange !== "all") {
       const doDate = new Date(doOrder.order_date);
       const today = new Date();
       const startOfToday = new Date(today.getFullYear(), today.getMonth(), today.getDate());
       
-      if (filters.dateRange === "today") {
+      if (dateRange === "today") {
         const endOfToday = new Date(today.getFullYear(), today.getMonth(), today.getDate(), 23, 59, 59);
         matchesDateRange = doDate >= startOfToday && doDate <= endOfToday;
-      } else if (filters.dateRange === "week") {
+      } else if (dateRange === "week") {
         const startOfWeek = new Date(today);
         startOfWeek.setDate(today.getDate() - today.getDay());
         startOfWeek.setHours(0, 0, 0, 0);
         matchesDateRange = doDate >= startOfWeek;
-      } else if (filters.dateRange === "month") {
+      } else if (dateRange === "month") {
         const startOfMonth = new Date(today.getFullYear(), today.getMonth(), 1);
         matchesDateRange = doDate >= startOfMonth;
-      } else if (filters.dateRange === "quarter") {
+      } else if (dateRange === "quarter") {
         const quarter = Math.floor(today.getMonth() / 3);
         const startOfQuarter = new Date(today.getFullYear(), quarter * 3, 1);
         matchesDateRange = doDate >= startOfQuarter;
-      } else if (typeof filters.dateRange === "object" && filters.dateRange.type === "custom") {
-        const startDate = new Date(filters.dateRange.startDate);
-        const endDate = new Date(filters.dateRange.endDate);
+      } else if (typeof dateRange === "object" && dateRange.type === "custom") {
+        const startDate = new Date(dateRange.startDate);
+        const endDate = new Date(dateRange.endDate);
         endDate.setHours(23, 59, 59, 999); // Include the entire end date
         matchesDateRange = doDate >= startDate && doDate <= endDate;
       }
@@ -243,7 +241,17 @@ export default function DeliveryOrders() {
           />
         </div>
         
-        <DOFilters filters={filters} onFiltersChange={setFilters} resetPagination={resetPagination} />
+        <DOFilters 
+          selectedStatuses={selectedStatuses}
+          setSelectedStatuses={setSelectedStatuses}
+          selectedCustomers={selectedCustomers}
+          setSelectedCustomers={setSelectedCustomers}
+          selectedTaxTreatments={selectedTaxTreatments}
+          setSelectedTaxTreatments={setSelectedTaxTreatments}
+          dateRange={dateRange}
+          setDateRange={setDateRange}
+          resetPagination={resetPagination}
+        />
       </div>
 
       {/* Delivery Orders List */}
