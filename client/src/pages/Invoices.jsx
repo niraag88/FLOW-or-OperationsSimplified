@@ -181,6 +181,17 @@ export default function Invoices() {
     return matchesSearch && matchesStatus && matchesCustomer && matchesCurrency && matchesTaxTreatment && matchesDateRange;
   });
 
+  // Calculate pagination
+  const totalPages = Math.ceil(filteredInvoices.length / itemsPerPage);
+  const startIndex = (currentPage - 1) * itemsPerPage;
+  const endIndex = startIndex + itemsPerPage;
+  const paginatedInvoices = filteredInvoices.slice(startIndex, endIndex);
+
+  // Reset pagination when filters/search change
+  const resetPagination = () => {
+    setCurrentPage(1);
+  };
+
   // Calculate totals - since all invoices are in AED, simpler calculation
   const totals = filteredInvoices.reduce((acc, invoice) => {
     acc.total += invoice.total_amount || 0;
@@ -269,17 +280,21 @@ export default function Invoices() {
           <Input
             placeholder="Search invoice numbers, notes..."
             value={searchTerm}
-            onChange={(e) => setSearchTerm(e.target.value)}
+            onChange={(e) => {
+              setSearchTerm(e.target.value);
+              resetPagination();
+            }}
             className="pl-10"
           />
         </div>
         
-        <InvoiceFilters filters={filters} onFiltersChange={setFilters} />
+        <InvoiceFilters filters={filters} onFiltersChange={setFilters} resetPagination={resetPagination} />
       </div>
 
       {/* Invoices List */}
       <InvoiceList 
-        invoices={filteredInvoices}
+        invoices={paginatedInvoices}
+        totalCount={filteredInvoices.length}
         loading={loading}
         canEdit={canEdit}
         canOverride={canOverride}
@@ -287,6 +302,88 @@ export default function Invoices() {
         onEdit={handleEditInvoice}
         onRefresh={handleRefresh}
       />
+
+      {/* Pagination Controls */}
+      {!loading && filteredInvoices.length > 0 && (
+        <div className="flex items-center justify-between mt-6 pt-4 border-t">
+          <div className="flex items-center gap-2">
+            <span className="text-sm text-gray-700">
+              Showing {startIndex + 1} to {Math.min(endIndex, filteredInvoices.length)} of {filteredInvoices.length} invoices
+            </span>
+          </div>
+          
+          <div className="flex items-center gap-4">
+            {/* Items per page selector */}
+            <div className="flex items-center gap-2">
+              <span className="text-sm text-gray-700">Show:</span>
+              <Select value={itemsPerPage.toString()} onValueChange={(value) => {
+                setItemsPerPage(Number(value));
+                setCurrentPage(1);
+              }}>
+                <SelectTrigger className="w-20">
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="20">20</SelectItem>
+                  <SelectItem value="50">50</SelectItem>
+                  <SelectItem value="100">100</SelectItem>
+                  <SelectItem value={filteredInvoices.length.toString()}>All</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
+            
+            {/* Page navigation */}
+            {totalPages > 1 && (
+              <div className="flex items-center gap-2">
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={() => setCurrentPage(prev => Math.max(1, prev - 1))}
+                  disabled={currentPage === 1}
+                >
+                  Previous
+                </Button>
+                
+                <div className="flex items-center gap-1">
+                  {Array.from({ length: Math.min(5, totalPages) }, (_, i) => {
+                    let pageNumber;
+                    if (totalPages <= 5) {
+                      pageNumber = i + 1;
+                    } else if (currentPage <= 3) {
+                      pageNumber = i + 1;
+                    } else if (currentPage >= totalPages - 2) {
+                      pageNumber = totalPages - 4 + i;
+                    } else {
+                      pageNumber = currentPage - 2 + i;
+                    }
+                    
+                    return (
+                      <Button
+                        key={pageNumber}
+                        variant={currentPage === pageNumber ? "default" : "outline"}
+                        size="sm"
+                        className="w-8 h-8 p-0"
+                        onClick={() => setCurrentPage(pageNumber)}
+                      >
+                        {pageNumber}
+                      </Button>
+                    );
+                  })}
+                </div>
+                
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={() => setCurrentPage(prev => Math.min(totalPages, prev + 1))}
+                  disabled={currentPage === totalPages}
+                >
+                  Next
+                </Button>
+              </div>
+            )}
+          </div>
+        </div>
+      )}
 
       {/* Invoice Form Modal */}
       <InvoiceForm
