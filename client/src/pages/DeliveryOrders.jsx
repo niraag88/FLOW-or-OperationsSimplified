@@ -168,6 +168,17 @@ export default function DeliveryOrders() {
     return matchesSearch && matchesStatus && matchesCustomer && matchesTaxTreatment && matchesDateRange;
   });
 
+  // Calculate pagination
+  const totalPages = Math.ceil(filteredDOs.length / itemsPerPage);
+  const startIndex = (currentPage - 1) * itemsPerPage;
+  const endIndex = startIndex + itemsPerPage;
+  const paginatedDOs = filteredDOs.slice(startIndex, endIndex);
+
+  // Reset pagination when filters/search change
+  const resetPagination = () => {
+    setCurrentPage(1);
+  };
+
   return (
     <div className="space-y-6">
       {/* Header */}
@@ -224,23 +235,109 @@ export default function DeliveryOrders() {
           <Input
             placeholder="Search DO numbers, remarks..."
             value={searchTerm}
-            onChange={(e) => setSearchTerm(e.target.value)}
+            onChange={(e) => {
+              setSearchTerm(e.target.value);
+              resetPagination();
+            }}
             className="pl-10"
           />
         </div>
         
-        <DOFilters filters={filters} onFiltersChange={setFilters} />
+        <DOFilters filters={filters} onFiltersChange={setFilters} resetPagination={resetPagination} />
       </div>
 
       {/* Delivery Orders List */}
       <DOList 
-        deliveryOrders={filteredDOs}
+        deliveryOrders={paginatedDOs}
+        totalCount={filteredDOs.length}
         loading={loading}
         canEdit={canEdit}
         currentUser={currentUser}
         onEdit={handleEditDO}
         onRefresh={handleRefresh}
       />
+
+      {/* Pagination Controls */}
+      {!loading && filteredDOs.length > 0 && (
+        <div className="flex items-center justify-between mt-6 pt-4 border-t">
+          <div className="flex items-center gap-2">
+            <span className="text-sm text-gray-700">
+              Showing {startIndex + 1} to {Math.min(endIndex, filteredDOs.length)} of {filteredDOs.length} delivery orders
+            </span>
+          </div>
+          
+          <div className="flex items-center gap-4">
+            {/* Items per page selector */}
+            <div className="flex items-center gap-2">
+              <span className="text-sm text-gray-700">Show:</span>
+              <Select value={itemsPerPage.toString()} onValueChange={(value) => {
+                setItemsPerPage(Number(value));
+                setCurrentPage(1);
+              }}>
+                <SelectTrigger className="w-20">
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="20">20</SelectItem>
+                  <SelectItem value="50">50</SelectItem>
+                  <SelectItem value="100">100</SelectItem>
+                  <SelectItem value={filteredDOs.length.toString()}>All</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
+            
+            {/* Page navigation */}
+            {totalPages > 1 && (
+              <div className="flex items-center gap-2">
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={() => setCurrentPage(prev => Math.max(1, prev - 1))}
+                  disabled={currentPage === 1}
+                >
+                  Previous
+                </Button>
+                
+                <div className="flex items-center gap-1">
+                  {Array.from({ length: Math.min(5, totalPages) }, (_, i) => {
+                    let pageNumber;
+                    if (totalPages <= 5) {
+                      pageNumber = i + 1;
+                    } else if (currentPage <= 3) {
+                      pageNumber = i + 1;
+                    } else if (currentPage >= totalPages - 2) {
+                      pageNumber = totalPages - 4 + i;
+                    } else {
+                      pageNumber = currentPage - 2 + i;
+                    }
+                    
+                    return (
+                      <Button
+                        key={pageNumber}
+                        variant={currentPage === pageNumber ? "default" : "outline"}
+                        size="sm"
+                        className="w-8 h-8 p-0"
+                        onClick={() => setCurrentPage(pageNumber)}
+                      >
+                        {pageNumber}
+                      </Button>
+                    );
+                  })}
+                </div>
+                
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={() => setCurrentPage(prev => Math.min(totalPages, prev + 1))}
+                  disabled={currentPage === totalPages}
+                >
+                  Next
+                </Button>
+              </div>
+            )}
+          </div>
+        </div>
+      )}
 
       {/* DO Form Modal */}
       <DOForm
