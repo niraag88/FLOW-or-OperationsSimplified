@@ -27,10 +27,12 @@ export default function CompanySettingsComponent() {
     do_number_prefix: "DO",
     invoice_number_prefix: "INV",
     grn_number_prefix: "GRN",
+    quotation_number_prefix: "QUO",
     next_po_number: 1,
     next_do_number: 1,
     next_invoice_number: 1,
-    next_grn_number: 1
+    next_grn_number: 1,
+    next_quotation_number: 1
   });
   const [loading, setLoading] = useState(false);
   const [initialLoad, setInitialLoad] = useState(true);
@@ -421,7 +423,7 @@ export default function CompanySettingsComponent() {
         <div className="space-y-4 pt-6 border-t">
           <h3 className="text-lg font-semibold">Document Numbering</h3>
           
-          <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+          <div className="grid grid-cols-2 md:grid-cols-5 gap-4">
             <div className="space-y-2">
               <Label htmlFor="po_prefix">PO Prefix</Label>
               <Input
@@ -469,9 +471,21 @@ export default function CompanySettingsComponent() {
                 className={!isEditMode ? "bg-gray-50" : ""}
               />
             </div>
+            
+            <div className="space-y-2">
+              <Label htmlFor="quotation_prefix">Quotation Prefix</Label>
+              <Input
+                id="quotation_prefix"
+                value={settings.quotation_number_prefix}
+                onChange={(e) => handleInputChange('quotation_number_prefix', e.target.value)}
+                placeholder="QUO"
+                readOnly={!isEditMode}
+                className={!isEditMode ? "bg-gray-50" : ""}
+              />
+            </div>
           </div>
 
-          <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+          <div className="grid grid-cols-2 md:grid-cols-5 gap-4">
             <div className="space-y-2">
               <Label htmlFor="next_po">Next PO Number</Label>
               <Input
@@ -519,6 +533,19 @@ export default function CompanySettingsComponent() {
                 min="1"
                 value={settings.next_grn_number}
                 onChange={(e) => handleInputChange('next_grn_number', parseInt(e.target.value) || 1)}
+                readOnly={!isEditMode}
+                className={!isEditMode ? "bg-gray-50" : ""}
+              />
+            </div>
+            
+            <div className="space-y-2">
+              <Label htmlFor="next_quotation">Next Quotation Number</Label>
+              <Input
+                id="next_quotation"
+                type="number"
+                min="1"
+                value={settings.next_quotation_number}
+                onChange={(e) => handleInputChange('next_quotation_number', parseInt(e.target.value) || 1)}
                 readOnly={!isEditMode}
                 className={!isEditMode ? "bg-gray-50" : ""}
               />
