@@ -275,13 +275,9 @@ export default function Layout({ children, currentPageName }) {
               </Button>
               
               <img 
-                src="/flow-logo.jpeg" 
+                src="/flow-logo-new.png" 
                 alt="FLOW Logo" 
                 className="h-8 sm:h-10 w-auto object-contain"
-                style={{
-                  filter: 'drop-shadow(0 1px 2px rgba(0, 0, 0, 0.1))',
-                  backgroundColor: 'transparent'
-                }}
               />
             </div>
 
