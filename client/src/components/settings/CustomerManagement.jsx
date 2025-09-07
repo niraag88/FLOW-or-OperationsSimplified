@@ -25,11 +25,11 @@ export default function CustomerManagement() {
   const [customerToDelete, setCustomerToDelete] = useState(null); // Added state
 
   const [formData, setFormData] = useState({
-    customer_name: "",
-    contact_name: "",
-    address: "",
-    type: "Local",
-    trn_number: "",
+    name: "",
+    contactPerson: "",
+    billingAddress: "",
+    vatTreatment: "Local",
+    vatNumber: "",
     isActive: true
   });
 
@@ -40,7 +40,7 @@ export default function CustomerManagement() {
   const loadCustomers = async () => {
     setLoading(true);
     try {
-      const customersData = await Customer.list('customer_name');
+      const customersData = await Customer.list('name');
       setCustomers(customersData);
     } catch (error) {
       console.error("Error loading customers:", error);
@@ -51,11 +51,11 @@ export default function CustomerManagement() {
 
   const resetForm = () => {
     setFormData({
-      customer_name: "",
-      contact_name: "",
-      address: "",
-      type: "Local",
-      trn_number: "",
+      name: "",
+      contactPerson: "",
+      billingAddress: "",
+      vatTreatment: "Local",
+      vatNumber: "",
       isActive: true
     });
     setEditingCustomer(null);
@@ -69,9 +69,9 @@ export default function CustomerManagement() {
     try {
       const customerData = { ...formData };
       
-      // Clear TRN if customer is International
-      if (customerData.type === "International") {
-        customerData.trn_number = "";
+      // Clear VAT Number if customer is International
+      if (customerData.vatTreatment === "International") {
+        customerData.vatNumber = "";
       }
 
       if (editingCustomer) {
@@ -83,7 +83,7 @@ export default function CustomerManagement() {
         });
       } else {
         const newCustomer = await Customer.create(customerData);
-        await logAuditAction("Customer", newCustomer.id, "create", "admin@example.com", { customer_name: customerData.customer_name });
+        await logAuditAction("Customer", newCustomer.id, "create", "admin@example.com", { name: customerData.name });
         toast({
           title: "Success",
           description: "Customer created successfully.",
@@ -122,7 +122,7 @@ export default function CustomerManagement() {
 
     try {
       await Customer.delete(customerToDelete.id);
-      await logAuditAction("Customer", customerToDelete.id, "delete", "admin@example.com", { customer_name: customerToDelete.customer_name });
+      await logAuditAction("Customer", customerToDelete.id, "delete", "admin@example.com", { name: customerToDelete.name });
       toast({
         title: "Success",
         description: "Customer deleted successfully.",
@@ -176,36 +176,36 @@ export default function CustomerManagement() {
             <form onSubmit={handleSubmit} className="space-y-4">
               <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                 <div className="space-y-2">
-                  <Label htmlFor="customer_name">Customer Name *</Label>
+                  <Label htmlFor="name">Customer Name *</Label>
                   <Input
-                    id="customer_name"
-                    value={formData.customer_name}
-                    onChange={(e) => setFormData(prev => ({ ...prev, customer_name: e.target.value.slice(0, 50) }))}
+                    id="name"
+                    value={formData.name}
+                    onChange={(e) => setFormData(prev => ({ ...prev, name: e.target.value.slice(0, 50) }))}
                     maxLength={50}
                     required
                   />
-                  <p className="text-xs text-gray-500">{formData.customer_name.length}/50 characters</p>
+                  <p className="text-xs text-gray-500">{formData.name.length}/50 characters</p>
                 </div>
                 
                 <div className="space-y-2">
-                  <Label htmlFor="contact_name">Contact Name *</Label>
+                  <Label htmlFor="contactPerson">Contact Name *</Label>
                   <Input
-                    id="contact_name"
-                    value={formData.contact_name}
-                    onChange={(e) => setFormData(prev => ({ ...prev, contact_name: e.target.value.slice(0, 20) }))}
+                    id="contactPerson"
+                    value={formData.contactPerson}
+                    onChange={(e) => setFormData(prev => ({ ...prev, contactPerson: e.target.value.slice(0, 20) }))}
                     maxLength={20}
                     required
                   />
-                  <p className="text-xs text-gray-500">{formData.contact_name.length}/20 characters</p>
+                  <p className="text-xs text-gray-500">{formData.contactPerson.length}/20 characters</p>
                 </div>
               </div>
 
               <div className="space-y-2">
-                <Label htmlFor="address">Address</Label>
+                <Label htmlFor="billingAddress">Address</Label>
                 <Textarea
-                  id="address"
-                  value={formData.address}
-                  onChange={(e) => setFormData(prev => ({ ...prev, address: e.target.value }))}
+                  id="billingAddress"
+                  value={formData.billingAddress}
+                  onChange={(e) => setFormData(prev => ({ ...prev, billingAddress: e.target.value }))}
                   placeholder="Optional - will appear in invoice outputs if provided"
                   rows={3}
                 />
@@ -215,8 +215,8 @@ export default function CustomerManagement() {
                 <div className="space-y-2">
                   <Label htmlFor="type">Customer Type *</Label>
                   <Select 
-                    value={formData.type} 
-                    onValueChange={(value) => setFormData(prev => ({ ...prev, type: value, trn_number: value === "International" ? "" : prev.trn_number }))}
+                    value={formData.vatTreatment} 
+                    onValueChange={(value) => setFormData(prev => ({ ...prev, vatTreatment: value, vatNumber: value === "International" ? "" : prev.vatNumber }))}
                   >
                     <SelectTrigger>
                       <SelectValue />
@@ -228,13 +228,13 @@ export default function CustomerManagement() {
                   </Select>
                 </div>
 
-                {formData.type === "Local" && (
+                {formData.vatTreatment === "Local" && (
                   <div className="space-y-2">
-                    <Label htmlFor="trn_number">TRN Number</Label>
+                    <Label htmlFor="vatNumber">TRN Number</Label>
                     <Input
-                      id="trn_number"
-                      value={formData.trn_number}
-                      onChange={(e) => setFormData(prev => ({ ...prev, trn_number: e.target.value }))}
+                      id="vatNumber"
+                      value={formData.vatNumber}
+                      onChange={(e) => setFormData(prev => ({ ...prev, vatNumber: e.target.value }))}
                       placeholder="Tax Registration Number"
                     />
                   </div>
@@ -286,14 +286,14 @@ export default function CustomerManagement() {
               <TableBody>
                 {customers.map((customer) => (
                   <TableRow key={customer.id}>
-                    <TableCell className="font-medium">{customer.customer_name}</TableCell>
-                    <TableCell>{customer.contact_name}</TableCell>
+                    <TableCell className="font-medium">{customer.name}</TableCell>
+                    <TableCell>{customer.contactPerson}</TableCell>
                     <TableCell>
-                      <Badge variant={customer.type === 'Local' ? 'default' : 'secondary'}>
-                        {customer.type}
+                      <Badge variant={customer.vatTreatment === 'Local' ? 'default' : 'secondary'}>
+                        {customer.vatTreatment}
                       </Badge>
                     </TableCell>
-                    <TableCell>{customer.trn_number || '-'}</TableCell>
+                    <TableCell>{customer.vatNumber || '-'}</TableCell>
                     <TableCell>
                       <div className="flex items-center gap-2">
                         <Switch
@@ -341,7 +341,7 @@ export default function CustomerManagement() {
         onClose={() => setDialogOpen(false)}
         onConfirm={handleDeleteConfirm}
         title="Confirm Deletion"
-        description={`Do you wish to confirm deleting customer "${customerToDelete?.customer_name}"?`}
+        description={`Do you wish to confirm deleting customer "${customerToDelete?.name}"?`}
         confirmText="Yes, Delete"
         confirmVariant="destructive"
       />
