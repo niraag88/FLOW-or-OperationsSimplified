@@ -275,25 +275,11 @@ export default function Layout({ children, currentPageName }) {
               </Button>
               
               <div className="flex items-center gap-2 sm:gap-3 min-w-0">
-                <div className="w-6 h-6 sm:w-8 sm:h-8 flex items-center justify-center flex-shrink-0">
-                  <img 
-                    src="/flow-logo-original.jpeg" 
-                    alt="FLOW Logo" 
-                    className="w-full h-full object-contain"
-                    style={{
-                      filter: 'brightness(0) invert(1)',
-                      backgroundColor: 'transparent'
-                    }}
-                    onError={(e) => {
-                      // Fallback to F if image fails to load
-                      e.target.style.display = 'none';
-                      e.target.nextSibling.style.display = 'flex';
-                    }}
-                  />
-                  <div className="w-6 h-6 sm:w-8 sm:h-8 bg-gradient-to-br from-blue-500 to-purple-600 rounded-lg flex items-center justify-center flex-shrink-0 shadow-md" style={{display: 'none'}}>
-                    <span className="text-white font-bold text-xs sm:text-sm">F</span>
-                  </div>
-                </div>
+                <img 
+                  src="/flow-logo.jpeg" 
+                  alt="FLOW Logo" 
+                  className="w-6 h-6 sm:w-8 sm:h-8 object-contain rounded"
+                />
                 <div className="hidden sm:block min-w-0">
                   <h1 className="text-lg sm:text-xl font-bold text-white tracking-tight truncate">FLOW</h1>
                   <p className="text-xs text-gray-400 truncate">Business Platform</p>
