@@ -12,6 +12,8 @@ import InvoiceFilters from "../components/invoices/InvoiceFilters";
 import CreateFromExistingDialog from "../components/invoices/CreateFromExistingDialog";
 import { getDerivedInvoiceStatus } from "../components/invoices/invoiceUtils";
 import ExportDropdown from "../components/common/ExportDropdown";
+import InvoiceTemplate from "../components/print/InvoiceTemplate";
+import { createRoot } from 'react-dom/client';
 
 export default function Invoices() {
   const [invoices, setInvoices] = useState([]);
@@ -184,6 +186,68 @@ export default function Invoices() {
     setCurrentPage(1);
   };
 
+  const handleExternalDocumentView = async (invoice) => {
+    try {
+      // Load customer data if needed
+      const customerData = invoice.customer_name ? 
+        { customer_name: invoice.customer_name } : 
+        null;
+      
+      // Mock company settings - in real app this would come from settings API
+      const companySettings = {
+        company_name: "Your Company Name",
+        company_address: "123 Business Street, Business City",
+        company_phone: "+1 234 567 8900",
+        company_email: "info@yourcompany.com",
+        company_trn: "TRN123456789"
+      };
+
+      const printWindow = window.open('', '_blank');
+      if (!printWindow) {
+        alert('Please allow popups to view the external document');
+        return;
+      }
+
+      // Create the document structure
+      printWindow.document.write(`
+        <!DOCTYPE html>
+        <html>
+        <head>
+          <title>Invoice ${invoice.invoice_number}</title>
+          <script src="https://unpkg.com/react@18/umd/react.development.js"></script>
+          <script src="https://unpkg.com/react-dom@18/umd/react-dom.development.js"></script>
+          <script src="https://cdn.tailwindcss.com"></script>
+          <style>
+            body { margin: 0; padding: 0; }
+          </style>
+        </head>
+        <body>
+          <div id="invoice-root"></div>
+        </body>
+        </html>
+      `);
+      printWindow.document.close();
+
+      // Wait for the window to load
+      printWindow.onload = () => {
+        const root = printWindow.document.getElementById('invoice-root');
+        const reactRoot = createRoot(root);
+        
+        reactRoot.render(
+          React.createElement(InvoiceTemplate, {
+            data: invoice,
+            customer: customerData,
+            settings: companySettings
+          })
+        );
+      };
+
+    } catch (error) {
+      console.error('Error opening external document:', error);
+      alert('Error opening external document. Please try again.');
+    }
+  };
+
   // Calculate totals - since all invoices are in AED, simpler calculation
   const totals = filteredInvoices.reduce((acc, invoice) => {
     acc.total += invoice.total_amount || 0;
@@ -219,6 +283,8 @@ export default function Invoices() {
               currency: 'Currency'
             }}
             isLoading={loading}
+            showExternalDocument={true}
+            onExternalDocumentClick={handleExternalDocumentView}
           />
           
           {canEdit && (
