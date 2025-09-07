@@ -317,59 +317,47 @@ export class BusinessStorage {
 
   // Generate sequential numbers
   async generatePoNumber() {
-    const result = await db.select({ poNumber: purchaseOrders.poNumber })
-      .from(purchaseOrders)
-      .orderBy(desc(purchaseOrders.id))
-      .limit(1);
+    // Get settings for configurable numbering
+    const settings = await this.getCompanySettings();
+    const prefix = settings?.po_number_prefix || 'PO';
+    const nextNumber = settings?.next_po_number || 1;
     
-    if (result.length === 0) {
-      const currentYear = new Date().getFullYear();
-      return `PO-${currentYear}-001`;
+    // Simple format: PREFIX-NUMBER (e.g., PO-1, PO-2025-001)
+    const formattedNumber = prefix.includes('-') 
+      ? `${prefix}-${String(nextNumber).padStart(3, '0')}`  // PO-2025-001 style
+      : `${prefix}-${nextNumber}`;  // PO-1 style
+    
+    // Update next number in settings
+    if (settings) {
+      await this.updateCompanySettings({
+        ...settings,
+        next_po_number: nextNumber + 1
+      });
     }
     
-    const lastNumber = result[0].poNumber;
-    const match = lastNumber.match(/PO-(\d{4})-(\d{3})/);
-    if (match) {
-      const year = new Date().getFullYear();
-      const currentYear = parseInt(match[1]);
-      const currentNum = parseInt(match[2]);
-      
-      if (year === currentYear) {
-        return `PO-${year}-${String(currentNum + 1).padStart(3, '0')}`;
-      } else {
-        return `PO-${year}-001`;
-      }
-    }
-    const currentYear = new Date().getFullYear();
-    return `PO-${currentYear}-001`;
+    return formattedNumber;
   }
 
   async generateQuotationNumber() {
-    const result = await db.select({ quoteNumber: quotations.quoteNumber })
-      .from(quotations)
-      .orderBy(desc(quotations.id))
-      .limit(1);
+    // Get settings for configurable numbering
+    const settings = await this.getCompanySettings();
+    const prefix = settings?.quotation_number_prefix || 'QUO';
+    const nextNumber = settings?.next_quotation_number || 1;
     
-    if (result.length === 0) {
-      const currentYear = new Date().getFullYear();
-      return `QUO-${currentYear}-001`;
+    // Simple format: PREFIX-NUMBER (e.g., QUO-1, PO-2025-001)
+    const formattedNumber = prefix.includes('-') 
+      ? `${prefix}-${String(nextNumber).padStart(3, '0')}`  // PO-2025-001 style
+      : `${prefix}-${nextNumber}`;  // PO-1 style
+    
+    // Update next number in settings
+    if (settings) {
+      await this.updateCompanySettings({
+        ...settings,
+        next_quotation_number: nextNumber + 1
+      });
     }
     
-    const lastNumber = result[0].quoteNumber;
-    const match = lastNumber.match(/QUO-(\d{4})-(\d{3})/);
-    if (match) {
-      const year = new Date().getFullYear();
-      const currentYear = parseInt(match[1]);
-      const currentNum = parseInt(match[2]);
-      
-      if (year === currentYear) {
-        return `QUO-${year}-${String(currentNum + 1).padStart(3, '0')}`;
-      } else {
-        return `QUO-${year}-001`;
-      }
-    }
-    const currentYear = new Date().getFullYear();
-    return `QUO-${currentYear}-001`;
+    return formattedNumber;
   }
 
   // Stock Count operations
