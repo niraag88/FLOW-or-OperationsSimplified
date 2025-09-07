@@ -274,17 +274,15 @@ export default function Layout({ children, currentPageName }) {
                 {mobileMenuOpen ? <X className="w-5 h-5" /> : <Menu className="w-5 h-5" />}
               </Button>
               
-              <div className="flex items-center gap-2 sm:gap-3 min-w-0">
-                <img 
-                  src="/flow-logo.jpeg" 
-                  alt="FLOW Logo" 
-                  className="w-6 h-6 sm:w-8 sm:h-8 object-contain rounded"
-                />
-                <div className="hidden sm:block min-w-0">
-                  <h1 className="text-lg sm:text-xl font-bold text-white tracking-tight truncate">FLOW</h1>
-                  <p className="text-xs text-gray-400 truncate">Business Platform</p>
-                </div>
-              </div>
+              <img 
+                src="/flow-logo.jpeg" 
+                alt="FLOW Logo" 
+                className="h-8 sm:h-10 w-auto object-contain"
+                style={{
+                  filter: 'drop-shadow(0 1px 2px rgba(0, 0, 0, 0.1))',
+                  backgroundColor: 'transparent'
+                }}
+              />
             </div>
 
             {/* Desktop Navigation */}
