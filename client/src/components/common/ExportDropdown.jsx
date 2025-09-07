@@ -9,6 +9,8 @@ import {
 import { Button } from "@/components/ui/button";
 import { Download, Eye } from "lucide-react";
 import { exportToCsv, exportToXLSX, exportToPDF } from "../utils/export";
+import { createRoot } from 'react-dom/client';
+import QuotationTemplate from '../print/QuotationTemplate';
 import { format } from 'date-fns';
 
 export default function ExportDropdown({ 
@@ -16,7 +18,9 @@ export default function ExportDropdown({
   type = "Data", 
   filename = "export",
   columns = {},
-  isLoading = false
+  isLoading = false,
+  showExternalDocument = false,
+  onExternalDocumentClick = null
 }) {
   const [isExporting, setIsExporting] = useState(false);
 
@@ -36,6 +40,12 @@ export default function ExportDropdown({
       });
       return exportItem;
     });
+  };
+
+  const handleViewExternalDocument = async (item) => {
+    if (onExternalDocumentClick) {
+      onExternalDocumentClick(item);
+    }
   };
 
   const handleExport = async (format = 'xlsx') => {
@@ -157,7 +167,7 @@ export default function ExportDropdown({
           disabled={disabled}
         >
           <Eye className="w-4 h-4 mr-2" />
-          View & Print
+          View & Print (Internal)
         </DropdownMenuItem>
         
         <DropdownMenuItem 
@@ -167,6 +177,19 @@ export default function ExportDropdown({
           <Download className="w-4 h-4 mr-2" />
           Export to XLSX
         </DropdownMenuItem>
+
+        {showExternalDocument && (
+          <>
+            <DropdownMenuSeparator />
+            <DropdownMenuItem 
+              onClick={() => handleViewExternalDocument(data[0])}
+              disabled={disabled || data.length === 0}
+            >
+              <Eye className="w-4 h-4 mr-2" />
+              View & Print (External)
+            </DropdownMenuItem>
+          </>
+        )}
         
         <DropdownMenuSeparator />
         
