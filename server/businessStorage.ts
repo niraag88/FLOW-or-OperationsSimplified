@@ -319,8 +319,8 @@ export class BusinessStorage {
   async generatePoNumber() {
     // Get settings for configurable numbering
     const settings = await this.getCompanySettings();
-    const prefix = settings?.poNumberPrefix || 'PO';
-    const nextNumber = settings?.nextPoNumber || 1;
+    const prefix = settings?.po_number_prefix || 'PO';
+    const nextNumber = settings?.next_po_number || 1;
     
     // Simple format: PREFIX-NUMBER (e.g., PO-1, PO-2025-001)
     const formattedNumber = prefix.includes('-') 
@@ -331,7 +331,7 @@ export class BusinessStorage {
     if (settings) {
       await this.updateCompanySettings({
         ...settings,
-        nextPoNumber: nextNumber + 1
+        next_po_number: nextNumber + 1
       });
     }
     
@@ -341,8 +341,8 @@ export class BusinessStorage {
   async generateQuotationNumber() {
     // Get settings for configurable numbering
     const settings = await this.getCompanySettings();
-    const prefix = settings?.quotationNumberPrefix || 'QUO';
-    const nextNumber = settings?.nextQuotationNumber || 1;
+    const prefix = settings?.quotation_number_prefix || 'QUO';
+    const nextNumber = settings?.next_quotation_number || 1;
     
     // Simple format: PREFIX-NUMBER (e.g., QUO-1, PO-2025-001)
     const formattedNumber = prefix.includes('-') 
@@ -353,7 +353,7 @@ export class BusinessStorage {
     if (settings) {
       await this.updateCompanySettings({
         ...settings,
-        nextQuotationNumber: nextNumber + 1
+        next_quotation_number: nextNumber + 1
       });
     }
     
