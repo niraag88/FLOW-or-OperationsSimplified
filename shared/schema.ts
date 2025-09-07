@@ -326,6 +326,17 @@ export const companySettings = pgTable("company_settings", {
   defaultVatRate: decimal("default_vat_rate", { precision: 5, scale: 2 }).default("0.00"),
   lowStockThreshold: integer("low_stock_threshold").default(6),
   fxGbpToAed: decimal("fx_gbp_to_aed", { precision: 8, scale: 4 }).default("4.8500"),
+  // Document numbering fields
+  poNumberPrefix: text("po_number_prefix").default("PO"),
+  doNumberPrefix: text("do_number_prefix").default("DO"), 
+  invoiceNumberPrefix: text("invoice_number_prefix").default("INV"),
+  grnNumberPrefix: text("grn_number_prefix").default("GRN"),
+  quotationNumberPrefix: text("quotation_number_prefix").default("QUO"),
+  nextPoNumber: integer("next_po_number").default(1),
+  nextDoNumber: integer("next_do_number").default(1),
+  nextInvoiceNumber: integer("next_invoice_number").default(1),
+  nextGrnNumber: integer("next_grn_number").default(1),
+  nextQuotationNumber: integer("next_quotation_number").default(1),
   updatedBy: varchar("updated_by").references(() => users.id),
   updatedAt: timestamp("updated_at").defaultNow().notNull(),
 });
