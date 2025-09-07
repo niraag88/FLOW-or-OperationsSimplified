@@ -263,7 +263,7 @@ export default function Layout({ children, currentPageName }) {
     <div className="min-h-screen bg-gray-50">
       <header className="bg-slate-900 shadow-xl border-b border-slate-800">
         <div className="px-3 sm:px-4 lg:px-8">
-          <div className="flex items-center justify-between h-16">
+          <div className="flex items-center justify-between h-20 sm:h-24">
             <div className="flex items-center gap-2 sm:gap-4 min-w-0">
               <Button
                 variant="ghost"
