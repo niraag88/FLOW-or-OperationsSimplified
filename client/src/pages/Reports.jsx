@@ -20,7 +20,6 @@ import { Books } from "@/api/entities";
 import { CompanySettings } from "@/api/entities";
 
 // Import Report Components
-import StockOnHandReport from "../components/reports/StockOnHandReport";
 import PoGrnReport from "../components/reports/PoGrnReport";
 import SalesAgedInvoicesReport from "../components/reports/SalesAgedInvoicesReport";
 import PurchasesReport from "../components/reports/PurchasesReport";
@@ -116,12 +115,8 @@ export default function Reports() {
         </div>
       </div>
 
-      <Tabs defaultValue="stock_on_hand" className="w-full">
-        <TabsList className="grid w-full max-w-3xl grid-cols-5">
-          <TabsTrigger value="stock_on_hand">
-            <Package className="w-4 h-4 mr-2" />
-            Stock Report
-          </TabsTrigger>
+      <Tabs defaultValue="po_vs_grn" className="w-full">
+        <TabsList className="grid w-full max-w-3xl grid-cols-4">
           <TabsTrigger value="po_vs_grn">
             <ShoppingCart className="w-4 h-4 mr-2" />
             PO vs GRN
@@ -139,13 +134,6 @@ export default function Reports() {
             VAT Report
           </TabsTrigger>
         </TabsList>
-        <TabsContent value="stock_on_hand" className="mt-6">
-          <StockOnHandReport 
-            products={data.products} 
-            lots={data.lots}
-            canExport={!!currentUser} 
-          />
-        </TabsContent>
         <TabsContent value="po_vs_grn" className="mt-6">
           <PoGrnReport
             purchaseOrders={data.purchaseOrders}
