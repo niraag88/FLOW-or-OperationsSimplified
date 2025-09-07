@@ -592,22 +592,30 @@ export default function PoGrnReport({ purchaseOrders, goodsReceipts, canExport }
               <TableHeader>
                 <TableRow>
                   <TableHead>GRN Number</TableHead>
+                  <TableHead>Brand</TableHead>
                   <TableHead>Receipt Date</TableHead>
-                  <TableHead>Brand/Supplier</TableHead>
                   <TableHead>PO Reference</TableHead>
-                  <TableHead>Received By</TableHead>
+                  <TableHead>Status</TableHead>
                 </TableRow>
               </TableHeader>
               <TableBody>
                 {paginatedGRNs.map((po) => (
                   <TableRow key={po.id}>
                     <TableCell className="font-medium">GRN-{po.poNumber || po.po_number}</TableCell>
-                    <TableCell>{formatDate(po.orderDate || po.order_date)}</TableCell>
                     <TableCell>{getBrandName(po.supplierId || po.supplier_id)}</TableCell>
+                    <TableCell>{formatDate(po.orderDate || po.order_date)}</TableCell>
                     <TableCell>
                       <Badge variant="outline">{po.poNumber || po.po_number}</Badge>
                     </TableCell>
-                    <TableCell>{po.status === 'submitted' ? 'Pending Receipt' : 'Completed'}</TableCell>
+                    <TableCell>
+                      <Badge variant="outline" className={
+                        po.status === 'closed' ? 'border-green-300 text-green-800 bg-green-50' :
+                        po.status === 'submitted' ? 'border-blue-300 text-blue-800 bg-blue-50' :
+                        'border-gray-300 text-gray-800 bg-gray-50'
+                      }>
+                        {po.status === 'submitted' ? 'SUBMITTED' : po.status?.toUpperCase()}
+                      </Badge>
+                    </TableCell>
                   </TableRow>
                 ))}
               </TableBody>
