@@ -89,12 +89,34 @@ export default function QuotationForm({ open, onClose, editingQuotation, current
           items: editingQuotation.items || []
         });
       } else {
-        const timestamp = Date.now().toString().slice(-6);
-        setFormData(prev => ({ 
-          ...prev, 
-          quotation_number: `QUO-${timestamp}`,
-          quotation_date: new Date().toISOString().split('T')[0]
-        }));
+        // Fetch next quotation number from API
+        try {
+          const response = await fetch('/api/quotations/next-number');
+          if (response.ok) {
+            const { nextNumber } = await response.json();
+            setFormData(prev => ({ 
+              ...prev, 
+              quotation_number: nextNumber,
+              quotation_date: new Date().toISOString().split('T')[0]
+            }));
+          } else {
+            console.error('Failed to fetch next quotation number');
+            // Fallback to manual number
+            setFormData(prev => ({ 
+              ...prev, 
+              quotation_number: '',
+              quotation_date: new Date().toISOString().split('T')[0]
+            }));
+          }
+        } catch (error) {
+          console.error('Error fetching next quotation number:', error);
+          // Fallback to manual number
+          setFormData(prev => ({ 
+            ...prev, 
+            quotation_number: '',
+            quotation_date: new Date().toISOString().split('T')[0]
+          }));
+        }
       }
     } catch (error) {
       console.error("Error loading data:", error);
