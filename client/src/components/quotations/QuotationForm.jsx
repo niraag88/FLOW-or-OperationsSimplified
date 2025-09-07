@@ -123,7 +123,7 @@ export default function QuotationForm({ open, onClose, editingQuotation, current
         let taxTreatment = "StandardRated";
         let taxRate = 0.05;
         
-        if (customer && customer.type === "International") {
+        if (customer && customer.vatTreatment === "International") {
           taxTreatment = "ZeroRated";
           taxRate = 0;
         }
@@ -332,7 +332,7 @@ export default function QuotationForm({ open, onClose, editingQuotation, current
                 <SelectContent>
                   {customers.map(c => (
                     <SelectItem key={c.id} value={c.id}>
-                      {c.customer_name} ({c.type})
+                      {c.name} ({c.vatTreatment})
                     </SelectItem>
                   ))}
                 </SelectContent>
