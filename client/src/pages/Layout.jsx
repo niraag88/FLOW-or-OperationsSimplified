@@ -275,8 +275,8 @@ export default function Layout({ children, currentPageName }) {
               </Button>
               
               <div className="flex items-center gap-2 sm:gap-3 min-w-0">
-                <div className="w-6 h-6 sm:w-8 sm:h-8 bg-gradient-to-r from-emerald-500 to-emerald-600 rounded-lg flex items-center justify-center flex-shrink-0">
-                  <LayoutDashboard className="w-3 h-3 sm:w-5 sm:h-5 text-white" />
+                <div className="w-6 h-6 sm:w-8 sm:h-8 bg-gradient-to-br from-blue-500 to-purple-600 rounded-lg flex items-center justify-center flex-shrink-0 shadow-md">
+                  <span className="text-white font-bold text-xs sm:text-sm">F</span>
                 </div>
                 <div className="hidden sm:block min-w-0">
                   <h1 className="text-lg sm:text-xl font-bold text-white tracking-tight truncate">FLOW</h1>

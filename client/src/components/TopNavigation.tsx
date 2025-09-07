@@ -13,15 +13,9 @@ export function TopNavigation() {
           {/* Logo */}
           <div className="flex items-center space-x-4">
             <div className="flex items-center space-x-2">
-              <img 
-                src="/flow-logo.jpeg" 
-                alt="FLOW Logo" 
-                className="w-8 h-8 object-contain bg-transparent"
-                style={{
-                  filter: 'brightness(0) invert(1)',
-                  mixBlendMode: 'normal'
-                }}
-              />
+              <div className="w-8 h-8 bg-gradient-to-br from-blue-500 to-purple-600 rounded-lg flex items-center justify-center shadow-md">
+                <span className="text-white font-bold text-sm">F</span>
+              </div>
               <div className="text-white">
                 <span className="font-semibold text-lg">FLOW</span>
               </div>
