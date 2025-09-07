@@ -14,7 +14,7 @@ export function TopNavigation() {
           <div className="flex items-center space-x-4">
             <div className="flex items-center space-x-2">
               <img 
-                src="/attached_assets/flow-logo.jpeg" 
+                src="/flow-logo.jpeg" 
                 alt="FLOW Logo" 
                 className="w-8 h-8 object-contain bg-transparent"
                 style={{
