@@ -344,7 +344,7 @@ export class BusinessStorage {
     return `PO-${currentYear}-001`;
   }
 
-  async generateQuoteNumber() {
+  async generateQuotationNumber() {
     const result = await db.select({ quoteNumber: quotations.quoteNumber })
       .from(quotations)
       .orderBy(desc(quotations.id))
@@ -352,24 +352,24 @@ export class BusinessStorage {
     
     if (result.length === 0) {
       const currentYear = new Date().getFullYear();
-      return `QT-${currentYear}-001`;
+      return `QUO-${currentYear}-001`;
     }
     
     const lastNumber = result[0].quoteNumber;
-    const match = lastNumber.match(/QT-(\d{4})-(\d{3})/);
+    const match = lastNumber.match(/QUO-(\d{4})-(\d{3})/);
     if (match) {
       const year = new Date().getFullYear();
       const currentYear = parseInt(match[1]);
       const currentNum = parseInt(match[2]);
       
       if (year === currentYear) {
-        return `QT-${year}-${String(currentNum + 1).padStart(3, '0')}`;
+        return `QUO-${year}-${String(currentNum + 1).padStart(3, '0')}`;
       } else {
-        return `QT-${year}-001`;
+        return `QUO-${year}-001`;
       }
     }
     const currentYear = new Date().getFullYear();
-    return `QT-${currentYear}-001`;
+    return `QUO-${currentYear}-001`;
   }
 
   // Stock Count operations
