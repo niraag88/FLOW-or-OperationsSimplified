@@ -112,7 +112,7 @@ export default function ExportDropdown({
           </head>
           <body>
             <div class="print-header">
-              <h1>Business Operations</h1>
+              <h1>FLOW</h1>
               <h2>${type}</h2>
             </div>
             

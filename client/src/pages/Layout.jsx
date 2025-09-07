@@ -248,7 +248,7 @@ export default function Layout({ children, currentPageName }) {
         }
       }
     }
-    return currentPageName || "Ops Suite";
+    return currentPageName || "FLOW";
   };
 
   const handleLogout = async () => {
@@ -279,8 +279,8 @@ export default function Layout({ children, currentPageName }) {
                   <LayoutDashboard className="w-3 h-3 sm:w-5 sm:h-5 text-white" />
                 </div>
                 <div className="hidden sm:block min-w-0">
-                  <h1 className="text-lg sm:text-xl font-bold text-white tracking-tight truncate">Ops Suite</h1>
-                  <p className="text-xs text-gray-400 truncate">Business Operations</p>
+                  <h1 className="text-lg sm:text-xl font-bold text-white tracking-tight truncate">FLOW</h1>
+                  <p className="text-xs text-gray-400 truncate">Business Platform</p>
                 </div>
               </div>
             </div>

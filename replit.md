@@ -1,6 +1,6 @@
 # Overview
 
-This is a full-stack web application built with a React frontend and Express.js backend, designed as a business operations dashboard. The application features a modern UI built with shadcn/ui components and Tailwind CSS, with PostgreSQL database integration using Drizzle ORM. The project appears to be migrated from a Base44 platform export and includes both demo mode capabilities and real backend functionality.
+This is a full-stack web application built with a React frontend and Express.js backend, designed as FLOW - a business operations platform. The application features a modern UI built with shadcn/ui components and Tailwind CSS, with PostgreSQL database integration using Drizzle ORM. The project appears to be migrated from a Base44 platform export and includes both demo mode capabilities and real backend functionality.
 
 # User Preferences
 

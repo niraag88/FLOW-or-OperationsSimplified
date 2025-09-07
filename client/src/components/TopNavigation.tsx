@@ -13,12 +13,17 @@ export function TopNavigation() {
           {/* Logo */}
           <div className="flex items-center space-x-4">
             <div className="flex items-center space-x-2">
-              <div className="w-8 h-8 bg-green-500 rounded-lg flex items-center justify-center">
-                <span className="text-white font-bold text-sm">OB</span>
-              </div>
+              <img 
+                src="/attached_assets/flow-logo.jpeg" 
+                alt="FLOW Logo" 
+                className="w-8 h-8 object-contain bg-transparent"
+                style={{
+                  filter: 'brightness(0) invert(1)',
+                  mixBlendMode: 'normal'
+                }}
+              />
               <div className="text-white">
-                <span className="font-semibold">Ops</span>
-                <span className="text-slate-300 text-sm ml-1">Business</span>
+                <span className="font-semibold text-lg">FLOW</span>
               </div>
             </div>
           </div>
