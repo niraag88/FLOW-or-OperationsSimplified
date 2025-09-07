@@ -22,6 +22,8 @@ export default function PoGrnReport({ purchaseOrders, goodsReceipts, canExport }
   const [dateRangeOpen, setDateRangeOpen] = useState(false);
   const [customStartDate, setCustomStartDate] = useState(null);
   const [customEndDate, setCustomEndDate] = useState(null);
+  const [currentPage, setCurrentPage] = useState(1);
+  const [itemsPerPage, setItemsPerPage] = useState(20);
 
   useEffect(() => {
     loadBrands();
@@ -41,6 +43,24 @@ export default function PoGrnReport({ purchaseOrders, goodsReceipts, canExport }
     return brand?.name || 'Unknown Brand';
   };
 
+  // Currency formatting - matching POList exactly
+  const formatCurrency = (amount, currency) => {
+    const formatter = new Intl.NumberFormat('en-US', {
+      style: 'decimal',
+      minimumFractionDigits: 2,
+      maximumFractionDigits: 2
+    });
+    const numericAmount = parseFloat(amount) || 0;
+    return `${currency} ${formatter.format(numericAmount)}`;
+  };
+
+  // Calculate AED equivalent - matching POList exactly
+  const calculateAEDAmount = (gbpAmount) => {
+    const exchangeRate = 5.00; // Same as POList
+    const numericAmount = parseFloat(gbpAmount) || 0;
+    return numericAmount * exchangeRate;
+  };
+
   const formatDate = (dateString) => {
     if (!dateString) return '-';
     try {
@@ -56,6 +76,7 @@ export default function PoGrnReport({ purchaseOrders, goodsReceipts, canExport }
       ...prev,
       [field]: value
     }));
+    resetPagination();
   };
 
   const clearFilters = () => {
@@ -182,25 +203,15 @@ export default function PoGrnReport({ purchaseOrders, goodsReceipts, canExport }
     });
   }, [goodsReceipts, filters]);
 
-  // Calculate totals - fixed currency logic
+  // Calculate totals - using POList logic exactly
   const totals = useMemo(() => {
     const poTotals = filteredPOs.reduce((acc, po) => {
-      // Use grandTotal as the main total field, fallback to totalAmount
-      const amount = Number(po.grandTotal || po.grand_total || po.totalAmount || po.total_amount || 0);
+      // Use totalAmount for GBP (same as POList)
+      const gbpAmount = Number(po.totalAmount || 0);
+      const aedAmount = calculateAEDAmount(gbpAmount);
       
-      // Check if currency is explicitly set to GBP, otherwise assume AED
-      const currency = po.currency || 'AED'; // Default to AED based on the data we see
-      
-      if (currency === 'GBP') {
-        acc.totalGBP += amount;
-        // Convert GBP to AED (using 5.0 as default exchange rate)
-        acc.totalAED += amount * Number(po.fxRateToAed || po.fx_rate_to_aed || 5.0);
-      } else {
-        // Assume AED currency
-        acc.totalAED += amount;
-        // Convert AED to GBP (divide by exchange rate)
-        acc.totalGBP += amount / Number(po.fxRateToAed || po.fx_rate_to_aed || 5.0);
-      }
+      acc.totalGBP += gbpAmount;
+      acc.totalAED += aedAmount;
       return acc;
     }, { totalGBP: 0, totalAED: 0 });
 
@@ -212,22 +223,31 @@ export default function PoGrnReport({ purchaseOrders, goodsReceipts, canExport }
     };
   }, [filteredPOs, filteredGRNs]);
 
-  // Prepare export data - fixed currency logic
+  // Pagination logic
+  const startIndex = (currentPage - 1) * itemsPerPage;
+  const endIndex = startIndex + itemsPerPage;
+  const paginatedPOs = filteredPOs.slice(startIndex, endIndex);
+  const totalPages = Math.ceil(filteredPOs.length / itemsPerPage);
+
+  const resetPagination = () => {
+    setCurrentPage(1);
+  };
+
+  // Prepare export data - using POList logic
   const exportData = [
     // Add PO data
     ...filteredPOs.map(po => {
-      const amount = Number(po.grandTotal || po.grand_total || po.totalAmount || po.total_amount || 0);
-      const currency = po.currency || 'AED';
-      const fxRate = Number(po.fxRateToAed || po.fx_rate_to_aed || 5.0);
+      const gbpAmount = Number(po.totalAmount || 0);
+      const aedAmount = calculateAEDAmount(gbpAmount);
       
       return {
         type: 'Purchase Order',
         document_number: po.poNumber || po.po_number,
         date: formatDate(po.orderDate || po.order_date),
         brand_supplier: getBrandName(po.supplierId || po.supplier_id),
-        currency: currency,
-        total_gbp: currency === 'GBP' ? amount.toFixed(2) : (amount / fxRate).toFixed(2),
-        total_aed: currency === 'AED' ? amount.toFixed(2) : (amount * fxRate).toFixed(2),
+        currency: 'GBP',
+        total_gbp: gbpAmount.toFixed(2),
+        total_aed: aedAmount.toFixed(2),
         status: po.status
       };
     }),
@@ -426,38 +446,16 @@ export default function PoGrnReport({ purchaseOrders, goodsReceipts, canExport }
                 </TableRow>
               </TableHeader>
               <TableBody>
-                {filteredPOs.map((po) => (
+                {paginatedPOs.map((po) => (
                   <TableRow key={po.id}>
                     <TableCell className="font-medium">{po.poNumber || po.po_number}</TableCell>
                     <TableCell>{getBrandName(po.supplierId || po.supplier_id)}</TableCell>
                     <TableCell>{formatDate(po.orderDate || po.order_date)}</TableCell>
                     <TableCell>
-                      {(() => {
-                        const amount = Number(po.grandTotal || po.grand_total || po.totalAmount || po.total_amount || 0);
-                        const currency = po.currency || 'AED';
-                        const fxRate = Number(po.fxRateToAed || po.fx_rate_to_aed || 5.0);
-                        
-                        if (currency === 'GBP') {
-                          return `GBP ${amount.toFixed(2)}`;
-                        } else {
-                          // Convert AED to GBP
-                          return `GBP ${(amount / fxRate).toFixed(2)}`;
-                        }
-                      })()}
+                      {formatCurrency(po.totalAmount || 0, 'GBP')}
                     </TableCell>
                     <TableCell>
-                      {(() => {
-                        const amount = Number(po.grandTotal || po.grand_total || po.totalAmount || po.total_amount || 0);
-                        const currency = po.currency || 'AED';
-                        const fxRate = Number(po.fxRateToAed || po.fx_rate_to_aed || 5.0);
-                        
-                        if (currency === 'AED') {
-                          return `AED ${amount.toFixed(2)}`;
-                        } else {
-                          // Convert GBP to AED
-                          return `AED ${(amount * fxRate).toFixed(2)}`;
-                        }
-                      })()}
+                      {formatCurrency(calculateAEDAmount(po.totalAmount), 'AED')}
                     </TableCell>
                     <TableCell>
                       <Badge variant="outline" className={
@@ -477,6 +475,88 @@ export default function PoGrnReport({ purchaseOrders, goodsReceipts, canExport }
             <div className="text-center py-12 text-gray-500">
               <FileText className="w-12 h-12 mx-auto mb-4 opacity-50" />
               <p>No purchase orders found for the selected filters</p>
+            </div>
+          )}
+
+          {/* Pagination Controls for POs */}
+          {filteredPOs.length > 0 && (
+            <div className="flex items-center justify-between mt-6 pt-4 border-t">
+              <div className="flex items-center gap-2">
+                <span className="text-sm text-gray-700">
+                  Showing {startIndex + 1} to {Math.min(endIndex, filteredPOs.length)} of {filteredPOs.length} purchase orders
+                </span>
+              </div>
+              
+              <div className="flex items-center gap-4">
+                {/* Items per page selector */}
+                <div className="flex items-center gap-2">
+                  <span className="text-sm text-gray-700">Show:</span>
+                  <Select value={itemsPerPage.toString()} onValueChange={(value) => {
+                    setItemsPerPage(Number(value));
+                    setCurrentPage(1);
+                  }}>
+                    <SelectTrigger className="w-20">
+                      <SelectValue />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="20">20</SelectItem>
+                      <SelectItem value="50">50</SelectItem>
+                      <SelectItem value="100">100</SelectItem>
+                      <SelectItem value={filteredPOs.length.toString()}>All</SelectItem>
+                    </SelectContent>
+                  </Select>
+                </div>
+                
+                {/* Page navigation */}
+                {totalPages > 1 && (
+                  <div className="flex items-center gap-2">
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      onClick={() => setCurrentPage(prev => Math.max(1, prev - 1))}
+                      disabled={currentPage === 1}
+                    >
+                      Previous
+                    </Button>
+                    
+                    <div className="flex items-center gap-1">
+                      {Array.from({ length: Math.min(5, totalPages) }, (_, i) => {
+                        let pageNumber;
+                        if (totalPages <= 5) {
+                          pageNumber = i + 1;
+                        } else if (currentPage <= 3) {
+                          pageNumber = i + 1;
+                        } else if (currentPage >= totalPages - 2) {
+                          pageNumber = totalPages - 4 + i;
+                        } else {
+                          pageNumber = currentPage - 2 + i;
+                        }
+                        
+                        return (
+                          <Button
+                            key={pageNumber}
+                            variant={currentPage === pageNumber ? "default" : "outline"}
+                            size="sm"
+                            className="w-8 h-8 p-0"
+                            onClick={() => setCurrentPage(pageNumber)}
+                          >
+                            {pageNumber}
+                          </Button>
+                        );
+                      })}
+                    </div>
+                    
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      onClick={() => setCurrentPage(prev => Math.min(totalPages, prev + 1))}
+                      disabled={currentPage === totalPages}
+                    >
+                      Next
+                    </Button>
+                  </div>
+                )}
+              </div>
             </div>
           )}
         </CardContent>
