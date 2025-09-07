@@ -51,6 +51,20 @@ export default function Quotations() {
     }
   };
 
+  // Extract unique customers from quotations data (avoid separate API call)
+  const uniqueCustomers = React.useMemo(() => {
+    const customerMap = new Map();
+    quotations.forEach(quotation => {
+      if (quotation.customerId && quotation.customerName) {
+        customerMap.set(quotation.customerId, {
+          id: quotation.customerId,
+          customer_name: quotation.customerName
+        });
+      }
+    });
+    return Array.from(customerMap.values());
+  }, [quotations]);
+
   const handleRefresh = () => {
     setRefreshTrigger(prev => prev + 1);
   };
@@ -249,6 +263,7 @@ export default function Quotations() {
           dateRange={dateRange}
           setDateRange={setDateRange}
           resetPagination={resetPagination}
+          customers={uniqueCustomers}
         />
       </div>
 

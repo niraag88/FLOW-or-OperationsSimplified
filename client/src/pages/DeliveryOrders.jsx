@@ -54,6 +54,20 @@ export default function DeliveryOrders() {
     }
   };
 
+  // Extract unique customers from delivery orders data (avoid separate API call)
+  const uniqueCustomers = React.useMemo(() => {
+    const customerMap = new Map();
+    deliveryOrders.forEach(doOrder => {
+      if (doOrder.customer_id && doOrder.customer_name) {
+        customerMap.set(doOrder.customer_id, {
+          id: doOrder.customer_id,
+          customer_name: doOrder.customer_name
+        });
+      }
+    });
+    return Array.from(customerMap.values());
+  }, [deliveryOrders]);
+
   const handleRefresh = () => {
     setRefreshTrigger(prev => prev + 1);
   };
@@ -317,6 +331,7 @@ export default function DeliveryOrders() {
           dateRange={dateRange}
           setDateRange={setDateRange}
           resetPagination={resetPagination}
+          customers={uniqueCustomers}
         />
       </div>
 

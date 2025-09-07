@@ -6,28 +6,13 @@ import { Calendar } from "@/components/ui/calendar";
 import { Filter, X, Calendar as CalendarIcon, ChevronDown } from "lucide-react";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Badge } from "@/components/ui/badge";
-import { Customer } from "@/api/entities";
 import { format } from "date-fns";
 import { cn } from "@/lib/utils";
 
-export default function InvoiceFilters({ selectedStatuses, setSelectedStatuses, selectedCustomers, setSelectedCustomers, selectedCurrencies, setSelectedCurrencies, selectedTaxTreatments, setSelectedTaxTreatments, dateRange, setDateRange, resetPagination }) {
-  const [customers, setCustomers] = useState([]);
+export default function InvoiceFilters({ selectedStatuses, setSelectedStatuses, selectedCustomers, setSelectedCustomers, selectedCurrencies, setSelectedCurrencies, selectedTaxTreatments, setSelectedTaxTreatments, dateRange, setDateRange, resetPagination, customers = [] }) {
   const [dateRangeOpen, setDateRangeOpen] = useState(false);
   const [customStartDate, setCustomStartDate] = useState(null);
   const [customEndDate, setCustomEndDate] = useState(null);
-
-  useEffect(() => {
-    loadCustomers();
-  }, []);
-
-  const loadCustomers = async () => {
-    try {
-      const customersData = await Customer.list();
-      setCustomers(customersData);
-    } catch (error) {
-      console.error("Error loading customers:", error);
-    }
-  };
 
   const clearFilters = () => {
     setSelectedStatuses([]);

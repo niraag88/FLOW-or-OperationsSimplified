@@ -56,6 +56,20 @@ export default function Invoices() {
     }
   };
 
+  // Extract unique customers from invoices data (avoid separate API call)
+  const uniqueCustomers = React.useMemo(() => {
+    const customerMap = new Map();
+    invoices.forEach(invoice => {
+      if (invoice.customer_id && invoice.customer_name) {
+        customerMap.set(invoice.customer_id, {
+          id: invoice.customer_id,
+          customer_name: invoice.customer_name
+        });
+      }
+    });
+    return Array.from(customerMap.values());
+  }, [invoices]);
+
   const handleRefresh = () => {
     setRefreshTrigger(prev => prev + 1);
   };
@@ -358,6 +372,7 @@ export default function Invoices() {
           dateRange={dateRange}
           setDateRange={setDateRange}
           resetPagination={resetPagination}
+          customers={uniqueCustomers}
         />
       </div>
 
