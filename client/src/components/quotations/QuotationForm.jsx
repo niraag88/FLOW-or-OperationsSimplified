@@ -188,6 +188,12 @@ export default function QuotationForm({ open, onClose, editingQuotation, current
 
   const updateItem = (index, field, value) => {
     const newItems = [...formData.items];
+    
+    // Convert string values to numbers for ID fields
+    if (field === 'brand_id' || field === 'product_id') {
+      value = parseInt(value);
+    }
+    
     newItems[index] = { ...newItems[index], [field]: value };
 
     if (field === 'brand_id') {
@@ -434,7 +440,7 @@ export default function QuotationForm({ open, onClose, editingQuotation, current
                       <div className="space-y-2">
                         <Label>Brand</Label>
                         <Select 
-                          value={item.brand_id || ''} 
+                          value={item.brand_id ? item.brand_id.toString() : ''} 
                           onValueChange={(v) => updateItem(index, 'brand_id', v)} 
                           disabled={!isEditable}
                         >
@@ -443,7 +449,7 @@ export default function QuotationForm({ open, onClose, editingQuotation, current
                           </SelectTrigger>
                           <SelectContent>
                             {brands.map(b => (
-                              <SelectItem key={b.id} value={b.id}>{b.name}</SelectItem>
+                              <SelectItem key={b.id} value={b.id.toString()}>{b.name}</SelectItem>
                             ))}
                           </SelectContent>
                         </Select>
@@ -452,7 +458,7 @@ export default function QuotationForm({ open, onClose, editingQuotation, current
                       <div className="space-y-2">
                         <Label>Product</Label>
                         <Select 
-                          value={item.product_id || ''} 
+                          value={item.product_id ? item.product_id.toString() : ''} 
                           onValueChange={(v) => updateItem(index, 'product_id', v)} 
                           disabled={!isEditable || !item.brand_id}
                         >
@@ -461,7 +467,7 @@ export default function QuotationForm({ open, onClose, editingQuotation, current
                           </SelectTrigger>
                           <SelectContent>
                             {getFilteredProducts(item.brand_id).map(p => (
-                              <SelectItem key={p.id} value={p.id}>
+                              <SelectItem key={p.id} value={p.id.toString()}>
                                 <div className="flex flex-col">
                                   <p className="font-medium truncate">{p.name}</p>
                                   {p.description && <p className="text-sm text-gray-500">{p.description}</p>}

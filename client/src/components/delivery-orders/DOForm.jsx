@@ -91,7 +91,8 @@ export default function DOForm({ open, onClose, editingDO, currentUser, onSucces
 
       // Handle customer change logic
       if (field === 'customer_id') {
-        const customer = customers.find(c => c.id === value);
+        const customerId = parseInt(value);
+        const customer = customers.find(c => c.id === customerId);
         setSelectedCustomer(customer);
         
         let taxTreatment = "StandardRated";
@@ -104,7 +105,7 @@ export default function DOForm({ open, onClose, editingDO, currentUser, onSucces
         
         newState = { 
           ...newState, 
-          customer_id: value, 
+          customer_id: customerId, 
           tax_treatment: taxTreatment, 
           tax_rate: taxRate 
         };
@@ -142,6 +143,12 @@ export default function DOForm({ open, onClose, editingDO, currentUser, onSucces
 
   const updateItem = (index, field, value) => {
     const newItems = [...formData.items];
+    
+    // Convert string values to numbers for ID fields
+    if (field === 'brand_id' || field === 'product_id') {
+      value = parseInt(value);
+    }
+    
     newItems[index] = { ...newItems[index], [field]: value };
 
     if (field === 'brand_id') {
@@ -250,13 +257,13 @@ export default function DOForm({ open, onClose, editingDO, currentUser, onSucces
             </div>
             <div className="space-y-2">
               <Label htmlFor="customer">Customer *</Label>
-              <Select value={formData.customer_id} onValueChange={(value) => handleInputChange('customer_id', value)} disabled={!isEditable}>
+              <Select value={formData.customer_id ? formData.customer_id.toString() : ''} onValueChange={(value) => handleInputChange('customer_id', value)} disabled={!isEditable}>
                 <SelectTrigger>
                   <SelectValue placeholder="Select customer" />
                 </SelectTrigger>
                 <SelectContent>
                   {customers.map(c => (
-                    <SelectItem key={c.id} value={c.id}>
+                    <SelectItem key={c.id} value={c.id.toString()}>
                       {c.customer_name} ({c.type})
                     </SelectItem>
                   ))}
@@ -340,7 +347,7 @@ export default function DOForm({ open, onClose, editingDO, currentUser, onSucces
                           </SelectTrigger>
                           <SelectContent>
                             {brands.map(b => (
-                              <SelectItem key={b.id} value={b.id}>{b.name}</SelectItem>
+                              <SelectItem key={b.id} value={b.id.toString()}>{b.name}</SelectItem>
                             ))}
                           </SelectContent>
                         </Select>
@@ -358,7 +365,7 @@ export default function DOForm({ open, onClose, editingDO, currentUser, onSucces
                           </SelectTrigger>
                           <SelectContent>
                             {getFilteredProducts(item.brand_id).map(p => (
-                              <SelectItem key={p.id} value={p.id}>
+                              <SelectItem key={p.id} value={p.id.toString()}>
                                 <div className="flex flex-col">
                                   <p className="font-medium truncate">{p.name}</p>
                                   {p.description && <p className="text-sm text-gray-500">{p.description}</p>}
