@@ -6,7 +6,8 @@ import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover
 import { Calendar } from "@/components/ui/calendar";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Badge } from "@/components/ui/badge";
-import { FileText, Filter, X, Calendar as CalendarIcon } from "lucide-react";
+import { FileText, Filter, X, Calendar as CalendarIcon, ChevronDown } from "lucide-react";
+import { Checkbox } from "@/components/ui/checkbox";
 import { format } from "date-fns";
 import { cn } from "@/lib/utils";
 import ExportDropdown from "../common/ExportDropdown";
@@ -14,11 +15,9 @@ import { Brand } from "@/api/entities";
 
 export default function PoGrnReport({ purchaseOrders, goodsReceipts, canExport }) {
   const [brands, setBrands] = useState([]);
-  const [filters, setFilters] = useState({
-    status: "all",
-    supplier: "all",
-    dateRange: "all"
-  });
+  const [selectedStatuses, setSelectedStatuses] = useState([]);
+  const [selectedSuppliers, setSelectedSuppliers] = useState([]);
+  const [dateRange, setDateRange] = useState("all");
   const [dateRangeOpen, setDateRangeOpen] = useState(false);
   const [customStartDate, setCustomStartDate] = useState(null);
   const [customEndDate, setCustomEndDate] = useState(null);
@@ -73,32 +72,27 @@ export default function PoGrnReport({ purchaseOrders, goodsReceipts, canExport }
     }
   };
 
-  const handleFilterChange = (field, value) => {
-    setFilters(prev => ({
-      ...prev,
-      [field]: value
-    }));
+  const clearFilters = () => {
+    setSelectedStatuses([]);
+    setSelectedSuppliers([]);
+    setDateRange("all");
+    setCustomStartDate(null);
+    setCustomEndDate(null);
     resetPagination();
   };
 
-  const clearFilters = () => {
-    setFilters({
-      status: "all",
-      supplier: "all", 
-      dateRange: "all"
-    });
-    setCustomStartDate(null);
-    setCustomEndDate(null);
-  };
+  const hasActiveFilters = selectedStatuses.length > 0 || selectedSuppliers.length > 0 || dateRange !== "all";
 
-  const hasActiveFilters = filters.status !== "all" || filters.supplier !== "all" || filters.dateRange !== "all";
+  // Get unique statuses
+  const uniqueStatuses = [...new Set(purchaseOrders.map(po => po.status).filter(Boolean))].sort();
 
   const handleDateRangeChange = (value) => {
     if (value !== 'custom') {
       setCustomStartDate(null);
       setCustomEndDate(null);
     }
-    handleFilterChange('dateRange', value);
+    setDateRange(value);
+    resetPagination();
   };
 
   const handleCustomDateRange = () => {
@@ -108,7 +102,7 @@ export default function PoGrnReport({ purchaseOrders, goodsReceipts, canExport }
         startDate: customStartDate,
         endDate: customEndDate
       };
-      handleFilterChange('dateRange', customRange);
+      setDateRange(customRange);
       setDateRangeOpen(false);
     }
   };
@@ -123,12 +117,12 @@ export default function PoGrnReport({ purchaseOrders, goodsReceipts, canExport }
   // Filter purchase orders
   const filteredPOs = useMemo(() => {
     return purchaseOrders.filter(po => {
-      const matchesStatus = filters.status === "all" || po.status === filters.status;
-      const matchesSupplier = filters.supplier === "all" || (po.supplierId || po.supplier_id) === filters.supplier;
+      const matchesStatus = selectedStatuses.length === 0 || selectedStatuses.includes(po.status);
+      const matchesSupplier = selectedSuppliers.length === 0 || selectedSuppliers.includes((po.supplierId || po.supplier_id));
       
       // Date range filtering
       let matchesDateRange = true;
-      if (filters.dateRange !== "all") {
+      if (dateRange !== "all") {
         const dateValue = po.orderDate || po.order_date;
         if (!dateValue) return false;
         
@@ -136,24 +130,24 @@ export default function PoGrnReport({ purchaseOrders, goodsReceipts, canExport }
         const today = new Date();
         const startOfToday = new Date(today.getFullYear(), today.getMonth(), today.getDate());
         
-        if (filters.dateRange === "today") {
+        if (dateRange === "today") {
           const endOfToday = new Date(today.getFullYear(), today.getMonth(), today.getDate(), 23, 59, 59);
           matchesDateRange = poDate >= startOfToday && poDate <= endOfToday;
-        } else if (filters.dateRange === "week") {
+        } else if (dateRange === "week") {
           const startOfWeek = new Date(today);
           startOfWeek.setDate(today.getDate() - today.getDay());
           startOfWeek.setHours(0, 0, 0, 0);
           matchesDateRange = poDate >= startOfWeek;
-        } else if (filters.dateRange === "month") {
+        } else if (dateRange === "month") {
           const startOfMonth = new Date(today.getFullYear(), today.getMonth(), 1);
           matchesDateRange = poDate >= startOfMonth;
-        } else if (filters.dateRange === "quarter") {
+        } else if (dateRange === "quarter") {
           const quarter = Math.floor(today.getMonth() / 3);
           const startOfQuarter = new Date(today.getFullYear(), quarter * 3, 1);
           matchesDateRange = poDate >= startOfQuarter;
-        } else if (typeof filters.dateRange === "object" && filters.dateRange.type === "custom") {
-          const startDate = new Date(filters.dateRange.startDate);
-          const endDate = new Date(filters.dateRange.endDate);
+        } else if (typeof dateRange === "object" && dateRange.type === "custom") {
+          const startDate = new Date(dateRange.startDate);
+          const endDate = new Date(dateRange.endDate);
           endDate.setHours(23, 59, 59, 999);
           matchesDateRange = poDate >= startDate && poDate <= endDate;
         }
@@ -161,7 +155,7 @@ export default function PoGrnReport({ purchaseOrders, goodsReceipts, canExport }
       
       return matchesStatus && matchesSupplier && matchesDateRange;
     });
-  }, [purchaseOrders, filters]);
+  }, [purchaseOrders, selectedStatuses, selectedSuppliers, dateRange]);
 
   // Filter goods receipts - combine submitted and closed POs (like Purchase Orders page)
   const filteredGRNs = useMemo(() => {
@@ -171,11 +165,11 @@ export default function PoGrnReport({ purchaseOrders, goodsReceipts, canExport }
     );
     
     return goodsReceiptPOs.filter(po => {
-      const matchesSupplier = filters.supplier === "all" || (po.supplierId || po.supplier_id) === filters.supplier;
+      const matchesSupplier = selectedSuppliers.length === 0 || selectedSuppliers.includes((po.supplierId || po.supplier_id));
       
       // Date range filtering using order date
       let matchesDateRange = true;
-      if (filters.dateRange !== "all") {
+      if (dateRange !== "all") {
         const dateValue = po.orderDate || po.order_date;
         if (!dateValue) return false;
         
@@ -183,24 +177,24 @@ export default function PoGrnReport({ purchaseOrders, goodsReceipts, canExport }
         const today = new Date();
         const startOfToday = new Date(today.getFullYear(), today.getMonth(), today.getDate());
         
-        if (filters.dateRange === "today") {
+        if (dateRange === "today") {
           const endOfToday = new Date(today.getFullYear(), today.getMonth(), today.getDate(), 23, 59, 59);
           matchesDateRange = poDate >= startOfToday && poDate <= endOfToday;
-        } else if (filters.dateRange === "week") {
+        } else if (dateRange === "week") {
           const startOfWeek = new Date(today);
           startOfWeek.setDate(today.getDate() - today.getDay());
           startOfWeek.setHours(0, 0, 0, 0);
           matchesDateRange = poDate >= startOfWeek;
-        } else if (filters.dateRange === "month") {
+        } else if (dateRange === "month") {
           const startOfMonth = new Date(today.getFullYear(), today.getMonth(), 1);
           matchesDateRange = poDate >= startOfMonth;
-        } else if (filters.dateRange === "quarter") {
+        } else if (dateRange === "quarter") {
           const quarter = Math.floor(today.getMonth() / 3);
           const startOfQuarter = new Date(today.getFullYear(), quarter * 3, 1);
           matchesDateRange = poDate >= startOfQuarter;
-        } else if (typeof filters.dateRange === "object" && filters.dateRange.type === "custom") {
-          const startDate = new Date(filters.dateRange.startDate);
-          const endDate = new Date(filters.dateRange.endDate);
+        } else if (typeof dateRange === "object" && dateRange.type === "custom") {
+          const startDate = new Date(dateRange.startDate);
+          const endDate = new Date(dateRange.endDate);
           endDate.setHours(23, 59, 59, 999);
           matchesDateRange = poDate >= startDate && poDate <= endDate;
         }
@@ -208,7 +202,7 @@ export default function PoGrnReport({ purchaseOrders, goodsReceipts, canExport }
       
       return matchesSupplier && matchesDateRange;
     });
-  }, [purchaseOrders, filters]);
+  }, [purchaseOrders, selectedSuppliers, dateRange]);
 
   // Calculate totals - using POList logic exactly
   const totals = useMemo(() => {
@@ -297,7 +291,7 @@ export default function PoGrnReport({ purchaseOrders, goodsReceipts, canExport }
             <ExportDropdown 
               data={exportData}
               type="PO vs GRN Report"
-              filename={`PO_GRN_Report_${filters.dateRange === 'all' ? 'All_Time' : 'Filtered'}`}
+              filename={`PO_GRN_Report_${dateRange === 'all' ? 'All_Time' : 'Filtered'}`}
               columns={{
                 type: 'Type',
                 document_number: 'Document Number',
@@ -316,33 +310,85 @@ export default function PoGrnReport({ purchaseOrders, goodsReceipts, canExport }
           <div className="flex items-center gap-3">
             <Filter className="w-4 h-4 text-gray-500" />
             
-            <Select value={filters.status} onValueChange={(value) => handleFilterChange('status', value)}>
-              <SelectTrigger className="w-32">
-                <SelectValue placeholder="Status" />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="all">All Status</SelectItem>
-                <SelectItem value="draft">Draft</SelectItem>
-                <SelectItem value="submitted">Submitted</SelectItem>
-                <SelectItem value="closed">Closed</SelectItem>
-              </SelectContent>
-            </Select>
+            {/* Status Filter */}
+            <Popover>
+              <PopoverTrigger asChild>
+                <Button variant="outline" className="justify-between w-36">
+                  {selectedStatuses.length === 0 ? "All Status" : `${selectedStatuses.length} selected`}
+                  <ChevronDown className="ml-2 h-4 w-4" />
+                </Button>
+              </PopoverTrigger>
+              <PopoverContent className="w-60 p-4">
+                <div className="space-y-3">
+                  <h4 className="font-medium leading-none">Select Status</h4>
+                  <div className="space-y-2 max-h-60 overflow-y-auto">
+                    {uniqueStatuses.map(status => (
+                      <div key={status} className="flex items-center space-x-2">
+                        <Checkbox
+                          id={`status-${status}`}
+                          checked={selectedStatuses.includes(status)}
+                          onCheckedChange={(checked) => {
+                            if (checked) {
+                              setSelectedStatuses(prev => [...prev, status]);
+                            } else {
+                              setSelectedStatuses(prev => prev.filter(s => s !== status));
+                            }
+                            resetPagination();
+                          }}
+                        />
+                        <label
+                          htmlFor={`status-${status}`}
+                          className="text-sm leading-none peer-disabled:cursor-not-allowed peer-disabled:opacity-70 cursor-pointer capitalize"
+                        >
+                          {status}
+                        </label>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              </PopoverContent>
+            </Popover>
 
-            <Select value={filters.supplier} onValueChange={(value) => handleFilterChange('supplier', value)}>
-              <SelectTrigger className="w-48">
-                <SelectValue placeholder="Brand/Supplier" />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="all">All Brands</SelectItem>
-                {brands.map(brand => (
-                  <SelectItem key={brand.id} value={brand.id}>
-                    {brand.name}
-                  </SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
+            {/* Supplier Filter */}
+            <Popover>
+              <PopoverTrigger asChild>
+                <Button variant="outline" className="justify-between w-48">
+                  {selectedSuppliers.length === 0 ? "All Brands" : `${selectedSuppliers.length} selected`}
+                  <ChevronDown className="ml-2 h-4 w-4" />
+                </Button>
+              </PopoverTrigger>
+              <PopoverContent className="w-60 p-4">
+                <div className="space-y-3">
+                  <h4 className="font-medium leading-none">Select Brands</h4>
+                  <div className="space-y-2 max-h-60 overflow-y-auto">
+                    {brands.map(brand => (
+                      <div key={brand.id} className="flex items-center space-x-2">
+                        <Checkbox
+                          id={`brand-${brand.id}`}
+                          checked={selectedSuppliers.includes(brand.id)}
+                          onCheckedChange={(checked) => {
+                            if (checked) {
+                              setSelectedSuppliers(prev => [...prev, brand.id]);
+                            } else {
+                              setSelectedSuppliers(prev => prev.filter(id => id !== brand.id));
+                            }
+                            resetPagination();
+                          }}
+                        />
+                        <label
+                          htmlFor={`brand-${brand.id}`}
+                          className="text-sm leading-none peer-disabled:cursor-not-allowed peer-disabled:opacity-70 cursor-pointer"
+                        >
+                          {brand.name}
+                        </label>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              </PopoverContent>
+            </Popover>
 
-            <Select value={typeof filters.dateRange === 'object' ? 'custom' : filters.dateRange} onValueChange={handleDateRangeChange}>
+            <Select value={typeof dateRange === 'object' ? 'custom' : dateRange} onValueChange={handleDateRangeChange}>
               <SelectTrigger className="w-32">
                 <SelectValue placeholder="Date" />
               </SelectTrigger>
@@ -357,7 +403,7 @@ export default function PoGrnReport({ purchaseOrders, goodsReceipts, canExport }
             </Select>
 
             {/* Custom Date Range Picker */}
-            {(filters.dateRange === 'custom' || typeof filters.dateRange === 'object') && (
+            {(dateRange === 'custom' || typeof dateRange === 'object') && (
               <Popover open={dateRangeOpen} onOpenChange={setDateRangeOpen}>
                 <PopoverTrigger asChild>
                   <Button
@@ -417,6 +463,39 @@ export default function PoGrnReport({ purchaseOrders, goodsReceipts, canExport }
               </Button>
             )}
           </div>
+          
+          {/* Active filter badges */}
+          {(selectedStatuses.length > 0 || selectedSuppliers.length > 0) && (
+            <div className="flex flex-wrap gap-2">
+              {selectedStatuses.map(status => (
+                <Badge key={status} variant="secondary" className="gap-1">
+                  Status: {status}
+                  <X 
+                    className="h-3 w-3 cursor-pointer" 
+                    onClick={() => {
+                      setSelectedStatuses(prev => prev.filter(s => s !== status));
+                      resetPagination();
+                    }}
+                  />
+                </Badge>
+              ))}
+              {selectedSuppliers.map(supplierId => {
+                const brand = brands.find(b => b.id === supplierId);
+                return (
+                  <Badge key={supplierId} variant="secondary" className="gap-1">
+                    Brand: {brand?.name}
+                    <X 
+                      className="h-3 w-3 cursor-pointer" 
+                      onClick={() => {
+                        setSelectedSuppliers(prev => prev.filter(id => id !== supplierId));
+                        resetPagination();
+                      }}
+                    />
+                  </Badge>
+                );
+              })}
+            </div>
+          )}
 
           {/* Summary Cards - Fixed currency breakdowns */}
           <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
