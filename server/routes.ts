@@ -978,6 +978,17 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  // Get next PO number (preview only, doesn't increment)
+  app.get('/api/purchase-orders/next-number', requireAuth(), async (req: AuthenticatedRequest, res) => {
+    try {
+      const nextNumber = await businessStorage.getNextPoNumber();
+      res.json({ nextNumber });
+    } catch (error) {
+      console.error('Error getting next PO number:', error);
+      res.status(500).json({ error: 'Failed to get next PO number' });
+    }
+  });
+
   app.post('/api/purchase-orders', requireAuth(['Admin', 'Manager']), async (req: AuthenticatedRequest, res) => {
     try {
       const poNumber = await businessStorage.generatePoNumber();
@@ -1127,14 +1138,14 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  // Get next quotation number
+  // Get next quotation number (preview only, doesn't increment)
   app.get('/api/quotations/next-number', requireAuth(), async (req: AuthenticatedRequest, res) => {
     try {
-      const nextNumber = await businessStorage.generateQuotationNumber();
+      const nextNumber = await businessStorage.getNextQuotationNumber();
       res.json({ nextNumber });
     } catch (error) {
-      console.error('Error generating next quotation number:', error);
-      res.status(500).json({ error: 'Failed to generate next quotation number' });
+      console.error('Error getting next quotation number:', error);
+      res.status(500).json({ error: 'Failed to get next quotation number' });
     }
   });
 

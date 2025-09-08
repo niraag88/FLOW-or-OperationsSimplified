@@ -338,6 +338,20 @@ export class BusinessStorage {
     return formattedNumber;
   }
 
+  async getNextPoNumber() {
+    // Preview the next number without incrementing it
+    const settings = await this.getCompanySettings();
+    const prefix = settings?.poNumberPrefix || 'PO';
+    const nextNumber = settings?.nextPoNumber || 1;
+    
+    // Simple format: PREFIX-NUMBER (e.g., PO-1, PO-2025-001)
+    const formattedNumber = prefix.includes('-') 
+      ? `${prefix}-${String(nextNumber).padStart(3, '0')}`  // PO-2025-001 style
+      : `${prefix}-${nextNumber}`;  // PO-1 style
+    
+    return formattedNumber;
+  }
+
   async generateQuotationNumber() {
     // Get settings for configurable numbering
     const settings = await this.getCompanySettings();
@@ -356,6 +370,20 @@ export class BusinessStorage {
         nextQuotationNumber: nextNumber + 1
       });
     }
+    
+    return formattedNumber;
+  }
+
+  async getNextQuotationNumber() {
+    // Preview the next number without incrementing it
+    const settings = await this.getCompanySettings();
+    const prefix = settings?.quotationNumberPrefix || 'QUO';
+    const nextNumber = settings?.nextQuotationNumber || 1;
+    
+    // Simple format: PREFIX-NUMBER (e.g., QUO-1, PO-2025-001)
+    const formattedNumber = prefix.includes('-') 
+      ? `${prefix}-${String(nextNumber).padStart(3, '0')}`  // PO-2025-001 style
+      : `${prefix}-${nextNumber}`;  // PO-1 style
     
     return formattedNumber;
   }
