@@ -378,7 +378,20 @@ export class BusinessStorage {
     // Preview the next number without incrementing it
     const settings = await this.getCompanySettings();
     const prefix = settings?.quotationNumberPrefix || 'QUO';
-    const nextNumber = settings?.nextQuotationNumber || 1;
+    let nextNumber = settings?.nextQuotationNumber || 1;
+    
+    // Check if there are any actual quotations - if not, reset to 1
+    const existingQuotations = await this.getQuotations();
+    if (existingQuotations.length === 0) {
+      nextNumber = 1;
+      // Update settings to sync the counter
+      if (settings) {
+        await this.updateCompanySettings({
+          ...settings,
+          nextQuotationNumber: 1
+        });
+      }
+    }
     
     // Simple format: PREFIX-NUMBER (e.g., QUO-1, PO-2025-001)
     const formattedNumber = prefix.includes('-') 
