@@ -261,20 +261,28 @@ export default function QuotationForm({ open, onClose, editingQuotation, current
 
     setLoading(true);
     try {
+      // Calculate validUntil as 30 days from quote date
+      const quoteDate = new Date(formData.quotation_date);
+      const validUntil = new Date(quoteDate.getTime() + 30 * 24 * 60 * 60 * 1000); // 30 days later
+
       const quotationData = {
-        quotation_number: formData.quotation_number,
-        customer_id: formData.customer_id,
-        quotation_date: formData.quotation_date,
+        // Map frontend snake_case fields to backend camelCase schema fields
+        quoteNumber: formData.quotation_number,
+        customerId: parseInt(formData.customer_id),
+        quoteDate: formData.quotation_date,
+        validUntil: validUntil.toISOString().split('T')[0], // Format as YYYY-MM-DD
+        status: formData.status,
+        totalAmount: parseFloat(formData.subtotal.toFixed(2)),
+        vatAmount: parseFloat(formData.tax_amount.toFixed(2)),
+        grandTotal: parseFloat(formData.total_amount.toFixed(2)),
+        notes: formData.remarks,
+        terms: "Payment terms - 30 days", // Default terms
+        // Keep additional fields for frontend use
         reference: formData.reference,
         reference_date: formData.reference_date,
-        status: formData.status,
         currency: formData.currency,
         tax_treatment: formData.tax_treatment,
         tax_rate: formData.tax_rate,
-        subtotal: parseFloat(formData.subtotal.toFixed(2)),
-        tax_amount: parseFloat(formData.tax_amount.toFixed(2)),
-        total_amount: parseFloat(formData.total_amount.toFixed(2)),
-        remarks: formData.remarks,
         attachments: formData.attachments || [],
         items: formData.items.map(item => ({
           brand_id: item.brand_id,
