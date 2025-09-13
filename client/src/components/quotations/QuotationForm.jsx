@@ -374,7 +374,7 @@ export default function QuotationForm({ open, onClose, editingQuotation, current
       <DialogContent className="max-w-6xl max-h-[90vh] overflow-y-auto">
         <DialogHeader>
           <DialogTitle>
-            {editingQuotation ? `Edit Quotation ${editingQuotation.quotation_number}` : 'New Quotation'}
+            {editingQuotation ? `Edit Quotation ${formData.quotation_number || editingQuotation.quoteNumber || ''}` : 'New Quotation'}
           </DialogTitle>
           <DialogDescription>
             {editingQuotation ? 'Update quotation details' : 'Create a new quotation'}
