@@ -116,7 +116,7 @@ export default function QuotationPrintView() {
         </div>
 
         {/* Items Table */}
-        <div className="print-table-container">
+        <div className="print-table-section">
           <table className="print-table">
             <thead>
               <tr>
@@ -143,23 +143,21 @@ export default function QuotationPrintView() {
           </table>
         </div>
 
-        {/* Totals */}
-        <div className="print-totals">
-          <div className="print-totals-content">
-            <div className="print-total-row">
-              <span className="print-total-label">Subtotal:</span>
-              <span className="print-total-value">{formatCurrency(quotation.subtotal, quotation.currency)}</span>
+        {/* Totals Section */}
+        <div className="print-totals-section">
+          <div className="totals-row">
+            <span className="totals-label">Subtotal</span>
+            <span className="totals-value">{formatCurrency(quotation.totalAmount)}</span>
+          </div>
+          {quotation.vatAmount && parseFloat(quotation.vatAmount) > 0 && (
+            <div className="totals-row">
+              <span className="totals-label">VAT</span>
+              <span className="totals-value">{formatCurrency(quotation.vatAmount)}</span>
             </div>
-            {quotation.tax_treatment === 'StandardRated' && quotation.tax_amount > 0 && (
-              <div className="print-total-row">
-                <span className="print-total-label">VAT ({(quotation.tax_rate * 100).toFixed(0)}%):</span>
-                <span className="print-total-value">{formatCurrency(quotation.tax_amount, quotation.currency)}</span>
-              </div>
-            )}
-            <div className="print-total-row print-final-total">
-              <span className="print-total-label">Total:</span>
-              <span className="print-total-value">{formatCurrency(quotation.total_amount, quotation.currency)}</span>
-            </div>
+          )}
+          <div className="totals-row total-final">
+            <span className="totals-label">Total</span>
+            <span className="totals-value">{formatCurrency(quotation.grandTotal)}</span>
           </div>
         </div>
 

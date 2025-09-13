@@ -2358,6 +2358,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const items = await db.select({
         productCode: products.sku,
         description: products.name,
+        size: products.size,
         quantity: quotationItems.quantity,
         unitPrice: quotationItems.unitPrice,
         discount: quotationItems.discount,
@@ -2373,6 +2374,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
         items: items.map(item => ({
           product_code: item.productCode,
           description: item.description,
+          size: item.size,
           quantity: item.quantity,
           unit_price: item.unitPrice,
           discount: item.discount,
