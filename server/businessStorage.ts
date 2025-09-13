@@ -372,20 +372,17 @@ export class BusinessStorage {
         const match = q.quoteNumber.match(regex);
         return match ? parseInt(match[1], 10) : 0;
       })
-      .filter(num => num > 0)
-      .sort((a, b) => a - b);
+      .filter(num => num > 0);
     
-    // Find the first gap in the sequence or use next sequential number
-    let nextNumber = 1;
-    for (let i = 0; i < existingNumbers.length; i++) {
-      if (existingNumbers[i] !== nextNumber) {
-        // Found a gap - use this number
-        break;
-      }
-      nextNumber++;
+    // If no quotations exist, start from 1
+    if (existingNumbers.length === 0) {
+      return 1;
     }
     
-    return nextNumber;
+    // Find the maximum number and add 1
+    // This ensures we never reuse numbers unless they're from the end
+    const maxNumber = Math.max(...existingNumbers);
+    return maxNumber + 1;
   }
 
   async generateQuotationNumber() {
