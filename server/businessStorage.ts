@@ -352,18 +352,55 @@ export class BusinessStorage {
     return formattedNumber;
   }
 
+  // Helper function to compute next available number for a given prefix
+  private async computeNextNumberForPrefix(prefix: string): Promise<number> {
+    // Create regex to match current prefix format exactly
+    const escapedPrefix = prefix.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+    const prefixPattern = prefix.includes('-') 
+      ? `${escapedPrefix}-(\\d+)$`  // Match "QUO-2025-123" format
+      : `${escapedPrefix}-(\\d+)$`;  // Always expect dash separation
+    
+    // Get only quotation numbers for current prefix (efficient query)
+    const existingQuotations = await db.select({
+      quoteNumber: quotations.quoteNumber
+    }).from(quotations);
+    
+    // Filter and extract numbers for current prefix only
+    const regex = new RegExp(prefixPattern);
+    const existingNumbers = existingQuotations
+      .map(q => {
+        const match = q.quoteNumber.match(regex);
+        return match ? parseInt(match[1], 10) : 0;
+      })
+      .filter(num => num > 0)
+      .sort((a, b) => a - b);
+    
+    // Find the first gap in the sequence or use next sequential number
+    let nextNumber = 1;
+    for (let i = 0; i < existingNumbers.length; i++) {
+      if (existingNumbers[i] !== nextNumber) {
+        // Found a gap - use this number
+        break;
+      }
+      nextNumber++;
+    }
+    
+    return nextNumber;
+  }
+
   async generateQuotationNumber() {
     // Get settings for configurable numbering
     const settings = await this.getCompanySettings();
     const prefix = settings?.quotationNumberPrefix || 'QUO';
-    const nextNumber = settings?.nextQuotationNumber || 1;
     
-    // Simple format: PREFIX-NUMBER (e.g., QUO-1, PO-2025-001)
+    // Use helper to get next available number for this prefix
+    const nextNumber = await this.computeNextNumberForPrefix(prefix);
+    
     const formattedNumber = prefix.includes('-') 
-      ? `${prefix}-${String(nextNumber).padStart(3, '0')}`  // PO-2025-001 style
-      : `${prefix}-${nextNumber}`;  // PO-1 style
+      ? `${prefix}-${String(nextNumber).padStart(3, '0')}`  // QUO-2025-001 style
+      : `${prefix}-${nextNumber}`;  // QUO-1 style
     
-    // Update next number in settings
+    // Update settings to track the highest number + 1 for future reference
     if (settings) {
       await this.updateCompanySettings({
         ...settings,
@@ -378,25 +415,13 @@ export class BusinessStorage {
     // Preview the next number without incrementing it
     const settings = await this.getCompanySettings();
     const prefix = settings?.quotationNumberPrefix || 'QUO';
-    let nextNumber = settings?.nextQuotationNumber || 1;
     
-    // Check if there are any actual quotations - if not, reset to 1
-    const existingQuotations = await this.getQuotations();
-    if (existingQuotations.length === 0) {
-      nextNumber = 1;
-      // Update settings to sync the counter
-      if (settings) {
-        await this.updateCompanySettings({
-          ...settings,
-          nextQuotationNumber: 1
-        });
-      }
-    }
+    // Use same helper logic for consistency
+    const nextNumber = await this.computeNextNumberForPrefix(prefix);
     
-    // Simple format: PREFIX-NUMBER (e.g., QUO-1, PO-2025-001)
     const formattedNumber = prefix.includes('-') 
-      ? `${prefix}-${String(nextNumber).padStart(3, '0')}`  // PO-2025-001 style
-      : `${prefix}-${nextNumber}`;  // PO-1 style
+      ? `${prefix}-${String(nextNumber).padStart(3, '0')}`  // QUO-2025-001 style
+      : `${prefix}-${nextNumber}`;  // QUO-1 style
     
     return formattedNumber;
   }
