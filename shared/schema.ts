@@ -234,6 +234,8 @@ export const quotations = pgTable("quotations", {
   grandTotal: decimal("grand_total", { precision: 10, scale: 2 }).default("0.00"),
   notes: text("notes"),
   terms: text("terms"),
+  reference: text("reference"),
+  referenceDate: timestamp("reference_date"),
   objectKey: text("object_key"), // Storage key for generated PDF
   createdBy: varchar("created_by").references(() => users.id).notNull(),
   createdAt: timestamp("created_at").defaultNow().notNull(),
