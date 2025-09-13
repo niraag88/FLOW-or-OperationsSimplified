@@ -1144,6 +1144,17 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  // Get next quotation number (preview only, doesn't increment)
+  app.get('/api/quotations/next-number', requireAuth(), async (req: AuthenticatedRequest, res) => {
+    try {
+      const nextNumber = await businessStorage.getNextQuotationNumber();
+      res.json({ nextNumber });
+    } catch (error) {
+      console.error('Error getting next quotation number:', error);
+      res.status(500).json({ error: 'Failed to get next quotation number' });
+    }
+  });
+
   // Get specific quotation with items for editing
   app.get('/api/quotations/:id', requireAuth(), async (req: AuthenticatedRequest, res) => {
     try {
@@ -1156,17 +1167,6 @@ export async function registerRoutes(app: Express): Promise<Server> {
     } catch (error) {
       console.error('Error fetching quotation:', error);
       res.status(500).json({ error: 'Failed to fetch quotation' });
-    }
-  });
-
-  // Get next quotation number (preview only, doesn't increment)
-  app.get('/api/quotations/next-number', requireAuth(), async (req: AuthenticatedRequest, res) => {
-    try {
-      const nextNumber = await businessStorage.getNextQuotationNumber();
-      res.json({ nextNumber });
-    } catch (error) {
-      console.error('Error getting next quotation number:', error);
-      res.status(500).json({ error: 'Failed to get next quotation number' });
     }
   });
 
