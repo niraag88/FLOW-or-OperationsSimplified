@@ -152,6 +152,11 @@ function PagesContent() {
           <POPrintView />
         </ProtectedRoute>
       } />
+      <Route path="/quotation-print" element={
+        <ProtectedRoute>
+          <QuotationPrintView />
+        </ProtectedRoute>
+      } />
       <Route path="/quotations/:id/print" element={
         <ProtectedRoute>
           <QuotationPrintView />

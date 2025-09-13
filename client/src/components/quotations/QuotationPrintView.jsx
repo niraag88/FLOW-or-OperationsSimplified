@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { useParams } from 'wouter';
-import { Quotation, CompanySettings } from '@/api/entities';
+import { CompanySettings } from '@/api/entities';
+import "../../styles/print.css";
 
 export default function QuotationPrintView() {
   const { id } = useParams();
@@ -9,13 +10,32 @@ export default function QuotationPrintView() {
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
+    // Get Quotation ID from URL params if not from wouter params
+    const urlParams = new URLSearchParams(window.location.search);
+    const quotationId = id || urlParams.get('id');
+    
+    if (!quotationId) {
+      console.error('No quotation ID provided');
+      setLoading(false);
+      return;
+    }
+
     const loadData = async () => {
       try {
-        const [quotationData, companyData] = await Promise.all([
-          Quotation.getById(id),
+        // Use optimized export API for speed like Purchase Orders
+        const [quotationResponse, companyData] = await Promise.all([
+          fetch(`/api/export/quotation?quotationId=${quotationId}`),
           CompanySettings.get()
         ]);
-        setQuotation(quotationData);
+        
+        const quotationResult = await quotationResponse.json();
+        
+        if (quotationResult.success) {
+          setQuotation(quotationResult.data);
+        } else {
+          console.error('Error loading quotation:', quotationResult.error);
+        }
+        
         setCompanySettings(companyData);
       } catch (error) {
         console.error('Error loading data:', error);
@@ -24,9 +44,7 @@ export default function QuotationPrintView() {
       }
     };
 
-    if (id) {
-      loadData();
-    }
+    loadData();
   }, [id]);
 
   useEffect(() => {

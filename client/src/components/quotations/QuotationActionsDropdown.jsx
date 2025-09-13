@@ -97,7 +97,9 @@ export default function QuotationActionsDropdown({ quotation, canEdit, onEdit, o
   };
 
   const handleViewPrint = () => {
-    window.open(`/quotations/${quotation.id}/print`, '_blank');
+    // Open print view in new tab for optimal speed
+    const printUrl = `/quotation-print?id=${quotation.id}`;
+    window.open(printUrl, '_blank');
   };
 
   const handleDelete = async () => {

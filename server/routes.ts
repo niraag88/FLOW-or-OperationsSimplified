@@ -4,7 +4,7 @@ import { storage } from "./storage";
 import { businessStorage } from "./businessStorage";
 import { Client } from '@replit/object-storage';
 import { invoices, deliveryOrders, auditLog, users, type InsertAuditLog, type InsertUser, type UpdateUser, type User } from "@shared/schema";
-import { insertBrandSchema, insertSupplierSchema, insertCustomerSchema, insertProductSchema, insertPurchaseOrderSchema, insertQuotationSchema, stockCounts, stockCountItems, goodsReceipts, goodsReceiptItems, stockMovements, products, purchaseOrders, purchaseOrderItems, enhancedInvoices, invoiceItems, suppliers, brands } from "@shared/schema";
+import { insertBrandSchema, insertSupplierSchema, insertCustomerSchema, insertProductSchema, insertPurchaseOrderSchema, insertQuotationSchema, stockCounts, stockCountItems, goodsReceipts, goodsReceiptItems, stockMovements, products, purchaseOrders, purchaseOrderItems, enhancedInvoices, invoiceItems, suppliers, brands, quotations, quotationItems, customers } from "@shared/schema";
 import { db } from "./db";
 import { eq, desc } from "drizzle-orm";
 import pkg from 'pg';
@@ -2313,6 +2313,84 @@ export async function registerRoutes(app: Express): Promise<Server> {
     } catch (error) {
       console.error('Error exporting purchase order:', error);
       res.status(500).json({ error: 'Failed to export purchase order' });
+    }
+  });
+
+  // GET /api/export/quotation - Generate quotation data for print view
+  app.get('/api/export/quotation', requireAuth(), async (req, res) => {
+    try {
+      const { quotationId } = req.query;
+      
+      if (!quotationId) {
+        return res.status(400).json({ error: 'quotationId parameter is required' });
+      }
+
+      // Get quotation data from database
+      const [quotation] = await db.select({
+        id: quotations.id,
+        quoteNumber: quotations.quoteNumber,
+        customerId: quotations.customerId,
+        status: quotations.status,
+        quoteDate: quotations.quoteDate,
+        validUntil: quotations.validUntil,
+        totalAmount: quotations.totalAmount,
+        vatAmount: quotations.vatAmount,
+        grandTotal: quotations.grandTotal,
+        notes: quotations.notes,
+        terms: quotations.terms,
+        reference: quotations.reference,
+        referenceDate: quotations.referenceDate,
+        customerName: customers.name,
+        customerBillingAddress: customers.billingAddress,
+        customerShippingAddress: customers.shippingAddress,
+        customerContactPerson: customers.contactPerson,
+        customerEmail: customers.email,
+        customerPhone: customers.phone,
+      }).from(quotations)
+        .leftJoin(customers, eq(quotations.customerId, customers.id))
+        .where(eq(quotations.id, parseInt(quotationId as string)));
+      
+      if (!quotation) {
+        return res.status(404).json({ error: 'Quotation not found' });
+      }
+
+      // Get quotation items
+      const items = await db.select({
+        productCode: products.sku,
+        description: products.name,
+        quantity: quotationItems.quantity,
+        unitPrice: quotationItems.unitPrice,
+        discount: quotationItems.discount,
+        vatRate: quotationItems.vatRate,
+        lineTotal: quotationItems.lineTotal
+      }).from(quotationItems)
+        .leftJoin(products, eq(quotationItems.productId, products.id))
+        .where(eq(quotationItems.quoteId, parseInt(quotationId as string)));
+
+      // Add items to quotation object
+      const quotationWithItems = {
+        ...quotation,
+        items: items.map(item => ({
+          product_code: item.productCode,
+          description: item.description,
+          quantity: item.quantity,
+          unit_price: item.unitPrice,
+          discount: item.discount,
+          vat_rate: item.vatRate,
+          line_total: item.lineTotal
+        }))
+      };
+
+      // Return structured data for frontend print view
+      res.json({
+        success: true,
+        data: quotationWithItems,
+        message: 'Quotation data for print view'
+      });
+      
+    } catch (error) {
+      console.error('Error exporting quotation:', error);
+      res.status(500).json({ error: 'Failed to export quotation' });
     }
   });
 
