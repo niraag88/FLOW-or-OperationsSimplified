@@ -66,43 +66,60 @@ export default function QuotationForm({ open, onClose, editingQuotation, current
       setBrands(brandsData.filter(b => b.isActive !== false));
 
       if (editingQuotation) {
-        console.log("Loading existing quotation:", editingQuotation);
-        const customer = customersData.find(c => c.id === editingQuotation.customerId);
-        setSelectedCustomer(customer);
-        
-        // Map API camelCase response to form snake_case fields
-        setFormData({
-          quotation_number: editingQuotation.quoteNumber || "",
-          customer_id: editingQuotation.customerId || "",
-          quotation_date: editingQuotation.quoteDate ? new Date(editingQuotation.quoteDate).toISOString().split('T')[0] : new Date().toISOString().split('T')[0],
-          reference: editingQuotation.reference || "",
-          reference_date: editingQuotation.referenceDate ? new Date(editingQuotation.referenceDate).toISOString().split('T')[0] : "",
-          status: editingQuotation.status || "draft",
-          currency: editingQuotation.currency || "AED",
-          tax_treatment: editingQuotation.taxTreatment || "StandardRated",
-          tax_rate: editingQuotation.taxRate || 0.05,
-          subtotal: parseFloat(editingQuotation.totalAmount || 0),
-          tax_amount: parseFloat(editingQuotation.vatAmount || 0),
-          total_amount: parseFloat(editingQuotation.grandTotal || 0),
-          remarks: editingQuotation.notes || "",
-          attachments: editingQuotation.attachments || [],
-          items: (editingQuotation.items || []).map(item => {
-            // Look up product details to get brand information
-            const product = productsData.find(p => p.id === (item.productId || item.product_id));
-            return {
-              product_id: item.productId || item.product_id || "",
-              brand_id: product?.brandId || item.brand_id || "",
-              brand_name: product?.brand?.name || item.brand_name || "",
-              product_code: product?.sku || item.product_code || "",
-              description: item.description || product?.name || "",
-              quantity: Number(item.quantity || 0),
-              unit_price: Number(item.unitPrice || item.unit_price || 0),
-              discount: Number(item.discount || 0),
-              vat_rate: Number(item.vatRate || item.vat_rate || 0.05),
-              line_total: Number(item.lineTotal || item.line_total || 0)
-            };
-          })
-        });
+        console.log("Loading existing quotation for editing, fetching full details...");
+        try {
+          // Fetch complete quotation data with items from the API
+          const response = await fetch(`/api/quotations/${editingQuotation.id}`);
+          if (!response.ok) {
+            throw new Error('Failed to fetch quotation details');
+          }
+          const fullQuotationData = await response.json();
+          console.log("Full quotation data:", fullQuotationData);
+          
+          const customer = customersData.find(c => c.id === fullQuotationData.customerId);
+          setSelectedCustomer(customer);
+          
+          // Map API camelCase response to form snake_case fields
+          setFormData({
+            quotation_number: fullQuotationData.quoteNumber || "",
+            customer_id: fullQuotationData.customerId || "",
+            quotation_date: fullQuotationData.quoteDate ? new Date(fullQuotationData.quoteDate).toISOString().split('T')[0] : new Date().toISOString().split('T')[0],
+            reference: fullQuotationData.reference || "",
+            reference_date: fullQuotationData.referenceDate ? new Date(fullQuotationData.referenceDate).toISOString().split('T')[0] : "",
+            status: fullQuotationData.status || "draft",
+            currency: fullQuotationData.currency || "AED",
+            tax_treatment: fullQuotationData.taxTreatment || "StandardRated",
+            tax_rate: fullQuotationData.taxRate || 0.05,
+            subtotal: parseFloat(fullQuotationData.totalAmount || 0),
+            tax_amount: parseFloat(fullQuotationData.vatAmount || 0),
+            total_amount: parseFloat(fullQuotationData.grandTotal || 0),
+            remarks: fullQuotationData.notes || "",
+            attachments: fullQuotationData.attachments || [],
+            items: (fullQuotationData.items || []).map(item => {
+              // Look up product details to get brand information
+              const product = productsData.find(p => p.id === (item.productId || item.product_id));
+              return {
+                product_id: item.productId || item.product_id || "",
+                brand_id: product?.brandId || item.brand_id || "",
+                brand_name: product?.brand?.name || item.brand_name || "",
+                product_code: product?.sku || item.product_code || "",
+                description: item.description || product?.name || "",
+                quantity: Number(item.quantity || 0),
+                unit_price: Number(item.unitPrice || item.unit_price || 0),
+                discount: Number(item.discount || 0),
+                vat_rate: Number(item.vatRate || item.vat_rate || 0.05),
+                line_total: Number(item.lineTotal || item.line_total || 0)
+              };
+            })
+          });
+        } catch (error) {
+          console.error("Error fetching quotation details:", error);
+          toast({
+            title: "Error",
+            description: "Failed to load quotation details for editing",
+            variant: "destructive",
+          });
+        }
       } else {
         // Fetch next quotation number from API
         try {

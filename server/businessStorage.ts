@@ -252,6 +252,8 @@ export class BusinessStorage {
       grandTotal: quotations.grandTotal,
       notes: quotations.notes,
       terms: quotations.terms,
+      reference: quotations.reference,
+      referenceDate: quotations.referenceDate,
       objectKey: quotations.objectKey,
       createdBy: quotations.createdBy,
       createdAt: quotations.createdAt,
@@ -265,6 +267,29 @@ export class BusinessStorage {
   async getQuotationById(id: number) {
     const [quote] = await db.select().from(quotations).where(eq(quotations.id, id));
     return quote;
+  }
+
+  async getQuotationWithItems(id: number) {
+    // Get quotation details
+    const [quote] = await db.select().from(quotations).where(eq(quotations.id, id));
+    if (!quote) return null;
+
+    // Get quotation items
+    const items = await db.select({
+      id: quotationItems.id,
+      productId: quotationItems.productId,
+      quantity: quotationItems.quantity,
+      unitPrice: quotationItems.unitPrice,
+      discount: quotationItems.discount,
+      vatRate: quotationItems.vatRate,
+      lineTotal: quotationItems.lineTotal,
+      description: products.name,
+      productCode: products.sku,
+    }).from(quotationItems)
+      .leftJoin(products, eq(quotationItems.productId, products.id))
+      .where(eq(quotationItems.quoteId, id));
+
+    return { ...quote, items };
   }
 
   async createQuotation(data: InsertQuotation) {

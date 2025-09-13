@@ -1144,6 +1144,21 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  // Get specific quotation with items for editing
+  app.get('/api/quotations/:id', requireAuth(), async (req: AuthenticatedRequest, res) => {
+    try {
+      const id = parseInt(req.params.id);
+      const quotation = await businessStorage.getQuotationWithItems(id);
+      if (!quotation) {
+        return res.status(404).json({ error: 'Quotation not found' });
+      }
+      res.json(quotation);
+    } catch (error) {
+      console.error('Error fetching quotation:', error);
+      res.status(500).json({ error: 'Failed to fetch quotation' });
+    }
+  });
+
   // Get next quotation number (preview only, doesn't increment)
   app.get('/api/quotations/next-number', requireAuth(), async (req: AuthenticatedRequest, res) => {
     try {
