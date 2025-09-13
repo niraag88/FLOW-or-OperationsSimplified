@@ -269,12 +269,12 @@ export default function QuotationForm({ open, onClose, editingQuotation, current
         // Map frontend snake_case fields to backend camelCase schema fields
         quoteNumber: formData.quotation_number,
         customerId: parseInt(formData.customer_id),
-        quoteDate: formData.quotation_date,
-        validUntil: validUntil.toISOString().split('T')[0], // Format as YYYY-MM-DD
+        quoteDate: quoteDate, // Send as Date object
+        validUntil: validUntil, // Send as Date object
         status: formData.status,
-        totalAmount: parseFloat(formData.subtotal.toFixed(2)),
-        vatAmount: parseFloat(formData.tax_amount.toFixed(2)),
-        grandTotal: parseFloat(formData.total_amount.toFixed(2)),
+        totalAmount: formData.subtotal.toFixed(2), // Send as string
+        vatAmount: formData.tax_amount.toFixed(2), // Send as string  
+        grandTotal: formData.total_amount.toFixed(2), // Send as string
         notes: formData.remarks,
         terms: "Payment terms - 30 days", // Default terms
         // Keep additional fields for frontend use
