@@ -88,16 +88,16 @@ export default function Quotations() {
   const canOverride = true;
 
   const filteredQuotations = quotations.filter(quotation => {
-    const matchesSearch = quotation.quotation_number?.toLowerCase().includes(searchTerm.toLowerCase()) ||
-                         quotation.remarks?.toLowerCase().includes(searchTerm.toLowerCase());
+    const matchesSearch = quotation.quoteNumber?.toLowerCase().includes(searchTerm.toLowerCase()) ||
+                         quotation.notes?.toLowerCase().includes(searchTerm.toLowerCase());
     
     const matchesStatus = selectedStatuses.length === 0 || selectedStatuses.includes(quotation.status);
-    const matchesCustomer = selectedCustomers.length === 0 || selectedCustomers.includes(quotation.customer_id);
+    const matchesCustomer = selectedCustomers.length === 0 || selectedCustomers.includes(quotation.customerId);
     
     // Date range filtering
     let matchesDateRange = true;
     if (dateRange !== "all") {
-      const quotationDate = new Date(quotation.quotation_date);
+      const quotationDate = new Date(quotation.quoteDate);
       const today = new Date();
       const startOfToday = new Date(today.getFullYear(), today.getMonth(), today.getDate());
       

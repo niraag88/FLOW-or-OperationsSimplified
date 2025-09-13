@@ -98,9 +98,9 @@ export default function QuotationList({ quotations, totalCount, loading, canEdit
               <TableBody>
                 {quotations.map((quotation) => (
                   <TableRow key={quotation.id} className="hover:bg-gray-50">
-                    <TableCell className="font-medium">{quotation.quotation_number}</TableCell>
+                    <TableCell className="font-medium">{quotation.quoteNumber}</TableCell>
                     <TableCell>{getCustomerName(quotation)}</TableCell>
-                    <TableCell>{formatDate(quotation.quotation_date)}</TableCell>
+                    <TableCell>{formatDate(quotation.quoteDate)}</TableCell>
                     <TableCell>{quotation.reference || '-'}</TableCell>
                     <TableCell>
                       <Badge className={`${getStatusColor(quotation.status)} border`}>
@@ -108,7 +108,7 @@ export default function QuotationList({ quotations, totalCount, loading, canEdit
                       </Badge>
                     </TableCell>
                     <TableCell>
-                      {formatCurrency(quotation.total_amount || 0, quotation.currency)}
+                      {formatCurrency(quotation.totalAmount || 0, quotation.currency)}
                     </TableCell>
                     <TableCell>
                       <QuotationActionsDropdown 
@@ -130,7 +130,7 @@ export default function QuotationList({ quotations, totalCount, loading, canEdit
               <Card key={quotation.id} className="p-4">
                 <div className="flex items-start justify-between mb-3">
                   <div>
-                    <h3 className="font-semibold text-gray-900">{quotation.quotation_number}</h3>
+                    <h3 className="font-semibold text-gray-900">{quotation.quoteNumber}</h3>
                     <p className="text-sm text-gray-600">{getCustomerName(quotation)}</p>
                   </div>
                   <Badge className={`${getStatusColor(quotation.status)} border`}>
@@ -141,7 +141,7 @@ export default function QuotationList({ quotations, totalCount, loading, canEdit
                 <div className="grid grid-cols-2 gap-4 text-sm mb-4">
                   <div>
                     <p className="text-gray-500">Quotation Date</p>
-                    <p className="font-medium">{formatDate(quotation.quotation_date)}</p>
+                    <p className="font-medium">{formatDate(quotation.quoteDate)}</p>
                   </div>
                   <div>
                     <p className="text-gray-500">Reference</p>
@@ -149,7 +149,7 @@ export default function QuotationList({ quotations, totalCount, loading, canEdit
                   </div>
                   <div>
                     <p className="text-gray-500">Total Amount</p>
-                    <p className="font-medium">{formatCurrency(quotation.total_amount || 0, quotation.currency)}</p>
+                    <p className="font-medium">{formatCurrency(quotation.totalAmount || 0, quotation.currency)}</p>
                   </div>
                 </div>
 
