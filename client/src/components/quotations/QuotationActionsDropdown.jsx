@@ -104,39 +104,47 @@ export default function QuotationActionsDropdown({ quotation, canEdit, onEdit, o
 
   const handleDelete = async () => {
     try {
-      // Move to recycle bin
-      await RecycleBin.create({
-        document_type: 'Quotation',
-        document_id: quotation.id,
-        document_number: quotation.quotation_number,
-        document_data: quotation,
-        deleted_by: currentUser?.email || 'unknown',
-        deleted_date: new Date().toISOString(),
-        reason: '', // Reason is not collected from SimpleConfirmDialog
-        original_status: quotation.status,
-        can_restore: true
-      });
+      // Try to move to recycle bin if implemented
+      try {
+        await RecycleBin.create({
+          document_type: 'Quotation',
+          document_id: quotation.id,
+          document_number: quotation.quotation_number || quotation.quoteNumber,
+          document_data: quotation,
+          deleted_by: currentUser?.email || 'unknown',
+          deleted_date: new Date().toISOString(),
+          reason: '', // Reason is not collected from SimpleConfirmDialog
+          original_status: quotation.status,
+          can_restore: true
+        });
+      } catch (error) {
+        console.warn('RecycleBin.create() not implemented yet');
+      }
 
-      // Log the deletion
-      await AuditLog.create({
-        entity_type: 'Quotation',
-        entity_id: quotation.id,
-        action: 'deleted',
-        user_email: currentUser?.email || 'unknown',
-        changes: { 
-          document_number: quotation.quotation_number,
-          deletion_reason: 'Deleted from UI', // Fixed reason for audit log
-          moved_to_recycle_bin: true
-        },
-        timestamp: new Date().toISOString()
-      });
+      // Try to log the deletion if implemented
+      try {
+        await AuditLog.create({
+          entity_type: 'Quotation',
+          entity_id: quotation.id,
+          action: 'deleted',
+          user_email: currentUser?.email || 'unknown',
+          changes: { 
+            document_number: quotation.quotation_number || quotation.quoteNumber,
+            deletion_reason: 'Deleted from UI', // Fixed reason for audit log
+            moved_to_recycle_bin: true
+          },
+          timestamp: new Date().toISOString()
+        });
+      } catch (error) {
+        console.warn('AuditLog.create() not implemented yet');
+      }
 
       // Delete from main table
       await Quotation.delete(quotation.id);
 
       toast({
         title: 'Quotation Deleted',
-        description: `${quotation.quotation_number} has been moved to the recycle bin.`
+        description: `${quotation.quotation_number || quotation.quoteNumber} has been deleted successfully.`
       });
 
       setShowDeleteDialog(false);

@@ -1170,6 +1170,18 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  // Delete quotation
+  app.delete('/api/quotations/:id', requireAuth(['Admin', 'Manager']), async (req: AuthenticatedRequest, res) => {
+    try {
+      const id = parseInt(req.params.id);
+      const deletedQuote = await businessStorage.deleteQuotation(id);
+      res.json({ success: true, message: 'Quotation deleted successfully', data: deletedQuote });
+    } catch (error) {
+      console.error('Error deleting quotation:', error);
+      res.status(500).json({ error: 'Failed to delete quotation' });
+    }
+  });
+
   // Stock Count management routes
   app.get('/api/stock-counts', requireAuth(), async (req: AuthenticatedRequest, res) => {
     try {

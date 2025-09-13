@@ -297,6 +297,15 @@ export class BusinessStorage {
     return quote;
   }
 
+  async deleteQuotation(id: number) {
+    // First delete all line items associated with this quotation
+    await db.delete(quotationItems).where(eq(quotationItems.quoteId, id));
+    
+    // Then delete the quotation itself
+    const [deletedQuote] = await db.delete(quotations).where(eq(quotations.id, id)).returning();
+    return deletedQuote;
+  }
+
   // Company Settings operations
   async getCompanySettings() {
     const [settings] = await db.select().from(companySettings).limit(1);
