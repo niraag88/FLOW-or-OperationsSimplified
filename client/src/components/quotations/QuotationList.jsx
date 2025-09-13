@@ -90,10 +90,10 @@ export default function QuotationList({ quotations, totalCount, loading, canEdit
                   <TableHead>Customer</TableHead>
                   <TableHead>Quotation Date</TableHead>
                   <TableHead>Reference</TableHead>
-                  <TableHead>Status</TableHead>
                   <TableHead>Subtotal</TableHead>
                   <TableHead>VAT</TableHead>
                   <TableHead>Total</TableHead>
+                  <TableHead>Status</TableHead>
                   <TableHead>Actions</TableHead>
                 </TableRow>
               </TableHeader>
@@ -105,11 +105,6 @@ export default function QuotationList({ quotations, totalCount, loading, canEdit
                     <TableCell>{formatDate(quotation.quoteDate)}</TableCell>
                     <TableCell>{quotation.reference || '-'}</TableCell>
                     <TableCell>
-                      <Badge className={`${getStatusColor(quotation.status)} border`}>
-                        {quotation.status?.toUpperCase()}
-                      </Badge>
-                    </TableCell>
-                    <TableCell>
                       {formatCurrency(quotation.totalAmount || 0, quotation.currency)}
                     </TableCell>
                     <TableCell>
@@ -117,6 +112,11 @@ export default function QuotationList({ quotations, totalCount, loading, canEdit
                     </TableCell>
                     <TableCell>
                       {formatCurrency(quotation.grandTotal || 0, quotation.currency)}
+                    </TableCell>
+                    <TableCell>
+                      <Badge className={`${getStatusColor(quotation.status)} border`}>
+                        {quotation.status?.toUpperCase()}
+                      </Badge>
                     </TableCell>
                     <TableCell>
                       <QuotationActionsDropdown 
