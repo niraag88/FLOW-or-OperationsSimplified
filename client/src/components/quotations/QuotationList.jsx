@@ -91,7 +91,9 @@ export default function QuotationList({ quotations, totalCount, loading, canEdit
                   <TableHead>Quotation Date</TableHead>
                   <TableHead>Reference</TableHead>
                   <TableHead>Status</TableHead>
-                  <TableHead>Total Amount</TableHead>
+                  <TableHead>Subtotal</TableHead>
+                  <TableHead>VAT</TableHead>
+                  <TableHead>Total</TableHead>
                   <TableHead>Actions</TableHead>
                 </TableRow>
               </TableHeader>
@@ -109,6 +111,12 @@ export default function QuotationList({ quotations, totalCount, loading, canEdit
                     </TableCell>
                     <TableCell>
                       {formatCurrency(quotation.totalAmount || 0, quotation.currency)}
+                    </TableCell>
+                    <TableCell>
+                      {formatCurrency(quotation.vatAmount || 0, quotation.currency)}
+                    </TableCell>
+                    <TableCell>
+                      {formatCurrency(quotation.grandTotal || 0, quotation.currency)}
                     </TableCell>
                     <TableCell>
                       <QuotationActionsDropdown 
@@ -148,8 +156,16 @@ export default function QuotationList({ quotations, totalCount, loading, canEdit
                     <p className="font-medium">{quotation.reference || '-'}</p>
                   </div>
                   <div>
-                    <p className="text-gray-500">Total Amount</p>
+                    <p className="text-gray-500">Subtotal</p>
                     <p className="font-medium">{formatCurrency(quotation.totalAmount || 0, quotation.currency)}</p>
+                  </div>
+                  <div>
+                    <p className="text-gray-500">VAT</p>
+                    <p className="font-medium">{formatCurrency(quotation.vatAmount || 0, quotation.currency)}</p>
+                  </div>
+                  <div>
+                    <p className="text-gray-500">Total</p>
+                    <p className="font-medium">{formatCurrency(quotation.grandTotal || 0, quotation.currency)}</p>
                   </div>
                 </div>
 
