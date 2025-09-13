@@ -1127,10 +1127,6 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const quoteNumber = await businessStorage.generateQuotationNumber();
       
       // Convert string dates back to Date objects for validation
-      console.log('Original req.body:', req.body);
-      console.log('quoteDate before conversion:', req.body.quoteDate, typeof req.body.quoteDate);
-      console.log('validUntil before conversion:', req.body.validUntil, typeof req.body.validUntil);
-      
       const requestData = {
         ...req.body,
         quoteNumber,
@@ -1138,13 +1134,6 @@ export async function registerRoutes(app: Express): Promise<Server> {
         quoteDate: req.body.quoteDate ? new Date(req.body.quoteDate) : undefined,
         validUntil: req.body.validUntil ? new Date(req.body.validUntil) : undefined
       };
-      
-      console.log('requestData after conversion:', {
-        quoteDate: requestData.quoteDate, 
-        validUntil: requestData.validUntil,
-        quoteDateType: typeof requestData.quoteDate,
-        validUntilType: typeof requestData.validUntil
-      });
       
       const validatedData = insertQuotationSchema.parse(requestData);
       const quotation = await businessStorage.createQuotation(validatedData);
