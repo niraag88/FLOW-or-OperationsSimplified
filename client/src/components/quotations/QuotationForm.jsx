@@ -67,26 +67,41 @@ export default function QuotationForm({ open, onClose, editingQuotation, current
 
       if (editingQuotation) {
         console.log("Loading existing quotation:", editingQuotation);
-        const customer = customersData.find(c => c.id === editingQuotation.customer_id);
+        const customer = customersData.find(c => c.id === editingQuotation.customerId);
         setSelectedCustomer(customer);
         
-        // Ensure we copy all the fields from the existing quotation
+        // Map API camelCase response to form snake_case fields
         setFormData({
-          quotation_number: editingQuotation.quotation_number || "",
-          customer_id: editingQuotation.customer_id || "",
-          quotation_date: editingQuotation.quotation_date || new Date().toISOString().split('T')[0],
+          quotation_number: editingQuotation.quoteNumber || "",
+          customer_id: editingQuotation.customerId || "",
+          quotation_date: editingQuotation.quoteDate ? new Date(editingQuotation.quoteDate).toISOString().split('T')[0] : new Date().toISOString().split('T')[0],
           reference: editingQuotation.reference || "",
-          reference_date: editingQuotation.reference_date || "",
+          reference_date: editingQuotation.referenceDate ? new Date(editingQuotation.referenceDate).toISOString().split('T')[0] : "",
           status: editingQuotation.status || "draft",
           currency: editingQuotation.currency || "AED",
-          tax_treatment: editingQuotation.tax_treatment || "StandardRated",
-          tax_rate: editingQuotation.tax_rate || 0.05,
-          subtotal: editingQuotation.subtotal || 0,
-          tax_amount: editingQuotation.tax_amount || 0,
-          total_amount: editingQuotation.total_amount || 0,
-          remarks: editingQuotation.remarks || "",
+          tax_treatment: editingQuotation.taxTreatment || "StandardRated",
+          tax_rate: editingQuotation.taxRate || 0.05,
+          subtotal: parseFloat(editingQuotation.totalAmount || 0),
+          tax_amount: parseFloat(editingQuotation.vatAmount || 0),
+          total_amount: parseFloat(editingQuotation.grandTotal || 0),
+          remarks: editingQuotation.notes || "",
           attachments: editingQuotation.attachments || [],
-          items: editingQuotation.items || []
+          items: (editingQuotation.items || []).map(item => {
+            // Look up product details to get brand information
+            const product = productsData.find(p => p.id === (item.productId || item.product_id));
+            return {
+              product_id: item.productId || item.product_id || "",
+              brand_id: product?.brandId || item.brand_id || "",
+              brand_name: product?.brand?.name || item.brand_name || "",
+              product_code: product?.sku || item.product_code || "",
+              description: item.description || product?.name || "",
+              quantity: Number(item.quantity || 0),
+              unit_price: Number(item.unitPrice || item.unit_price || 0),
+              discount: Number(item.discount || 0),
+              vat_rate: Number(item.vatRate || item.vat_rate || 0.05),
+              line_total: Number(item.lineTotal || item.line_total || 0)
+            };
+          })
         });
       } else {
         // Fetch next quotation number from API
