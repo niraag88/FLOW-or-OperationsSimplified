@@ -527,7 +527,7 @@ export default function QuotationForm({ open, onClose, editingQuotation, current
                       <TableHead>Description</TableHead>
                       <TableHead>Quantity</TableHead>
                       <TableHead>Unit Price (AED)</TableHead>
-                      <TableHead>Line Total</TableHead>
+                      <TableHead>Line Total (AED)</TableHead>
                       {isEditable && <TableHead></TableHead>}
                     </TableRow>
                   </TableHeader>
@@ -596,7 +596,7 @@ export default function QuotationForm({ open, onClose, editingQuotation, current
                             className="w-24"
                           />
                         </TableCell>
-                        <TableCell>AED {(item.line_total || 0).toFixed(2)}</TableCell>
+                        <TableCell>{(item.line_total || 0).toFixed(2)}</TableCell>
                         {isEditable && (
                           <TableCell>
                             <Button
