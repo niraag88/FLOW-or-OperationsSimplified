@@ -10,20 +10,13 @@ export default function PrintHeader({
   companyTrn
 }) {
   return (
-    <header className="flex justify-between items-start mb-10 border-b pb-6">
+    <header className="flex justify-between items-start mb-10 border-b-2 border-gray-300 pb-6">
       <div>
-        <h1 className="text-4xl font-bold text-gray-800">{documentTitle}</h1>
-        <div className="mt-2 text-gray-600">
-          <p>{documentTitle.includes('PURCHASE') ? 'PO Number' : 'Quote Number'}: <span className="font-semibold">{documentNumber}</span></p>
-          <p>{documentTitle.includes('PURCHASE') ? 'Order Date' : 'Quote Date'}: <span className="font-semibold">{documentDate}</span></p>
-        </div>
-      </div>
-      <div className="text-right">
         {logoUrl && (
           <img 
             src={logoUrl} 
             alt="Company Logo" 
-            className="h-16 w-auto mb-4 ml-auto"
+            className="h-16 w-auto mb-4"
           />
         )}
         {companyName && (
@@ -39,6 +32,13 @@ export default function PrintHeader({
             </div>
           </div>
         )}
+      </div>
+      <div className="text-right">
+        <h1 className="text-4xl font-bold text-gray-800">{documentTitle}</h1>
+        <div className="mt-2 text-gray-600">
+          <p>{documentTitle.includes('PURCHASE') ? 'PO Number' : 'Quote Number'}: <span className="font-semibold">{documentNumber}</span></p>
+          <p>{documentTitle.includes('PURCHASE') ? 'Order Date' : 'Quote Date'}: <span className="font-semibold">{documentDate}</span></p>
+        </div>
       </div>
     </header>
   );

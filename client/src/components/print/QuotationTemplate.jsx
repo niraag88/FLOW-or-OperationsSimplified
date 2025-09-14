@@ -30,7 +30,7 @@ export default function QuotationTemplate({ data, customer, settings }) {
   ];
 
   return (
-    <PrintPage>
+    <PrintPage className="p-8">
       <PrintHeader
         documentTitle="QUOTATION"
         documentNumber={data.quoteNumber}
