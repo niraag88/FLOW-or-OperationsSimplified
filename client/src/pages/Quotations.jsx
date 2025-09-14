@@ -38,8 +38,10 @@ export default function Quotations() {
   }, [refreshTrigger]);
 
   const loadData = async () => {
+    console.time('🚀 Quotations Page - Total Load Time');
     setLoading(true);
     try {
+      console.time('📡 API Calls - Parallel Loading');
       // Load all necessary data in parallel like the optimized PO page
       const [quotationsData, customersData, productsData, brandsData] = await Promise.all([
         Quotation.list('-updated_date'),
@@ -47,15 +49,21 @@ export default function Quotations() {
         Product.list().catch(() => []),
         Brand.list().catch(() => [])
       ]);
+      console.timeEnd('📡 API Calls - Parallel Loading');
 
+      console.time('⚡ State Updates');
       setQuotations(quotationsData);
       setCustomers(customersData.filter(c => c.is_active !== false));
       setProducts(productsData);
       setBrands(brandsData.filter(b => b.isActive !== false));
+      console.timeEnd('⚡ State Updates');
+
+      console.log(`📊 Data loaded: ${quotationsData.length} quotations, ${customersData.length} customers, ${productsData.length} products, ${brandsData.length} brands`);
     } catch (error) {
       console.error("Error loading quotations data:", error);
     } finally {
       setLoading(false);
+      console.timeEnd('🚀 Quotations Page - Total Load Time');
     }
   };
 

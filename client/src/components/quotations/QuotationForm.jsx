@@ -54,6 +54,7 @@ export default function QuotationForm({ open, onClose, editingQuotation, current
 
   const loadData = async () => {
     try {
+      console.time('📝 QuotationForm - Total Load Time');
       setLoading(true);
       
       // Use preloaded data if available, otherwise fetch from API (fallback)
@@ -61,16 +62,22 @@ export default function QuotationForm({ open, onClose, editingQuotation, current
       
       if (preloadedCustomers && preloadedProducts && preloadedBrands) {
         // Use preloaded data for better performance
+        console.time('⚡ Using Preloaded Data');
         customersData = preloadedCustomers;
         productsData = preloadedProducts;
         brandsData = preloadedBrands;
+        console.timeEnd('⚡ Using Preloaded Data');
+        console.log('✅ QuotationForm using preloaded data - significantly faster!');
       } else {
         // Fallback to API calls if preloaded data not available
+        console.time('📡 Fallback API Calls');
+        console.warn('⚠️ No preloaded data - falling back to API calls (slower)');
         [customersData, productsData, brandsData] = await Promise.all([
           Customer.list().catch(() => []),
           Product.list().catch(() => []),
           Brand.list().catch(() => [])
         ]);
+        console.timeEnd('📡 Fallback API Calls');
       }
 
       setCustomers(customersData.filter(c => c.is_active !== false));
@@ -171,6 +178,7 @@ export default function QuotationForm({ open, onClose, editingQuotation, current
       });
     } finally {
       setLoading(false);
+      console.timeEnd('📝 QuotationForm - Total Load Time');
     }
   };
 
