@@ -13,330 +13,173 @@ export default function QuotationTemplate({ data, customer, settings }) {
   };
 
   return (
-    <div style={{ 
-      maxWidth: '210mm', 
-      margin: '0 auto', 
-      padding: '20mm', 
-      fontFamily: 'Arial, sans-serif',
-      fontSize: '12px',
-      lineHeight: '1.4',
-      color: '#333'
-    }}>
-      
-      {/* Header Section - Logo LEFT, Title RIGHT */}
-      <div style={{ 
-        display: 'flex', 
-        justifyContent: 'space-between', 
-        alignItems: 'flex-start',
-        marginBottom: '20px' 
-      }}>
-        {/* Logo on LEFT */}
+    <div className="p-8 font-sans">
+      <style jsx global>{`
+        @media print {
+          @page {
+            size: A4 portrait;
+            margin: 1.2cm;
+          }
+          body, html {
+            -webkit-print-color-adjust: exact;
+            print-color-adjust: exact;
+            font-size: 10pt;
+          }
+          .invoice-container {
+            width: 100%;
+            margin: 0;
+            padding: 0;
+            box-shadow: none;
+            border: none;
+          }
+        }
+      `}</style>
+
+      {/* Header - Title LEFT, Logo RIGHT (matching PO) */}
+      <header className="flex justify-between items-start mb-10 border-b pb-6">
         <div>
+          <h1 className="text-4xl font-bold text-gray-800">QUOTATION</h1>
+          <div className="mt-2 text-gray-600">
+            <p>Quotation Number: <span className="font-semibold">{data.quoteNumber}</span></p>
+            <p>Quotation Date: <span className="font-semibold">{formatDate(data.quoteDate)}</span></p>
+            {data.reference && (
+              <p>Reference: <span className="font-semibold">{data.reference}</span></p>
+            )}
+            {data.referenceDate && (
+              <p>Reference Date: <span className="font-semibold">{formatDate(data.referenceDate)}</span></p>
+            )}
+          </div>
+        </div>
+        <div className="text-right">
           {settings?.logo && (
             <img 
               src={settings.logo} 
               alt="Company Logo" 
-              style={{ height: '60px', width: 'auto' }}
+              className="h-16 w-auto mb-4 ml-auto"
             />
           )}
-        </div>
-        
-        {/* Document Title on RIGHT */}
-        <div>
-          <h1 style={{ 
-            fontSize: '28px', 
-            fontWeight: 'bold', 
-            margin: '0',
-            textAlign: 'right',
-            color: '#333'
-          }}>
-            QUOTATION
-          </h1>
-        </div>
-      </div>
-
-      {/* Horizontal Divider */}
-      <div style={{ 
-        borderBottom: '2px solid #333', 
-        marginBottom: '20px' 
-      }}></div>
-
-      {/* Company Details and Document Info */}
-      <div style={{ 
-        display: 'grid', 
-        gridTemplateColumns: '1fr 1fr', 
-        gap: '40px',
-        marginBottom: '30px' 
-      }}>
-        {/* Company Details - LEFT */}
-        <div>
-          <div style={{ fontWeight: 'bold', fontSize: '14px', marginBottom: '5px' }}>
-            {settings?.companyName || 'SUPERNATURE LLC'}
-          </div>
-          <div style={{ fontSize: '11px', lineHeight: '1.3' }}>
-            {settings?.address && <div>{settings.address}</div>}
-            {settings?.phone && <div>Tel: {settings.phone}</div>}
-            {settings?.email && <div>Email: {settings.email}</div>}
-          </div>
-        </div>
-
-        {/* Document Details - RIGHT */}
-        <div style={{ textAlign: 'right' }}>
-          <table style={{ marginLeft: 'auto', borderSpacing: '0', fontSize: '11px' }}>
-            <tbody>
-              <tr>
-                <td style={{ padding: '2px 10px 2px 0', fontWeight: 'bold' }}>Quotation Number</td>
-                <td style={{ padding: '2px 0' }}>{data.quoteNumber}</td>
-              </tr>
-              <tr>
-                <td style={{ padding: '2px 10px 2px 0', fontWeight: 'bold' }}>Quotation Date</td>
-                <td style={{ padding: '2px 0' }}>{formatDate(data.quoteDate)}</td>
-              </tr>
-              {data.reference && (
-                <tr>
-                  <td style={{ padding: '2px 10px 2px 0', fontWeight: 'bold' }}>Reference</td>
-                  <td style={{ padding: '2px 0' }}>{data.reference}</td>
-                </tr>
+          {settings?.companyName && (
+            <div>
+              <h2 className="text-xl font-bold text-gray-800">{settings.companyName}</h2>
+              {settings.address && (
+                <p className="text-gray-600 mt-1">{settings.address}</p>
               )}
-              {data.referenceDate && (
-                <tr>
-                  <td style={{ padding: '2px 10px 2px 0', fontWeight: 'bold' }}>Reference Date</td>
-                  <td style={{ padding: '2px 0' }}>{formatDate(data.referenceDate)}</td>
-                </tr>
-              )}
-            </tbody>
-          </table>
+              <div className="mt-2 text-sm text-gray-600">
+                {settings.phone && <p>Tel: {settings.phone}</p>}
+                {settings.email && <p>Email: {settings.email}</p>}
+                {settings.trn && <p>TRN: {settings.trn}</p>}
+              </div>
+            </div>
+          )}
         </div>
-      </div>
+      </header>
 
-      {/* Bill To Section */}
-      <div style={{ 
-        marginBottom: '20px',
-        border: '1px solid #ddd',
-        padding: '10px'
-      }}>
-        <div style={{ 
-          fontWeight: 'bold', 
-          fontSize: '11px', 
-          textTransform: 'uppercase',
-          marginBottom: '5px',
-          color: '#666'
-        }}>
-          Bill To
-        </div>
-        <div style={{ fontSize: '12px' }}>
-          <div style={{ fontWeight: 'bold', marginBottom: '3px' }}>
-            {data.customerName || 'Unknown Customer'}
+      {/* Bill To and Quotation Details */}
+      <section className="grid grid-cols-2 gap-8 mb-10">
+        <div>
+          <h3 className="text-sm font-semibold text-gray-500 uppercase mb-2">Bill To</h3>
+          <div className="text-gray-700">
+            <p className="font-semibold text-lg">{data.customerName || 'Unknown Customer'}</p>
+            {data.customerContactPerson && <p>Contact: {data.customerContactPerson}</p>}
+            {data.customerEmail && <p>Email: {data.customerEmail}</p>}
+            {data.customerPhone && <p>Phone: {data.customerPhone}</p>}
+            {data.customerBillingAddress && <p>{data.customerBillingAddress}</p>}
           </div>
-          {data.customerContactPerson && (
-            <div>Contact: {data.customerContactPerson}</div>
-          )}
-          {data.customerEmail && (
-            <div>Email: {data.customerEmail}</div>
-          )}
-          {data.customerPhone && (
-            <div>Tel: {data.customerPhone}</div>
-          )}
-          {data.customerBillingAddress && (
-            <div>{data.customerBillingAddress}</div>
-          )}
         </div>
-      </div>
+        <div className="text-right">
+          <div className="text-gray-700">
+            {data.validUntil && (
+              <p className="text-gray-500">Valid Until: <span className="font-semibold text-gray-700">{formatDate(data.validUntil)}</span></p>
+            )}
+            <p className="text-gray-500">Currency: <span className="font-semibold text-gray-700">AED</span></p>
+            <p className="text-gray-500">Status: <span className="font-semibold text-gray-700 capitalize">{data.status || 'Draft'}</span></p>
+          </div>
+        </div>
+      </section>
 
-      {/* Items Table */}
-      <table style={{ 
-        width: '100%', 
-        borderCollapse: 'collapse',
-        marginBottom: '20px',
-        fontSize: '10px'
-      }}>
-        <thead>
-          <tr style={{ backgroundColor: '#f5f5f5' }}>
-            <th style={{ 
-              border: '1px solid #ddd', 
-              padding: '8px', 
-              textAlign: 'left',
-              fontWeight: 'bold'
-            }}>
-              Product Code
-            </th>
-            <th style={{ 
-              border: '1px solid #ddd', 
-              padding: '8px', 
-              textAlign: 'left',
-              fontWeight: 'bold'
-            }}>
-              Description
-            </th>
-            <th style={{ 
-              border: '1px solid #ddd', 
-              padding: '8px', 
-              textAlign: 'center',
-              fontWeight: 'bold'
-            }}>
-              Size
-            </th>
-            <th style={{ 
-              border: '1px solid #ddd', 
-              padding: '8px', 
-              textAlign: 'center',
-              fontWeight: 'bold'
-            }}>
-              Qty
-            </th>
-            <th style={{ 
-              border: '1px solid #ddd', 
-              padding: '8px', 
-              textAlign: 'right',
-              fontWeight: 'bold'
-            }}>
-              Unit Price (AED)
-            </th>
-            <th style={{ 
-              border: '1px solid #ddd', 
-              padding: '8px', 
-              textAlign: 'right',
-              fontWeight: 'bold'
-            }}>
-              Line Total (AED)
-            </th>
-          </tr>
-        </thead>
-        <tbody>
-          {data.items && data.items.length > 0 ? (
-            data.items.map((item, index) => (
-              <tr key={index}>
-                <td style={{ border: '1px solid #ddd', padding: '6px', textAlign: 'left' }}>
-                  {item.product_code || '-'}
-                </td>
-                <td style={{ border: '1px solid #ddd', padding: '6px', textAlign: 'left' }}>
-                  {item.description}
-                </td>
-                <td style={{ border: '1px solid #ddd', padding: '6px', textAlign: 'center' }}>
-                  {item.size || '-'}
-                </td>
-                <td style={{ border: '1px solid #ddd', padding: '6px', textAlign: 'center' }}>
-                  {item.quantity}
-                </td>
-                <td style={{ border: '1px solid #ddd', padding: '6px', textAlign: 'right' }}>
-                  {parseFloat(item.unit_price || 0).toFixed(2)}
-                </td>
-                <td style={{ border: '1px solid #ddd', padding: '6px', textAlign: 'right' }}>
-                  {parseFloat(item.line_total || 0).toFixed(2)}
-                </td>
-              </tr>
-            ))
-          ) : (
-            <tr>
-              <td colSpan="6" style={{ 
-                border: '1px solid #ddd', 
-                padding: '20px', 
-                textAlign: 'center',
-                color: '#666'
-              }}>
-                No items
-              </td>
+      {/* Items Table - Exact same structure as PO */}
+      <section className="mb-8">
+        <table className="w-full border-collapse">
+          <thead>
+            <tr className="bg-gray-100 border-b-2 border-gray-200">
+              <th className="text-left py-3 px-4 font-semibold text-gray-700 border-r border-gray-200">Product Code</th>
+              <th className="text-left py-3 px-4 font-semibold text-gray-700 border-r border-gray-200">Description</th>
+              <th className="text-center py-3 px-4 font-semibold text-gray-700 border-r border-gray-200">Size</th>
+              <th className="text-center py-3 px-4 font-semibold text-gray-700 border-r border-gray-200">Qty</th>
+              <th className="text-right py-3 px-4 font-semibold text-gray-700 border-r border-gray-200">Unit Price (AED)</th>
+              <th className="text-right py-3 px-4 font-semibold text-gray-700">Line Total (AED)</th>
             </tr>
-          )}
-        </tbody>
-      </table>
-
-      {/* Totals Section */}
-      <div style={{ textAlign: 'right', marginBottom: '30px' }}>
-        <table style={{ 
-          marginLeft: 'auto', 
-          borderSpacing: '0',
-          fontSize: '11px',
-          minWidth: '200px'
-        }}>
+          </thead>
           <tbody>
-            <tr>
-              <td style={{ 
-                padding: '4px 15px 4px 0', 
-                fontWeight: 'bold',
-                borderBottom: '1px solid #eee'
-              }}>
-                Subtotal
-              </td>
-              <td style={{ 
-                padding: '4px 0', 
-                textAlign: 'right',
-                borderBottom: '1px solid #eee'
-              }}>
-                AED {parseFloat(data.totalAmount || 0).toFixed(2)}
-              </td>
-            </tr>
-            {data.vatAmount && parseFloat(data.vatAmount) > 0 && (
+            {data.items && data.items.length > 0 ? (
+              data.items.map((item, index) => (
+                <tr key={index} className="border-b border-gray-200">
+                  <td className="py-3 px-4 border-r border-gray-200 font-medium">{item.product_code || '-'}</td>
+                  <td className="py-3 px-4 border-r border-gray-200">{item.description}</td>
+                  <td className="text-center py-3 px-4 border-r border-gray-200">{item.size || '-'}</td>
+                  <td className="text-center py-3 px-4 border-r border-gray-200">{item.quantity}</td>
+                  <td className="text-right py-3 px-4 border-r border-gray-200">{parseFloat(item.unit_price || 0).toFixed(2)}</td>
+                  <td className="text-right py-3 px-4 font-medium">{parseFloat(item.line_total || 0).toFixed(2)}</td>
+                </tr>
+              ))
+            ) : (
               <tr>
-                <td style={{ 
-                  padding: '4px 15px 4px 0', 
-                  fontWeight: 'bold',
-                  borderBottom: '1px solid #eee'
-                }}>
-                  VAT
-                </td>
-                <td style={{ 
-                  padding: '4px 0', 
-                  textAlign: 'right',
-                  borderBottom: '1px solid #eee'
-                }}>
-                  AED {parseFloat(data.vatAmount || 0).toFixed(2)}
-                </td>
+                <td colSpan="6" className="py-8 text-center text-gray-500">No items</td>
               </tr>
             )}
-            <tr>
-              <td style={{ 
-                padding: '8px 15px 4px 0', 
-                fontWeight: 'bold',
-                fontSize: '12px',
-                borderTop: '2px solid #333'
-              }}>
-                Total
-              </td>
-              <td style={{ 
-                padding: '8px 0 4px 0', 
-                textAlign: 'right',
-                fontWeight: 'bold',
-                fontSize: '12px',
-                borderTop: '2px solid #333'
-              }}>
-                AED {parseFloat(data.grandTotal || 0).toFixed(2)}
-              </td>
-            </tr>
           </tbody>
         </table>
-      </div>
+      </section>
 
-      {/* Signature Section */}
-      <div style={{ 
-        display: 'grid', 
-        gridTemplateColumns: '1fr 1fr', 
-        gap: '60px',
-        marginTop: '40px',
-        borderTop: '1px solid #ddd',
-        paddingTop: '20px'
-      }}>
-        <div style={{ textAlign: 'center' }}>
-          <div style={{ 
-            borderBottom: '1px solid #999', 
-            height: '40px',
-            marginBottom: '8px'
-          }}></div>
-          <div style={{ fontSize: '10px', fontWeight: 'bold' }}>
-            For {settings?.companyName || 'Supernature'}
+      {/* Totals - Exact same structure as PO */}
+      <section className="flex justify-end mb-8">
+        <div className="w-full md:w-1/2">
+          <div className="flex justify-between py-2">
+            <span className="text-gray-600">Subtotal:</span>
+            <span className="font-semibold">AED {parseFloat(data.totalAmount || 0).toFixed(2)}</span>
+          </div>
+          {data.vatAmount && parseFloat(data.vatAmount) > 0 && (
+            <div className="flex justify-between py-2">
+              <span className="text-gray-600">VAT:</span>
+              <span className="font-semibold">AED {parseFloat(data.vatAmount || 0).toFixed(2)}</span>
+            </div>
+          )}
+          <div className="flex justify-between py-2 border-t-2 border-gray-300 mt-2">
+            <span className="font-bold text-lg">Total:</span>
+            <span className="font-bold text-lg">AED {parseFloat(data.grandTotal || 0).toFixed(2)}</span>
           </div>
         </div>
-        <div style={{ textAlign: 'center' }}>
-          <div style={{ 
-            borderBottom: '1px solid #999', 
-            height: '40px',
-            marginBottom: '8px'
-          }}></div>
-          <div style={{ fontSize: '10px', fontWeight: 'bold' }}>
-            For Customer
+      </section>
+
+      {/* Remarks */}
+      {data.remarks && (
+        <section className="mb-8">
+          <h3 className="text-sm font-semibold text-gray-500 uppercase mb-2">Remarks</h3>
+          <p className="text-gray-600 text-sm whitespace-pre-wrap">{data.remarks}</p>
+        </section>
+      )}
+
+      {/* Terms & Conditions */}
+      {data.terms && (
+        <section className="mb-8">
+          <h3 className="text-sm font-semibold text-gray-500 uppercase mb-2">Terms & Conditions</h3>
+          <p className="text-gray-600 text-sm whitespace-pre-wrap">{data.terms}</p>
+        </section>
+      )}
+
+      {/* Signature Section - Exact same structure as PO */}
+      <section className="mt-auto pt-8 border-t">
+        <div className="grid grid-cols-2 gap-8">
+          <div className="text-center">
+            <div className="border-b border-gray-400 mb-2 pb-6"></div>
+            <p className="text-sm font-medium">For {settings?.companyName || 'Supernature'}</p>
+          </div>
+          <div className="text-center">
+            <div className="border-b border-gray-400 mb-2 pb-6"></div>
+            <p className="text-sm font-medium">For Customer</p>
           </div>
         </div>
-      </div>
+      </section>
     </div>
   );
 }
