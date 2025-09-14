@@ -14,7 +14,7 @@ export default function QuotationTemplate({ data, customer, settings }) {
 
   return (
     <div className="p-8 font-sans">
-      <style>{`
+      <style jsx global>{`
         @media print {
           @page {
             size: A4 portrait;
@@ -35,19 +35,27 @@ export default function QuotationTemplate({ data, customer, settings }) {
         }
       `}</style>
 
-      {/* Centered Title */}
-      <div className="text-center mb-6">
-        <h1 className="text-4xl font-bold text-gray-800">QUOTATION</h1>
-      </div>
-
-      {/* Header */}
+      {/* Header - EXACT copy of PO structure */}
       <header className="flex justify-between items-start mb-10 border-b pb-6">
         <div>
+          <h1 className="text-4xl font-bold text-gray-800">QUOTATION</h1>
+          <div className="mt-2 text-gray-600">
+            <p>Quotation Number: <span className="font-semibold">{data.quoteNumber}</span></p>
+            <p>Quotation Date: <span className="font-semibold">{formatDate(data.quoteDate)}</span></p>
+            {data.reference && (
+              <p>Reference: <span className="font-semibold">{data.reference}</span></p>
+            )}
+            {data.referenceDate && (
+              <p>Reference Date: <span className="font-semibold">{formatDate(data.referenceDate)}</span></p>
+            )}
+          </div>
+        </div>
+        <div className="text-right">
           {settings?.company_logo_url && (
             <img 
               src={settings.company_logo_url} 
               alt="Company Logo" 
-              className="h-16 w-auto mb-4"
+              className="h-16 w-auto mb-4 ml-auto"
             />
           )}
           {settings?.company_name && (
@@ -64,21 +72,9 @@ export default function QuotationTemplate({ data, customer, settings }) {
             </div>
           )}
         </div>
-        <div className="text-right">
-          <div className="text-gray-700">
-            <p>Quotation Number: <span className="font-semibold">{data.quoteNumber}</span></p>
-            <p>Quotation Date: <span className="font-semibold">{formatDate(data.quoteDate)}</span></p>
-            {data.reference && (
-              <p>Reference: <span className="font-semibold">{data.reference}</span></p>
-            )}
-            {data.referenceDate && (
-              <p>Reference Date: <span className="font-semibold">{formatDate(data.referenceDate)}</span></p>
-            )}
-          </div>
-        </div>
       </header>
 
-      {/* Bill To and Quotation Details */}
+      {/* Bill To and Quotation Details - EXACT copy of PO structure */}
       <section className="grid grid-cols-2 gap-8 mb-10">
         <div>
           <h3 className="text-sm font-semibold text-gray-500 uppercase mb-2">Bill To</h3>
@@ -101,13 +97,14 @@ export default function QuotationTemplate({ data, customer, settings }) {
         </div>
       </section>
 
-      {/* Items Table - EXACT same structure as PO (5 columns only) */}
+      {/* Items Table - EXACT copy of PO structure */}
       <section className="mb-8">
         <table className="w-full border-collapse">
           <thead>
             <tr className="bg-gray-100 border-b-2 border-gray-200">
               <th className="text-left py-3 px-4 font-semibold text-gray-700 border-r border-gray-200">Product Code</th>
               <th className="text-left py-3 px-4 font-semibold text-gray-700 border-r border-gray-200">Description</th>
+              <th className="text-center py-3 px-4 font-semibold text-gray-700 border-r border-gray-200">Size</th>
               <th className="text-center py-3 px-4 font-semibold text-gray-700 border-r border-gray-200">Qty</th>
               <th className="text-right py-3 px-4 font-semibold text-gray-700 border-r border-gray-200">Unit Price ({data.currency || 'AED'})</th>
               <th className="text-right py-3 px-4 font-semibold text-gray-700">Line Total ({data.currency || 'AED'})</th>
@@ -119,6 +116,7 @@ export default function QuotationTemplate({ data, customer, settings }) {
                 <tr key={index} className="border-b border-gray-200">
                   <td className="py-3 px-4 border-r border-gray-200 font-medium">{item.product_code || '-'}</td>
                   <td className="py-3 px-4 border-r border-gray-200">{item.description}</td>
+                  <td className="text-center py-3 px-4 border-r border-gray-200">{item.size || '-'}</td>
                   <td className="text-center py-3 px-4 border-r border-gray-200">{item.quantity}</td>
                   <td className="text-right py-3 px-4 border-r border-gray-200">{(parseFloat(item.unit_price) || 0).toFixed(2)}</td>
                   <td className="text-right py-3 px-4 font-medium">{(parseFloat(item.line_total) || 0).toFixed(2)}</td>
@@ -126,14 +124,14 @@ export default function QuotationTemplate({ data, customer, settings }) {
               ))
             ) : (
               <tr>
-                <td colSpan="5" className="py-8 text-center text-gray-500">No items</td>
+                <td colSpan="6" className="py-8 text-center text-gray-500">No items</td>
               </tr>
             )}
           </tbody>
         </table>
       </section>
 
-      {/* Totals - EXACT same structure as PO */}
+      {/* Totals - EXACT copy of PO structure */}
       <section className="flex justify-end mb-8">
         <div className="w-full md:w-1/2">
           <div className="flex justify-between py-2">
@@ -153,7 +151,7 @@ export default function QuotationTemplate({ data, customer, settings }) {
         </div>
       </section>
 
-      {/* Notes */}
+      {/* Notes - EXACT copy of PO structure */}
       {data.remarks && (
         <section className="mb-8">
           <h3 className="text-sm font-semibold text-gray-500 uppercase mb-2">Notes</h3>
@@ -161,7 +159,7 @@ export default function QuotationTemplate({ data, customer, settings }) {
         </section>
       )}
 
-      {/* Terms & Conditions */}
+      {/* Terms & Conditions - EXACT copy of PO structure */}
       {data.terms && (
         <section className="mb-8">
           <h3 className="text-sm font-semibold text-gray-500 uppercase mb-2">Terms & Conditions</h3>
@@ -169,7 +167,7 @@ export default function QuotationTemplate({ data, customer, settings }) {
         </section>
       )}
 
-      {/* Signature Section - EXACT same structure as PO */}
+      {/* Signature Section - EXACT copy of PO structure */}
       <section className="mt-auto pt-8 border-t">
         <div className="grid grid-cols-2 gap-8">
           <div className="text-center">
