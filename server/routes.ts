@@ -1138,6 +1138,24 @@ export async function registerRoutes(app: Express): Promise<Server> {
       
       const validatedData = insertQuotationSchema.parse(requestData);
       const quotation = await businessStorage.createQuotation(validatedData);
+      
+      // If there are line items, save them (same as PO system)
+      if (req.body.items && Array.isArray(req.body.items) && req.body.items.length > 0) {
+        for (const item of req.body.items) {
+          if (item.product_id && item.quantity > 0) {
+            await db.insert(quotationItems).values({
+              quoteId: quotation.id,
+              productId: parseInt(item.product_id),
+              quantity: item.quantity,
+              unitPrice: item.unit_price.toString(),
+              discount: item.discount ? item.discount.toString() : "0.00",
+              vatRate: item.vat_rate ? item.vat_rate.toString() : "0.05",
+              lineTotal: item.line_total.toString()
+            });
+          }
+        }
+      }
+      
       res.status(201).json(quotation);
     } catch (error) {
       console.error('Error creating quotation:', error);
