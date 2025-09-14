@@ -35,123 +35,142 @@ export default function QuotationTemplate({ data, customer, settings }) {
         }
       `}</style>
 
-      {/* Header - EXACT copy of PO structure */}
-      <header className="flex justify-between items-start mb-10 border-b pb-6">
+      {/* Header - Logo LEFT, Title RIGHT */}
+      <header className="flex justify-between items-start mb-6">
         <div>
-          <h1 className="text-4xl font-bold text-gray-800">QUOTATION</h1>
-          <div className="mt-2 text-gray-600">
-            <p>Quotation Number: <span className="font-semibold">{data.quoteNumber}</span></p>
-            <p>Quotation Date: <span className="font-semibold">{formatDate(data.quoteDate)}</span></p>
-            {data.reference && (
-              <p>Reference: <span className="font-semibold">{data.reference}</span></p>
-            )}
-            {data.referenceDate && (
-              <p>Reference Date: <span className="font-semibold">{formatDate(data.referenceDate)}</span></p>
-            )}
-          </div>
-        </div>
-        <div className="text-right">
           {settings?.company_logo_url && (
             <img 
               src={settings.company_logo_url} 
               alt="Company Logo" 
-              className="h-16 w-auto mb-4 ml-auto"
+              className="h-16 w-auto"
             />
           )}
+        </div>
+        <div className="text-right">
+          <h1 className="text-4xl font-bold text-gray-800">QUOTATION</h1>
+        </div>
+      </header>
+
+      {/* Horizontal divider line */}
+      <div className="border-b-2 border-gray-800 mb-8"></div>
+
+      {/* Company Details LEFT, Document Details RIGHT */}
+      <section className="flex justify-between items-start mb-10">
+        <div>
           {settings?.company_name && (
             <div>
-              <h2 className="text-xl font-bold text-gray-800">{settings.company_name}</h2>
+              <h2 className="text-lg font-bold text-gray-800">{settings.company_name}</h2>
               {settings.company_address && (
-                <p className="text-gray-600 mt-1">{settings.company_address}</p>
+                <p className="text-gray-700 text-sm">{settings.company_address}</p>
               )}
-              <div className="mt-2 text-sm text-gray-600">
+              <div className="text-sm text-gray-700">
                 {settings.company_phone && <p>Tel: {settings.company_phone}</p>}
                 {settings.company_email && <p>Email: {settings.company_email}</p>}
-                {settings.company_trn && <p>TRN: {settings.company_trn}</p>}
               </div>
             </div>
           )}
         </div>
-      </header>
+        <div className="text-right">
+          <table className="text-sm">
+            <tbody>
+              <tr>
+                <td className="pr-8 py-1 font-semibold">Quotation Number</td>
+                <td className="py-1">{data.quoteNumber}</td>
+              </tr>
+              <tr>
+                <td className="pr-8 py-1 font-semibold">Quotation Date</td>
+                <td className="py-1">{formatDate(data.quoteDate)}</td>
+              </tr>
+              {data.reference && (
+                <tr>
+                  <td className="pr-8 py-1 font-semibold">Reference</td>
+                  <td className="py-1">{data.reference}</td>
+                </tr>
+              )}
+              {data.referenceDate && (
+                <tr>
+                  <td className="pr-8 py-1 font-semibold">Reference Date</td>
+                  <td className="py-1">{formatDate(data.referenceDate)}</td>
+                </tr>
+              )}
+            </tbody>
+          </table>
+        </div>
+      </section>
 
-      {/* Bill To and Quotation Details - EXACT copy of PO structure */}
-      <section className="grid grid-cols-2 gap-8 mb-10">
-        <div>
-          <h3 className="text-sm font-semibold text-gray-500 uppercase mb-2">Bill To</h3>
-          <div className="text-gray-700">
-            <p className="font-semibold text-lg">{data.customerName || 'Unknown Customer'}</p>
+      {/* Bill To Section - Bordered like Supplier/Brand */}
+      <section className="mb-8">
+        <div className="border border-gray-300 p-4">
+          <h3 className="text-sm font-semibold text-gray-700 uppercase mb-2">Bill To</h3>
+          <div className="text-gray-700 text-sm">
+            <p className="font-semibold">{data.customerName || 'Unknown Customer'}</p>
+            {data.customerBillingAddress && <p>{data.customerBillingAddress}</p>}
             {data.customerContactPerson && <p>Contact: {data.customerContactPerson}</p>}
             {data.customerEmail && <p>Email: {data.customerEmail}</p>}
-            {data.customerPhone && <p>Phone: {data.customerPhone}</p>}
-            {data.customerBillingAddress && <p>{data.customerBillingAddress}</p>}
-          </div>
-        </div>
-        <div className="text-right">
-          <div className="text-gray-700">
-            {data.validUntil && (
-              <p className="text-gray-500">Valid Until: <span className="font-semibold text-gray-700">{formatDate(data.validUntil)}</span></p>
-            )}
-            <p className="text-gray-500">Currency: <span className="font-semibold text-gray-700">{data.currency || 'AED'}</span></p>
-            <p className="text-gray-500">Status: <span className="font-semibold text-gray-700 capitalize">{data.status || 'Draft'}</span></p>
+            {data.customerPhone && <p>Tel: {data.customerPhone}</p>}
           </div>
         </div>
       </section>
 
-      {/* Items Table - EXACT copy of PO structure */}
+      {/* Items Table */}
       <section className="mb-8">
-        <table className="w-full border-collapse">
+        <table className="w-full border-collapse border border-gray-300">
           <thead>
-            <tr className="bg-gray-100 border-b-2 border-gray-200">
-              <th className="text-left py-3 px-4 font-semibold text-gray-700 border-r border-gray-200">Product Code</th>
-              <th className="text-left py-3 px-4 font-semibold text-gray-700 border-r border-gray-200">Description</th>
-              <th className="text-center py-3 px-4 font-semibold text-gray-700 border-r border-gray-200">Size</th>
-              <th className="text-center py-3 px-4 font-semibold text-gray-700 border-r border-gray-200">Qty</th>
-              <th className="text-right py-3 px-4 font-semibold text-gray-700 border-r border-gray-200">Unit Price ({data.currency || 'AED'})</th>
-              <th className="text-right py-3 px-4 font-semibold text-gray-700">Line Total ({data.currency || 'AED'})</th>
+            <tr className="bg-gray-50">
+              <th className="text-left py-2 px-3 font-semibold text-gray-700 border-r border-gray-300 text-sm">Product Code</th>
+              <th className="text-left py-2 px-3 font-semibold text-gray-700 border-r border-gray-300 text-sm">Description</th>
+              <th className="text-center py-2 px-3 font-semibold text-gray-700 border-r border-gray-300 text-sm">Size</th>
+              <th className="text-center py-2 px-3 font-semibold text-gray-700 border-r border-gray-300 text-sm">Qty</th>
+              <th className="text-right py-2 px-3 font-semibold text-gray-700 border-r border-gray-300 text-sm">Unit Price ({data.currency || 'AED'})</th>
+              <th className="text-right py-2 px-3 font-semibold text-gray-700 text-sm">Line Total ({data.currency || 'AED'})</th>
             </tr>
           </thead>
           <tbody>
             {data.items && data.items.length > 0 ? (
               data.items.map((item, index) => (
-                <tr key={index} className="border-b border-gray-200">
-                  <td className="py-3 px-4 border-r border-gray-200 font-medium">{item.product_code || '-'}</td>
-                  <td className="py-3 px-4 border-r border-gray-200">{item.description}</td>
-                  <td className="text-center py-3 px-4 border-r border-gray-200">{item.size || '-'}</td>
-                  <td className="text-center py-3 px-4 border-r border-gray-200">{item.quantity}</td>
-                  <td className="text-right py-3 px-4 border-r border-gray-200">{(parseFloat(item.unit_price) || 0).toFixed(2)}</td>
-                  <td className="text-right py-3 px-4 font-medium">{(parseFloat(item.line_total) || 0).toFixed(2)}</td>
+                <tr key={index} className="border-b border-gray-300">
+                  <td className="py-2 px-3 border-r border-gray-300 text-sm">{item.product_code || '-'}</td>
+                  <td className="py-2 px-3 border-r border-gray-300 text-sm">{item.description}</td>
+                  <td className="text-center py-2 px-3 border-r border-gray-300 text-sm">{item.size || '-'}</td>
+                  <td className="text-center py-2 px-3 border-r border-gray-300 text-sm">{item.quantity}</td>
+                  <td className="text-right py-2 px-3 border-r border-gray-300 text-sm">{(parseFloat(item.unit_price) || 0).toFixed(2)}</td>
+                  <td className="text-right py-2 px-3 text-sm">{(parseFloat(item.line_total) || 0).toFixed(2)}</td>
                 </tr>
               ))
             ) : (
               <tr>
-                <td colSpan="6" className="py-8 text-center text-gray-500">No items</td>
+                <td colSpan="6" className="py-8 text-center text-gray-500 text-sm">No items</td>
               </tr>
             )}
           </tbody>
         </table>
       </section>
 
-      {/* Totals - EXACT copy of PO structure */}
+      {/* Totals - Right aligned */}
       <section className="flex justify-end mb-8">
-        <div className="w-full md:w-1/2">
-          <div className="flex justify-between py-2">
-            <span className="text-gray-600">Subtotal:</span>
-            <span className="font-semibold">{(parseFloat(data.totalAmount) || 0).toFixed(2)} {data.currency || 'AED'}</span>
-          </div>
-          {data.vatAmount && parseFloat(data.vatAmount) > 0 && (
-            <div className="flex justify-between py-2">
-              <span className="text-gray-600">VAT:</span>
-              <span className="font-semibold">{(parseFloat(data.vatAmount) || 0).toFixed(2)} {data.currency || 'AED'}</span>
-            </div>
-          )}
-          <div className="flex justify-between py-2 border-t-2 border-gray-300 mt-2">
-            <span className="font-bold text-lg">Total:</span>
-            <span className="font-bold text-lg">{(parseFloat(data.grandTotal) || 0).toFixed(2)} {data.currency || 'AED'}</span>
-          </div>
+        <div>
+          <table className="text-sm">
+            <tbody>
+              <tr>
+                <td className="pr-8 py-1 font-semibold text-right">Subtotal</td>
+                <td className="py-1 text-right">{data.currency || 'AED'} {(parseFloat(data.totalAmount) || 0).toFixed(2)}</td>
+              </tr>
+              {data.vatAmount && parseFloat(data.vatAmount) > 0 && (
+                <tr>
+                  <td className="pr-8 py-1 font-semibold text-right">VAT</td>
+                  <td className="py-1 text-right">{data.currency || 'AED'} {(parseFloat(data.vatAmount) || 0).toFixed(2)}</td>
+                </tr>
+              )}
+              <tr>
+                <td className="pr-8 py-1 font-bold text-right">Total</td>
+                <td className="py-1 text-right font-bold">{data.currency || 'AED'} {(parseFloat(data.grandTotal) || 0).toFixed(2)}</td>
+              </tr>
+            </tbody>
+          </table>
         </div>
       </section>
 
-      {/* Notes - EXACT copy of PO structure */}
+      {/* Notes */}
       {data.remarks && (
         <section className="mb-8">
           <h3 className="text-sm font-semibold text-gray-500 uppercase mb-2">Notes</h3>
@@ -159,7 +178,7 @@ export default function QuotationTemplate({ data, customer, settings }) {
         </section>
       )}
 
-      {/* Terms & Conditions - EXACT copy of PO structure */}
+      {/* Terms & Conditions */}
       {data.terms && (
         <section className="mb-8">
           <h3 className="text-sm font-semibold text-gray-500 uppercase mb-2">Terms & Conditions</h3>
@@ -167,8 +186,8 @@ export default function QuotationTemplate({ data, customer, settings }) {
         </section>
       )}
 
-      {/* Signature Section - EXACT copy of PO structure */}
-      <section className="mt-auto pt-8 border-t">
+      {/* Signature Section */}
+      <section className="mt-16 pt-8 border-t border-gray-300">
         <div className="grid grid-cols-2 gap-8">
           <div className="text-center">
             <div className="border-b border-gray-400 mb-2 pb-6"></div>
