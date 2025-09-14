@@ -1,5 +1,11 @@
 import React from 'react';
 import { format, isValid, parseISO } from 'date-fns';
+import PrintPage from './shared/PrintPage';
+import PrintHeader from './shared/PrintHeader';
+import PrintTable from './shared/PrintTable';
+import TotalsSummary from './shared/TotalsSummary';
+import NotesSection from './shared/NotesSection';
+import SignatureSection from './shared/SignatureSection';
 
 export default function QuotationTemplate({ data, customer, settings }) {
   const formatDate = (dateString) => {
@@ -13,87 +19,31 @@ export default function QuotationTemplate({ data, customer, settings }) {
   };
 
   const showTax = data.vatAmount && data.vatAmount > 0;
+  
+  const headers = [
+    { label: 'Product Code', align: 'left' },
+    { label: 'Description', align: 'left' },
+    { label: 'Size', align: 'center' },
+    { label: 'Qty', align: 'center' },
+    { label: `Unit Price (${data.currency || 'AED'})`, align: 'right' },
+    { label: `Line Total (${data.currency || 'AED'})`, align: 'right' }
+  ];
 
   return (
-    <div className="invoice-container" style={{ maxWidth: '210mm', margin: '0 auto', padding: '20mm', background: 'white' }}>
-      <style jsx global>{`
-        @media print {
-          @page {
-            size: A4 portrait;
-            margin: 1.2cm;
-          }
-          body, html {
-            -webkit-print-color-adjust: exact;
-            print-color-adjust: exact;
-            font-size: 10pt;
-          }
-          .invoice-container {
-            width: 100%;
-            height: 100%;
-            margin: 0;
-            padding: 0;
-            box-shadow: none;
-            border: none;
-            display: flex;
-            flex-direction: column;
-          }
-          header, section {
-            margin-bottom: 1.5rem !important;
-          }
-          table {
-            page-break-inside: auto;
-          }
-          tr {
-            page-break-inside: avoid;
-            page-break-after: auto;
-          }
-          thead {
-            display: table-header-group;
-          }
-          .signature-section {
-            margin-top: auto;
-          }
-        }
-        @media screen {
-          .invoice-container {
-            box-shadow: 0 0 10px rgba(0,0,0,0.1);
-            background: white;
-          }
-        }
-      `}</style>
-    
-      {/* Header */}
-      <header className="flex justify-between items-start mb-10 border-b pb-6">
-        <div>
-          {settings?.logo && (
-            <img 
-              src={settings.logo} 
-              alt="Company Logo" 
-              className="h-12 w-auto mb-3"
-            />
-          )}
-          {settings?.companyName && (
-            <div>
-              <h2 className="text-lg font-bold text-gray-800">{settings.companyName}</h2>
-              {settings.address && (
-                <p className="text-gray-600 text-sm mt-1">{settings.address}</p>
-              )}
-              <div className="mt-2 text-xs text-gray-600">
-                {settings.phone && <p>Tel: {settings.phone}</p>}
-                {settings.email && <p>Email: {settings.email}</p>}
-              </div>
-            </div>
-          )}
-        </div>
-        <div className="text-right">
-          <h1 className="text-3xl font-bold text-gray-800">QUOTATION</h1>
-          <div className="mt-2 text-gray-600 text-sm">
-            <p>Quote Number: <span className="font-semibold">{data.quoteNumber}</span></p>
-            <p>Quote Date: <span className="font-semibold">{formatDate(data.quoteDate)}</span></p>
-          </div>
-        </div>
-      </header>
+    <PrintPage>
+      <PrintHeader
+        documentTitle="QUOTATION"
+        documentNumber={data.quoteNumber}
+        documentDate={formatDate(data.quoteDate)}
+        logoUrl={settings?.logo}
+        companyName={settings?.companyName}
+        companyAddress={settings?.address}
+        companyPhone={settings?.phone}
+        companyEmail={settings?.email}
+        companyTrn={settings?.trn}
+      />
 
+      {/* Customer and Quote Details */}
       <section className="grid grid-cols-2 gap-8 mb-10">
         <div>
           <h3 className="text-sm font-semibold text-gray-500 uppercase mb-2">Bill To</h3>
@@ -118,77 +68,29 @@ export default function QuotationTemplate({ data, customer, settings }) {
         </div>
       </section>
 
-      <section className="mb-8">
-        <table className="w-full border-collapse">
-          <thead>
-            <tr className="bg-gray-100 border-b-2 border-gray-200">
-              <th className="text-left py-3 px-4 font-semibold text-gray-700 border-r border-gray-200">Product Code</th>
-              <th className="text-left py-3 px-4 font-semibold text-gray-700 border-r border-gray-200">Description</th>
-              <th className="text-center py-3 px-4 font-semibold text-gray-700 border-r border-gray-200">Size</th>
-              <th className="text-center py-3 px-4 font-semibold text-gray-700 border-r border-gray-200">Qty</th>
-              <th className="text-right py-3 px-4 font-semibold text-gray-700 border-r border-gray-200">Unit Price ({data.currency || 'AED'})</th>
-              <th className="text-right py-3 px-4 font-semibold text-gray-700">Line Total ({data.currency || 'AED'})</th>
-            </tr>
-          </thead>
-          <tbody>
-            {data.items && data.items.length > 0 ? (
-              data.items.map((item, index) => (
-                <tr key={index} className="border-b border-gray-200">
-                  <td className="py-3 px-4 border-r border-gray-200 font-medium">{item.product_code || '-'}</td>
-                  <td className="py-3 px-4 border-r border-gray-200">{item.description}</td>
-                  <td className="text-center py-3 px-4 border-r border-gray-200">{item.size || '-'}</td>
-                  <td className="text-center py-3 px-4 border-r border-gray-200">{item.quantity}</td>
-                  <td className="text-right py-3 px-4 border-r border-gray-200">{(parseFloat(item.unit_price) || 0).toFixed(2)}</td>
-                  <td className="text-right py-3 px-4 font-medium">{(parseFloat(item.line_total) || 0).toFixed(2)}</td>
-                </tr>
-              ))
-            ) : (
-              <tr>
-                <td colSpan="6" className="py-8 text-center text-gray-500">No items</td>
-              </tr>
-            )}
-          </tbody>
-        </table>
-      </section>
+      <PrintTable
+        headers={headers}
+        items={data.items}
+        currency={data.currency || 'AED'}
+        showSize={true}
+        colSpan={6}
+      />
 
-      <section className="flex justify-end mb-8">
-        <div className="w-full md:w-1/2">
-          <div className="flex justify-between py-2">
-            <span className="text-gray-600">Subtotal:</span>
-            <span className="font-semibold">{data.currency || 'AED'} {(parseFloat(data.totalAmount) || 0).toFixed(2)}</span>
-          </div>
-          {showTax && (
-            <div className="flex justify-between py-2">
-              <span className="text-gray-600">VAT:</span>
-              <span className="font-semibold">{data.currency || 'AED'} {(parseFloat(data.vatAmount) || 0).toFixed(2)}</span>
-            </div>
-          )}
-          <div className="flex justify-between py-2 border-t-2 border-gray-300 mt-2">
-            <span className="font-bold text-lg">Total:</span>
-            <span className="font-bold text-lg">{data.currency || 'AED'} {(parseFloat(data.grandTotal) || 0).toFixed(2)}</span>
-          </div>
-        </div>
-      </section>
+      <TotalsSummary
+        subtotal={data.totalAmount}
+        taxAmount={data.vatAmount}
+        totalAmount={data.grandTotal}
+        currency={data.currency || 'AED'}
+        showTax={showTax}
+        taxLabel="VAT"
+      />
 
-      {data.remarks && (
-        <section className="mb-8">
-          <h3 className="text-sm font-semibold text-gray-500 uppercase mb-2">Remarks</h3>
-          <p className="text-gray-600 text-sm whitespace-pre-wrap">{data.remarks}</p>
-        </section>
-      )}
+      <NotesSection title="Remarks" content={data.remarks} />
 
-      <section className="signature-section mt-auto pt-8 border-t">
-        <div className="grid grid-cols-2 gap-8">
-          <div className="text-center">
-            <div className="border-b border-gray-400 mb-2 pb-6"></div>
-            <p className="text-sm font-medium">For {settings?.companyName || 'Supernature'}</p>
-          </div>
-          <div className="text-center">
-            <div className="border-b border-gray-400 mb-2 pb-6"></div>
-            <p className="text-sm font-medium">For Customer</p>
-          </div>
-        </div>
-      </section>
-    </div>
+      <SignatureSection
+        leftSignatureLabel={`For ${settings?.companyName || 'Supernature'}`}
+        rightSignatureLabel="For Customer"
+      />
+    </PrintPage>
   );
 }
