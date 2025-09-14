@@ -77,27 +77,29 @@ export default function QuotationTemplate({ data, customer, settings }) {
         <table className="w-full border-collapse">
           <thead>
             <tr className="bg-gray-100 border-b-2 border-gray-200">
-              <th className="text-left py-3 px-4 font-semibold text-gray-700 border-r border-gray-200">Product Code</th>
+              <th className="text-left py-3 px-2 font-semibold text-gray-700 border-r border-gray-200 w-20">Product Code</th>
               <th className="text-left py-3 px-4 font-semibold text-gray-700 border-r border-gray-200">Description</th>
-              <th className="text-center py-3 px-4 font-semibold text-gray-700 border-r border-gray-200">Qty</th>
-              <th className="text-right py-3 px-4 font-semibold text-gray-700 border-r border-gray-200">Unit Price (AED)</th>
-              <th className="text-right py-3 px-4 font-semibold text-gray-700">Line Total (AED)</th>
+              <th className="text-center py-3 px-2 font-semibold text-gray-700 border-r border-gray-200 w-16">Size</th>
+              <th className="text-center py-3 px-2 font-semibold text-gray-700 border-r border-gray-200 w-12">Qty</th>
+              <th className="text-right py-3 px-2 font-semibold text-gray-700 border-r border-gray-200 w-24">Unit Price (AED)</th>
+              <th className="text-right py-3 px-2 font-semibold text-gray-700 w-24">Line Total (AED)</th>
             </tr>
           </thead>
           <tbody>
             {data.items && data.items.length > 0 ? (
               data.items.map((item, index) => (
                 <tr key={index} className="border-b border-gray-200">
-                  <td className="py-3 px-4 border-r border-gray-200 font-medium">{item.product_code || '-'}</td>
+                  <td className="py-3 px-2 border-r border-gray-200 font-medium">{item.product_code || '-'}</td>
                   <td className="py-3 px-4 border-r border-gray-200">{item.description}</td>
-                  <td className="text-center py-3 px-4 border-r border-gray-200">{item.quantity}</td>
-                  <td className="text-right py-3 px-4 border-r border-gray-200">{parseFloat(item.unit_price || 0).toFixed(2)}</td>
-                  <td className="text-right py-3 px-4 font-medium">{parseFloat(item.line_total || 0).toFixed(2)}</td>
+                  <td className="text-center py-3 px-2 border-r border-gray-200">{item.size || '-'}</td>
+                  <td className="text-center py-3 px-2 border-r border-gray-200">{item.quantity}</td>
+                  <td className="text-right py-3 px-2 border-r border-gray-200">{parseFloat(item.unit_price || 0).toFixed(2)}</td>
+                  <td className="text-right py-3 px-2 font-medium">{parseFloat(item.line_total || 0).toFixed(2)}</td>
                 </tr>
               ))
             ) : (
               <tr>
-                <td colSpan="5" className="py-8 text-center text-gray-500">No items</td>
+                <td colSpan="6" className="py-8 text-center text-gray-500">No items</td>
               </tr>
             )}
           </tbody>
