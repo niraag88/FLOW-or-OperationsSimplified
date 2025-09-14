@@ -1132,7 +1132,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
         quoteNumber,
         createdBy: req.user!.id,
         quoteDate: req.body.quoteDate ? new Date(req.body.quoteDate) : undefined,
-        validUntil: req.body.validUntil ? new Date(req.body.validUntil) : undefined
+        validUntil: req.body.validUntil ? new Date(req.body.validUntil) : undefined,
+        referenceDate: req.body.reference_date ? new Date(req.body.reference_date) : undefined
       };
       
       const validatedData = insertQuotationSchema.parse(requestData);
