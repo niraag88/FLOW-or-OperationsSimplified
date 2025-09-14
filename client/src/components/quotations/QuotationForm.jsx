@@ -112,11 +112,17 @@ export default function QuotationForm({ open, onClose, editingQuotation, current
         
         setFormData(basicFormData);
         
+        // Force a small delay to ensure React state updates are processed (like POForm)
+        await new Promise(resolve => setTimeout(resolve, 100));
+        
+        // Set the customer ID again separately to force Select component update (like POForm)
+        setFormData(prev => ({ ...prev, customer_id: editingQuotation.customerId?.toString() || "" }));
+        
         // 🟢 Only fetch line items separately (like POForm does)
         console.log("Fetching line items separately for performance...");
         try {
-          const itemsResponse = await fetch(`/api/quotations/${editingQuotation.id}/items`);
-          if (itemsResponse.ok) {
+          const itemsResponse = await fetch(`/api/quotations/${editingQuotation.id}/items`, { cache: 'no-store' });
+          if (itemsResponse.ok || itemsResponse.status === 304) {
             const items = await itemsResponse.json();
             console.log("Line items loaded:", items.length, "items");
             
@@ -124,16 +130,16 @@ export default function QuotationForm({ open, onClose, editingQuotation, current
               // Look up product details to get brand information
               const product = productsData.find(p => p.id === (item.productId || item.product_id));
               return {
-                product_id: item.productId || item.product_id || "",
-                brand_id: product?.brandId || item.brand_id || "",
-                brand_name: product?.brand?.name || item.brand_name || "",
-                product_code: product?.sku || item.product_code || "",
-                description: item.description || product?.name || "",
+                productId: (item.productId || item.product_id || "").toString(),
+                brandId: (product?.brandId || item.brand_id || "").toString(),
+                brandName: product?.brand?.name || item.brand_name || "",
+                productSku: product?.sku || item.product_code || "",
+                productName: item.description || product?.name || "",
                 quantity: Number(item.quantity || 0),
-                unit_price: Number(item.unitPrice || item.unit_price || 0),
+                unitPrice: Number(item.unitPrice || item.unit_price || 0),
                 discount: Number(item.discount || 0),
-                vat_rate: Number(item.vatRate || item.vat_rate || 0.05),
-                line_total: Number(item.lineTotal || item.line_total || 0)
+                vatRate: Number(item.vatRate || item.vat_rate || 0.05),
+                lineTotal: Number(item.lineTotal || item.line_total || 0)
               };
             });
             
