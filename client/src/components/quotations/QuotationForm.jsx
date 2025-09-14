@@ -129,17 +129,18 @@ export default function QuotationForm({ open, onClose, editingQuotation, current
             const formattedItems = items.map(item => {
               // Look up product details to get brand information
               const product = productsData.find(p => p.id === (item.productId || item.product_id));
+              const brand = brandsData.find(b => b.id === product?.brandId);
               return {
-                productId: (item.productId || item.product_id || "").toString(),
-                brandId: (product?.brandId || item.brand_id || "").toString(),
-                brandName: product?.brand?.name || item.brand_name || "",
-                productSku: product?.sku || item.product_code || "",
-                productName: item.description || product?.name || "",
+                product_id: (item.productId || item.product_id || "").toString(),
+                brand_id: (product?.brandId || item.brand_id || "").toString(),
+                brand_name: brand?.name || item.brand_name || "",
+                product_code: product?.sku || item.product_code || "",
+                description: product?.name || item.description || "",
                 quantity: Number(item.quantity || 0),
-                unitPrice: Number(item.unitPrice || item.unit_price || 0),
+                unit_price: Number(item.unitPrice || item.unit_price || 0),
                 discount: Number(item.discount || 0),
-                vatRate: Number(item.vatRate || item.vat_rate || 0.05),
-                lineTotal: Number(item.lineTotal || item.line_total || 0)
+                vat_rate: Number(item.vatRate || item.vat_rate || 0.05),
+                line_total: Number(item.lineTotal || item.line_total || 0)
               };
             });
             
