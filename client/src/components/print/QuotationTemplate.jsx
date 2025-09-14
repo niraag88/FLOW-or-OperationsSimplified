@@ -13,7 +13,7 @@ export default function QuotationTemplate({ data, customer, settings }) {
   };
 
   return (
-    <div className="p-8 font-sans">
+    <div className="invoice-container" style={{ maxWidth: '210mm', margin: '0 auto', padding: '20mm', background: 'white' }}>
       <style jsx global>{`
         @media print {
           @page {
@@ -31,6 +31,12 @@ export default function QuotationTemplate({ data, customer, settings }) {
             padding: 0;
             box-shadow: none;
             border: none;
+          }
+        }
+        @media screen {
+          .invoice-container {
+            box-shadow: 0 0 10px rgba(0,0,0,0.1);
+            background: white;
           }
         }
       `}</style>
