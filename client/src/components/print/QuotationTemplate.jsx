@@ -109,17 +109,17 @@ export default function QuotationTemplate({ data, customer, settings }) {
         <div className="w-full md:w-1/2">
           <div className="flex justify-between py-2">
             <span className="text-gray-600">Subtotal:</span>
-            <span className="font-semibold">{parseFloat(data.totalAmount || 0).toFixed(2)} AED</span>
+            <span className="font-semibold">AED {parseFloat(data.totalAmount || 0).toFixed(2)}</span>
           </div>
           {data.vatAmount && parseFloat(data.vatAmount) > 0 && (
             <div className="flex justify-between py-2">
               <span className="text-gray-600">VAT:</span>
-              <span className="font-semibold">{parseFloat(data.vatAmount || 0).toFixed(2)} AED</span>
+              <span className="font-semibold">AED {parseFloat(data.vatAmount || 0).toFixed(2)}</span>
             </div>
           )}
           <div className="flex justify-between py-2 border-t-2 border-gray-300 mt-2">
             <span className="font-bold text-lg">Total:</span>
-            <span className="font-bold text-lg">{parseFloat(data.grandTotal || 0).toFixed(2)} AED</span>
+            <span className="font-bold text-lg">AED {parseFloat(data.grandTotal || 0).toFixed(2)}</span>
           </div>
         </div>
       </section>

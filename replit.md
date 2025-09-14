@@ -6,6 +6,13 @@ This is a full-stack web application built with a React frontend and Express.js 
 
 Preferred communication style: Simple, everyday language.
 
+## Critical Currency Format Standard
+**ALWAYS use "AED 2220.00" format - Currency FIRST, then value**
+**NEVER use "2220.00 AED" format - This is incorrect**
+- Headers show currency: "Unit Price (AED)" & "Line Total (AED)"
+- Line items show numbers only: "620" & "1860.00" 
+- Totals sections show: "AED 2220.00" format
+
 # System Architecture
 
 ## Frontend Architecture
