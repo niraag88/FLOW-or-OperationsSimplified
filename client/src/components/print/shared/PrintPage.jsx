@@ -8,6 +8,7 @@ export default function PrintPage({ children, className = "", style = {} }) {
     background: 'white',
     fontFamily: 'sans-serif',
     minHeight: '297mm',
+    boxSizing: 'border-box',
     ...style
   };
 

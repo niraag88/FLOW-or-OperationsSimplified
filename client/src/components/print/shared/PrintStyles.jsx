@@ -12,7 +12,7 @@ export const printStyles = `
     .print-container {
       width: 100%;
       margin: 0;
-      padding: 0;
+      padding: 32px !important;
       box-shadow: none;
       border: none;
     }
