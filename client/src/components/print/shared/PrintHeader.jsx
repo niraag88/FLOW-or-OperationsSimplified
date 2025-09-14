@@ -16,7 +16,7 @@ export default function PrintHeader({
           <img 
             src={logoUrl} 
             alt="Company Logo" 
-            className="h-16 w-auto mb-4"
+            className="h-12 w-auto mb-4"
           />
         )}
         {companyName && (
