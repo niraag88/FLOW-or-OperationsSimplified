@@ -20,28 +20,28 @@ export default function QuotationTemplate({ data, customer, settings }) {
         <div>
           <h1 className="text-4xl font-bold text-gray-800">QUOTATION</h1>
           <div className="mt-2 text-gray-600">
-            <p>Quotation Number: <span className="font-semibold">{data.quotation_number}</span></p>
-            <p>Quotation Date: <span className="font-semibold">{formatDate(data.quotation_date)}</span></p>
+            <p>Quotation Number: <span className="font-semibold">{data.quoteNumber}</span></p>
+            <p>Quotation Date: <span className="font-semibold">{formatDate(data.quoteDate)}</span></p>
           </div>
         </div>
         <div className="text-right">
-          {settings?.company_logo_url && (
+          {settings?.logo && (
             <img 
-              src={settings.company_logo_url} 
+              src={settings.logo} 
               alt="Company Logo" 
               className="h-16 w-auto mb-4 ml-auto"
             />
           )}
-          {settings?.company_name && (
+          {settings?.companyName && (
             <div>
-              <h2 className="text-xl font-bold text-gray-800">{settings.company_name}</h2>
-              {settings.company_address && (
-                <p className="text-gray-600 mt-1">{settings.company_address}</p>
+              <h2 className="text-xl font-bold text-gray-800">{settings.companyName}</h2>
+              {settings.address && (
+                <p className="text-gray-600 mt-1">{settings.address}</p>
               )}
               <div className="mt-2 text-sm text-gray-600">
-                {settings.company_phone && <p>Tel: {settings.company_phone}</p>}
-                {settings.company_email && <p>Email: {settings.company_email}</p>}
-                {settings.company_trn && <p>TRN: {settings.company_trn}</p>}
+                {settings.phone && <p>Tel: {settings.phone}</p>}
+                {settings.email && <p>Email: {settings.email}</p>}
+                {settings.trn && <p>TRN: {settings.trn}</p>}
               </div>
             </div>
           )}
@@ -53,11 +53,11 @@ export default function QuotationTemplate({ data, customer, settings }) {
         <div>
           <h3 className="text-sm font-semibold text-gray-500 uppercase mb-2">Bill To</h3>
           <div className="text-gray-700">
-            <p className="font-semibold text-lg">{data.customer_name || 'Unknown Customer'}</p>
-            {data.customer_contact_person && <p>Contact: {data.customer_contact_person}</p>}
-            {data.customer_email && <p>Email: {data.customer_email}</p>}
-            {data.customer_phone && <p>Phone: {data.customer_phone}</p>}
-            {data.customer_billing_address && <p className="mt-1">{data.customer_billing_address}</p>}
+            <p className="font-semibold text-lg">{data.customerName || 'Unknown Customer'}</p>
+            {data.customerContactPerson && <p>Contact: {data.customerContactPerson}</p>}
+            {data.customerEmail && <p>Email: {data.customerEmail}</p>}
+            {data.customerPhone && <p>Phone: {data.customerPhone}</p>}
+            {data.customerBillingAddress && <p className="mt-1">{data.customerBillingAddress}</p>}
           </div>
         </div>
         <div className="text-right">
@@ -65,11 +65,9 @@ export default function QuotationTemplate({ data, customer, settings }) {
             {data.reference && (
               <p className="text-gray-500">Reference: <span className="font-semibold text-gray-700">{data.reference}</span></p>
             )}
-            {data.reference_date && (
-              <p className="text-gray-500">Reference Date: <span className="font-semibold text-gray-700">{formatDate(data.reference_date)}</span></p>
+            {data.referenceDate && (
+              <p className="text-gray-500">Reference Date: <span className="font-semibold text-gray-700">{formatDate(data.referenceDate)}</span></p>
             )}
-            <p className="text-gray-500">Currency: <span className="font-semibold text-gray-700">{data.currency}</span></p>
-            <p className="text-gray-500">Status: <span className="font-semibold text-gray-700 capitalize">{data.status}</span></p>
           </div>
         </div>
       </section>
@@ -82,8 +80,8 @@ export default function QuotationTemplate({ data, customer, settings }) {
               <th className="text-left py-3 px-4 font-semibold text-gray-700 border-r border-gray-200">Product Code</th>
               <th className="text-left py-3 px-4 font-semibold text-gray-700 border-r border-gray-200">Description</th>
               <th className="text-center py-3 px-4 font-semibold text-gray-700 border-r border-gray-200">Qty</th>
-              <th className="text-right py-3 px-4 font-semibold text-gray-700 border-r border-gray-200">Unit Price ({data.currency})</th>
-              <th className="text-right py-3 px-4 font-semibold text-gray-700">Line Total ({data.currency})</th>
+              <th className="text-right py-3 px-4 font-semibold text-gray-700 border-r border-gray-200">Unit Price (AED)</th>
+              <th className="text-right py-3 px-4 font-semibold text-gray-700">Line Total (AED)</th>
             </tr>
           </thead>
           <tbody>
@@ -111,17 +109,17 @@ export default function QuotationTemplate({ data, customer, settings }) {
         <div className="w-full md:w-1/2">
           <div className="flex justify-between py-2">
             <span className="text-gray-600">Subtotal:</span>
-            <span className="font-semibold">{parseFloat(data.subtotal || 0).toFixed(2)} {data.currency}</span>
+            <span className="font-semibold">{parseFloat(data.totalAmount || 0).toFixed(2)} AED</span>
           </div>
-          {data.tax_amount && parseFloat(data.tax_amount) > 0 && (
+          {data.vatAmount && parseFloat(data.vatAmount) > 0 && (
             <div className="flex justify-between py-2">
-              <span className="text-gray-600">Tax:</span>
-              <span className="font-semibold">{parseFloat(data.tax_amount || 0).toFixed(2)} {data.currency}</span>
+              <span className="text-gray-600">VAT:</span>
+              <span className="font-semibold">{parseFloat(data.vatAmount || 0).toFixed(2)} AED</span>
             </div>
           )}
           <div className="flex justify-between py-2 border-t-2 border-gray-300 mt-2">
             <span className="font-bold text-lg">Total:</span>
-            <span className="font-bold text-lg">{parseFloat(data.total_amount || 0).toFixed(2)} {data.currency}</span>
+            <span className="font-bold text-lg">{parseFloat(data.grandTotal || 0).toFixed(2)} AED</span>
           </div>
         </div>
       </section>
@@ -147,7 +145,7 @@ export default function QuotationTemplate({ data, customer, settings }) {
         <div className="grid grid-cols-2 gap-8">
           <div className="text-center">
             <div className="border-b border-gray-400 mb-2 pb-6"></div>
-            <p className="text-sm font-medium">For {settings?.company_name || 'Supernature'}</p>
+            <p className="text-sm font-medium">For {settings?.companyName || 'Supernature'}</p>
           </div>
           <div className="text-center">
             <div className="border-b border-gray-400 mb-2 pb-6"></div>
