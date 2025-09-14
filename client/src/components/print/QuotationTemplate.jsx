@@ -41,19 +41,28 @@ export default function QuotationTemplate({ data, customer, settings }) {
         }
       `}</style>
 
-      {/* Header */}
-      <header className="flex justify-between items-start mb-10 border-b pb-6">
+      {/* Header - Logo LEFT, Title RIGHT */}
+      <header className="flex justify-between items-start mb-6">
         <div>
-          <h1 className="text-4xl font-bold text-gray-800">QUOTATION</h1>
-        </div>
-        <div className="text-right">
           {settings?.logo && (
             <img 
               src={settings.logo} 
               alt="Company Logo" 
-              className="h-16 w-auto mb-4 ml-auto"
+              className="h-16 w-auto"
             />
           )}
+        </div>
+        <div className="text-right">
+          <h1 className="text-4xl font-bold text-gray-800">QUOTATION</h1>
+        </div>
+      </header>
+
+      {/* Horizontal divider line */}
+      <div className="border-b-2 border-gray-800 mb-8"></div>
+
+      {/* Company Details LEFT, Document Details RIGHT */}
+      <section className="flex justify-between items-start mb-10">
+        <div>
           {settings?.companyName && (
             <div>
               <h2 className="text-xl font-bold text-gray-800">{settings.companyName}</h2>
@@ -67,25 +76,16 @@ export default function QuotationTemplate({ data, customer, settings }) {
             </div>
           )}
         </div>
-      </header>
-
-      {/* Customer and Quotation Details */}
-      <section className="grid grid-cols-2 gap-8 mb-10">
-        <div>
+        <div className="text-right">
           <div className="text-gray-600">
             <p>Quote Number: <span className="font-semibold">{data.quoteNumber}</span></p>
             <p>Quote Date: <span className="font-semibold">{formatDate(data.quoteDate)}</span></p>
-          </div>
-        </div>
-        <div className="text-right">
-          <div className="text-gray-700">
             {data.reference && (
-              <p className="text-gray-500">Reference: <span className="font-semibold text-gray-700">{data.reference}</span></p>
+              <p>Reference: <span className="font-semibold">{data.reference}</span></p>
             )}
             {data.referenceDate && (
-              <p className="text-gray-500">Reference Date: <span className="font-semibold text-gray-700">{formatDate(data.referenceDate)}</span></p>
+              <p>Reference Date: <span className="font-semibold">{formatDate(data.referenceDate)}</span></p>
             )}
-            <p className="text-gray-500">Currency: <span className="font-semibold text-gray-700">{data.currency || 'AED'}</span></p>
           </div>
         </div>
       </section>
