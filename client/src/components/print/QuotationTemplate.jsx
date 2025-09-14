@@ -132,8 +132,8 @@ export default function QuotationTemplate({ data, customer, settings }) {
                   <td className="py-3 px-4 border-r border-gray-200">{item.brand_name || '-'}</td>
                   <td className="py-3 px-4 border-r border-gray-200">{item.description}</td>
                   <td className="text-center py-3 px-4 border-r border-gray-200">{item.quantity}</td>
-                  <td className="text-right py-3 px-4 border-r border-gray-200">{(item.unit_price || 0).toFixed(2)}</td>
-                  <td className="text-right py-3 px-4 font-medium">{(item.line_total || 0).toFixed(2)}</td>
+                  <td className="text-right py-3 px-4 border-r border-gray-200">{parseFloat(item.unit_price || 0).toFixed(2)}</td>
+                  <td className="text-right py-3 px-4 font-medium">{parseFloat(item.line_total || 0).toFixed(2)}</td>
                 </tr>
               ))
             ) : (
@@ -149,17 +149,17 @@ export default function QuotationTemplate({ data, customer, settings }) {
         <div className="w-full md:w-1/2">
           <div className="flex justify-between py-2">
             <span className="text-gray-600">Subtotal:</span>
-            <span className="font-semibold">{(data.subtotal || 0).toFixed(2)} {data.currency}</span>
+            <span className="font-semibold">{parseFloat(data.subtotal || 0).toFixed(2)} {data.currency}</span>
           </div>
           {showTax && (
             <div className="flex justify-between py-2">
-              <span className="text-gray-600">VAT ({(data.tax_rate * 100).toFixed(0)}%):</span>
-              <span className="font-semibold">{(data.tax_amount || 0).toFixed(2)} {data.currency}</span>
+              <span className="text-gray-600">VAT ({(parseFloat(data.tax_rate || 0) * 100).toFixed(0)}%):</span>
+              <span className="font-semibold">{parseFloat(data.tax_amount || 0).toFixed(2)} {data.currency}</span>
             </div>
           )}
           <div className="flex justify-between py-2 border-t-2 border-gray-300 mt-2">
             <span className="font-bold text-lg">Total:</span>
-            <span className="font-bold text-lg">{(data.total_amount || 0).toFixed(2)} {data.currency}</span>
+            <span className="font-bold text-lg">{parseFloat(data.total_amount || 0).toFixed(2)} {data.currency}</span>
           </div>
         </div>
       </section>
