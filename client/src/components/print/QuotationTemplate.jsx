@@ -12,8 +12,10 @@ export default function QuotationTemplate({ data, customer, settings }) {
     }
   };
 
+  const showTax = data.vatAmount && data.vatAmount > 0;
+
   return (
-    <div className="invoice-container" style={{ maxWidth: '210mm', margin: '0 auto', padding: '20mm', background: 'white' }}>
+    <div className="p-8 font-sans invoice-container">
       <style jsx global>{`
         @media print {
           @page {
@@ -27,42 +29,49 @@ export default function QuotationTemplate({ data, customer, settings }) {
           }
           .invoice-container {
             width: 100%;
+            height: 100%;
             margin: 0;
             padding: 0;
             box-shadow: none;
             border: none;
+            display: flex;
+            flex-direction: column;
           }
-        }
-        @media screen {
-          .invoice-container {
-            box-shadow: 0 0 10px rgba(0,0,0,0.1);
-            background: white;
+          header, section {
+            margin-bottom: 1.5rem !important;
+          }
+          table {
+            page-break-inside: auto;
+          }
+          tr {
+            page-break-inside: avoid;
+            page-break-after: auto;
+          }
+          thead {
+            display: table-header-group;
+          }
+          .signature-section {
+            margin-top: auto;
           }
         }
       `}</style>
-
-      {/* Header - Logo LEFT, Title RIGHT */}
-      <header className="flex justify-between items-start mb-6">
+    
+      <header className="flex justify-between items-start mb-10 border-b pb-6">
         <div>
+          <h1 className="text-4xl font-bold text-gray-800">QUOTATION</h1>
+          <div className="mt-2 text-gray-600">
+            <p>Quotation Number: <span className="font-semibold">{data.quoteNumber}</span></p>
+            <p>Quotation Date: <span className="font-semibold">{formatDate(data.quoteDate)}</span></p>
+          </div>
+        </div>
+        <div className="text-right">
           {settings?.logo && (
             <img 
               src={settings.logo} 
               alt="Company Logo" 
-              className="h-16 w-auto"
+              className="h-16 w-auto mb-4 ml-auto"
             />
           )}
-        </div>
-        <div className="text-right">
-          <h1 className="text-4xl font-bold text-gray-800">QUOTATION</h1>
-        </div>
-      </header>
-
-      {/* Horizontal divider line */}
-      <div className="border-b-2 border-gray-800 mb-8"></div>
-
-      {/* Company Details LEFT, Document Details RIGHT */}
-      <section className="flex justify-between items-start mb-10">
-        <div>
           {settings?.companyName && (
             <div>
               <h2 className="text-xl font-bold text-gray-800">{settings.companyName}</h2>
@@ -76,35 +85,32 @@ export default function QuotationTemplate({ data, customer, settings }) {
             </div>
           )}
         </div>
-        <div className="text-right">
-          <div className="text-gray-600">
-            <p>Quote Number: <span className="font-semibold">{data.quoteNumber}</span></p>
-            <p>Quote Date: <span className="font-semibold">{formatDate(data.quoteDate)}</span></p>
-            {data.reference && (
-              <p>Reference: <span className="font-semibold">{data.reference}</span></p>
-            )}
-            {data.referenceDate && (
-              <p>Reference Date: <span className="font-semibold">{formatDate(data.referenceDate)}</span></p>
-            )}
-          </div>
-        </div>
-      </section>
+      </header>
 
-      {/* Bill To Section */}
-      <section className="mb-8">
+      <section className="grid grid-cols-2 gap-8 mb-10">
         <div>
           <h3 className="text-sm font-semibold text-gray-500 uppercase mb-2">Bill To</h3>
           <div className="text-gray-700">
             <p className="font-semibold text-lg">{data.customerName || 'Unknown Customer'}</p>
             {data.customerContactPerson && <p>Contact: {data.customerContactPerson}</p>}
+            {data.customerBillingAddress && <p className="mt-1">{data.customerBillingAddress}</p>}
+            {data.customerPhone && <p>Tel: {data.customerPhone}</p>}
             {data.customerEmail && <p>Email: {data.customerEmail}</p>}
-            {data.customerPhone && <p>Phone: {data.customerPhone}</p>}
-            {data.customerBillingAddress && <p>{data.customerBillingAddress}</p>}
+          </div>
+        </div>
+        <div className="text-right">
+          <div className="text-gray-700">
+            {data.reference && (
+              <p className="text-gray-500">Reference: <span className="font-semibold text-gray-700">{data.reference}</span></p>
+            )}
+            {data.referenceDate && (
+              <p className="text-gray-500">Reference Date: <span className="font-semibold text-gray-700">{formatDate(data.referenceDate)}</span></p>
+            )}
+            <p className="text-gray-500">Currency: <span className="font-semibold text-gray-700">{data.currency || 'AED'}</span></p>
           </div>
         </div>
       </section>
 
-      {/* Items Table */}
       <section className="mb-8">
         <table className="w-full border-collapse">
           <thead>
@@ -131,55 +137,40 @@ export default function QuotationTemplate({ data, customer, settings }) {
               ))
             ) : (
               <tr>
-                <td colSpan="6" className="py-8 text-center text-gray-500 text-sm">No items</td>
+                <td colSpan="6" className="py-8 text-center text-gray-500">No items</td>
               </tr>
             )}
           </tbody>
         </table>
       </section>
 
-      {/* Totals - Right aligned */}
       <section className="flex justify-end mb-8">
-        <div>
-          <table className="text-sm">
-            <tbody>
-              <tr>
-                <td className="pr-8 py-1 font-semibold text-right">Subtotal</td>
-                <td className="py-1 text-right">{data.currency || 'AED'} {(parseFloat(data.totalAmount) || 0).toFixed(2)}</td>
-              </tr>
-              {data.vatAmount && parseFloat(data.vatAmount) > 0 && (
-                <tr>
-                  <td className="pr-8 py-1 font-semibold text-right">VAT</td>
-                  <td className="py-1 text-right">{data.currency || 'AED'} {(parseFloat(data.vatAmount) || 0).toFixed(2)}</td>
-                </tr>
-              )}
-              <tr>
-                <td className="pr-8 py-1 font-bold text-right">Total</td>
-                <td className="py-1 text-right font-bold">{data.currency || 'AED'} {(parseFloat(data.grandTotal) || 0).toFixed(2)}</td>
-              </tr>
-            </tbody>
-          </table>
+        <div className="w-full md:w-1/2">
+          <div className="flex justify-between py-2">
+            <span className="text-gray-600">Subtotal:</span>
+            <span className="font-semibold">{data.currency || 'AED'} {(parseFloat(data.totalAmount) || 0).toFixed(2)}</span>
+          </div>
+          {showTax && (
+            <div className="flex justify-between py-2">
+              <span className="text-gray-600">VAT:</span>
+              <span className="font-semibold">{data.currency || 'AED'} {(parseFloat(data.vatAmount) || 0).toFixed(2)}</span>
+            </div>
+          )}
+          <div className="flex justify-between py-2 border-t-2 border-gray-300 mt-2">
+            <span className="font-bold text-lg">Total:</span>
+            <span className="font-bold text-lg">{data.currency || 'AED'} {(parseFloat(data.grandTotal) || 0).toFixed(2)}</span>
+          </div>
         </div>
       </section>
 
-      {/* Notes */}
       {data.remarks && (
         <section className="mb-8">
-          <h3 className="text-sm font-semibold text-gray-500 uppercase mb-2">Notes</h3>
+          <h3 className="text-sm font-semibold text-gray-500 uppercase mb-2">Remarks</h3>
           <p className="text-gray-600 text-sm whitespace-pre-wrap">{data.remarks}</p>
         </section>
       )}
 
-      {/* Terms & Conditions */}
-      {data.terms && (
-        <section className="mb-8">
-          <h3 className="text-sm font-semibold text-gray-500 uppercase mb-2">Terms & Conditions</h3>
-          <p className="text-gray-600 text-sm whitespace-pre-wrap">{data.terms}</p>
-        </section>
-      )}
-
-      {/* Signature Section */}
-      <section className="mt-16 pt-8 border-t border-gray-300">
+      <section className="signature-section mt-auto pt-8 border-t">
         <div className="grid grid-cols-2 gap-8">
           <div className="text-center">
             <div className="border-b border-gray-400 mb-2 pb-6"></div>
