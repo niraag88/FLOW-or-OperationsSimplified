@@ -1171,6 +1171,34 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  // Get quotation items for editing (optimized like PO system)
+  app.get('/api/quotations/:id/items', requireAuth(), async (req: AuthenticatedRequest, res) => {
+    try {
+      const quoteId = parseInt(req.params.id);
+      
+      const items = await db.select({
+        id: quotationItems.id,
+        productId: quotationItems.productId,
+        productName: products.name,
+        productSku: products.sku,
+        quantity: quotationItems.quantity,
+        unitPrice: quotationItems.unitPrice,
+        discount: quotationItems.discount,
+        vatRate: quotationItems.vatRate,
+        lineTotal: quotationItems.lineTotal,
+        description: products.name // Use product name as description
+      })
+      .from(quotationItems)
+      .leftJoin(products, eq(quotationItems.productId, products.id))
+      .where(eq(quotationItems.quoteId, quoteId));
+      
+      res.json(items);
+    } catch (error) {
+      console.error('Error fetching quotation items:', error);
+      res.status(500).json({ error: 'Failed to fetch quotation items' });
+    }
+  });
+
   // Delete quotation
   app.delete('/api/quotations/:id', requireAuth(['Admin', 'Manager']), async (req: AuthenticatedRequest, res) => {
     try {
