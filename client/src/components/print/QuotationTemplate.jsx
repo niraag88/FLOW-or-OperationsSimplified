@@ -35,27 +35,15 @@ export default function QuotationTemplate({ data, customer, settings }) {
         }
       `}</style>
 
-      {/* Header - Title LEFT, Logo RIGHT (matching PO) */}
+      {/* Header - Logo LEFT, Title RIGHT (matching PO exactly) */}
       <header className="flex justify-between items-start mb-10 border-b pb-6">
-        <div>
-          <h1 className="text-4xl font-bold text-gray-800">QUOTATION</h1>
-          <div className="mt-2 text-gray-600">
-            <p>Quotation Number: <span className="font-semibold">{data.quoteNumber}</span></p>
-            <p>Quotation Date: <span className="font-semibold">{formatDate(data.quoteDate)}</span></p>
-            {data.reference && (
-              <p>Reference: <span className="font-semibold">{data.reference}</span></p>
-            )}
-            {data.referenceDate && (
-              <p>Reference Date: <span className="font-semibold">{formatDate(data.referenceDate)}</span></p>
-            )}
-          </div>
-        </div>
-        <div className="text-right">
+        {/* LEFT: Logo + company info */}
+        <div className="flex-1">
           {settings?.logo && (
             <img 
               src={settings.logo} 
               alt="Company Logo" 
-              className="h-16 w-auto mb-4 ml-auto"
+              className="h-16 w-auto mb-4"
             />
           )}
           {settings?.companyName && (
@@ -71,6 +59,21 @@ export default function QuotationTemplate({ data, customer, settings }) {
               </div>
             </div>
           )}
+        </div>
+
+        {/* RIGHT: Title + quotation details */}
+        <div className="text-right">
+          <h1 className="text-4xl font-bold text-gray-800">QUOTATION</h1>
+          <div className="mt-2 text-gray-600">
+            <p>Quotation Number: <span className="font-semibold">{data.quoteNumber}</span></p>
+            <p>Quotation Date: <span className="font-semibold">{formatDate(data.quoteDate)}</span></p>
+            {data.reference && (
+              <p>Reference: <span className="font-semibold">{data.reference}</span></p>
+            )}
+            {data.referenceDate && (
+              <p>Reference Date: <span className="font-semibold">{formatDate(data.referenceDate)}</span></p>
+            )}
+          </div>
         </div>
       </header>
 
