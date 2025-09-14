@@ -65,32 +65,32 @@ export default function QuotationTemplate({ data, customer, settings }) {
       {/* Header */}
       <header className="flex justify-between items-start mb-10 border-b pb-6">
         <div>
-          <h1 className="text-4xl font-bold text-gray-800">QUOTATION</h1>
-          <div className="mt-2 text-gray-600">
-            <p>Quote Number: <span className="font-semibold">{data.quoteNumber}</span></p>
-            <p>Quote Date: <span className="font-semibold">{formatDate(data.quoteDate)}</span></p>
-          </div>
-        </div>
-        <div className="text-right">
           {settings?.logo && (
             <img 
               src={settings.logo} 
               alt="Company Logo" 
-              className="h-16 w-auto mb-4 ml-auto"
+              className="h-12 w-auto mb-3"
             />
           )}
           {settings?.companyName && (
             <div>
-              <h2 className="text-xl font-bold text-gray-800">{settings.companyName}</h2>
+              <h2 className="text-lg font-bold text-gray-800">{settings.companyName}</h2>
               {settings.address && (
-                <p className="text-gray-600 mt-1">{settings.address}</p>
+                <p className="text-gray-600 text-sm mt-1">{settings.address}</p>
               )}
-              <div className="mt-2 text-sm text-gray-600">
+              <div className="mt-2 text-xs text-gray-600">
                 {settings.phone && <p>Tel: {settings.phone}</p>}
                 {settings.email && <p>Email: {settings.email}</p>}
               </div>
             </div>
           )}
+        </div>
+        <div className="text-right">
+          <h1 className="text-3xl font-bold text-gray-800">QUOTATION</h1>
+          <div className="mt-2 text-gray-600 text-sm">
+            <p>Quote Number: <span className="font-semibold">{data.quoteNumber}</span></p>
+            <p>Quote Date: <span className="font-semibold">{formatDate(data.quoteDate)}</span></p>
+          </div>
         </div>
       </header>
 
