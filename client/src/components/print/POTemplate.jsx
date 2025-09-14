@@ -32,12 +32,12 @@ export default function POTemplate({ data, brand, settings }) {
         documentTitle="PURCHASE ORDER"
         documentNumber={data.po_number}
         documentDate={formatDate(data.order_date)}
-        logoUrl={settings?.company_logo_url}
-        companyName={settings?.company_name}
-        companyAddress={settings?.company_address}
-        companyPhone={settings?.company_phone}
-        companyEmail={settings?.company_email}
-        companyTrn={settings?.company_trn}
+        logoUrl={settings?.logo}
+        companyName={settings?.companyName}
+        companyAddress={settings?.address}
+        companyPhone={settings?.phone}
+        companyEmail={settings?.email}
+        companyTrn={settings?.taxNumber}
       />
 
       {/* Supplier/Brand and PO Details */}
