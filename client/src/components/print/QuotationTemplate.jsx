@@ -41,106 +41,92 @@ export default function QuotationTemplate({ data, customer, settings }) {
         }
       `}</style>
 
-      {/* Header - Logo LEFT, Title RIGHT */}
-      <header className="flex justify-between items-start mb-6">
+      {/* Header */}
+      <header className="flex justify-between items-start mb-10 border-b pb-6">
         <div>
+          <h1 className="text-4xl font-bold text-gray-800">QUOTATION</h1>
+        </div>
+        <div className="text-right">
           {settings?.logo && (
             <img 
               src={settings.logo} 
               alt="Company Logo" 
-              className="h-16 w-auto"
+              className="h-16 w-auto mb-4 ml-auto"
             />
           )}
-        </div>
-        <div className="text-right">
-          <h1 className="text-4xl font-bold text-gray-800">QUOTATION</h1>
-        </div>
-      </header>
-
-      {/* Horizontal divider line */}
-      <div className="border-b-2 border-gray-800 mb-8"></div>
-
-      {/* Company Details LEFT, Document Details RIGHT */}
-      <section className="flex justify-between items-start mb-10">
-        <div>
           {settings?.companyName && (
             <div>
-              <h2 className="text-lg font-bold text-gray-800">{settings.companyName}</h2>
+              <h2 className="text-xl font-bold text-gray-800">{settings.companyName}</h2>
               {settings.address && (
-                <p className="text-gray-700 text-sm">{settings.address}</p>
+                <p className="text-gray-600 mt-1">{settings.address}</p>
               )}
-              <div className="text-sm text-gray-700">
+              <div className="mt-2 text-sm text-gray-600">
                 {settings.phone && <p>Tel: {settings.phone}</p>}
                 {settings.email && <p>Email: {settings.email}</p>}
               </div>
             </div>
           )}
         </div>
+      </header>
+
+      {/* Customer and Quotation Details */}
+      <section className="grid grid-cols-2 gap-8 mb-10">
+        <div>
+          <div className="text-gray-600">
+            <p>Quote Number: <span className="font-semibold">{data.quoteNumber}</span></p>
+            <p>Quote Date: <span className="font-semibold">{formatDate(data.quoteDate)}</span></p>
+          </div>
+        </div>
         <div className="text-right">
-          <table className="text-sm">
-            <tbody>
-              <tr>
-                <td className="pr-8 py-1 font-semibold">Quotation Number</td>
-                <td className="py-1">{data.quoteNumber}</td>
-              </tr>
-              <tr>
-                <td className="pr-8 py-1 font-semibold">Quotation Date</td>
-                <td className="py-1">{formatDate(data.quoteDate)}</td>
-              </tr>
-              {data.reference && (
-                <tr>
-                  <td className="pr-8 py-1 font-semibold">Reference</td>
-                  <td className="py-1">{data.reference}</td>
-                </tr>
-              )}
-              {data.referenceDate && (
-                <tr>
-                  <td className="pr-8 py-1 font-semibold">Reference Date</td>
-                  <td className="py-1">{formatDate(data.referenceDate)}</td>
-                </tr>
-              )}
-            </tbody>
-          </table>
+          <div className="text-gray-700">
+            {data.reference && (
+              <p className="text-gray-500">Reference: <span className="font-semibold text-gray-700">{data.reference}</span></p>
+            )}
+            {data.referenceDate && (
+              <p className="text-gray-500">Reference Date: <span className="font-semibold text-gray-700">{formatDate(data.referenceDate)}</span></p>
+            )}
+            <p className="text-gray-500">Currency: <span className="font-semibold text-gray-700">{data.currency || 'AED'}</span></p>
+          </div>
         </div>
       </section>
 
-      {/* Bill To Section - Bordered like Supplier/Brand */}
+      {/* Bill To Section */}
       <section className="mb-8">
-        <div className="border border-gray-300 p-4">
-          <h3 className="text-sm font-semibold text-gray-700 uppercase mb-2">Bill To</h3>
-          <div className="text-gray-700 text-sm">
-            <p className="font-semibold">{data.customerName || 'Unknown Customer'}</p>
-            {data.customerBillingAddress && <p>{data.customerBillingAddress}</p>}
+        <div>
+          <h3 className="text-sm font-semibold text-gray-500 uppercase mb-2">Bill To</h3>
+          <div className="text-gray-700">
+            <p className="font-semibold text-lg">{data.customerName || 'Unknown Customer'}</p>
             {data.customerContactPerson && <p>Contact: {data.customerContactPerson}</p>}
             {data.customerEmail && <p>Email: {data.customerEmail}</p>}
-            {data.customerPhone && <p>Tel: {data.customerPhone}</p>}
+            {data.customerPhone && <p>Phone: {data.customerPhone}</p>}
+            {data.customerBillingAddress && <p>{data.customerBillingAddress}</p>}
           </div>
         </div>
       </section>
 
       {/* Items Table */}
       <section className="mb-8">
-        <table className="w-full border-collapse border border-gray-300">
+        <table className="w-full border-collapse">
           <thead>
-            <tr>
-              <th className="text-left py-2 px-3 font-semibold text-gray-700 border-r border-gray-300 text-sm">Product Code</th>
-              <th className="text-left py-2 px-3 font-semibold text-gray-700 border-r border-gray-300 text-sm">Description</th>
-              <th className="text-center py-2 px-3 font-semibold text-gray-700 border-r border-gray-300 text-sm">Size</th>
-              <th className="text-center py-2 px-3 font-semibold text-gray-700 border-r border-gray-300 text-sm">Qty</th>
-              <th className="text-right py-2 px-3 font-semibold text-gray-700 border-r border-gray-300 text-sm">Unit Price ({data.currency || 'AED'})</th>
-              <th className="text-right py-2 px-3 font-semibold text-gray-700 text-sm">Line Total ({data.currency || 'AED'})</th>
+            <tr className="bg-gray-100 border-b-2 border-gray-200">
+              <th className="text-left py-3 px-4 font-semibold text-gray-700 border-r border-gray-200">Product Code</th>
+              <th className="text-left py-3 px-4 font-semibold text-gray-700 border-r border-gray-200">Description</th>
+              <th className="text-center py-3 px-4 font-semibold text-gray-700 border-r border-gray-200">Size</th>
+              <th className="text-center py-3 px-4 font-semibold text-gray-700 border-r border-gray-200">Qty</th>
+              <th className="text-right py-3 px-4 font-semibold text-gray-700 border-r border-gray-200">Unit Price ({data.currency || 'AED'})</th>
+              <th className="text-right py-3 px-4 font-semibold text-gray-700">Line Total ({data.currency || 'AED'})</th>
             </tr>
           </thead>
           <tbody>
             {data.items && data.items.length > 0 ? (
               data.items.map((item, index) => (
-                <tr key={index} className="border-b border-gray-300">
-                  <td className="py-2 px-3 border-r border-gray-300 text-sm">{item.product_code || '-'}</td>
-                  <td className="py-2 px-3 border-r border-gray-300 text-sm">{item.description}</td>
-                  <td className="text-center py-2 px-3 border-r border-gray-300 text-sm">{item.size || '-'}</td>
-                  <td className="text-center py-2 px-3 border-r border-gray-300 text-sm">{item.quantity}</td>
-                  <td className="text-right py-2 px-3 border-r border-gray-300 text-sm">{(parseFloat(item.unit_price) || 0).toFixed(2)}</td>
-                  <td className="text-right py-2 px-3 text-sm">{(parseFloat(item.line_total) || 0).toFixed(2)}</td>
+                <tr key={index} className="border-b border-gray-200">
+                  <td className="py-3 px-4 border-r border-gray-200 font-medium">{item.product_code || '-'}</td>
+                  <td className="py-3 px-4 border-r border-gray-200">{item.description}</td>
+                  <td className="text-center py-3 px-4 border-r border-gray-200">{item.size || '-'}</td>
+                  <td className="text-center py-3 px-4 border-r border-gray-200">{item.quantity}</td>
+                  <td className="text-right py-3 px-4 border-r border-gray-200">{(parseFloat(item.unit_price) || 0).toFixed(2)}</td>
+                  <td className="text-right py-3 px-4 font-medium">{(parseFloat(item.line_total) || 0).toFixed(2)}</td>
                 </tr>
               ))
             ) : (
