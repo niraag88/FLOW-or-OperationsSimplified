@@ -62,12 +62,13 @@ export default function QuotationTemplate({ data, customer, settings }) {
         }
       `}</style>
     
+      {/* Header */}
       <header className="flex justify-between items-start mb-10 border-b pb-6">
         <div>
           <h1 className="text-4xl font-bold text-gray-800">QUOTATION</h1>
           <div className="mt-2 text-gray-600">
-            <p>Quotation Number: <span className="font-semibold">{data.quoteNumber}</span></p>
-            <p>Quotation Date: <span className="font-semibold">{formatDate(data.quoteDate)}</span></p>
+            <p>Quote Number: <span className="font-semibold">{data.quoteNumber}</span></p>
+            <p>Quote Date: <span className="font-semibold">{formatDate(data.quoteDate)}</span></p>
           </div>
         </div>
         <div className="text-right">
