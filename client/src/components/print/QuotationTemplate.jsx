@@ -14,26 +14,6 @@ export default function QuotationTemplate({ data, customer, settings }) {
 
   return (
     <div className="p-8 font-sans">
-      <style jsx global>{`
-        @media print {
-          @page {
-            size: A4 portrait;
-            margin: 1.2cm;
-          }
-          body, html {
-            -webkit-print-color-adjust: exact;
-            print-color-adjust: exact;
-            font-size: 10pt;
-          }
-          .invoice-container {
-            width: 100%;
-            margin: 0;
-            padding: 0;
-            box-shadow: none;
-            border: none;
-          }
-        }
-      `}</style>
 
       {/* Header */}
       <header className="flex justify-between items-start mb-10 border-b pb-6">
