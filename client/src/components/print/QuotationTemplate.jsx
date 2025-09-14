@@ -15,7 +15,7 @@ export default function QuotationTemplate({ data, customer, settings }) {
   const showTax = data.vatAmount && data.vatAmount > 0;
 
   return (
-    <div className="p-8 font-sans invoice-container">
+    <div className="invoice-container" style={{ maxWidth: '210mm', margin: '0 auto', padding: '20mm', background: 'white' }}>
       <style jsx global>{`
         @media print {
           @page {
@@ -52,6 +52,12 @@ export default function QuotationTemplate({ data, customer, settings }) {
           }
           .signature-section {
             margin-top: auto;
+          }
+        }
+        @media screen {
+          .invoice-container {
+            box-shadow: 0 0 10px rgba(0,0,0,0.1);
+            background: white;
           }
         }
       `}</style>
