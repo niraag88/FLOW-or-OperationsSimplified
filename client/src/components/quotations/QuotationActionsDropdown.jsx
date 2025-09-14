@@ -211,7 +211,7 @@ export default function QuotationActionsDropdown({ quotation, canEdit, onEdit, o
         onClose={() => setShowDeleteDialog(false)}
         onConfirm={handleDelete}
         title="Confirm Deletion"
-        description={`Do you wish to confirm deleting Quotation "${quotation.quotation_number}"? It will be moved to the recycle bin.`}
+        description={`Do you wish to confirm deleting Quotation "${quotation.quotation_number || quotation.quoteNumber}"? It will be moved to the recycle bin.`}
         confirmText="Yes, Delete"
         confirmVariant="destructive"
       />
