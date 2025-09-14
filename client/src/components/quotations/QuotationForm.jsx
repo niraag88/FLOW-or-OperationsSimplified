@@ -85,36 +85,42 @@ export default function QuotationForm({ open, onClose, editingQuotation, current
       setBrands(brandsData.filter(b => b.isActive !== false));
 
       if (editingQuotation) {
-        console.log("Loading existing quotation for editing, fetching full details...");
+        console.log("⚡ Loading quotation for editing using passed data (like POForm)...");
+        
+        // 🟢 Use passed editingQuotation data immediately (like POForm does)
+        const customer = customersData.find(c => c.id === editingQuotation.customerId);
+        setSelectedCustomer(customer);
+        
+        // Set basic form data immediately from passed quotation
+        const basicFormData = {
+          quotation_number: editingQuotation.quoteNumber || "",
+          customer_id: editingQuotation.customerId || "",
+          quotation_date: editingQuotation.quoteDate ? new Date(editingQuotation.quoteDate).toISOString().split('T')[0] : new Date().toISOString().split('T')[0],
+          reference: editingQuotation.reference || "",
+          reference_date: editingQuotation.referenceDate ? new Date(editingQuotation.referenceDate).toISOString().split('T')[0] : "",
+          status: editingQuotation.status || "draft",
+          currency: editingQuotation.currency || "AED",
+          tax_treatment: editingQuotation.taxTreatment || "StandardRated", 
+          tax_rate: editingQuotation.taxRate || 0.05,
+          subtotal: parseFloat(editingQuotation.totalAmount || 0),
+          tax_amount: parseFloat(editingQuotation.vatAmount || 0),
+          total_amount: parseFloat(editingQuotation.grandTotal || 0),
+          remarks: editingQuotation.notes || "",
+          attachments: editingQuotation.attachments || [],
+          items: [] // Will load separately for performance
+        };
+        
+        setFormData(basicFormData);
+        
+        // 🟢 Only fetch line items separately (like POForm does)
+        console.log("Fetching line items separately for performance...");
         try {
-          // Fetch complete quotation data with items from the API
-          const response = await fetch(`/api/quotations/${editingQuotation.id}`);
-          if (!response.ok) {
-            throw new Error('Failed to fetch quotation details');
-          }
-          const fullQuotationData = await response.json();
-          console.log("Full quotation data:", fullQuotationData);
-          
-          const customer = customersData.find(c => c.id === fullQuotationData.customerId);
-          setSelectedCustomer(customer);
-          
-          // Map API camelCase response to form snake_case fields
-          setFormData({
-            quotation_number: fullQuotationData.quoteNumber || "",
-            customer_id: fullQuotationData.customerId || "",
-            quotation_date: fullQuotationData.quoteDate ? new Date(fullQuotationData.quoteDate).toISOString().split('T')[0] : new Date().toISOString().split('T')[0],
-            reference: fullQuotationData.reference || "",
-            reference_date: fullQuotationData.referenceDate ? new Date(fullQuotationData.referenceDate).toISOString().split('T')[0] : "",
-            status: fullQuotationData.status || "draft",
-            currency: fullQuotationData.currency || "AED",
-            tax_treatment: fullQuotationData.taxTreatment || "StandardRated",
-            tax_rate: fullQuotationData.taxRate || 0.05,
-            subtotal: parseFloat(fullQuotationData.totalAmount || 0),
-            tax_amount: parseFloat(fullQuotationData.vatAmount || 0),
-            total_amount: parseFloat(fullQuotationData.grandTotal || 0),
-            remarks: fullQuotationData.notes || "",
-            attachments: fullQuotationData.attachments || [],
-            items: (fullQuotationData.items || []).map(item => {
+          const itemsResponse = await fetch(`/api/quotations/${editingQuotation.id}/items`);
+          if (itemsResponse.ok) {
+            const items = await itemsResponse.json();
+            console.log("Line items loaded:", items.length, "items");
+            
+            const formattedItems = items.map(item => {
               // Look up product details to get brand information
               const product = productsData.find(p => p.id === (item.productId || item.product_id));
               return {
@@ -129,8 +135,14 @@ export default function QuotationForm({ open, onClose, editingQuotation, current
                 vat_rate: Number(item.vatRate || item.vat_rate || 0.05),
                 line_total: Number(item.lineTotal || item.line_total || 0)
               };
-            })
-          });
+            });
+            
+            // Update form with line items
+            setFormData(prev => ({
+              ...prev,
+              items: formattedItems
+            }));
+          }
         } catch (error) {
           console.error("Error fetching quotation details:", error);
           toast({
