@@ -20,7 +20,7 @@ import { Brand } from "@/api/entities";
 import { Card } from "@/components/ui/card";
 import { useToast } from "@/components/ui/use-toast";
 
-export default function QuotationForm({ open, onClose, editingQuotation, currentUser, canOverride, onSuccess }) {
+export default function QuotationForm({ open, onClose, editingQuotation, currentUser, canOverride, onSuccess, preloadedCustomers, preloadedProducts, preloadedBrands }) {
   const [loading, setLoading] = useState(false);
   const [customers, setCustomers] = useState([]);
   const [products, setProducts] = useState([]);
@@ -55,13 +55,25 @@ export default function QuotationForm({ open, onClose, editingQuotation, current
   const loadData = async () => {
     try {
       setLoading(true);
-      const [customersData, productsData, brandsData] = await Promise.all([
-        Customer.list().catch(() => []),
-        Product.list().catch(() => []),
-        Brand.list().catch(() => [])
-      ]);
+      
+      // Use preloaded data if available, otherwise fetch from API (fallback)
+      let customersData, productsData, brandsData;
+      
+      if (preloadedCustomers && preloadedProducts && preloadedBrands) {
+        // Use preloaded data for better performance
+        customersData = preloadedCustomers;
+        productsData = preloadedProducts;
+        brandsData = preloadedBrands;
+      } else {
+        // Fallback to API calls if preloaded data not available
+        [customersData, productsData, brandsData] = await Promise.all([
+          Customer.list().catch(() => []),
+          Product.list().catch(() => []),
+          Brand.list().catch(() => [])
+        ]);
+      }
 
-      setCustomers(customersData.filter(c => c.isActive !== false));
+      setCustomers(customersData.filter(c => c.is_active !== false));
       setProducts(productsData);
       setBrands(brandsData.filter(b => b.isActive !== false));
 

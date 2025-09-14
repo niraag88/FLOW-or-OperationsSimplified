@@ -5,7 +5,9 @@ import { Input } from "@/components/ui/input";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Plus, Search } from "lucide-react";
 import { Quotation } from "@/api/entities";
-import { User } from "@/api/entities"; // Keep import for User entity, though User.me() will be removed.
+import { Customer } from "@/api/entities";
+import { Product } from "@/api/entities";
+import { Brand } from "@/api/entities";
 import QuotationList from "../components/quotations/QuotationList";
 import QuotationForm from "../components/quotations/QuotationForm";
 import QuotationFilters from "../components/quotations/QuotationFilters";
@@ -15,11 +17,13 @@ import { createRoot } from 'react-dom/client';
 
 export default function Quotations() {
   const [quotations, setQuotations] = useState([]);
+  const [customers, setCustomers] = useState([]);
+  const [products, setProducts] = useState([]);
+  const [brands, setBrands] = useState([]);
   const [loading, setLoading] = useState(true);
   const [searchTerm, setSearchTerm] = useState("");
   const [showQuotationForm, setShowQuotationForm] = useState(false);
   const [editingQuotation, setEditingQuotation] = useState(null);
-  const [currentUser, setCurrentUser] = useState(null);
   const [selectedStatuses, setSelectedStatuses] = useState([]);
   const [selectedCustomers, setSelectedCustomers] = useState([]);
   const [dateRange, setDateRange] = useState("all");
@@ -31,19 +35,23 @@ export default function Quotations() {
 
   useEffect(() => {
     loadData();
-    loadCurrentUser();
   }, [refreshTrigger]);
-
-  const loadCurrentUser = async () => {
-    // Always use mock user for public access
-    setCurrentUser({ role: 'Admin', email: 'public@opsuite.com' });
-  };
 
   const loadData = async () => {
     setLoading(true);
     try {
-      const quotationsData = await Quotation.list('-updated_date');
+      // Load all necessary data in parallel like the optimized PO page
+      const [quotationsData, customersData, productsData, brandsData] = await Promise.all([
+        Quotation.list('-updated_date'),
+        Customer.list().catch(() => []),
+        Product.list().catch(() => []),
+        Brand.list().catch(() => [])
+      ]);
+
       setQuotations(quotationsData);
+      setCustomers(customersData.filter(c => c.is_active !== false));
+      setProducts(productsData);
+      setBrands(brandsData.filter(b => b.isActive !== false));
     } catch (error) {
       console.error("Error loading quotations data:", error);
     } finally {
@@ -51,19 +59,8 @@ export default function Quotations() {
     }
   };
 
-  // Extract unique customers from quotations data (avoid separate API call)
-  const uniqueCustomers = React.useMemo(() => {
-    const customerMap = new Map();
-    quotations.forEach(quotation => {
-      if (quotation.customerId && quotation.customerName) {
-        customerMap.set(quotation.customerId, {
-          id: quotation.customerId,
-          customer_name: quotation.customerName
-        });
-      }
-    });
-    return Array.from(customerMap.values());
-  }, [quotations]);
+  // Use preloaded customers data instead of extracting from quotations
+  const availableCustomers = customers;
 
   const handleRefresh = () => {
     setRefreshTrigger(prev => prev + 1);
@@ -86,6 +83,7 @@ export default function Quotations() {
 
   const canEdit = true;
   const canOverride = true;
+  const currentUser = { role: 'Admin', email: 'public@opsuite.com' }; // Mock user for optimization
 
   const filteredQuotations = quotations.filter(quotation => {
     const matchesSearch = quotation.quoteNumber?.toLowerCase().includes(searchTerm.toLowerCase()) ||
@@ -140,10 +138,9 @@ export default function Quotations() {
 
   const handleExternalDocumentView = async (quotation) => {
     try {
-      // Load customer data if needed
-      const customerData = quotation.customer_name ? 
-        { customer_name: quotation.customer_name } : 
-        null;
+      // Use preloaded customer data for better performance
+      const customerData = customers.find(c => c.id === quotation.customerId) || 
+        (quotation.customer_name ? { customer_name: quotation.customer_name } : null);
       
       // Mock company settings - in real app this would come from settings API
       const companySettings = {
@@ -263,7 +260,7 @@ export default function Quotations() {
           dateRange={dateRange}
           setDateRange={setDateRange}
           resetPagination={resetPagination}
-          customers={uniqueCustomers}
+          customers={availableCustomers}
         />
       </div>
 
@@ -367,6 +364,9 @@ export default function Quotations() {
         currentUser={currentUser}
         canOverride={canOverride}
         onSuccess={handleRefresh}
+        preloadedCustomers={customers}
+        preloadedProducts={products}
+        preloadedBrands={brands}
       />
     </div>
   );
