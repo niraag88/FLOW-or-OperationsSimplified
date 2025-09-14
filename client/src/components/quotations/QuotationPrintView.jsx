@@ -49,14 +49,7 @@ export default function QuotationPrintView() {
     loadData();
   }, [navigate]);
 
-  useEffect(() => {
-    if (!loading && quotation && companySettings) {
-      // Auto-trigger print dialog
-      setTimeout(() => {
-        window.print();
-      }, 500);
-    }
-  }, [loading, quotation, companySettings]);
+  // No auto-print - following PO system exactly
 
   if (loading) {
     return <div className="p-8">Loading...</div>;
