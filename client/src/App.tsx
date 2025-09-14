@@ -30,6 +30,7 @@ import POPrintView from "@/components/purchase-orders/POPrintView.jsx";
 import QuotationPrintView from "@/components/quotations/QuotationPrintView.jsx";
 import InvoicePrintView from "@/components/invoices/InvoicePrintView.jsx";
 import DOPrintView from "@/components/delivery-orders/DOPrintView.jsx";
+import PrintSandboxPage from "@/pages/PrintSandboxPage.jsx";
 
 function PagesContent() {
   const { isAuthenticated, isLoading } = useAuth();
@@ -170,6 +171,11 @@ function PagesContent() {
       <Route path="/delivery-orders/:id/print" element={
         <ProtectedRoute>
           <DOPrintView />
+        </ProtectedRoute>
+      } />
+      <Route path="/dev/print-sandbox" element={
+        <ProtectedRoute>
+          <PrintSandboxPage />
         </ProtectedRoute>
       } />
     </Routes>
