@@ -518,7 +518,7 @@ export default function QuotationForm({ open, onClose, editingQuotation, current
               <div className="space-y-4">
                 {formData.items.map((item, index) => (
                   <Card key={index} className="p-4">
-                    <div className="grid grid-cols-1 md:grid-cols-6 gap-4 items-end">
+                    <div className="grid grid-cols-1 md:grid-cols-[1fr_1fr_120px_1fr_80px_100px_120px] gap-4 items-end">
                       <div className="space-y-2">
                         <Label>Brand</Label>
                         <Select 
