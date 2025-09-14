@@ -12,6 +12,7 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Plus, Trash2 } from "lucide-react";
 import { Quotation } from "@/api/entities";
 import { Product } from "@/api/entities";
@@ -246,8 +247,6 @@ export default function QuotationForm({ open, onClose, editingQuotation, current
 
   const addItem = () => {
     const newItem = {
-      brand_id: "",
-      brand_name: "",
       product_id: "",
       product_code: "",
       description: "",
@@ -262,38 +261,26 @@ export default function QuotationForm({ open, onClose, editingQuotation, current
     const newItems = [...formData.items];
     
     // Convert string values to numbers for ID fields
-    if (field === 'brand_id' || field === 'product_id') {
+    if (field === 'product_id') {
       value = parseInt(value);
     }
     
     newItems[index] = { ...newItems[index], [field]: value };
 
-    if (field === 'brand_id') {
-      const brand = brands.find(b => b.id === value);
-      newItems[index] = {
-        ...newItems[index],
-        brand_name: brand?.name || "",
-        product_id: "",
-        product_code: "",
-        description: "",
-        unit_price: 0,
-        line_total: 0
-      };
-    }
-
+    // Auto-populate product details when product is selected
     if (field === 'product_id' && value) {
       const product = products.find(p => p.id === value);
       if (product) {
         newItems[index] = {
           ...newItems[index],
           product_code: product.sku || "",
-          description: `${product.name || ''}${product.description ? ` - ${product.description}` : ''}`,
-          unit_price: product.unitPrice || 0,
-          brand_name: product.brand?.name || newItems[index].brand_name,
+          description: product.name || "",
+          unit_price: parseFloat(product.unitPrice) || 0,
         };
       }
     }
 
+    // Recalculate line total when quantity or unit price changes
     if (['quantity', 'unit_price'].includes(field) || field === 'product_id') {
       const quantity = field === 'quantity' ? (parseInt(value) || 0) : (newItems[index].quantity || 0);
       const unitPrice = field === 'unit_price' ? (parseFloat(value) || 0) : (newItems[index].unit_price || 0);
@@ -301,13 +288,6 @@ export default function QuotationForm({ open, onClose, editingQuotation, current
     }
 
     setFormData(prev => ({ ...prev, items: newItems }));
-  };
-
-  const getFilteredProducts = (brandId) => {
-    if (!brandId) return [];
-    // Convert brandId to number for comparison since product.brandId is a number
-    const numericBrandId = parseInt(brandId);
-    return products.filter(product => product.brandId === numericBrandId);
   };
 
   const removeItem = (index) => {
@@ -515,111 +495,84 @@ export default function QuotationForm({ open, onClose, editingQuotation, current
             </div>
 
             {formData.items.length > 0 && (
-              <div className="space-y-4">
-                {formData.items.map((item, index) => (
-                  <Card key={index} className="p-4">
-                    <div className="grid grid-cols-1 md:grid-cols-[1fr_1fr_120px_1fr_80px_100px_120px] gap-4 items-end">
-                      <div className="space-y-2">
-                        <Label>Brand</Label>
-                        <Select 
-                          value={item.brand_id ? item.brand_id.toString() : ''} 
-                          onValueChange={(v) => updateItem(index, 'brand_id', v)} 
-                          disabled={!isEditable}
-                        >
-                          <SelectTrigger>
-                            <SelectValue placeholder="Select brand" />
-                          </SelectTrigger>
-                          <SelectContent>
-                            {brands.map(b => (
-                              <SelectItem key={b.id} value={b.id.toString()}>{b.name}</SelectItem>
-                            ))}
-                          </SelectContent>
-                        </Select>
-                      </div>
-                      
-                      <div className="space-y-2">
-                        <Label>Product</Label>
-                        <Select 
-                          value={item.product_id ? item.product_id.toString() : ''} 
-                          onValueChange={(v) => updateItem(index, 'product_id', v)} 
-                          disabled={!isEditable || !item.brand_id}
-                        >
-                          <SelectTrigger>
-                            <SelectValue placeholder="Select product" />
-                          </SelectTrigger>
-                          <SelectContent>
-                            {getFilteredProducts(item.brand_id).map(p => (
-                              <SelectItem key={p.id} value={p.id.toString()}>
-                                <div className="flex flex-col">
-                                  <p className="font-medium truncate">{p.name}</p>
-                                  {p.description && <p className="text-sm text-gray-500">{p.description}</p>}
-                                </div>
-                              </SelectItem>
-                            ))}
-                          </SelectContent>
-                        </Select>
-                      </div>
-                      
-                      <div className="space-y-2">
-                        <Label>Product Code</Label>
-                        <Input 
-                          value={item.product_code || ''} 
-                          disabled 
-                          className="bg-gray-50"
-                          placeholder="Auto-filled" 
-                        />
-                      </div>
-
-                      <div className="space-y-2">
-                        <Label>Description</Label>
-                        <Input 
-                          value={item.description} 
-                          onChange={(e) => updateItem(index, 'description', e.target.value)} 
-                          disabled={!isEditable} 
-                        />
-                      </div>
-
-                      <div className="space-y-2">
-                        <Label>Quantity</Label>
-                        <Input 
-                          type="number" 
-                          min="1" 
-                          value={item.quantity} 
-                          onChange={(e) => updateItem(index, 'quantity', e.target.value)} 
-                          disabled={!isEditable} 
-                        />
-                      </div>
-
-                      <div className="space-y-2">
-                        <Label>Unit Price</Label>
-                        <Input 
-                          type="number" 
-                          step="0.01" 
-                          value={item.unit_price} 
-                          onChange={(e) => updateItem(index, 'unit_price', e.target.value)} 
-                          disabled={!isEditable} 
-                        />
-                      </div>
-
-                      <div className="space-y-2">
-                        <Label>Total</Label>
-                        <div className="flex items-center gap-2">
-                          <span className="font-medium">AED {(item.line_total || 0).toFixed(2)}</span>
-                          {isEditable && (
-                            <Button 
-                              type="button" 
-                              variant="ghost" 
-                              size="sm" 
+              <div className="rounded-md border">
+                <Table>
+                  <TableHeader>
+                    <TableRow>
+                      <TableHead>Product</TableHead>
+                      <TableHead>Description</TableHead>
+                      <TableHead>Quantity</TableHead>
+                      <TableHead>Unit Price (AED)</TableHead>
+                      <TableHead>Line Total</TableHead>
+                      {isEditable && <TableHead></TableHead>}
+                    </TableRow>
+                  </TableHeader>
+                  <TableBody>
+                    {formData.items.map((item, index) => (
+                      <TableRow key={index}>
+                        <TableCell>
+                          <Select 
+                            value={item.product_id ? item.product_id.toString() : ''} 
+                            onValueChange={(v) => updateItem(index, 'product_id', v)} 
+                            disabled={!isEditable}
+                          >
+                            <SelectTrigger>
+                              <SelectValue placeholder="Select product" />
+                            </SelectTrigger>
+                            <SelectContent>
+                              {products.map(p => (
+                                <SelectItem key={p.id} value={p.id.toString()}>
+                                  {p.name} - {p.sku} - {p.size || 'N/A'}
+                                </SelectItem>
+                              ))}
+                            </SelectContent>
+                          </Select>
+                        </TableCell>
+                        <TableCell>
+                          <Input 
+                            value={item.description} 
+                            onChange={(e) => updateItem(index, 'description', e.target.value)} 
+                            disabled={!isEditable}
+                            className="border-0 bg-transparent p-0 h-auto"
+                          />
+                        </TableCell>
+                        <TableCell>
+                          <Input
+                            type="number"
+                            min="1"
+                            value={item.quantity}
+                            onChange={(e) => updateItem(index, 'quantity', e.target.value)}
+                            disabled={!isEditable}
+                            className="w-20"
+                          />
+                        </TableCell>
+                        <TableCell>
+                          <Input
+                            type="number"
+                            step="0.01"
+                            value={item.unit_price}
+                            onChange={(e) => updateItem(index, 'unit_price', e.target.value)}
+                            disabled={!isEditable}
+                            className="w-24"
+                          />
+                        </TableCell>
+                        <TableCell>AED {(item.line_total || 0).toFixed(2)}</TableCell>
+                        {isEditable && (
+                          <TableCell>
+                            <Button
+                              type="button"
+                              variant="ghost"
+                              size="sm"
                               onClick={() => removeItem(index)}
                             >
-                              <Trash2 className="w-4 h-4 text-red-500" />
+                              <Trash2 className="w-4 h-4" />
                             </Button>
-                          )}
-                        </div>
-                      </div>
-                    </div>
-                  </Card>
-                ))}
+                          </TableCell>
+                        )}
+                      </TableRow>
+                    ))}
+                  </TableBody>
+                </Table>
               </div>
             )}
           </div>
