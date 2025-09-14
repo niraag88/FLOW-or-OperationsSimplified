@@ -38,9 +38,9 @@ export default function QuotationTemplate({ data, customer, settings }) {
       {/* Header - Logo LEFT, Title RIGHT */}
       <header className="flex justify-between items-start mb-6">
         <div>
-          {settings?.company_logo_url && (
+          {settings?.logo && (
             <img 
-              src={settings.company_logo_url} 
+              src={settings.logo} 
               alt="Company Logo" 
               className="h-16 w-auto"
             />
@@ -57,15 +57,15 @@ export default function QuotationTemplate({ data, customer, settings }) {
       {/* Company Details LEFT, Document Details RIGHT */}
       <section className="flex justify-between items-start mb-10">
         <div>
-          {settings?.company_name && (
+          {settings?.companyName && (
             <div>
-              <h2 className="text-lg font-bold text-gray-800">{settings.company_name}</h2>
-              {settings.company_address && (
-                <p className="text-gray-700 text-sm">{settings.company_address}</p>
+              <h2 className="text-lg font-bold text-gray-800">{settings.companyName}</h2>
+              {settings.address && (
+                <p className="text-gray-700 text-sm">{settings.address}</p>
               )}
               <div className="text-sm text-gray-700">
-                {settings.company_phone && <p>Tel: {settings.company_phone}</p>}
-                {settings.company_email && <p>Email: {settings.company_email}</p>}
+                {settings.phone && <p>Tel: {settings.phone}</p>}
+                {settings.email && <p>Email: {settings.email}</p>}
               </div>
             </div>
           )}
@@ -116,7 +116,7 @@ export default function QuotationTemplate({ data, customer, settings }) {
       <section className="mb-8">
         <table className="w-full border-collapse border border-gray-300">
           <thead>
-            <tr className="bg-gray-50">
+            <tr>
               <th className="text-left py-2 px-3 font-semibold text-gray-700 border-r border-gray-300 text-sm">Product Code</th>
               <th className="text-left py-2 px-3 font-semibold text-gray-700 border-r border-gray-300 text-sm">Description</th>
               <th className="text-center py-2 px-3 font-semibold text-gray-700 border-r border-gray-300 text-sm">Size</th>
@@ -191,7 +191,7 @@ export default function QuotationTemplate({ data, customer, settings }) {
         <div className="grid grid-cols-2 gap-8">
           <div className="text-center">
             <div className="border-b border-gray-400 mb-2 pb-6"></div>
-            <p className="text-sm font-medium">For {settings?.company_name || 'Supernature'}</p>
+            <p className="text-sm font-medium">For {settings?.companyName || 'Supernature'}</p>
           </div>
           <div className="text-center">
             <div className="border-b border-gray-400 mb-2 pb-6"></div>
