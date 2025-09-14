@@ -94,7 +94,7 @@ export default function QuotationForm({ open, onClose, editingQuotation, current
         // Set basic form data immediately from passed quotation
         const basicFormData = {
           quotation_number: editingQuotation.quoteNumber || "",
-          customer_id: editingQuotation.customerId || "",
+          customer_id: editingQuotation.customerId ? editingQuotation.customerId.toString() : "",
           quotation_date: editingQuotation.quoteDate ? new Date(editingQuotation.quoteDate).toISOString().split('T')[0] : new Date().toISOString().split('T')[0],
           reference: editingQuotation.reference || "",
           reference_date: editingQuotation.referenceDate ? new Date(editingQuotation.referenceDate).toISOString().split('T')[0] : "",
