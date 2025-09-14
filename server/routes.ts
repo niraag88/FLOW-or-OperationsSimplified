@@ -1141,11 +1141,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
       
       // If there are line items, save them (same as PO system)
       if (req.body.items && Array.isArray(req.body.items) && req.body.items.length > 0) {
-        console.log('💾 Saving quotation line items:', req.body.items.length, 'items');
         for (const item of req.body.items) {
-          console.log('💾 Processing item:', { product_id: item.product_id, quantity: item.quantity, type_of_quantity: typeof item.quantity });
           if (item.product_id && Number(item.quantity) > 0) {
-            console.log('💾 Saving item to database...');
             await db.insert(quotationItems).values({
               quoteId: quotation.id,
               productId: parseInt(item.product_id),
@@ -1155,14 +1152,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
               vatRate: item.vat_rate ? item.vat_rate.toString() : "0.05",
               lineTotal: item.line_total.toString()
             });
-            console.log('✅ Item saved successfully');
-          } else {
-            console.log('❌ Skipping item - invalid product_id or quantity');
           }
         }
-        console.log('💾 Finished saving all line items');
-      } else {
-        console.log('❌ No line items to save');
       }
       
       res.status(201).json(quotation);
