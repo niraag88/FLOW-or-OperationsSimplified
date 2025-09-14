@@ -61,7 +61,7 @@ export default function QuotationTemplate({ data, customer, settings }) {
           </div>
         </div>
         <div className="text-right">
-          <div className="text-gray-700">
+          <div className="text-gray-700 mt-6">
             {data.reference && (
               <p className="text-gray-500">Reference: <span className="font-semibold text-gray-700">{data.reference}</span></p>
             )}
