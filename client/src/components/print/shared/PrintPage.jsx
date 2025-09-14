@@ -2,11 +2,12 @@ import PrintStyles from './PrintStyles';
 
 export default function PrintPage({ children, className = "", style = {} }) {
   const defaultStyle = {
+    width: '100%',
     maxWidth: '210mm',
     margin: '0 auto',
-    padding: '20mm',
     background: 'white',
     fontFamily: 'sans-serif',
+    minHeight: '297mm',
     ...style
   };
 
