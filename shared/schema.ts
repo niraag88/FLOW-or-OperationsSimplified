@@ -515,6 +515,8 @@ export const insertQuotationSchema = createInsertSchema(quotations).pick({
   grandTotal: true,
   notes: true,
   terms: true,
+  reference: true,
+  referenceDate: true,
   objectKey: true,
   createdBy: true,
 });
