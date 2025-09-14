@@ -130,6 +130,7 @@ export default function QuotationForm({ open, onClose, editingQuotation, current
               // Look up product details to get brand information
               const product = productsData.find(p => p.id === (item.productId || item.product_id));
               const brand = brandsData.find(b => b.id === product?.brandId);
+              
               return {
                 product_id: (item.productId || item.product_id || "").toString(),
                 brand_id: (product?.brandId || item.brand_id || "").toString(),
@@ -304,7 +305,9 @@ export default function QuotationForm({ open, onClose, editingQuotation, current
 
   const getFilteredProducts = (brandId) => {
     if (!brandId) return [];
-    return products.filter(product => product.brandId === brandId);
+    // Convert brandId to number for comparison since product.brandId is a number
+    const numericBrandId = parseInt(brandId);
+    return products.filter(product => product.brandId === numericBrandId);
   };
 
   const removeItem = (index) => {
