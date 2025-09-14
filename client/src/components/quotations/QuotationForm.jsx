@@ -247,6 +247,8 @@ export default function QuotationForm({ open, onClose, editingQuotation, current
 
   const addItem = () => {
     const newItem = {
+      brand_id: "",
+      brand_name: "",
       product_id: "",
       product_code: "",
       description: "",
@@ -261,11 +263,25 @@ export default function QuotationForm({ open, onClose, editingQuotation, current
     const newItems = [...formData.items];
     
     // Convert string values to numbers for ID fields
-    if (field === 'product_id') {
+    if (field === 'brand_id' || field === 'product_id') {
       value = parseInt(value);
     }
     
     newItems[index] = { ...newItems[index], [field]: value };
+
+    // Handle brand selection - reset product fields
+    if (field === 'brand_id') {
+      const brand = brands.find(b => b.id === value);
+      newItems[index] = {
+        ...newItems[index],
+        brand_name: brand?.name || "",
+        product_id: "",
+        product_code: "",
+        description: "",
+        unit_price: 0,
+        line_total: 0
+      };
+    }
 
     // Auto-populate product details when product is selected
     if (field === 'product_id' && value) {
@@ -274,7 +290,7 @@ export default function QuotationForm({ open, onClose, editingQuotation, current
         newItems[index] = {
           ...newItems[index],
           product_code: product.sku || "",
-          description: product.name || "",
+          description: `${product.name} - ${product.sku} - ${product.size || 'N/A'}`,
           unit_price: parseFloat(product.unitPrice) || 0,
         };
       }
@@ -288,6 +304,13 @@ export default function QuotationForm({ open, onClose, editingQuotation, current
     }
 
     setFormData(prev => ({ ...prev, items: newItems }));
+  };
+
+  const getFilteredProducts = (brandId) => {
+    if (!brandId) return [];
+    // Convert brandId to number for comparison since product.brandId is a number
+    const numericBrandId = parseInt(brandId);
+    return products.filter(product => product.brandId === numericBrandId);
   };
 
   const removeItem = (index) => {
@@ -499,6 +522,7 @@ export default function QuotationForm({ open, onClose, editingQuotation, current
                 <Table>
                   <TableHeader>
                     <TableRow>
+                      <TableHead>Brand</TableHead>
                       <TableHead>Product</TableHead>
                       <TableHead>Description</TableHead>
                       <TableHead>Quantity</TableHead>
@@ -512,15 +536,31 @@ export default function QuotationForm({ open, onClose, editingQuotation, current
                       <TableRow key={index}>
                         <TableCell>
                           <Select 
-                            value={item.product_id ? item.product_id.toString() : ''} 
-                            onValueChange={(v) => updateItem(index, 'product_id', v)} 
+                            value={item.brand_id ? item.brand_id.toString() : ''} 
+                            onValueChange={(v) => updateItem(index, 'brand_id', v)} 
                             disabled={!isEditable}
                           >
                             <SelectTrigger>
-                              <SelectValue placeholder="Select product" />
+                              <SelectValue placeholder="Select brand" />
                             </SelectTrigger>
                             <SelectContent>
-                              {products.map(p => (
+                              {brands.map(b => (
+                                <SelectItem key={b.id} value={b.id.toString()}>{b.name}</SelectItem>
+                              ))}
+                            </SelectContent>
+                          </Select>
+                        </TableCell>
+                        <TableCell>
+                          <Select 
+                            value={item.product_id ? item.product_id.toString() : ''} 
+                            onValueChange={(v) => updateItem(index, 'product_id', v)} 
+                            disabled={!isEditable || !item.brand_id}
+                          >
+                            <SelectTrigger>
+                              <SelectValue placeholder={item.brand_id ? "Select product" : "Select brand first"} />
+                            </SelectTrigger>
+                            <SelectContent>
+                              {getFilteredProducts(item.brand_id).map(p => (
                                 <SelectItem key={p.id} value={p.id.toString()}>
                                   {p.name} - {p.sku} - {p.size || 'N/A'}
                                 </SelectItem>
