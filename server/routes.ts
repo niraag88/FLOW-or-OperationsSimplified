@@ -2405,6 +2405,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
         customerContactPerson: customers.contactPerson,
         customerEmail: customers.email,
         customerPhone: customers.phone,
+        customerVatNumber: customers.vatNumber,
       }).from(quotations)
         .leftJoin(customers, eq(quotations.customerId, customers.id))
         .where(eq(quotations.id, parseInt(quotationId as string)));
