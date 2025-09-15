@@ -144,6 +144,9 @@ export default function QuotationPrintView() {
             {quotation.customerPhone && (
               <div className="company-contact">Tel: {quotation.customerPhone}</div>
             )}
+            {quotation.customerVatNumber && (
+              <div className="company-contact">TRN: {quotation.customerVatNumber}</div>
+            )}
           </div>
 
           {/* Right Column - Customer Meta Info */}
