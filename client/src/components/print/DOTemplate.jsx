@@ -168,6 +168,14 @@ export default function DOTemplate({ data, customer, settings }) {
         </div>
       </section>
 
+      {/* Payment Terms */}
+      {data.terms && (
+        <section className="mb-8">
+          <h3 className="text-sm font-semibold text-gray-500 uppercase mb-2">Payment Terms</h3>
+          <p className="text-gray-600 text-sm whitespace-pre-wrap">{data.terms}</p>
+        </section>
+      )}
+
       {/* Remarks */}
       {data.remarks && (
         <section className="mb-8">
