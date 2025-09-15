@@ -43,6 +43,7 @@ export default function QuotationForm({ open, onClose, editingQuotation, current
     tax_amount: 0,
     total_amount: 0,
     remarks: "",
+    payment_terms: "",
     attachments: [],
     items: []
   });
@@ -107,6 +108,7 @@ export default function QuotationForm({ open, onClose, editingQuotation, current
           tax_amount: parseFloat(editingQuotation.vatAmount || 0),
           total_amount: parseFloat(editingQuotation.grandTotal || 0),
           remarks: editingQuotation.notes || "",
+          payment_terms: editingQuotation.terms || "", // Preserve existing payment terms
           attachments: editingQuotation.attachments || [],
           items: [] // Will load separately for performance
         };
@@ -226,6 +228,13 @@ export default function QuotationForm({ open, onClose, editingQuotation, current
         }
         newState.tax_treatment = taxTreatment;
         newState.tax_rate = taxRate;
+        
+        // Set payment terms from customer
+        if (customer && customer.paymentTerms) {
+          newState.payment_terms = customer.paymentTerms;
+        } else {
+          newState.payment_terms = "";
+        }
       }
       return newState;
     });
@@ -353,7 +362,7 @@ export default function QuotationForm({ open, onClose, editingQuotation, current
         vatAmount: formData.tax_amount.toFixed(2), // Send as string  
         grandTotal: formData.total_amount.toFixed(2), // Send as string
         notes: formData.remarks,
-        terms: "Payment terms - 30 days", // Default terms
+        terms: formData.payment_terms || "Net 30", // Use customer's payment terms
         // Keep additional fields for frontend use
         reference: formData.reference,
         reference_date: formData.reference_date,
@@ -502,6 +511,20 @@ export default function QuotationForm({ open, onClose, editingQuotation, current
                 onChange={(e) => handleInputChange('reference_date', e.target.value)} 
                 disabled={!isEditable} 
               />
+            </div>
+          </div>
+
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+            <div className="space-y-2">
+              <Label htmlFor="payment_terms">Payment Terms</Label>
+              <Input 
+                id="payment_terms" 
+                value={formData.payment_terms || ''} 
+                disabled={true}
+                placeholder="Will be set automatically from customer"
+                className="bg-gray-50 text-gray-700"
+              />
+              <p className="text-xs text-gray-500">Payment terms are set from the customer's profile and cannot be edited here</p>
             </div>
           </div>
 
