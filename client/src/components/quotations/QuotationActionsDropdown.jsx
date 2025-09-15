@@ -8,7 +8,7 @@ import {
   DropdownMenuSeparator,
 } from "@/components/ui/dropdown-menu";
 import { Button } from "@/components/ui/button";
-import { MoreHorizontal, Edit2, Download, Trash2, Eye, FileText } from "lucide-react";
+import { MoreHorizontal, Edit2, Download, Trash2, Eye } from "lucide-react";
 import { exportToCsv } from "../utils/export";
 import { format, isValid, parseISO } from 'date-fns';
 import { useToast } from "@/components/ui/use-toast";
@@ -16,14 +16,12 @@ import { Quotation } from "@/api/entities";
 import { RecycleBin } from "@/api/entities";
 import { AuditLog } from "@/api/entities";
 import { User } from "@/api/entities";
-import CreateInvoiceFromQuotationDialog from '../invoices/CreateInvoiceFromQuotationDialog';
 import SimpleConfirmDialog from "../common/SimpleConfirmDialog";
 
 
-export default function QuotationActionsDropdown({ quotation, canEdit, onEdit, onRefresh, onConvertToInvoice }) {
+export default function QuotationActionsDropdown({ quotation, canEdit, onEdit, onRefresh }) {
   const { toast } = useToast();
   const [showDeleteDialog, setShowDeleteDialog] = useState(false);
-  const [showConvertToInvoiceDialog, setShowConvertToInvoiceDialog] = useState(false); // New state for convert to invoice dialog
   const [currentUser, setCurrentUser] = useState(null);
 
   useEffect(() => {
@@ -170,13 +168,6 @@ export default function QuotationActionsDropdown({ quotation, canEdit, onEdit, o
     }
   };
 
-  const handleInvoiceCreated = () => {
-    setShowConvertToInvoiceDialog(false);
-    onRefresh(); // Refresh the list after invoice is created
-    if (onConvertToInvoice) {
-      onConvertToInvoice(); // Call the parent callback if provided
-    }
-  };
 
   return (
     <>
@@ -201,11 +192,6 @@ export default function QuotationActionsDropdown({ quotation, canEdit, onEdit, o
             <Download className="w-4 h-4 mr-2" />
             Export to XLSX
           </DropdownMenuItem>
-          {/* New dropdown item for converting to invoice */}
-          <DropdownMenuItem onClick={() => setShowConvertToInvoiceDialog(true)}>
-              <FileText className="w-4 h-4 mr-2" /> {/* Reusing FileText icon for now, consider a more fitting icon if available */}
-              Convert to Invoice
-            </DropdownMenuItem>
           <DropdownMenuSeparator />
           <DropdownMenuItem 
             onClick={() => setShowDeleteDialog(true)}
@@ -225,12 +211,6 @@ export default function QuotationActionsDropdown({ quotation, canEdit, onEdit, o
         description={`Do you wish to confirm deleting Quotation "${quotation.quotation_number || quotation.quoteNumber}"? It will be moved to the recycle bin.`}
         confirmText="Yes, Delete"
         confirmVariant="destructive"
-      />
-      <CreateInvoiceFromQuotationDialog
-        open={showConvertToInvoiceDialog}
-        onClose={() => setShowConvertToInvoiceDialog(false)}
-        quotation={quotation}
-        onInvoiceCreated={handleInvoiceCreated}
       />
     </>
   );
