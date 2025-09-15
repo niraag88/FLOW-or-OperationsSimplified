@@ -123,42 +123,51 @@ export default function QuotationPrintView() {
               <span className="po-label">Quote Date</span>
               <span className="po-value">{formatDate(quotation.quoteDate)}</span>
             </div>
+          </div>
+        </div>
+
+        {/* Customer Section */}
+        <div className="print-info-section">
+          {/* Left Column - Customer Info */}
+          <div className="print-supplier-section">
+            <div className="supplier-title">BILL TO</div>
+            <div className="supplier-name">{quotation.customerName || 'Unknown Customer'}</div>
+            {quotation.customerBillingAddress && (
+              <div className="supplier-address">{quotation.customerBillingAddress}</div>
+            )}
+            {quotation.customerContactPerson && (
+              <div className="supplier-contact">Contact: {quotation.customerContactPerson}</div>
+            )}
+            {quotation.customerEmail && (
+              <div className="supplier-contact">Email: {quotation.customerEmail}</div>
+            )}
+            {quotation.customerPhone && (
+              <div className="supplier-contact">Tel: {quotation.customerPhone}</div>
+            )}
+          </div>
+
+          {/* Right Column - Customer Meta Info */}
+          <div className="print-po-info">
+            {quotation.reference && (
+              <div className="po-info-row">
+                <span className="po-label">Reference</span>
+                <span className="po-value">{quotation.reference}</span>
+              </div>
+            )}
             {quotation.referenceDate && (
               <div className="po-info-row">
                 <span className="po-label">Reference Date</span>
                 <span className="po-value">{formatDate(quotation.referenceDate)}</span>
               </div>
             )}
+            {quotation.terms && (
+              <div className="po-info-row">
+                <span className="po-label">Payment Terms</span>
+                <span className="po-value">{quotation.terms}</span>
+              </div>
+            )}
           </div>
         </div>
-
-        {/* Customer Section */}
-        <div className="print-supplier-section">
-          <div className="supplier-title">BILL TO</div>
-          <div className="supplier-name">{quotation.customerName || 'Unknown Customer'}</div>
-          {quotation.customerBillingAddress && (
-            <div className="supplier-address">{quotation.customerBillingAddress}</div>
-          )}
-          {quotation.customerContactPerson && (
-            <div className="supplier-contact">Contact: {quotation.customerContactPerson}</div>
-          )}
-          {quotation.customerEmail && (
-            <div className="supplier-contact">Email: {quotation.customerEmail}</div>
-          )}
-          {quotation.customerPhone && (
-            <div className="supplier-contact">Tel: {quotation.customerPhone}</div>
-          )}
-        </div>
-
-        {/* Payment Terms Section */}
-        {quotation.terms && (
-          <div className="print-supplier-section">
-            <div className="supplier-title">PAYMENT TERMS</div>
-            <div style={{fontSize: '11px', color: '#333', marginTop: '5px'}}>
-              {quotation.terms}
-            </div>
-          </div>
-        )}
 
         {/* Items Table */}
         <div className="print-table-section">
