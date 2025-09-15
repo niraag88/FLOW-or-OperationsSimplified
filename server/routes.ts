@@ -1222,8 +1222,6 @@ export async function registerRoutes(app: Express): Promise<Server> {
     try {
       const id = parseInt(req.params.id);
       
-      console.log('Raw request body showRemarks:', req.body.showRemarks);
-      
       // Convert date strings to Date objects if present
       const processedData = { ...req.body };
       if (processedData.quoteDate && typeof processedData.quoteDate === 'string') {
@@ -1236,14 +1234,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
         processedData.referenceDate = new Date(processedData.referenceDate);
       }
       
-      console.log('Processed data showRemarks:', processedData.showRemarks);
-      
       const validatedData = insertQuotationSchema.partial().parse(processedData);
-      console.log('Validated data showRemarks:', validatedData.showRemarks);
-      
       const updatedQuote = await businessStorage.updateQuotation(id, validatedData);
-      console.log('Updated quote showRemarks:', updatedQuote.showRemarks);
-      
       res.json(updatedQuote);
     } catch (error) {
       console.error('Error updating quotation:', error);
