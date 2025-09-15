@@ -50,6 +50,16 @@ export default function QuotationActionsDropdown({ quotation, canEdit, onEdit, o
       return '';
     }
   };
+
+  const formatDateForExport = (dateString) => {
+    if (!dateString) return '';
+    try {
+      const date = typeof dateString === 'string' ? parseISO(dateString) : new Date(dateString);
+      return isValid(date) ? format(date, 'yyyy-MM-dd') : '';
+    } catch (error) {
+      return '';
+    }
+  };
   
   const handleExportXLSX = () => {
     const exportData = [];
@@ -57,7 +67,7 @@ export default function QuotationActionsDropdown({ quotation, canEdit, onEdit, o
     exportData.push({
       'Document Type': 'QUOTATION',
       'Quotation Number': quotation.quotation_number,
-      'Quotation Date': format(new Date(quotation.quotation_date), 'yyyy-MM-dd'),
+      'Quotation Date': formatDateForExport(quotation.quotation_date),
       'Customer': quotation.customer_name || 'Unknown Customer',
       'Reference': quotation.reference || '',
       'Reference Date': quotation.reference_date ? formatDate(quotation.reference_date) : '',
