@@ -150,6 +150,16 @@ export default function QuotationPrintView() {
           )}
         </div>
 
+        {/* Payment Terms Section */}
+        {quotation.terms && (
+          <div className="print-supplier-section">
+            <div className="supplier-title">PAYMENT TERMS</div>
+            <div style={{fontSize: '11px', color: '#333', marginTop: '5px'}}>
+              {quotation.terms}
+            </div>
+          </div>
+        )}
+
         {/* Items Table */}
         <div className="print-table-section">
           <table className="print-table">
