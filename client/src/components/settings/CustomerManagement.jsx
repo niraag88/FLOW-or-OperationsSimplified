@@ -35,6 +35,7 @@ export default function CustomerManagement() {
     billingAddress: "",
     vatTreatment: "Local",
     vatNumber: "",
+    paymentTerms: "",
     isActive: true
   });
 
@@ -61,6 +62,7 @@ export default function CustomerManagement() {
       billingAddress: "",
       vatTreatment: "Local",
       vatNumber: "",
+      paymentTerms: "",
       isActive: true
     });
     setEditingCustomer(null);
@@ -348,6 +350,17 @@ export default function CustomerManagement() {
                       />
                     </div>
                   )}
+                </div>
+
+                <div className="space-y-2">
+                  <Label htmlFor="paymentTerms">Payment Terms</Label>
+                  <Input
+                    id="paymentTerms"
+                    value={formData.paymentTerms}
+                    onChange={(e) => setFormData(prev => ({ ...prev, paymentTerms: e.target.value }))}
+                    placeholder="e.g., Cash, Net 30, Net 45, Credit"
+                  />
+                  <p className="text-xs text-gray-500">Payment terms for this customer (will appear on quotations, invoices, and delivery notes)</p>
                 </div>
 
                 <div className="flex items-center space-x-2">
