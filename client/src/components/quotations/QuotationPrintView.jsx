@@ -219,11 +219,11 @@ export default function QuotationPrintView() {
         </div>
 
         {/* Notes Section */}
-        {quotation.remarks && (
+        {quotation.notes && quotation.showRemarks && (
           <div className="print-supplier-section" style={{marginTop: '30px'}}>
             <div className="supplier-title">REMARKS</div>
             <div style={{fontSize: '11px', color: '#333', marginTop: '5px'}}>
-              {quotation.remarks}
+              {quotation.notes}
             </div>
           </div>
         )}

@@ -12,6 +12,7 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { Switch } from "@/components/ui/switch";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Plus, Trash2 } from "lucide-react";
 import { Quotation } from "@/api/entities";
@@ -43,6 +44,7 @@ export default function QuotationForm({ open, onClose, editingQuotation, current
     tax_amount: 0,
     total_amount: 0,
     remarks: "",
+    show_remarks: false,
     payment_terms: "",
     attachments: [],
     items: []
@@ -108,6 +110,7 @@ export default function QuotationForm({ open, onClose, editingQuotation, current
           tax_amount: parseFloat(editingQuotation.vatAmount || 0),
           total_amount: parseFloat(editingQuotation.grandTotal || 0),
           remarks: editingQuotation.notes || "",
+          show_remarks: editingQuotation.showRemarks || false,
           payment_terms: editingQuotation.terms || "", // Preserve existing payment terms
           attachments: editingQuotation.attachments || [],
           items: [] // Will load separately for performance
@@ -362,6 +365,7 @@ export default function QuotationForm({ open, onClose, editingQuotation, current
         vatAmount: formData.tax_amount.toFixed(2), // Send as string  
         grandTotal: formData.total_amount.toFixed(2), // Send as string
         notes: formData.remarks,
+        showRemarks: formData.show_remarks,
         terms: formData.payment_terms || "Net 30", // Use customer's payment terms
         // Keep additional fields for frontend use
         reference: formData.reference,
@@ -661,8 +665,21 @@ export default function QuotationForm({ open, onClose, editingQuotation, current
           </div>
 
           {/* Remarks */}
-          <div className="space-y-2">
-            <Label htmlFor="remarks">Remarks</Label>
+          <div className="space-y-4">
+            <div className="flex items-center justify-between">
+              <Label htmlFor="remarks">Remarks</Label>
+              <div className="flex items-center space-x-2">
+                <Label htmlFor="show_remarks" className="text-sm font-normal">
+                  Show in output
+                </Label>
+                <Switch 
+                  id="show_remarks"
+                  checked={formData.show_remarks || false}
+                  onCheckedChange={(checked) => handleInputChange('show_remarks', checked)}
+                  disabled={!isEditable}
+                />
+              </div>
+            </div>
             <Textarea
               id="remarks"
               value={formData.remarks || ''}

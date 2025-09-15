@@ -233,6 +233,7 @@ export const quotations = pgTable("quotations", {
   vatAmount: decimal("vat_amount", { precision: 10, scale: 2 }).default("0.00"),
   grandTotal: decimal("grand_total", { precision: 10, scale: 2 }).default("0.00"),
   notes: text("notes"),
+  showRemarks: boolean("show_remarks").default(false), // Toggle for showing remarks in output
   terms: text("terms"),
   reference: text("reference"),
   referenceDate: timestamp("reference_date"),

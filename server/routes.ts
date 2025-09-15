@@ -2396,6 +2396,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
         vatAmount: quotations.vatAmount,
         grandTotal: quotations.grandTotal,
         notes: quotations.notes,
+        showRemarks: quotations.showRemarks,
         terms: quotations.terms,
         reference: quotations.reference,
         referenceDate: quotations.referenceDate,
