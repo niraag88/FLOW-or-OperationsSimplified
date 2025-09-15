@@ -123,6 +123,12 @@
   border-radius: 4px;
 }
 
+/* Remarks Section - Clean and Simple */
+.print-remarks-section {
+  margin: 30px 0;
+  padding: 0;
+}
+
 .supplier-title {
   font-weight: bold;
   font-size: 12px;
