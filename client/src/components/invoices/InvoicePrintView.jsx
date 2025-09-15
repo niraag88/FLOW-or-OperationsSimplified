@@ -158,6 +158,16 @@ export default function InvoicePrintView() {
           </div>
         </div>
 
+        {/* Payment Terms */}
+        {invoice.terms && (
+          <div className="print-payment-info">
+            <div className="print-section-title">Payment Terms:</div>
+            <div className="print-payment-details">
+              <div>{invoice.terms}</div>
+            </div>
+          </div>
+        )}
+
         {/* Payment Information */}
         {invoice.payment_reference && (
           <div className="print-payment-info">
