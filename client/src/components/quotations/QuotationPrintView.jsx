@@ -129,20 +129,20 @@ export default function QuotationPrintView() {
         {/* Customer Section */}
         <div className="print-info-section">
           {/* Left Column - Customer Info */}
-          <div className="print-supplier-section">
-            <div className="supplier-title">BILL TO</div>
-            <div className="supplier-name">{quotation.customerName || 'Unknown Customer'}</div>
+          <div className="print-company-info">
+            <div className="company-name">BILL TO</div>
+            <div className="company-name">{quotation.customerName || 'Unknown Customer'}</div>
             {quotation.customerBillingAddress && (
-              <div className="supplier-address">{quotation.customerBillingAddress}</div>
+              <div className="company-address">{quotation.customerBillingAddress}</div>
             )}
             {quotation.customerContactPerson && (
-              <div className="supplier-contact">Contact: {quotation.customerContactPerson}</div>
+              <div className="company-contact">Contact: {quotation.customerContactPerson}</div>
             )}
             {quotation.customerEmail && (
-              <div className="supplier-contact">Email: {quotation.customerEmail}</div>
+              <div className="company-contact">Email: {quotation.customerEmail}</div>
             )}
             {quotation.customerPhone && (
-              <div className="supplier-contact">Tel: {quotation.customerPhone}</div>
+              <div className="company-contact">Tel: {quotation.customerPhone}</div>
             )}
           </div>
 
