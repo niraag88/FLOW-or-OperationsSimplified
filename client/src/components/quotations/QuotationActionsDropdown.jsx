@@ -62,7 +62,8 @@ export default function QuotationActionsDropdown({ quotation, canEdit, onEdit, o
       'Reference': quotation.reference || '',
       'Reference Date': quotation.reference_date ? formatDate(quotation.reference_date) : '',
       'Currency': quotation.currency,
-      'Status': quotation.status
+      'Status': quotation.status,
+      'Payment Terms': quotation.terms || ''
     });
     exportData.push({});
     exportData.push({

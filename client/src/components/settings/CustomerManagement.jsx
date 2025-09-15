@@ -16,10 +16,11 @@ import {
   DialogHeader,
   DialogTitle,
 } from "@/components/ui/dialog";
-import { Plus, Edit2, Trash2, Save, X, Users } from "lucide-react";
+import { Plus, Edit2, Trash2, Save, X, Users, Download } from "lucide-react";
 import { Customer } from "@/api/entities";
 import { useToast } from "@/components/ui/use-toast";
 import { logAuditAction } from "../utils/auditLogger";
+import { exportToCsv } from "../utils/export";
 import CustomerActionsDropdown from "./CustomerActionsDropdown";
 
 export default function CustomerManagement() {
@@ -130,6 +131,34 @@ export default function CustomerManagement() {
     }
   };
 
+  const handleExportCustomers = () => {
+    if (!customers || customers.length === 0) {
+      toast({
+        title: "No Data",
+        description: "No customers to export.",
+        variant: "destructive",
+      });
+      return;
+    }
+
+    const exportData = customers.map(customer => ({
+      'Customer Name': customer.name || '',
+      'Contact Person': customer.contactPerson || '',
+      'Type': customer.vatTreatment || '',
+      'TRN Number': customer.vatNumber || '',
+      'Billing Address': customer.billingAddress || '',
+      'Payment Terms': customer.paymentTerms || '',
+      'Status': customer.isActive ? 'Active' : 'Inactive'
+    }));
+
+    exportToCsv(exportData, 'Customers');
+    
+    toast({
+      title: "Export Complete",
+      description: `Exported ${customers.length} customers to CSV.`,
+    });
+  };
+
   return (
     <>
       <Card className="border-0 shadow-lg">
@@ -143,13 +172,23 @@ export default function CustomerManagement() {
               Manage customer information and settings for VAT and billing.
             </p>
           </div>
-          <Button 
-            onClick={() => setShowForm(true)} 
-            className="bg-emerald-600 hover:bg-emerald-700 w-full sm:w-auto"
-          >
-            <Plus className="w-4 h-4 mr-2" />
-            Add Customer
-          </Button>
+          <div className="flex gap-2 w-full sm:w-auto">
+            <Button 
+              onClick={handleExportCustomers}
+              variant="outline"
+              className="w-full sm:w-auto"
+            >
+              <Download className="w-4 h-4 mr-2" />
+              Export
+            </Button>
+            <Button 
+              onClick={() => setShowForm(true)} 
+              className="bg-emerald-600 hover:bg-emerald-700 w-full sm:w-auto"
+            >
+              <Plus className="w-4 h-4 mr-2" />
+              Add Customer
+            </Button>
+          </div>
         </CardHeader>
         <CardContent className="px-4 sm:px-6">
 

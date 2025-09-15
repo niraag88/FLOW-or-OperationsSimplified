@@ -63,7 +63,8 @@ export default function DOActionsDropdown({ doOrder, canEdit, onEdit, onRefresh 
       'Reference': doOrder.reference || '',
       'Reference Date': doOrder.reference_date ? formatDate(doOrder.reference_date) : '',
       'Currency': doOrder.currency,
-      'Status': doOrder.status
+      'Status': doOrder.status,
+      'Payment Terms': doOrder.terms || ''
     });
 
     // Add empty row

@@ -56,7 +56,8 @@ export default function InvoiceActionsDropdown({ invoice, canEdit, onEdit, onRef
       'Customer': invoice.customer_name || 'Unknown Customer',
       'Reference': invoice.reference || '',
       'Currency': invoice.currency,
-      'Status': invoice.status
+      'Status': invoice.status,
+      'Payment Terms': invoice.terms || ''
     });
 
     // Add empty row
