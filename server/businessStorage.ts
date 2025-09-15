@@ -297,6 +297,14 @@ export class BusinessStorage {
     return quote;
   }
 
+  async updateQuotation(id: number, data: Partial<InsertQuotation>) {
+    const [updatedQuote] = await db.update(quotations)
+      .set({ ...data, updatedAt: new Date() })
+      .where(eq(quotations.id, id))
+      .returning();
+    return updatedQuote;
+  }
+
   async deleteQuotation(id: number) {
     // First delete all line items associated with this quotation
     await db.delete(quotationItems).where(eq(quotationItems.quoteId, id));

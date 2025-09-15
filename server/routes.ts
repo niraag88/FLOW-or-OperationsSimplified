@@ -1217,6 +1217,19 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  // Update quotation
+  app.put('/api/quotations/:id', requireAuth(['Admin', 'Manager']), async (req: AuthenticatedRequest, res) => {
+    try {
+      const id = parseInt(req.params.id);
+      const validatedData = insertQuotationSchema.partial().parse(req.body);
+      const updatedQuote = await businessStorage.updateQuotation(id, validatedData);
+      res.json(updatedQuote);
+    } catch (error) {
+      console.error('Error updating quotation:', error);
+      res.status(500).json({ error: 'Failed to update quotation' });
+    }
+  });
+
   // Delete quotation
   app.delete('/api/quotations/:id', requireAuth(['Admin', 'Manager']), async (req: AuthenticatedRequest, res) => {
     try {
