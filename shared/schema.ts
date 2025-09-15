@@ -515,6 +515,7 @@ export const insertQuotationSchema = createInsertSchema(quotations).pick({
   vatAmount: true,
   grandTotal: true,
   notes: true,
+  showRemarks: true,
   terms: true,
   reference: true,
   referenceDate: true,
