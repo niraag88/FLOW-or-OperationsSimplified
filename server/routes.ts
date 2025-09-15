@@ -1221,7 +1221,20 @@ export async function registerRoutes(app: Express): Promise<Server> {
   app.put('/api/quotations/:id', requireAuth(['Admin', 'Manager']), async (req: AuthenticatedRequest, res) => {
     try {
       const id = parseInt(req.params.id);
-      const validatedData = insertQuotationSchema.partial().parse(req.body);
+      
+      // Convert date strings to Date objects if present
+      const processedData = { ...req.body };
+      if (processedData.quoteDate && typeof processedData.quoteDate === 'string') {
+        processedData.quoteDate = new Date(processedData.quoteDate);
+      }
+      if (processedData.validUntil && typeof processedData.validUntil === 'string') {
+        processedData.validUntil = new Date(processedData.validUntil);
+      }
+      if (processedData.referenceDate && typeof processedData.referenceDate === 'string') {
+        processedData.referenceDate = new Date(processedData.referenceDate);
+      }
+      
+      const validatedData = insertQuotationSchema.partial().parse(processedData);
       const updatedQuote = await businessStorage.updateQuotation(id, validatedData);
       res.json(updatedQuote);
     } catch (error) {
