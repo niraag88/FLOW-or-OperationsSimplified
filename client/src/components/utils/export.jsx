@@ -229,8 +229,8 @@ export const exportQuotationToXLSX = async (quotation) => {
     exportData.push([
       'Product Code',
       'Brand Name',
-      'Size',
       'Description',
+      'Size',
       'Quantity',
       'Unit Price (AED)',
       'Line Total (AED)'
@@ -243,8 +243,8 @@ export const exportQuotationToXLSX = async (quotation) => {
         exportData.push([
           item.productSku || item.productCode || item.product_code || '',
           item.brandName || '',  // Use brandName from API response
-          item.size || '',  // Use size from API response
           item.description || item.productName || item.product_name || '',
+          item.size || '',  // Use size from API response
           item.quantity || 0,
           parseFloat(item.unitPrice || item.unit_price || 0).toFixed(2),
           parseFloat(item.lineTotal || item.line_total || (Number(item.quantity || 0) * Number(item.unitPrice || item.unit_price || 0))).toFixed(2)
@@ -308,6 +308,7 @@ export const exportQuotationToXLSX = async (quotation) => {
       { width: 15 }, // Product Code
       { width: 20 }, // Brand Name
       { width: 40 }, // Description
+      { width: 12 }, // Size
       { width: 10 }, // Quantity
       { width: 18 }, // Unit Price
       { width: 18 }  // Line Total
@@ -317,7 +318,7 @@ export const exportQuotationToXLSX = async (quotation) => {
     XLSX.utils.book_append_sheet(workbook, worksheet, 'Quotation');
     
     // Generate filename with timestamp
-    const timestampedFilename = `Quotation_${quotationNumber}_${new Date().toISOString().split('T')[0]}.xlsx`;
+    const timestampedFilename = `Quotation_${fullQuotation.quoteNumber || quotationNumber || 'Unknown'}_${new Date().toISOString().split('T')[0]}.xlsx`;
     
     console.log('Saving file as:', timestampedFilename);
     
