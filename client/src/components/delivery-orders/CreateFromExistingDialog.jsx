@@ -81,14 +81,14 @@ export default function CreateFromExistingDialog({ open, onClose, onDocumentSele
   const handleQuotationCustomerChange = (customerId) => {
     setQuotationCustomerId(customerId);
     setSelectedQuotationId('');
-    const customerQuotations = quotations.filter(q => q.customer_id === customerId);
+    const customerQuotations = quotations.filter(q => String(q.customer_id) === String(customerId));
     setFilteredQuotations(customerQuotations);
   };
 
   const handleInvoiceCustomerChange = (customerId) => {
     setInvoiceCustomerId(customerId);
     setSelectedInvoiceId('');
-    const customerInvoices = invoices.filter(i => i.customer_id === customerId);
+    const customerInvoices = invoices.filter(i => String(i.customer_id) === String(customerId));
     setFilteredInvoices(customerInvoices);
   };
 
@@ -105,7 +105,7 @@ export default function CreateFromExistingDialog({ open, onClose, onDocumentSele
         });
         return;
       }
-      selectedDocument = quotations.find(q => q.id === selectedQuotationId);
+      selectedDocument = quotations.find(q => String(q.id) === String(selectedQuotationId));
       documentType = 'quotation';
     } else {
       if (!selectedInvoiceId) {
@@ -116,7 +116,7 @@ export default function CreateFromExistingDialog({ open, onClose, onDocumentSele
         });
         return;
       }
-      selectedDocument = invoices.find(i => i.id === selectedInvoiceId);
+      selectedDocument = invoices.find(i => String(i.id) === String(selectedInvoiceId));
       documentType = 'invoice';
     }
 
@@ -161,7 +161,7 @@ export default function CreateFromExistingDialog({ open, onClose, onDocumentSele
                 </SelectTrigger>
                 <SelectContent>
                   {customers.map(c => (
-                    <SelectItem key={c.id} value={c.id}>
+                    <SelectItem key={c.id} value={String(c.id)}>
                       {c.customer_name}
                     </SelectItem>
                   ))}
@@ -182,7 +182,7 @@ export default function CreateFromExistingDialog({ open, onClose, onDocumentSele
                 <SelectContent>
                   {filteredQuotations.length > 0 ? (
                     filteredQuotations.map(q => (
-                      <SelectItem key={q.id} value={q.id}>
+                      <SelectItem key={q.id} value={String(q.id)}>
                         {q.quotation_number} - {q.total_amount.toFixed(2)} {q.currency}
                       </SelectItem>
                     ))
@@ -209,7 +209,7 @@ export default function CreateFromExistingDialog({ open, onClose, onDocumentSele
                 </SelectTrigger>
                 <SelectContent>
                   {customers.map(c => (
-                    <SelectItem key={c.id} value={c.id}>
+                    <SelectItem key={c.id} value={String(c.id)}>
                       {c.customer_name}
                     </SelectItem>
                   ))}
@@ -230,7 +230,7 @@ export default function CreateFromExistingDialog({ open, onClose, onDocumentSele
                 <SelectContent>
                   {filteredInvoices.length > 0 ? (
                     filteredInvoices.map(i => (
-                      <SelectItem key={i.id} value={i.id}>
+                      <SelectItem key={i.id} value={String(i.id)}>
                         {i.invoice_number} - {i.total_amount.toFixed(2)} {i.currency}
                       </SelectItem>
                     ))

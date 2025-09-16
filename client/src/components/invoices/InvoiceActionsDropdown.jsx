@@ -10,7 +10,7 @@ import {
 import { Button } from "@/components/ui/button";
 import { MoreHorizontal, Edit2, Download, Trash2, Eye } from "lucide-react";
 import { useToast } from "@/components/ui/use-toast";
-import { exportToCsv } from "../utils/export";
+import { exportInvoiceToXLSX } from "../utils/export";
 import { format } from 'date-fns';
 import { Invoice } from "@/api/entities";
 import { RecycleBin } from "@/api/entities";
@@ -44,83 +44,21 @@ export default function InvoiceActionsDropdown({ invoice, canEdit, onEdit, onRef
     }
   };
 
-  const handleExportXLSX = () => {
-    // Create header row
-    const exportData = [];
-    
-    // Add invoice header info
-    exportData.push({
-      'Document Type': 'TAX INVOICE',
-      'Invoice Number': invoice.invoice_number,
-      'Invoice Date': format(new Date(invoice.invoice_date), 'yyyy-MM-dd'),
-      'Customer': invoice.customer_name || 'Unknown Customer',
-      'Reference': invoice.reference || '',
-      'Currency': invoice.currency,
-      'Status': invoice.status,
-      'Payment Terms': invoice.terms || ''
-    });
-
-    // Add empty row
-    exportData.push({});
-
-    // Add line items header with corrected order
-    exportData.push({
-      'Product Code': 'PRODUCT CODE', 
-      'Brand Name': 'BRAND NAME',
-      'Description': 'DESCRIPTION',
-      'Quantity': 'QTY',
-      'Unit Price': 'UNIT PRICE',
-      'Line Total': 'LINE TOTAL'
-    });
-
-    // Add line items with corrected order
-    if (invoice.items && invoice.items.length > 0) {
-      invoice.items.forEach(item => {
-        exportData.push({
-          'Product Code': item.product_code || '',
-          'Brand Name': item.brand_name || '',
-          'Description': item.description || '',
-          'Quantity': item.quantity || 0,
-          'Unit Price': (item.unit_price || 0).toFixed(2),
-          'Line Total': (item.line_total || 0).toFixed(2)
-        });
+  const handleExportXLSX = async () => {
+    try {
+      await exportInvoiceToXLSX(invoice);
+      toast({
+        title: 'Export Successful',
+        description: `Invoice ${invoice.invoice_number} exported to Excel.`
+      });
+    } catch (error) {
+      console.error('XLSX export error:', error);
+      toast({
+        title: 'Export Failed', 
+        description: 'Failed to export invoice to Excel. Please try again.',
+        variant: 'destructive'
       });
     }
-
-    // Add empty row
-    exportData.push({});
-
-    // Add totals with corrected alignment
-    exportData.push({
-      'Product Code': '',
-      'Brand Name': '',
-      'Description': '',
-      'Quantity': '',
-      'Unit Price': 'Subtotal:',
-      'Line Total': (invoice.subtotal || 0).toFixed(2)
-    });
-
-    if (invoice.tax_amount && invoice.tax_amount > 0) {
-      exportData.push({
-        'Product Code': '',
-        'Brand Name': '',
-        'Description': '',
-        'Quantity': '',
-        'Unit Price': 'VAT:',
-        'Line Total': (invoice.tax_amount || 0).toFixed(2)
-      });
-    }
-
-    exportData.push({
-      'Product Code': '',
-      'Brand Name': '',
-      'Description': '',
-      'Quantity': '',
-      'Unit Price': 'TOTAL:',
-      'Line Total': (invoice.total_amount || 0).toFixed(2)
-    });
-    
-    exportToCsv(exportData, `Tax_Invoice_${invoice.invoice_number}`);
   };
 
   const handleViewPrint = () => {

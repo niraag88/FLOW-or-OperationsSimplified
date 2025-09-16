@@ -333,6 +333,189 @@ export const exportQuotationToXLSX = async (quotation) => {
   }
 };
 
+export const exportInvoiceToXLSX = async (invoice) => {
+  if (!invoice) {
+    console.error("No invoice data to export.");
+    return;
+  }
+
+  try {
+    // Create export data using array of arrays for proper structure
+    const exportData = [];
+    
+    // Document Header
+    exportData.push(['TAX INVOICE', '', '', '', '', '', '']);
+    exportData.push([]); // Empty row
+    
+    // Invoice details
+    exportData.push(['Invoice Number:', invoice.invoice_number || '', '', '', '', '', '']);
+    exportData.push(['Invoice Date:', invoice.invoice_date ? new Date(invoice.invoice_date).toLocaleDateString('en-GB') : '', '', '', '', '', '']);
+    exportData.push(['Customer:', invoice.customer_name || 'Unknown Customer', '', '', '', '', '']);
+    exportData.push(['Reference:', invoice.reference || '', '', '', '', '', '']);
+    exportData.push(['Currency:', invoice.currency || 'AED', '', '', '', '', '']);
+    exportData.push(['Status:', invoice.status || '', '', '', '', '', '']);
+    
+    exportData.push([]); // Empty row
+    
+    // Table Headers - matching critical currency format standard
+    exportData.push([
+      'Product Code',
+      'Brand Name', 
+      'Description',
+      'Size',
+      'Quantity',
+      'Unit Price (AED)',
+      'Line Total (AED)'
+    ]);
+    
+    // Line Items
+    if (invoice.items && invoice.items.length > 0) {
+      invoice.items.forEach(item => {
+        exportData.push([
+          item.product_code || '',
+          item.brand_name || '',
+          item.description || '',
+          item.size || '',
+          item.quantity || 0,
+          parseFloat(item.unit_price || 0).toFixed(2),
+          parseFloat(item.line_total || 0).toFixed(2)
+        ]);
+      });
+    }
+    
+    exportData.push([]); // Empty row
+    
+    // Totals Section - using critical currency format: AED first, then value
+    exportData.push(['', '', '', '', '', 'Subtotal:', `AED ${parseFloat(invoice.subtotal || 0).toFixed(2)}`]);
+    
+    if (invoice.tax_amount && invoice.tax_amount > 0) {
+      exportData.push(['', '', '', '', '', 'VAT:', `AED ${parseFloat(invoice.tax_amount || 0).toFixed(2)}`]);
+    }
+    
+    exportData.push(['', '', '', '', '', 'TOTAL:', `AED ${parseFloat(invoice.total_amount || 0).toFixed(2)}`]);
+    
+    // Create workbook and worksheet using array of arrays
+    const workbook = XLSX.utils.book_new();
+    const worksheet = XLSX.utils.aoa_to_sheet(exportData);
+    
+    // Set column widths
+    worksheet['!cols'] = [
+      { width: 15 }, // Product Code
+      { width: 20 }, // Brand Name  
+      { width: 40 }, // Description
+      { width: 12 }, // Size
+      { width: 10 }, // Quantity
+      { width: 18 }, // Unit Price
+      { width: 18 }  // Line Total
+    ];
+    
+    // Add worksheet to workbook
+    XLSX.utils.book_append_sheet(workbook, worksheet, 'Invoice');
+    
+    // Generate filename with timestamp
+    const timestampedFilename = `Invoice_${invoice.invoice_number || 'Unknown'}_${new Date().toISOString().split('T')[0]}.xlsx`;
+    
+    // Write and download the file
+    XLSX.writeFile(workbook, timestampedFilename);
+    
+  } catch (error) {
+    console.error("Invoice XLSX export error:", error);
+    throw error;
+  }
+};
+
+export const exportDeliveryOrderToXLSX = async (deliveryOrder) => {
+  if (!deliveryOrder) {
+    console.error("No delivery order data to export.");
+    return;
+  }
+
+  try {
+    // Create export data using array of arrays for proper structure
+    const exportData = [];
+    
+    // Document Header  
+    exportData.push(['DELIVERY ORDER', '', '', '', '', '', '']);
+    exportData.push([]); // Empty row
+    
+    // DO details
+    exportData.push(['DO Number:', deliveryOrder.do_number || '', '', '', '', '', '']);
+    exportData.push(['Order Date:', deliveryOrder.order_date ? new Date(deliveryOrder.order_date).toLocaleDateString('en-GB') : '', '', '', '', '', '']);
+    exportData.push(['Customer:', deliveryOrder.customer_name || 'Unknown Customer', '', '', '', '', '']);
+    exportData.push(['Reference:', deliveryOrder.reference || '', '', '', '', '', '']);
+    exportData.push(['Reference Date:', deliveryOrder.reference_date ? new Date(deliveryOrder.reference_date).toLocaleDateString('en-GB') : '', '', '', '', '', '']);
+    exportData.push(['Currency:', deliveryOrder.currency || 'AED', '', '', '', '', '']);
+    exportData.push(['Status:', deliveryOrder.status || '', '', '', '', '', '']);
+    
+    exportData.push([]); // Empty row
+    
+    // Table Headers - matching critical currency format standard
+    exportData.push([
+      'Product Code',
+      'Brand Name',
+      'Description', 
+      'Size',
+      'Quantity',
+      'Unit Price (AED)',
+      'Line Total (AED)'
+    ]);
+    
+    // Line Items
+    if (deliveryOrder.items && deliveryOrder.items.length > 0) {
+      deliveryOrder.items.forEach(item => {
+        exportData.push([
+          item.product_code || '',
+          item.brand_name || '',
+          item.description || '',
+          item.size || '',
+          item.quantity || 0,
+          parseFloat(item.unit_price || 0).toFixed(2),
+          parseFloat(item.line_total || 0).toFixed(2)
+        ]);
+      });
+    }
+    
+    exportData.push([]); // Empty row
+    
+    // Totals Section - using critical currency format: AED first, then value
+    exportData.push(['', '', '', '', '', 'Subtotal:', `AED ${parseFloat(deliveryOrder.subtotal || 0).toFixed(2)}`]);
+    
+    if (deliveryOrder.tax_amount && deliveryOrder.tax_amount > 0) {
+      exportData.push(['', '', '', '', '', 'VAT:', `AED ${parseFloat(deliveryOrder.tax_amount || 0).toFixed(2)}`]);
+    }
+    
+    exportData.push(['', '', '', '', '', 'TOTAL:', `AED ${parseFloat(deliveryOrder.total_amount || 0).toFixed(2)}`]);
+    
+    // Create workbook and worksheet using array of arrays
+    const workbook = XLSX.utils.book_new();
+    const worksheet = XLSX.utils.aoa_to_sheet(exportData);
+    
+    // Set column widths
+    worksheet['!cols'] = [
+      { width: 15 }, // Product Code
+      { width: 20 }, // Brand Name
+      { width: 40 }, // Description
+      { width: 12 }, // Size
+      { width: 10 }, // Quantity
+      { width: 18 }, // Unit Price  
+      { width: 18 }  // Line Total
+    ];
+    
+    // Add worksheet to workbook
+    XLSX.utils.book_append_sheet(workbook, worksheet, 'Delivery Order');
+    
+    // Generate filename with timestamp
+    const timestampedFilename = `Delivery_Order_${deliveryOrder.do_number || 'Unknown'}_${new Date().toISOString().split('T')[0]}.xlsx`;
+    
+    // Write and download the file
+    XLSX.writeFile(workbook, timestampedFilename);
+    
+  } catch (error) {
+    console.error("Delivery Order XLSX export error:", error);
+    throw error;
+  }
+};
+
 export const exportPurchaseOrderToPDF = async (purchaseOrder) => {
   console.log('Purchase Order data:', purchaseOrder);
   

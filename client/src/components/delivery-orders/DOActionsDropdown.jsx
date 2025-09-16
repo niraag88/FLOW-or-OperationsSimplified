@@ -10,7 +10,7 @@ import {
 import { Button } from "@/components/ui/button";
 import { MoreHorizontal, Edit2, Download, Trash2, Eye } from "lucide-react"; // Added Trash2
 import { useToast } from "@/components/ui/use-toast";
-import { exportToCsv } from "../utils/export";
+import { exportDeliveryOrderToXLSX } from "../utils/export";
 import { format, isValid, parseISO } from 'date-fns';
 import SimpleConfirmDialog from "../common/SimpleConfirmDialog"; // Changed import from ConfirmDeleteDialog
 import { DeliveryOrder } from "@/api/entities"; // New import
@@ -51,83 +51,21 @@ export default function DOActionsDropdown({ doOrder, canEdit, onEdit, onRefresh 
     }
   };
 
-  const handleExportXLSX = () => {
-    const exportData = [];
-    
-    // Add DO header info
-    exportData.push({
-      'Document Type': 'DELIVERY ORDER',
-      'DO Number': doOrder.do_number,
-      'Order Date': format(new Date(doOrder.order_date), 'yyyy-MM-dd'),
-      'Customer': doOrder.customer_name || 'Unknown Customer',
-      'Reference': doOrder.reference || '',
-      'Reference Date': doOrder.reference_date ? formatDate(doOrder.reference_date) : '',
-      'Currency': doOrder.currency,
-      'Status': doOrder.status,
-      'Payment Terms': doOrder.terms || ''
-    });
-
-    // Add empty row
-    exportData.push({});
-
-    // Add line items header
-    exportData.push({
-      'Product Code': 'PRODUCT CODE', 
-      'Brand Name': 'BRAND NAME',
-      'Description': 'DESCRIPTION',
-      'Quantity': 'QTY',
-      'Unit Price': 'UNIT PRICE',
-      'Line Total': 'LINE TOTAL'
-    });
-
-    // Add line items
-    if (doOrder.items && doOrder.items.length > 0) {
-      doOrder.items.forEach(item => {
-        exportData.push({
-          'Product Code': item.product_code || '',
-          'Brand Name': item.brand_name || '',
-          'Description': item.description || '',
-          'Quantity': item.quantity || 0,
-          'Unit Price': (item.unit_price || 0).toFixed(2),
-          'Line Total': (item.line_total || 0).toFixed(2)
-        });
+  const handleExportXLSX = async () => {
+    try {
+      await exportDeliveryOrderToXLSX(doOrder);
+      toast({
+        title: 'Export Successful',
+        description: `Delivery Order ${doOrder.do_number} exported to Excel.`
+      });
+    } catch (error) {
+      console.error('XLSX export error:', error);
+      toast({
+        title: 'Export Failed', 
+        description: 'Failed to export delivery order to Excel. Please try again.',
+        variant: 'destructive'
       });
     }
-
-    // Add empty row
-    exportData.push({});
-
-    // Add totals
-    exportData.push({
-      'Product Code': '',
-      'Brand Name': '',
-      'Description': '',
-      'Quantity': '',
-      'Unit Price': 'Subtotal:',
-      'Line Total': (doOrder.subtotal || 0).toFixed(2)
-    });
-
-    if (doOrder.tax_amount && doOrder.tax_amount > 0) {
-      exportData.push({
-        'Product Code': '',
-        'Brand Name': '',
-        'Description': '',
-        'Quantity': '',
-        'Unit Price': 'VAT:',
-        'Line Total': (doOrder.tax_amount || 0).toFixed(2)
-      });
-    }
-
-    exportData.push({
-      'Product Code': '',
-      'Brand Name': '',
-      'Description': '',
-      'Quantity': '',
-      'Unit Price': 'TOTAL:',
-      'Line Total': (doOrder.total_amount || 0).toFixed(2)
-    });
-    
-    exportToCsv(exportData, `Delivery_Order_${doOrder.do_number}`);
   };
 
   const handleViewPrint = () => {
