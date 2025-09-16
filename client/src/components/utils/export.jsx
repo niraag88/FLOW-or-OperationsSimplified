@@ -127,6 +127,20 @@ export const exportQuotationToXLSX = async (quotation) => {
     // Get quotation number with fallback
     const quotationNumber = quotation.quotation_number || quotation.quoteNumber || 'UNKNOWN';
     
+    // Fetch complete quotation with line items
+    let fullQuotation = quotation;
+    try {
+      const response = await fetch(`/api/quotations/${quotation.id}`, { credentials: 'include' });
+      if (response.ok) {
+        fullQuotation = await response.json();
+        console.log('Fetched complete quotation with items:', fullQuotation);
+      } else {
+        console.warn('Could not fetch complete quotation, using base quotation data');
+      }
+    } catch (err) {
+      console.warn('Error fetching complete quotation:', err);
+    }
+    
     // Get company settings dynamically
     let companyInfo = {
       companyName: 'SUPERNATURE LLC',
@@ -150,7 +164,7 @@ export const exportQuotationToXLSX = async (quotation) => {
             email: settings.email || companyInfo.email,
             website: settings.website || companyInfo.website,
             vatNumber: settings.vatNumber || companyInfo.vatNumber,
-            currency: quotation.currency || 'AED'
+            currency: 'AED'
           };
         }
       }
@@ -160,146 +174,132 @@ export const exportQuotationToXLSX = async (quotation) => {
 
     console.log('Creating XLSX workbook...');
     
-    // Simplified approach - use basic XLSX format first
+    // Use array of arrays approach to avoid column headers (A, B, C, etc.)
     const exportData = [];
     
     // Document Header
-    exportData.push({
-      'A': 'QUOTATION',
-      'B': '',
-      'C': '',
-      'D': '',
-      'E': '',
-      'F': ''
-    });
+    exportData.push(['QUOTATION', '', '', '', '', '']);
     
-    exportData.push({}); // Empty row
+    exportData.push([]); // Empty row
     
-    // Company Information
-    exportData.push({
-      'A': companyInfo.companyName,
-      'B': '',
-      'C': '',
-      'D': 'Quotation Number:',
-      'E': quotationNumber,
-      'F': ''
-    });
+    // Company Information with document details side by side
+    exportData.push([companyInfo.companyName, '', '', 'Quotation Number:', quotationNumber, '']);
     
     const addressLines = companyInfo.address.split('\n');
     addressLines.forEach((line, index) => {
       if (line.trim()) {
-        const row = { 'A': line.trim(), 'B': '', 'C': '' };
+        const row = [line.trim(), '', ''];
         if (index === 0) {
-          row['D'] = 'Date:';
-          const quotationDate = quotation.quotation_date ? 
-            new Date(quotation.quotation_date).toLocaleDateString('en-GB') : 
-            (quotation.quoteDate ? new Date(quotation.quoteDate).toLocaleDateString('en-GB') : '');
-          row['E'] = quotationDate;
+          row.push('Date:');
+          const quotationDate = fullQuotation.quoteDate || fullQuotation.quotation_date ? 
+            new Date(fullQuotation.quoteDate || fullQuotation.quotation_date).toLocaleDateString('en-GB') : '';
+          row.push(quotationDate);
         } else if (index === 1) {
-          row['D'] = 'Customer:';
-          row['E'] = quotation.customer_name || quotation.customerName || '';
+          row.push('Customer:');
+          row.push(fullQuotation.customerName || fullQuotation.customer_name || '');
+        } else if (index === 2 && (fullQuotation.reference || fullQuotation.referenceNumber)) {
+          row.push('Reference:');
+          row.push(fullQuotation.reference || fullQuotation.referenceNumber);
         }
         exportData.push(row);
       }
     });
     
     if (companyInfo.phone) {
-      exportData.push({
-        'A': `Tel: ${companyInfo.phone}`,
-        'B': '',
-        'C': '',
-        'D': 'Currency:',
-        'E': quotation.currency || 'AED',
-        'F': ''
-      });
+      const phoneRow = [`Tel: ${companyInfo.phone}`, '', ''];
+      if (fullQuotation.referenceDate || fullQuotation.reference_date) {
+        phoneRow.push('Reference Date:');
+        const refDate = new Date(fullQuotation.referenceDate || fullQuotation.reference_date).toLocaleDateString('en-GB');
+        phoneRow.push(refDate);
+      }
+      exportData.push(phoneRow);
     }
     
     if (companyInfo.email) {
-      exportData.push({
-        'A': `Email: ${companyInfo.email}`,
-        'B': '',
-        'C': '',
-        'D': 'Status:',
-        'E': quotation.status || 'draft',
-        'F': ''
-      });
+      exportData.push([`Email: ${companyInfo.email}`, '', '', '', '', '']);
     }
     
     if (companyInfo.vatNumber) {
-      exportData.push({
-        'A': `TRN: ${companyInfo.vatNumber}`,
-        'B': '',
-        'C': '',
-        'D': '',
-        'E': '',
-        'F': ''
-      });
+      exportData.push([`TRN: ${companyInfo.vatNumber}`, '', '', '', '', '']);
     }
     
-    exportData.push({}); // Empty row
+    exportData.push([]); // Empty row
     
     // Table Headers
-    const currency = quotation.currency || 'AED';
-    exportData.push({
-      'A': 'Product Code',
-      'B': 'Brand Name', 
-      'C': 'Description',
-      'D': 'Quantity',
-      'E': `Unit Price (${currency})`,
-      'F': `Line Total (${currency})`
-    });
+    exportData.push([
+      'Product Code',
+      'Brand Name', 
+      'Description',
+      'Quantity',
+      'Unit Price (AED)',
+      'Line Total (AED)'
+    ]);
     
-    // Line Items
-    if (quotation.items && quotation.items.length > 0) {
-      quotation.items.forEach(item => {
-        exportData.push({
-          'A': item.product_code || '',
-          'B': item.brand_name || '',
-          'C': item.description || '',
-          'D': item.quantity || 0,
-          'E': parseFloat(item.unit_price || 0).toFixed(2),
-          'F': parseFloat(item.line_total || 0).toFixed(2)
-        });
+    // Line Items - check both items and lineItems properties
+    const items = fullQuotation.items || fullQuotation.lineItems || [];
+    if (items.length > 0) {
+      items.forEach(item => {
+        exportData.push([
+          item.productSku || item.productCode || item.product_code || '',
+          '',  // Brand name not available in items - leave empty
+          item.description || item.productName || item.product_name || '',
+          item.quantity || 0,
+          parseFloat(item.unitPrice || item.unit_price || 0).toFixed(2),
+          parseFloat(item.lineTotal || item.line_total || (Number(item.quantity || 0) * Number(item.unitPrice || item.unit_price || 0))).toFixed(2)
+        ]);
       });
     }
     
-    exportData.push({}); // Empty row
+    exportData.push([]); // Empty row
     
-    // Totals Section
-    exportData.push({
-      'A': '',
-      'B': '',
-      'C': '',
-      'D': '',
-      'E': 'Subtotal:',
-      'F': `${currency} ${parseFloat(quotation.subtotal || quotation.subTotal || 0).toFixed(2)}`
-    });
+    // Totals Section - with comprehensive fallbacks
+    // Calculate subtotal with proper fallback logic
+    let subtotal = 0;
     
-    if (quotation.tax_amount && quotation.tax_amount > 0) {
-      exportData.push({
-        'A': '',
-        'B': '',
-        'C': '',
-        'D': '',
-        'E': 'VAT:',
-        'F': `${currency} ${parseFloat(quotation.tax_amount).toFixed(2)}`
-      });
+    // First try explicit subtotal fields
+    if (fullQuotation.subtotal || fullQuotation.subTotal || fullQuotation.totalBeforeTax) {
+      subtotal = parseFloat(fullQuotation.subtotal || fullQuotation.subTotal || fullQuotation.totalBeforeTax || 0);
+    } else {
+      // Compute from line items (most reliable method)
+      if (items.length > 0) {
+        subtotal = items.reduce((sum, item) => {
+          const lineTotal = parseFloat(item.lineTotal || item.line_total || (Number(item.quantity || 0) * Number(item.unitPrice || item.unit_price || 0)));
+          return sum + (isFinite(lineTotal) ? lineTotal : 0);
+        }, 0);
+      }
+      // Only use totalAmount if it's clearly before VAT (when VAT exists and totalAmount != grandTotal)
+      if (subtotal === 0 && fullQuotation.totalAmount) {
+        const vat = parseFloat(fullQuotation.vatAmount || fullQuotation.vat_amount || fullQuotation.taxAmount || fullQuotation.tax_amount || 0);
+        const grand = parseFloat(fullQuotation.grandTotal || 0);
+        const total = parseFloat(fullQuotation.totalAmount);
+        
+        // Only use totalAmount as subtotal if it's different from grandTotal (indicating it's before VAT)
+        if (vat > 0 && grand > 0 && Math.abs(total - grand) > 0.01) {
+          subtotal = total;
+        } else if (vat === 0) {
+          // No VAT, so totalAmount is likely the subtotal
+          subtotal = total;
+        }
+      }
     }
     
-    exportData.push({
-      'A': '',
-      'B': '',
-      'C': '',
-      'D': '',
-      'E': 'TOTAL:',
-      'F': `${currency} ${parseFloat(quotation.total_amount || quotation.totalAmount || 0).toFixed(2)}`
-    });
+    exportData.push(['', '', '', '', 'Subtotal:', `AED ${subtotal.toFixed(2)}`]);
+    
+    // VAT with comprehensive fallbacks
+    const vatAmount = parseFloat(fullQuotation.vatAmount || fullQuotation.vat_amount || fullQuotation.taxAmount || fullQuotation.tax_amount || 0);
+    if (vatAmount > 0) {
+      exportData.push(['', '', '', '', 'VAT:', `AED ${vatAmount.toFixed(2)}`]);
+    }
+    
+    // Total with fallbacks
+    const total = parseFloat(fullQuotation.grandTotal || fullQuotation.total || fullQuotation.totalAmount || (subtotal + vatAmount) || 0);
+    exportData.push(['', '', '', '', 'TOTAL:', `AED ${total.toFixed(2)}`]);
     
     console.log('Export data prepared:', exportData);
     
-    // Create workbook and worksheet
+    // Create workbook and worksheet using array of arrays (no column headers)
     const workbook = XLSX.utils.book_new();
-    const worksheet = XLSX.utils.json_to_sheet(exportData);
+    const worksheet = XLSX.utils.aoa_to_sheet(exportData);
     
     // Set column widths
     worksheet['!cols'] = [
