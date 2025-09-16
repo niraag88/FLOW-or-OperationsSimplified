@@ -88,7 +88,17 @@ function PagesContent() {
           <Layout currentPageName="Delivery Orders"><DeliveryOrders /></Layout>
         </ProtectedRoute>
       } />
+      <Route path="/delivery-orders" element={
+        <ProtectedRoute>
+          <Layout currentPageName="Delivery Orders"><DeliveryOrders /></Layout>
+        </ProtectedRoute>
+      } />
       <Route path="/Invoices" element={
+        <ProtectedRoute>
+          <Layout currentPageName="Invoices"><Invoices /></Layout>
+        </ProtectedRoute>
+      } />
+      <Route path="/invoices" element={
         <ProtectedRoute>
           <Layout currentPageName="Invoices"><Invoices /></Layout>
         </ProtectedRoute>
