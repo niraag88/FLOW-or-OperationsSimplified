@@ -9,7 +9,7 @@ import {
 } from "@/components/ui/dropdown-menu";
 import { Button } from "@/components/ui/button";
 import { MoreHorizontal, Edit2, Download, Trash2, Eye } from "lucide-react";
-import { exportToCsv } from "../utils/export";
+import { exportToCsv, exportQuotationToXLSX } from "../utils/export";
 import { format, isValid, parseISO } from 'date-fns';
 import { useToast } from "@/components/ui/use-toast";
 import { Quotation } from "@/api/entities";
@@ -59,50 +59,21 @@ export default function QuotationActionsDropdown({ quotation, canEdit, onEdit, o
     }
   };
   
-  const handleExportXLSX = () => {
-    const exportData = [];
-    
-    exportData.push({
-      'Document Type': 'QUOTATION',
-      'Quotation Number': quotation.quotation_number,
-      'Quotation Date': formatDateForExport(quotation.quotation_date),
-      'Customer': quotation.customer_name || 'Unknown Customer',
-      'Reference': quotation.reference || '',
-      'Reference Date': quotation.reference_date ? formatDate(quotation.reference_date) : '',
-      'Currency': quotation.currency,
-      'Status': quotation.status,
-      'Payment Terms': quotation.terms || ''
-    });
-    exportData.push({});
-    exportData.push({
-      'Product Code': 'PRODUCT CODE', 
-      'Brand Name': 'BRAND NAME',
-      'Description': 'DESCRIPTION',
-      'Quantity': 'QTY',
-      'Unit Price': 'UNIT PRICE',
-      'Line Total': 'LINE TOTAL'
-    });
-
-    if (quotation.items && quotation.items.length > 0) {
-      quotation.items.forEach(item => {
-        exportData.push({
-          'Product Code': item.product_code || '',
-          'Brand Name': item.brand_name || '',
-          'Description': item.description || '',
-          'Quantity': item.quantity || 0,
-          'Unit Price': (item.unit_price || 0).toFixed(2),
-          'Line Total': (item.line_total || 0).toFixed(2)
-        });
+  const handleExportXLSX = async () => {
+    try {
+      await exportQuotationToXLSX(quotation);
+      toast({
+        title: 'Export Successful',
+        description: `Quotation ${quotation.quotation_number} exported to Excel.`
+      });
+    } catch (error) {
+      console.error('XLSX export error:', error);
+      toast({
+        title: 'Export Failed', 
+        description: 'Failed to export quotation to Excel. Please try again.',
+        variant: 'destructive'
       });
     }
-    exportData.push({});
-    exportData.push({'Product Code': '', 'Brand Name': '', 'Description': '', 'Quantity': '', 'Unit Price': 'Subtotal:', 'Line Total': (quotation.subtotal || 0).toFixed(2) });
-    if (quotation.tax_amount && quotation.tax_amount > 0) {
-      exportData.push({'Product Code': '', 'Brand Name': '', 'Description': '', 'Quantity': '', 'Unit Price': 'VAT:', 'Line Total': (quotation.tax_amount || 0).toFixed(2) });
-    }
-    exportData.push({'Product Code': '', 'Brand Name': '', 'Description': '', 'Quantity': '', 'Unit Price': 'TOTAL:', 'Line Total': (quotation.total_amount || 0).toFixed(2) });
-    
-    exportToCsv(exportData, `Quotation_${quotation.quotation_number}`);
   };
 
   const handleViewPrint = () => {

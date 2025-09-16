@@ -115,6 +115,263 @@ export const exportToPDF = (data, filename, title = 'Export', columns = null) =>
   }
 };
 
+export const exportQuotationToXLSX = async (quotation) => {
+  if (!quotation) {
+    console.error("No quotation data to export.");
+    return;
+  }
+
+  try {
+    // Get company settings dynamically
+    let companyInfo = {
+      companyName: 'SUPERNATURE LLC',
+      address: 'Al Rukhaimi Building\nSheikh Zayed Road\nDubai\nU.A.E.',
+      phone: '+971 4 4582211',
+      email: 'info@supernaturellc.com',
+      website: '',
+      vatNumber: '100042339000003',
+      currency: 'AED'
+    };
+
+    try {
+      const settingsResponse = await fetch('/api/company-settings', { credentials: 'include' });
+      if (settingsResponse.ok) {
+        const settings = await settingsResponse.json();
+        if (settings) {
+          companyInfo = {
+            companyName: settings.companyName || companyInfo.companyName,
+            address: settings.address || companyInfo.address,
+            phone: settings.phone || companyInfo.phone,
+            email: settings.email || companyInfo.email,
+            website: settings.website || companyInfo.website,
+            vatNumber: settings.vatNumber || companyInfo.vatNumber,
+            currency: quotation.currency || 'AED'
+          };
+        }
+      }
+    } catch (err) {
+      console.warn('Could not fetch company settings, using defaults');
+    }
+
+    // Create workbook and worksheet
+    const workbook = XLSX.utils.book_new();
+    const worksheet = {};
+
+    // Helper function to set cell value with style
+    const setCell = (address, value, style = {}) => {
+      worksheet[address] = {
+        v: value,
+        s: style
+      };
+    };
+
+    // Define styles
+    const headerStyle = {
+      font: { bold: true, sz: 14 },
+      alignment: { horizontal: 'center', vertical: 'center' },
+      fill: { fgColor: { rgb: 'E6E6FA' } },
+      border: {
+        top: { style: 'thin', color: { rgb: '000000' } },
+        bottom: { style: 'thin', color: { rgb: '000000' } },
+        left: { style: 'thin', color: { rgb: '000000' } },
+        right: { style: 'thin', color: { rgb: '000000' } }
+      }
+    };
+
+    const companyStyle = {
+      font: { bold: true, sz: 12 },
+      alignment: { horizontal: 'left', vertical: 'center' }
+    };
+
+    const labelStyle = {
+      font: { bold: true, sz: 10 },
+      alignment: { horizontal: 'left', vertical: 'center' }
+    };
+
+    const dataStyle = {
+      font: { sz: 10 },
+      alignment: { horizontal: 'left', vertical: 'center' }
+    };
+
+    const tableHeaderStyle = {
+      font: { bold: true, sz: 10 },
+      alignment: { horizontal: 'center', vertical: 'center' },
+      fill: { fgColor: { rgb: 'D3D3D3' } },
+      border: {
+        top: { style: 'thin', color: { rgb: '000000' } },
+        bottom: { style: 'thin', color: { rgb: '000000' } },
+        left: { style: 'thin', color: { rgb: '000000' } },
+        right: { style: 'thin', color: { rgb: '000000' } }
+      }
+    };
+
+    const tableCellStyle = {
+      font: { sz: 10 },
+      alignment: { horizontal: 'left', vertical: 'center' },
+      border: {
+        top: { style: 'thin', color: { rgb: '000000' } },
+        bottom: { style: 'thin', color: { rgb: '000000' } },
+        left: { style: 'thin', color: { rgb: '000000' } },
+        right: { style: 'thin', color: { rgb: '000000' } }
+      }
+    };
+
+    const currencyStyle = {
+      font: { sz: 10 },
+      alignment: { horizontal: 'right', vertical: 'center' },
+      border: {
+        top: { style: 'thin', color: { rgb: '000000' } },
+        bottom: { style: 'thin', color: { rgb: '000000' } },
+        left: { style: 'thin', color: { rgb: '000000' } },
+        right: { style: 'thin', color: { rgb: '000000' } }
+      }
+    };
+
+    let currentRow = 1;
+
+    // Document Header
+    setCell(`A${currentRow}`, 'QUOTATION', headerStyle);
+    worksheet[`!merges`] = [{ s: { c: 0, r: 0 }, e: { c: 7, r: 0 } }];
+    currentRow += 2;
+
+    // Company Information Section
+    setCell(`A${currentRow}`, companyInfo.companyName, companyStyle);
+    currentRow++;
+    const addressLines = companyInfo.address.split('\n');
+    addressLines.forEach(line => {
+      if (line.trim()) {
+        setCell(`A${currentRow}`, line.trim(), dataStyle);
+        currentRow++;
+      }
+    });
+    if (companyInfo.phone) {
+      setCell(`A${currentRow}`, `Tel: ${companyInfo.phone}`, dataStyle);
+      currentRow++;
+    }
+    if (companyInfo.email) {
+      setCell(`A${currentRow}`, `Email: ${companyInfo.email}`, dataStyle);
+      currentRow++;
+    }
+    if (companyInfo.vatNumber) {
+      setCell(`A${currentRow}`, `TRN: ${companyInfo.vatNumber}`, dataStyle);
+      currentRow++;
+    }
+
+    // Document Details (right side)
+    let detailsRow = 3;
+    setCell(`F${detailsRow}`, 'Quotation Number:', labelStyle);
+    setCell(`G${detailsRow}`, quotation.quotation_number || '', dataStyle);
+    detailsRow++;
+    
+    setCell(`F${detailsRow}`, 'Date:', labelStyle);
+    const quotationDate = quotation.quotation_date ? 
+      new Date(quotation.quotation_date).toLocaleDateString('en-GB') : '';
+    setCell(`G${detailsRow}`, quotationDate, dataStyle);
+    detailsRow++;
+    
+    setCell(`F${detailsRow}`, 'Customer:', labelStyle);
+    setCell(`G${detailsRow}`, quotation.customer_name || '', dataStyle);
+    detailsRow++;
+    
+    if (quotation.reference) {
+      setCell(`F${detailsRow}`, 'Reference:', labelStyle);
+      setCell(`G${detailsRow}`, quotation.reference, dataStyle);
+      detailsRow++;
+    }
+    
+    setCell(`F${detailsRow}`, 'Currency:', labelStyle);
+    setCell(`G${detailsRow}`, quotation.currency || 'AED', dataStyle);
+    detailsRow++;
+    
+    setCell(`F${detailsRow}`, 'Status:', labelStyle);
+    setCell(`G${detailsRow}`, quotation.status || 'draft', dataStyle);
+    
+    if (quotation.terms) {
+      detailsRow++;
+      setCell(`F${detailsRow}`, 'Payment Terms:', labelStyle);
+      setCell(`G${detailsRow}`, quotation.terms, dataStyle);
+    }
+
+    currentRow = Math.max(currentRow, detailsRow) + 3;
+
+    // Table Headers
+    const tableHeaders = [
+      'Product Code', 'Brand Name', 'Description', 'Quantity', 
+      `Unit Price (${quotation.currency || 'AED'})`, 
+      `Line Total (${quotation.currency || 'AED'})`
+    ];
+    
+    tableHeaders.forEach((header, index) => {
+      const col = String.fromCharCode(65 + index); // A, B, C, etc.
+      setCell(`${col}${currentRow}`, header, tableHeaderStyle);
+    });
+    currentRow++;
+
+    // Line Items
+    if (quotation.items && quotation.items.length > 0) {
+      quotation.items.forEach(item => {
+        setCell(`A${currentRow}`, item.product_code || '', tableCellStyle);
+        setCell(`B${currentRow}`, item.brand_name || '', tableCellStyle);
+        setCell(`C${currentRow}`, item.description || '', tableCellStyle);
+        setCell(`D${currentRow}`, item.quantity || 0, { ...tableCellStyle, alignment: { horizontal: 'center', vertical: 'center' } });
+        setCell(`E${currentRow}`, parseFloat(item.unit_price || 0).toFixed(2), currencyStyle);
+        setCell(`F${currentRow}`, parseFloat(item.line_total || 0).toFixed(2), currencyStyle);
+        currentRow++;
+      });
+    }
+
+    currentRow += 2;
+
+    // Totals Section
+    const currency = quotation.currency || 'AED';
+    
+    setCell(`E${currentRow}`, 'Subtotal:', labelStyle);
+    setCell(`F${currentRow}`, `${currency} ${parseFloat(quotation.subtotal || 0).toFixed(2)}`, currencyStyle);
+    currentRow++;
+    
+    if (quotation.tax_amount && quotation.tax_amount > 0) {
+      setCell(`E${currentRow}`, 'VAT:', labelStyle);
+      setCell(`F${currentRow}`, `${currency} ${parseFloat(quotation.tax_amount).toFixed(2)}`, currencyStyle);
+      currentRow++;
+    }
+    
+    setCell(`E${currentRow}`, 'TOTAL:', { ...labelStyle, font: { bold: true, sz: 12 } });
+    setCell(`F${currentRow}`, `${currency} ${parseFloat(quotation.total_amount || 0).toFixed(2)}`, 
+      { ...currencyStyle, font: { bold: true, sz: 12 } });
+
+    // Set column widths
+    worksheet['!cols'] = [
+      { width: 15 }, // Product Code
+      { width: 20 }, // Brand Name
+      { width: 40 }, // Description
+      { width: 10 }, // Quantity
+      { width: 18 }, // Unit Price
+      { width: 18 }, // Line Total
+      { width: 20 }, // Extra space
+      { width: 20 }  // Extra space
+    ];
+
+    // Set row heights for better spacing
+    worksheet['!rows'] = [];
+    for (let i = 0; i < currentRow; i++) {
+      worksheet['!rows'][i] = { hpt: 20 };
+    }
+
+    // Add worksheet to workbook
+    XLSX.utils.book_append_sheet(workbook, worksheet, 'Quotation');
+    
+    // Generate filename with timestamp
+    const timestampedFilename = `Quotation_${quotation.quotation_number}_${new Date().toISOString().split('T')[0]}.xlsx`;
+    
+    // Write and download the file
+    XLSX.writeFile(workbook, timestampedFilename);
+    
+  } catch (error) {
+    console.error("Quotation XLSX export error:", error);
+    throw error;
+  }
+};
+
 export const exportPurchaseOrderToPDF = async (purchaseOrder) => {
   console.log('Purchase Order data:', purchaseOrder);
   
