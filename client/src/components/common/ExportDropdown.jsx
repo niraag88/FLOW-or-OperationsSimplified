@@ -167,7 +167,7 @@ export default function ExportDropdown({
           disabled={disabled}
         >
           <Eye className="w-4 h-4 mr-2" />
-          View & Print (Internal)
+          View & Print
         </DropdownMenuItem>
         
         <DropdownMenuItem 
@@ -178,18 +178,6 @@ export default function ExportDropdown({
           Export to XLSX
         </DropdownMenuItem>
 
-        {showExternalDocument && (
-          <>
-            <DropdownMenuSeparator />
-            <DropdownMenuItem 
-              onClick={() => handleViewExternalDocument(data[0])}
-              disabled={disabled || data.length === 0}
-            >
-              <Eye className="w-4 h-4 mr-2" />
-              View & Print (External)
-            </DropdownMenuItem>
-          </>
-        )}
         
         <DropdownMenuSeparator />
         

@@ -144,66 +144,6 @@ export default function Quotations() {
     setCurrentPage(1);
   };
 
-  const handleExternalDocumentView = async (quotation) => {
-    try {
-      // Use preloaded customer data for better performance
-      const customerData = customers.find(c => c.id === quotation.customerId) || 
-        (quotation.customer_name ? { customer_name: quotation.customer_name } : null);
-      
-      // Mock company settings - in real app this would come from settings API
-      const companySettings = {
-        company_name: "Your Company Name",
-        company_address: "123 Business Street, Business City",
-        company_phone: "+1 234 567 8900",
-        company_email: "info@yourcompany.com",
-        company_trn: "TRN123456789"
-      };
-
-      const printWindow = window.open('', '_blank');
-      if (!printWindow) {
-        alert('Please allow popups to view the external document');
-        return;
-      }
-
-      // Create the document structure
-      printWindow.document.write(`
-        <!DOCTYPE html>
-        <html>
-        <head>
-          <title>Quotation ${quotation.quotation_number}</title>
-          <script src="https://unpkg.com/react@18/umd/react.development.js"></script>
-          <script src="https://unpkg.com/react-dom@18/umd/react-dom.development.js"></script>
-          <script src="https://cdn.tailwindcss.com"></script>
-          <style>
-            body { margin: 0; padding: 0; }
-          </style>
-        </head>
-        <body>
-          <div id="quotation-root"></div>
-        </body>
-        </html>
-      `);
-      printWindow.document.close();
-
-      // Wait for the window to load
-      printWindow.onload = () => {
-        const root = printWindow.document.getElementById('quotation-root');
-        const reactRoot = createRoot(root);
-        
-        reactRoot.render(
-          React.createElement(QuotationTemplate, {
-            data: quotation,
-            customer: customerData,
-            settings: companySettings
-          })
-        );
-      };
-
-    } catch (error) {
-      console.error('Error opening external document:', error);
-      alert('Error opening external document. Please try again.');
-    }
-  };
 
   return (
     <div className="space-y-6">
@@ -229,8 +169,6 @@ export default function Quotations() {
               grandTotal: { label: 'Total (AED)', transform: (val) => `${val || 0}` }
             }}
             isLoading={loading}
-            showExternalDocument={true}
-            onExternalDocumentClick={handleExternalDocumentView}
           />
           
           {canEdit && (
