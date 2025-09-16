@@ -31,7 +31,7 @@ export default function InvoiceFilters({ selectedStatuses, setSelectedStatuses, 
 
   // Get unique values
   const uniqueStatuses = ['draft', 'submitted'];
-  const uniqueCurrencies = ['AED', 'USD', 'GBP'];
+  const uniqueCurrencies = ['AED']; // Invoices are AED-only per business requirements
   const uniqueTaxTreatments = ['standard', 'exempt', 'reverse_charge'];
 
   const handleDateRangeChange = (value) => {
