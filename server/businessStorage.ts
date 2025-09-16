@@ -4,12 +4,13 @@ import {
   brands, suppliers, customers, products, purchaseOrders, quotations,
   vatReturns, companySettings, purchaseOrderItems, quotationItems,
   stockCounts, stockCountItems, users, goodsReceipts, goodsReceiptItems,
+  invoices, deliveryOrders,
   type Brand, type Supplier, type Customer, type Product, 
   type PurchaseOrder, type Quotation, type VatReturn, type CompanySettings,
-  type StockCount, type StockCountItem,
+  type StockCount, type StockCountItem, type Invoice, type DeliveryOrder,
   type InsertBrand, type InsertSupplier, type InsertCustomer, 
   type InsertProduct, type InsertPurchaseOrder, type InsertQuotation,
-  type InsertStockCount, type InsertStockCountItem
+  type InsertStockCount, type InsertStockCountItem, type InsertInvoice, type InsertDeliveryOrder
 } from "@shared/schema";
 
 export class BusinessStorage {
@@ -679,6 +680,56 @@ export class BusinessStorage {
       lowStockProducts,
       outOfStockProducts
     };
+  }
+
+  // Invoice operations
+  async getInvoices() {
+    return await db.select().from(invoices).orderBy(desc(invoices.createdAt));
+  }
+
+  async getInvoiceById(id: number) {
+    const [invoice] = await db.select().from(invoices).where(eq(invoices.id, id));
+    return invoice;
+  }
+
+  async createInvoice(data: InsertInvoice) {
+    const [invoice] = await db.insert(invoices).values(data).returning();
+    return invoice;
+  }
+
+  async updateInvoice(id: number, data: Partial<InsertInvoice>) {
+    const [invoice] = await db.update(invoices).set(data).where(eq(invoices.id, id)).returning();
+    return invoice;
+  }
+
+  async deleteInvoice(id: number) {
+    const [deletedInvoice] = await db.delete(invoices).where(eq(invoices.id, id)).returning();
+    return deletedInvoice;
+  }
+
+  // Delivery Order operations
+  async getDeliveryOrders() {
+    return await db.select().from(deliveryOrders).orderBy(desc(deliveryOrders.createdAt));
+  }
+
+  async getDeliveryOrderById(id: number) {
+    const [deliveryOrder] = await db.select().from(deliveryOrders).where(eq(deliveryOrders.id, id));
+    return deliveryOrder;
+  }
+
+  async createDeliveryOrder(data: InsertDeliveryOrder) {
+    const [deliveryOrder] = await db.insert(deliveryOrders).values(data).returning();
+    return deliveryOrder;
+  }
+
+  async updateDeliveryOrder(id: number, data: Partial<InsertDeliveryOrder>) {
+    const [deliveryOrder] = await db.update(deliveryOrders).set(data).where(eq(deliveryOrders.id, id)).returning();
+    return deliveryOrder;
+  }
+
+  async deleteDeliveryOrder(id: number) {
+    const [deletedDeliveryOrder] = await db.delete(deliveryOrders).where(eq(deliveryOrders.id, id)).returning();
+    return deletedDeliveryOrder;
   }
 }
 
