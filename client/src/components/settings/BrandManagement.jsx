@@ -15,8 +15,7 @@ import {
   DialogTitle,
 } from "@/components/ui/dialog";
 import { Plus, Edit2, Trash2, Building2, ExternalLink } from "lucide-react";
-import { Brand } from "@/api/entities";
-import { User } from "@/api/entities";
+import { Brand, RecycleBin, AuditLog, User } from "@/api/entities";
 import { logAuditAction } from "../utils/auditLogger";
 import { useToast } from "@/components/ui/use-toast";
 import SimpleConfirmDialog from "../common/SimpleConfirmDialog";
@@ -144,18 +143,46 @@ export default function BrandManagement() {
     if (!brandToDelete) return;
     
     try {
+      // Move to recycle bin
+      await RecycleBin.create({
+        document_type: 'Brand',
+        document_id: brandToDelete.id,
+        document_number: brandToDelete.name,
+        document_data: brandToDelete,
+        deleted_by: currentUser?.email || 'unknown',
+        deleted_date: new Date().toISOString(),
+        reason: 'Deleted from UI',
+        original_status: brandToDelete.isActive ? 'Active' : 'Inactive',
+        can_restore: true
+      });
+
+      // Log the deletion
+      await AuditLog.create({
+        entity_type: 'Brand',
+        entity_id: brandToDelete.id,
+        action: 'deleted',
+        user_email: currentUser?.email || 'unknown',
+        changes: { 
+          brand_name: brandToDelete.name,
+          deletion_reason: 'Deleted from UI',
+          moved_to_recycle_bin: true
+        },
+        timestamp: new Date().toISOString()
+      });
+
+      // Delete from main table
       await Brand.delete(brandToDelete.id);
-      await logAuditAction("Brand", brandToDelete.id, "delete", currentUser?.email, { deleted_brand: brandToDelete });
+      
       toast({
-        title: "Success",
-        description: "Brand deleted successfully.",
+        title: "Brand Deleted",
+        description: `${brandToDelete.name} has been moved to the recycle bin.`,
       });
       loadBrands();
     } catch (error) {
       console.error("Error deleting brand:", error);
       toast({
-        title: "Error",
-        description: "Failed to delete brand. It may be in use by products.",
+        title: "Delete Failed",
+        description: "Failed to delete the brand. Please try again.",
         variant: "destructive",
       });
     } finally {

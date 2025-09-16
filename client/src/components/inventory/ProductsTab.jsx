@@ -10,9 +10,8 @@ import { Checkbox } from "@/components/ui/checkbox";
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
 import { Package, Trash2, MoreHorizontal, Edit, Search, Filter, ChevronDown, X } from "lucide-react";
 import { Skeleton } from "@/components/ui/skeleton";
-import { Product } from "@/api/entities";
+import { Product, RecycleBin, AuditLog, User } from "@/api/entities";
 import { logAuditAction } from "../utils/auditLogger";
-import { User } from "@/api/entities";
 import SimpleConfirmDialog from "../common/SimpleConfirmDialog";
 
 export default function ProductsTab({ 
@@ -60,9 +59,38 @@ export default function ProductsTab({
   const handleDeleteConfirm = async () => {
     if (!productToDelete) return;
     try {
-      await Product.delete(productToDelete.id);
       const user = await User.me();
-      await logAuditAction("Product", productToDelete.id, "delete", user.email, { deleted_product: productToDelete });
+      
+      // Move to recycle bin
+      await RecycleBin.create({
+        document_type: 'Product',
+        document_id: productToDelete.id,
+        document_number: productToDelete.name,
+        document_data: productToDelete,
+        deleted_by: user?.email || 'unknown',
+        deleted_date: new Date().toISOString(),
+        reason: 'Deleted from UI',
+        original_status: productToDelete.isActive ? 'Active' : 'Inactive',
+        can_restore: true
+      });
+
+      // Log the deletion
+      await AuditLog.create({
+        entity_type: 'Product',
+        entity_id: productToDelete.id,
+        action: 'deleted',
+        user_email: user?.email || 'unknown',
+        changes: { 
+          product_name: productToDelete.name,
+          deletion_reason: 'Deleted from UI',
+          moved_to_recycle_bin: true
+        },
+        timestamp: new Date().toISOString()
+      });
+
+      // Delete from main table
+      await Product.delete(productToDelete.id);
+      
       onRefresh();
     } catch (error) {
       console.error("Error deleting product:", error);

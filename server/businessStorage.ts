@@ -37,11 +37,8 @@ export class BusinessStorage {
   }
 
   async deleteBrand(id: number) {
-    await db.update(brands).set({ 
-      isActive: false,
-      updatedAt: new Date()
-    }).where(eq(brands.id, id));
-    return true;
+    const [deletedBrand] = await db.delete(brands).where(eq(brands.id, id)).returning();
+    return deletedBrand;
   }
 
   // Supplier operations
@@ -157,11 +154,8 @@ export class BusinessStorage {
   }
 
   async deleteProduct(id: number) {
-    await db.update(products).set({ 
-      isActive: false,
-      updatedAt: new Date()
-    }).where(eq(products.id, id));
-    return true;
+    const [deletedProduct] = await db.delete(products).where(eq(products.id, id)).returning();
+    return deletedProduct;
   }
 
   // Purchase Order operations

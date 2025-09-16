@@ -27,6 +27,9 @@ import { PurchaseOrder } from '@/api/entities';
 import { Invoice } from '@/api/entities';
 import { DeliveryOrder } from '@/api/entities';
 import { Quotation } from '@/api/entities';
+import { Customer } from '@/api/entities';
+import { Product } from '@/api/entities';
+import { Brand } from '@/api/entities';
 import { AuditLog } from '@/api/entities';
 import { User } from '@/api/entities';
 import SimpleConfirmDialog from '../common/SimpleConfirmDialog';
@@ -615,6 +618,9 @@ const getEntityClass = (type) => {
     case 'Invoice': return Invoice;
     case 'DeliveryOrder': return DeliveryOrder;
     case 'Quotation': return Quotation;
+    case 'Customer': return Customer;
+    case 'Product': return Product;
+    case 'Brand': return Brand;
     default: return null;
   }
 };
