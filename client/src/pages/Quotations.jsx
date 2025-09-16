@@ -219,15 +219,14 @@ export default function Quotations() {
             type="Quotations"
             filename="quotations"
             columns={{
-              quotation_number: 'Quotation Number',
-              customer_name: 'Customer',
-              quotation_date: { label: 'Quotation Date', transform: (date) => date ? new Date(date).toLocaleDateString('en-GB') : '' },
+              quoteNumber: 'Quotation Number',
+              customerName: 'Customer',
+              quoteDate: { label: 'Quotation Date', transform: (date) => date ? new Date(date).toLocaleDateString('en-GB') : '' },
               reference: 'Reference',
               status: 'Status',
-              subtotal: { label: 'Subtotal (AED)', transform: (val) => `${val || 0}` },
-              tax_amount: { label: 'VAT (AED)', transform: (val) => `${val || 0}` },
-              total_amount: { label: 'Total (AED)', transform: (val) => `${val || 0}` },
-              currency: 'Currency'
+              totalAmount: { label: 'Subtotal (AED)', transform: (val) => `${val || 0}` },
+              vatAmount: { label: 'VAT (AED)', transform: (val) => `${val || 0}` },
+              grandTotal: { label: 'Total (AED)', transform: (val) => `${val || 0}` }
             }}
             isLoading={loading}
             showExternalDocument={true}

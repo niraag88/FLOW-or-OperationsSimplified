@@ -131,7 +131,7 @@ export default function QuotationFilters({ selectedStatuses, setSelectedStatuses
                       htmlFor={`quotation-customer-${customer.id}`}
                       className="text-sm leading-none peer-disabled:cursor-not-allowed peer-disabled:opacity-70 cursor-pointer"
                     >
-                      {customer.customer_name}
+                      {customer.name || customer.customer_name}
                     </label>
                   </div>
                 ))}
@@ -234,7 +234,7 @@ export default function QuotationFilters({ selectedStatuses, setSelectedStatuses
             const customer = customers.find(c => c.id === customerId);
             return (
               <Badge key={customerId} variant="secondary" className="gap-1">
-                Customer: {customer?.customer_name}
+                Customer: {customer?.name || customer?.customer_name}
                 <X 
                   className="h-3 w-3 cursor-pointer" 
                   onClick={() => {
