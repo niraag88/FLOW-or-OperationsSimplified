@@ -241,7 +241,7 @@ export const exportQuotationToXLSX = async (quotation) => {
       items.forEach(item => {
         exportData.push([
           item.productSku || item.productCode || item.product_code || '',
-          '',  // Brand name not available in items - leave empty
+          item.brandName || '',  // Use brandName from API response
           item.description || item.productName || item.product_name || '',
           item.quantity || 0,
           parseFloat(item.unitPrice || item.unit_price || 0).toFixed(2),

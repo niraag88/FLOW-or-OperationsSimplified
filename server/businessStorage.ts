@@ -265,11 +265,34 @@ export class BusinessStorage {
   }
 
   async getQuotationWithItems(id: number) {
-    // Get quotation details
-    const [quote] = await db.select().from(quotations).where(eq(quotations.id, id));
+    // Get quotation details with customer name
+    const [quote] = await db.select({
+      id: quotations.id,
+      quoteNumber: quotations.quoteNumber,
+      customerId: quotations.customerId,
+      status: quotations.status,
+      quoteDate: quotations.quoteDate,
+      validUntil: quotations.validUntil,
+      totalAmount: quotations.totalAmount,
+      vatAmount: quotations.vatAmount,
+      grandTotal: quotations.grandTotal,
+      notes: quotations.notes,
+      showRemarks: quotations.showRemarks,
+      terms: quotations.terms,
+      reference: quotations.reference,
+      referenceDate: quotations.referenceDate,
+      objectKey: quotations.objectKey,
+      createdBy: quotations.createdBy,
+      createdAt: quotations.createdAt,
+      updatedAt: quotations.updatedAt,
+      customerName: customers.name,
+    }).from(quotations)
+      .leftJoin(customers, eq(quotations.customerId, customers.id))
+      .where(eq(quotations.id, id));
+    
     if (!quote) return null;
 
-    // Get quotation items
+    // Get quotation items with brand names
     const items = await db.select({
       id: quotationItems.id,
       productId: quotationItems.productId,
@@ -280,8 +303,10 @@ export class BusinessStorage {
       lineTotal: quotationItems.lineTotal,
       description: products.name,
       productCode: products.sku,
+      brandName: brands.name,
     }).from(quotationItems)
       .leftJoin(products, eq(quotationItems.productId, products.id))
+      .leftJoin(brands, eq(products.brandId, brands.id))
       .where(eq(quotationItems.quoteId, id));
 
     return { ...quote, items };
