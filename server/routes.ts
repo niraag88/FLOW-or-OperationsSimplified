@@ -1122,6 +1122,28 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  // GET /api/invoices
+  app.get('/api/invoices', requireAuth(), async (req: AuthenticatedRequest, res) => {
+    try {
+      const invoices = await businessStorage.getInvoices();
+      res.json(invoices);
+    } catch (error) {
+      console.error('Error fetching invoices:', error);
+      res.status(500).json({ error: 'Failed to fetch invoices' });
+    }
+  });
+
+  // GET /api/delivery-orders
+  app.get('/api/delivery-orders', requireAuth(), async (req: AuthenticatedRequest, res) => {
+    try {
+      const deliveryOrders = await businessStorage.getDeliveryOrders();
+      res.json(deliveryOrders);
+    } catch (error) {
+      console.error('Error fetching delivery orders:', error);
+      res.status(500).json({ error: 'Failed to fetch delivery orders' });
+    }
+  });
+
   app.post('/api/quotations', requireAuth(['Admin', 'Manager']), async (req: AuthenticatedRequest, res) => {
     try {
       const quoteNumber = await businessStorage.generateQuotationNumber();

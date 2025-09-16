@@ -112,10 +112,12 @@ export const Brand = new ApiEntity('brands');
 export const PurchaseOrder = new ApiEntity('purchase-orders');
 export const Quotation = new ApiEntity('quotations');
 
+// API-backed entities now implemented
+export const Invoice = new ApiEntity('invoices');
+export const DeliveryOrder = new ApiEntity('delivery-orders');
+
 // Fallback entities for features not yet implemented
 export const GoodsReceipt = new FallbackEntity('GoodsReceipt');
-export const DeliveryOrder = new FallbackEntity('DeliveryOrder');
-export const Invoice = new FallbackEntity('Invoice');
 export const InventoryLot = new FallbackEntity('InventoryLot');
 export const StockCount = {
   ...new ApiEntity('stock-counts'),
