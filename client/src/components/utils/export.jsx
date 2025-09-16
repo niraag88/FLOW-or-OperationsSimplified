@@ -121,7 +121,12 @@ export const exportQuotationToXLSX = async (quotation) => {
     return;
   }
 
+  console.log('Starting XLSX export for quotation:', quotation);
+  
   try {
+    // Get quotation number with fallback
+    const quotationNumber = quotation.quotation_number || quotation.quoteNumber || 'UNKNOWN';
+    
     // Get company settings dynamically
     let companyInfo = {
       companyName: 'SUPERNATURE LLC',
@@ -150,195 +155,152 @@ export const exportQuotationToXLSX = async (quotation) => {
         }
       }
     } catch (err) {
-      console.warn('Could not fetch company settings, using defaults');
+      console.warn('Could not fetch company settings, using defaults:', err);
     }
 
-    // Create workbook and worksheet
-    const workbook = XLSX.utils.book_new();
-    const worksheet = {};
-
-    // Helper function to set cell value with style
-    const setCell = (address, value, style = {}) => {
-      worksheet[address] = {
-        v: value,
-        s: style
-      };
-    };
-
-    // Define styles
-    const headerStyle = {
-      font: { bold: true, sz: 14 },
-      alignment: { horizontal: 'center', vertical: 'center' },
-      fill: { fgColor: { rgb: 'E6E6FA' } },
-      border: {
-        top: { style: 'thin', color: { rgb: '000000' } },
-        bottom: { style: 'thin', color: { rgb: '000000' } },
-        left: { style: 'thin', color: { rgb: '000000' } },
-        right: { style: 'thin', color: { rgb: '000000' } }
-      }
-    };
-
-    const companyStyle = {
-      font: { bold: true, sz: 12 },
-      alignment: { horizontal: 'left', vertical: 'center' }
-    };
-
-    const labelStyle = {
-      font: { bold: true, sz: 10 },
-      alignment: { horizontal: 'left', vertical: 'center' }
-    };
-
-    const dataStyle = {
-      font: { sz: 10 },
-      alignment: { horizontal: 'left', vertical: 'center' }
-    };
-
-    const tableHeaderStyle = {
-      font: { bold: true, sz: 10 },
-      alignment: { horizontal: 'center', vertical: 'center' },
-      fill: { fgColor: { rgb: 'D3D3D3' } },
-      border: {
-        top: { style: 'thin', color: { rgb: '000000' } },
-        bottom: { style: 'thin', color: { rgb: '000000' } },
-        left: { style: 'thin', color: { rgb: '000000' } },
-        right: { style: 'thin', color: { rgb: '000000' } }
-      }
-    };
-
-    const tableCellStyle = {
-      font: { sz: 10 },
-      alignment: { horizontal: 'left', vertical: 'center' },
-      border: {
-        top: { style: 'thin', color: { rgb: '000000' } },
-        bottom: { style: 'thin', color: { rgb: '000000' } },
-        left: { style: 'thin', color: { rgb: '000000' } },
-        right: { style: 'thin', color: { rgb: '000000' } }
-      }
-    };
-
-    const currencyStyle = {
-      font: { sz: 10 },
-      alignment: { horizontal: 'right', vertical: 'center' },
-      border: {
-        top: { style: 'thin', color: { rgb: '000000' } },
-        bottom: { style: 'thin', color: { rgb: '000000' } },
-        left: { style: 'thin', color: { rgb: '000000' } },
-        right: { style: 'thin', color: { rgb: '000000' } }
-      }
-    };
-
-    let currentRow = 1;
-
+    console.log('Creating XLSX workbook...');
+    
+    // Simplified approach - use basic XLSX format first
+    const exportData = [];
+    
     // Document Header
-    setCell(`A${currentRow}`, 'QUOTATION', headerStyle);
-    worksheet[`!merges`] = [{ s: { c: 0, r: 0 }, e: { c: 7, r: 0 } }];
-    currentRow += 2;
-
-    // Company Information Section
-    setCell(`A${currentRow}`, companyInfo.companyName, companyStyle);
-    currentRow++;
+    exportData.push({
+      'A': 'QUOTATION',
+      'B': '',
+      'C': '',
+      'D': '',
+      'E': '',
+      'F': ''
+    });
+    
+    exportData.push({}); // Empty row
+    
+    // Company Information
+    exportData.push({
+      'A': companyInfo.companyName,
+      'B': '',
+      'C': '',
+      'D': 'Quotation Number:',
+      'E': quotationNumber,
+      'F': ''
+    });
+    
     const addressLines = companyInfo.address.split('\n');
-    addressLines.forEach(line => {
+    addressLines.forEach((line, index) => {
       if (line.trim()) {
-        setCell(`A${currentRow}`, line.trim(), dataStyle);
-        currentRow++;
+        const row = { 'A': line.trim(), 'B': '', 'C': '' };
+        if (index === 0) {
+          row['D'] = 'Date:';
+          const quotationDate = quotation.quotation_date ? 
+            new Date(quotation.quotation_date).toLocaleDateString('en-GB') : 
+            (quotation.quoteDate ? new Date(quotation.quoteDate).toLocaleDateString('en-GB') : '');
+          row['E'] = quotationDate;
+        } else if (index === 1) {
+          row['D'] = 'Customer:';
+          row['E'] = quotation.customer_name || quotation.customerName || '';
+        }
+        exportData.push(row);
       }
     });
+    
     if (companyInfo.phone) {
-      setCell(`A${currentRow}`, `Tel: ${companyInfo.phone}`, dataStyle);
-      currentRow++;
+      exportData.push({
+        'A': `Tel: ${companyInfo.phone}`,
+        'B': '',
+        'C': '',
+        'D': 'Currency:',
+        'E': quotation.currency || 'AED',
+        'F': ''
+      });
     }
+    
     if (companyInfo.email) {
-      setCell(`A${currentRow}`, `Email: ${companyInfo.email}`, dataStyle);
-      currentRow++;
+      exportData.push({
+        'A': `Email: ${companyInfo.email}`,
+        'B': '',
+        'C': '',
+        'D': 'Status:',
+        'E': quotation.status || 'draft',
+        'F': ''
+      });
     }
+    
     if (companyInfo.vatNumber) {
-      setCell(`A${currentRow}`, `TRN: ${companyInfo.vatNumber}`, dataStyle);
-      currentRow++;
-    }
-
-    // Document Details (right side)
-    let detailsRow = 3;
-    setCell(`F${detailsRow}`, 'Quotation Number:', labelStyle);
-    setCell(`G${detailsRow}`, quotation.quotation_number || '', dataStyle);
-    detailsRow++;
-    
-    setCell(`F${detailsRow}`, 'Date:', labelStyle);
-    const quotationDate = quotation.quotation_date ? 
-      new Date(quotation.quotation_date).toLocaleDateString('en-GB') : '';
-    setCell(`G${detailsRow}`, quotationDate, dataStyle);
-    detailsRow++;
-    
-    setCell(`F${detailsRow}`, 'Customer:', labelStyle);
-    setCell(`G${detailsRow}`, quotation.customer_name || '', dataStyle);
-    detailsRow++;
-    
-    if (quotation.reference) {
-      setCell(`F${detailsRow}`, 'Reference:', labelStyle);
-      setCell(`G${detailsRow}`, quotation.reference, dataStyle);
-      detailsRow++;
+      exportData.push({
+        'A': `TRN: ${companyInfo.vatNumber}`,
+        'B': '',
+        'C': '',
+        'D': '',
+        'E': '',
+        'F': ''
+      });
     }
     
-    setCell(`F${detailsRow}`, 'Currency:', labelStyle);
-    setCell(`G${detailsRow}`, quotation.currency || 'AED', dataStyle);
-    detailsRow++;
+    exportData.push({}); // Empty row
     
-    setCell(`F${detailsRow}`, 'Status:', labelStyle);
-    setCell(`G${detailsRow}`, quotation.status || 'draft', dataStyle);
-    
-    if (quotation.terms) {
-      detailsRow++;
-      setCell(`F${detailsRow}`, 'Payment Terms:', labelStyle);
-      setCell(`G${detailsRow}`, quotation.terms, dataStyle);
-    }
-
-    currentRow = Math.max(currentRow, detailsRow) + 3;
-
     // Table Headers
-    const tableHeaders = [
-      'Product Code', 'Brand Name', 'Description', 'Quantity', 
-      `Unit Price (${quotation.currency || 'AED'})`, 
-      `Line Total (${quotation.currency || 'AED'})`
-    ];
-    
-    tableHeaders.forEach((header, index) => {
-      const col = String.fromCharCode(65 + index); // A, B, C, etc.
-      setCell(`${col}${currentRow}`, header, tableHeaderStyle);
+    const currency = quotation.currency || 'AED';
+    exportData.push({
+      'A': 'Product Code',
+      'B': 'Brand Name', 
+      'C': 'Description',
+      'D': 'Quantity',
+      'E': `Unit Price (${currency})`,
+      'F': `Line Total (${currency})`
     });
-    currentRow++;
-
+    
     // Line Items
     if (quotation.items && quotation.items.length > 0) {
       quotation.items.forEach(item => {
-        setCell(`A${currentRow}`, item.product_code || '', tableCellStyle);
-        setCell(`B${currentRow}`, item.brand_name || '', tableCellStyle);
-        setCell(`C${currentRow}`, item.description || '', tableCellStyle);
-        setCell(`D${currentRow}`, item.quantity || 0, { ...tableCellStyle, alignment: { horizontal: 'center', vertical: 'center' } });
-        setCell(`E${currentRow}`, parseFloat(item.unit_price || 0).toFixed(2), currencyStyle);
-        setCell(`F${currentRow}`, parseFloat(item.line_total || 0).toFixed(2), currencyStyle);
-        currentRow++;
+        exportData.push({
+          'A': item.product_code || '',
+          'B': item.brand_name || '',
+          'C': item.description || '',
+          'D': item.quantity || 0,
+          'E': parseFloat(item.unit_price || 0).toFixed(2),
+          'F': parseFloat(item.line_total || 0).toFixed(2)
+        });
       });
     }
-
-    currentRow += 2;
-
-    // Totals Section
-    const currency = quotation.currency || 'AED';
     
-    setCell(`E${currentRow}`, 'Subtotal:', labelStyle);
-    setCell(`F${currentRow}`, `${currency} ${parseFloat(quotation.subtotal || 0).toFixed(2)}`, currencyStyle);
-    currentRow++;
+    exportData.push({}); // Empty row
+    
+    // Totals Section
+    exportData.push({
+      'A': '',
+      'B': '',
+      'C': '',
+      'D': '',
+      'E': 'Subtotal:',
+      'F': `${currency} ${parseFloat(quotation.subtotal || quotation.subTotal || 0).toFixed(2)}`
+    });
     
     if (quotation.tax_amount && quotation.tax_amount > 0) {
-      setCell(`E${currentRow}`, 'VAT:', labelStyle);
-      setCell(`F${currentRow}`, `${currency} ${parseFloat(quotation.tax_amount).toFixed(2)}`, currencyStyle);
-      currentRow++;
+      exportData.push({
+        'A': '',
+        'B': '',
+        'C': '',
+        'D': '',
+        'E': 'VAT:',
+        'F': `${currency} ${parseFloat(quotation.tax_amount).toFixed(2)}`
+      });
     }
     
-    setCell(`E${currentRow}`, 'TOTAL:', { ...labelStyle, font: { bold: true, sz: 12 } });
-    setCell(`F${currentRow}`, `${currency} ${parseFloat(quotation.total_amount || 0).toFixed(2)}`, 
-      { ...currencyStyle, font: { bold: true, sz: 12 } });
-
+    exportData.push({
+      'A': '',
+      'B': '',
+      'C': '',
+      'D': '',
+      'E': 'TOTAL:',
+      'F': `${currency} ${parseFloat(quotation.total_amount || quotation.totalAmount || 0).toFixed(2)}`
+    });
+    
+    console.log('Export data prepared:', exportData);
+    
+    // Create workbook and worksheet
+    const workbook = XLSX.utils.book_new();
+    const worksheet = XLSX.utils.json_to_sheet(exportData);
+    
     // Set column widths
     worksheet['!cols'] = [
       { width: 15 }, // Product Code
@@ -346,25 +308,21 @@ export const exportQuotationToXLSX = async (quotation) => {
       { width: 40 }, // Description
       { width: 10 }, // Quantity
       { width: 18 }, // Unit Price
-      { width: 18 }, // Line Total
-      { width: 20 }, // Extra space
-      { width: 20 }  // Extra space
+      { width: 18 }  // Line Total
     ];
-
-    // Set row heights for better spacing
-    worksheet['!rows'] = [];
-    for (let i = 0; i < currentRow; i++) {
-      worksheet['!rows'][i] = { hpt: 20 };
-    }
-
+    
     // Add worksheet to workbook
     XLSX.utils.book_append_sheet(workbook, worksheet, 'Quotation');
     
     // Generate filename with timestamp
-    const timestampedFilename = `Quotation_${quotation.quotation_number}_${new Date().toISOString().split('T')[0]}.xlsx`;
+    const timestampedFilename = `Quotation_${quotationNumber}_${new Date().toISOString().split('T')[0]}.xlsx`;
+    
+    console.log('Saving file as:', timestampedFilename);
     
     // Write and download the file
     XLSX.writeFile(workbook, timestampedFilename);
+    
+    console.log('XLSX export completed successfully');
     
   } catch (error) {
     console.error("Quotation XLSX export error:", error);
