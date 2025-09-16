@@ -5,6 +5,9 @@ import { Input } from "@/components/ui/input";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Plus, Search, FileText } from "lucide-react"; // Added FileText
 import { DeliveryOrder } from "@/api/entities";
+import { Customer } from "@/api/entities";
+import { Product } from "@/api/entities";
+import { Brand } from "@/api/entities";
 import { User } from "@/api/entities";
 import DOList from "../components/delivery-orders/DOList";
 import DOForm from "../components/delivery-orders/DOForm";
@@ -16,6 +19,9 @@ import { createRoot } from 'react-dom/client';
 
 export default function DeliveryOrders() {
   const [deliveryOrders, setDeliveryOrders] = useState([]);
+  const [customers, setCustomers] = useState([]);
+  const [products, setProducts] = useState([]);
+  const [brands, setBrands] = useState([]);
   const [loading, setLoading] = useState(true);
   const [searchTerm, setSearchTerm] = useState("");
   const [showDOForm, setShowDOForm] = useState(false);
@@ -43,30 +49,42 @@ export default function DeliveryOrders() {
   };
 
   const loadData = async () => {
+    console.time('🚀 Delivery Orders Page - Total Load Time');
     setLoading(true);
     try {
-      const dosData = await DeliveryOrder.list('-updated_date');
+      console.time('📡 API Calls - Parallel Loading');
+      // Load all necessary data in parallel like the optimized quotations page
+      const [dosData, customersData, productsData, brandsData] = await Promise.all([
+        DeliveryOrder.list('-updated_date'),
+        Customer.list().catch(() => []),
+        Product.list().catch(() => []),
+        Brand.list().catch(() => [])
+      ]);
+      console.timeEnd('📡 API Calls - Parallel Loading');
+
+      console.time('⚡ State Updates');
       setDeliveryOrders(dosData);
+      setCustomers(customersData.filter(c => c.is_active !== false));
+      setProducts(productsData);
+      setBrands(brandsData.filter(b => b.isActive !== false));
+      console.timeEnd('⚡ State Updates');
+      
+      console.log('📊 Data loaded:', dosData.length, 'delivery orders,', customersData.length, 'customers,', productsData.length, 'products,', brandsData.length, 'brands');
     } catch (error) {
       console.error("Error loading delivery orders data:", error);
     } finally {
       setLoading(false);
+      console.timeEnd('🚀 Delivery Orders Page - Total Load Time');
     }
   };
 
-  // Extract unique customers from delivery orders data (avoid separate API call)
-  const uniqueCustomers = React.useMemo(() => {
-    const customerMap = new Map();
-    deliveryOrders.forEach(doOrder => {
-      if (doOrder.customer_id && doOrder.customer_name) {
-        customerMap.set(doOrder.customer_id, {
-          id: doOrder.customer_id,
-          customer_name: doOrder.customer_name
-        });
-      }
-    });
-    return Array.from(customerMap.values());
-  }, [deliveryOrders]);
+  // Use preloaded customers for better performance
+  const availableCustomers = React.useMemo(() => {
+    return customers.map(customer => ({
+      ...customer,
+      name: customer.name || customer.customer_name // Fallback for reliable display
+    }));
+  }, [customers]);
 
   const handleRefresh = () => {
     setRefreshTrigger(prev => prev + 1);
@@ -193,67 +211,6 @@ export default function DeliveryOrders() {
     setCurrentPage(1);
   };
 
-  const handleExternalDocumentView = async (deliveryOrder) => {
-    try {
-      // Load customer data if needed
-      const customerData = deliveryOrder.customer_name ? 
-        { customer_name: deliveryOrder.customer_name } : 
-        null;
-      
-      // Mock company settings - in real app this would come from settings API
-      const companySettings = {
-        company_name: "Your Company Name",
-        company_address: "123 Business Street, Business City",
-        company_phone: "+1 234 567 8900",
-        company_email: "info@yourcompany.com",
-        company_trn: "TRN123456789"
-      };
-
-      const printWindow = window.open('', '_blank');
-      if (!printWindow) {
-        alert('Please allow popups to view the external document');
-        return;
-      }
-
-      // Create the document structure
-      printWindow.document.write(`
-        <!DOCTYPE html>
-        <html>
-        <head>
-          <title>Delivery Order ${deliveryOrder.do_number}</title>
-          <script src="https://unpkg.com/react@18/umd/react.development.js"></script>
-          <script src="https://unpkg.com/react-dom@18/umd/react-dom.development.js"></script>
-          <script src="https://cdn.tailwindcss.com"></script>
-          <style>
-            body { margin: 0; padding: 0; }
-          </style>
-        </head>
-        <body>
-          <div id="do-root"></div>
-        </body>
-        </html>
-      `);
-      printWindow.document.close();
-
-      // Wait for the window to load
-      printWindow.onload = () => {
-        const root = printWindow.document.getElementById('do-root');
-        const reactRoot = createRoot(root);
-        
-        reactRoot.render(
-          React.createElement(DOTemplate, {
-            data: deliveryOrder,
-            customer: customerData,
-            settings: companySettings
-          })
-        );
-      };
-
-    } catch (error) {
-      console.error('Error opening external document:', error);
-      alert('Error opening external document. Please try again.');
-    }
-  };
 
   return (
     <div className="space-y-6">
@@ -277,12 +234,9 @@ export default function DeliveryOrders() {
               status: 'Status',
               subtotal: { label: 'Subtotal (AED)', transform: (val) => `${val || 0}` },
               tax_amount: { label: 'VAT (AED)', transform: (val) => `${val || 0}` },
-              total_amount: { label: 'Total (AED)', transform: (val) => `${val || 0}` },
-              currency: 'Currency'
+              total_amount: { label: 'Total (AED)', transform: (val) => `${val || 0}` }
             }}
             isLoading={loading}
-            showExternalDocument={true}
-            onExternalDocumentClick={handleExternalDocumentView}
           />
           
           {canEdit && (
@@ -331,7 +285,7 @@ export default function DeliveryOrders() {
           dateRange={dateRange}
           setDateRange={setDateRange}
           resetPagination={resetPagination}
-          customers={uniqueCustomers}
+          customers={availableCustomers}
         />
       </div>
 

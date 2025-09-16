@@ -5,6 +5,9 @@ import { Input } from "@/components/ui/input";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Plus, Search, FileText } from "lucide-react";
 import { Invoice } from "@/api/entities";
+import { Customer } from "@/api/entities";
+import { Product } from "@/api/entities";
+import { Brand } from "@/api/entities";
 import { User } from "@/api/entities";
 import InvoiceList from "../components/invoices/InvoiceList";
 import InvoiceForm from "../components/invoices/InvoiceForm";
@@ -17,6 +20,9 @@ import { createRoot } from 'react-dom/client';
 
 export default function Invoices() {
   const [invoices, setInvoices] = useState([]);
+  const [customers, setCustomers] = useState([]);
+  const [products, setProducts] = useState([]);
+  const [brands, setBrands] = useState([]);
   const [loading, setLoading] = useState(true);
   const [searchTerm, setSearchTerm] = useState("");
   const [showInvoiceForm, setShowInvoiceForm] = useState(false);
@@ -45,30 +51,42 @@ export default function Invoices() {
   };
 
   const loadData = async () => {
+    console.time('🚀 Invoices Page - Total Load Time');
     setLoading(true);
     try {
-      const invoicesData = await Invoice.list('-updated_date');
+      console.time('📡 API Calls - Parallel Loading');
+      // Load all necessary data in parallel like the optimized quotations page
+      const [invoicesData, customersData, productsData, brandsData] = await Promise.all([
+        Invoice.list('-updated_date'),
+        Customer.list().catch(() => []),
+        Product.list().catch(() => []),
+        Brand.list().catch(() => [])
+      ]);
+      console.timeEnd('📡 API Calls - Parallel Loading');
+
+      console.time('⚡ State Updates');
       setInvoices(invoicesData);
+      setCustomers(customersData.filter(c => c.is_active !== false));
+      setProducts(productsData);
+      setBrands(brandsData.filter(b => b.isActive !== false));
+      console.timeEnd('⚡ State Updates');
+      
+      console.log('📊 Data loaded:', invoicesData.length, 'invoices,', customersData.length, 'customers,', productsData.length, 'products,', brandsData.length, 'brands');
     } catch (error) {
       console.error("Error loading invoices data:", error);
     } finally {
       setLoading(false);
+      console.timeEnd('🚀 Invoices Page - Total Load Time');
     }
   };
 
-  // Extract unique customers from invoices data (avoid separate API call)
-  const uniqueCustomers = React.useMemo(() => {
-    const customerMap = new Map();
-    invoices.forEach(invoice => {
-      if (invoice.customer_id && invoice.customer_name) {
-        customerMap.set(invoice.customer_id, {
-          id: invoice.customer_id,
-          customer_name: invoice.customer_name
-        });
-      }
-    });
-    return Array.from(customerMap.values());
-  }, [invoices]);
+  // Use preloaded customers for better performance
+  const availableCustomers = React.useMemo(() => {
+    return customers.map(customer => ({
+      ...customer,
+      name: customer.name || customer.customer_name // Fallback for reliable display
+    }));
+  }, [customers]);
 
   const handleRefresh = () => {
     setRefreshTrigger(prev => prev + 1);
@@ -200,67 +218,6 @@ export default function Invoices() {
     setCurrentPage(1);
   };
 
-  const handleExternalDocumentView = async (invoice) => {
-    try {
-      // Load customer data if needed
-      const customerData = invoice.customer_name ? 
-        { customer_name: invoice.customer_name } : 
-        null;
-      
-      // Mock company settings - in real app this would come from settings API
-      const companySettings = {
-        company_name: "Your Company Name",
-        company_address: "123 Business Street, Business City",
-        company_phone: "+1 234 567 8900",
-        company_email: "info@yourcompany.com",
-        company_trn: "TRN123456789"
-      };
-
-      const printWindow = window.open('', '_blank');
-      if (!printWindow) {
-        alert('Please allow popups to view the external document');
-        return;
-      }
-
-      // Create the document structure
-      printWindow.document.write(`
-        <!DOCTYPE html>
-        <html>
-        <head>
-          <title>Invoice ${invoice.invoice_number}</title>
-          <script src="https://unpkg.com/react@18/umd/react.development.js"></script>
-          <script src="https://unpkg.com/react-dom@18/umd/react-dom.development.js"></script>
-          <script src="https://cdn.tailwindcss.com"></script>
-          <style>
-            body { margin: 0; padding: 0; }
-          </style>
-        </head>
-        <body>
-          <div id="invoice-root"></div>
-        </body>
-        </html>
-      `);
-      printWindow.document.close();
-
-      // Wait for the window to load
-      printWindow.onload = () => {
-        const root = printWindow.document.getElementById('invoice-root');
-        const reactRoot = createRoot(root);
-        
-        reactRoot.render(
-          React.createElement(InvoiceTemplate, {
-            data: invoice,
-            customer: customerData,
-            settings: companySettings
-          })
-        );
-      };
-
-    } catch (error) {
-      console.error('Error opening external document:', error);
-      alert('Error opening external document. Please try again.');
-    }
-  };
 
   // Calculate totals - since all invoices are in AED, simpler calculation
   const totals = filteredInvoices.reduce((acc, invoice) => {
@@ -292,13 +249,9 @@ export default function Invoices() {
               status: 'Status',
               subtotal: { label: 'Subtotal (AED)', transform: (val) => `${val || 0}` },
               tax_amount: { label: 'VAT (AED)', transform: (val) => `${val || 0}` },
-              total_amount: { label: 'Total (AED)', transform: (val) => `${val || 0}` },
-              paid_amount: { label: 'Paid (AED)', transform: (val) => `${val || 0}` },
-              currency: 'Currency'
+              total_amount: { label: 'Total (AED)', transform: (val) => `${val || 0}` }
             }}
             isLoading={loading}
-            showExternalDocument={true}
-            onExternalDocumentClick={handleExternalDocumentView}
           />
           
           {canEdit && (
@@ -372,7 +325,7 @@ export default function Invoices() {
           dateRange={dateRange}
           setDateRange={setDateRange}
           resetPagination={resetPagination}
-          customers={uniqueCustomers}
+          customers={availableCustomers}
         />
       </div>
 
