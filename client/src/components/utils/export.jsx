@@ -216,11 +216,11 @@ export const exportQuotationToXLSX = async (quotation) => {
     }
     
     if (companyInfo.email) {
-      exportData.push([`Email: ${companyInfo.email}`, '', '', '', '', '']);
+      exportData.push([`Email: ${companyInfo.email}`, '', '', '', '', '', '']);
     }
     
     if (companyInfo.vatNumber) {
-      exportData.push([`TRN: ${companyInfo.vatNumber}`, '', '', '', '', '']);
+      exportData.push([`TRN: ${companyInfo.vatNumber}`, '', '', '', '', '', '']);
     }
     
     exportData.push([]); // Empty row
@@ -228,7 +228,8 @@ export const exportQuotationToXLSX = async (quotation) => {
     // Table Headers
     exportData.push([
       'Product Code',
-      'Brand Name', 
+      'Brand Name',
+      'Size',
       'Description',
       'Quantity',
       'Unit Price (AED)',
@@ -242,6 +243,7 @@ export const exportQuotationToXLSX = async (quotation) => {
         exportData.push([
           item.productSku || item.productCode || item.product_code || '',
           item.brandName || '',  // Use brandName from API response
+          item.size || '',  // Use size from API response
           item.description || item.productName || item.product_name || '',
           item.quantity || 0,
           parseFloat(item.unitPrice || item.unit_price || 0).toFixed(2),
@@ -283,17 +285,17 @@ export const exportQuotationToXLSX = async (quotation) => {
       }
     }
     
-    exportData.push(['', '', '', '', 'Subtotal:', `AED ${subtotal.toFixed(2)}`]);
+    exportData.push(['', '', '', '', '', 'Subtotal:', `AED ${subtotal.toFixed(2)}`]);
     
     // VAT with comprehensive fallbacks
     const vatAmount = parseFloat(fullQuotation.vatAmount || fullQuotation.vat_amount || fullQuotation.taxAmount || fullQuotation.tax_amount || 0);
     if (vatAmount > 0) {
-      exportData.push(['', '', '', '', 'VAT:', `AED ${vatAmount.toFixed(2)}`]);
+      exportData.push(['', '', '', '', '', 'VAT:', `AED ${vatAmount.toFixed(2)}`]);
     }
     
     // Total with fallbacks
     const total = parseFloat(fullQuotation.grandTotal || fullQuotation.total || fullQuotation.totalAmount || (subtotal + vatAmount) || 0);
-    exportData.push(['', '', '', '', 'TOTAL:', `AED ${total.toFixed(2)}`]);
+    exportData.push(['', '', '', '', '', 'TOTAL:', `AED ${total.toFixed(2)}`]);
     
     console.log('Export data prepared:', exportData);
     

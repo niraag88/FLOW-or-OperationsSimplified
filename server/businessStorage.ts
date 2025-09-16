@@ -292,7 +292,7 @@ export class BusinessStorage {
     
     if (!quote) return null;
 
-    // Get quotation items with brand names
+    // Get quotation items with brand names and size
     const items = await db.select({
       id: quotationItems.id,
       productId: quotationItems.productId,
@@ -304,6 +304,7 @@ export class BusinessStorage {
       description: products.name,
       productCode: products.sku,
       brandName: brands.name,
+      size: products.size,
     }).from(quotationItems)
       .leftJoin(products, eq(quotationItems.productId, products.id))
       .leftJoin(brands, eq(products.brandId, brands.id))
