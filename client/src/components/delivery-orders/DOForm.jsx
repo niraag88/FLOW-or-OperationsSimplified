@@ -71,12 +71,23 @@ export default function DOForm({ open, onClose, editingDO, currentUser, onSucces
           items: editingDO.items || []
         });
       } else {
-        // Generate DO number for new DO
+        // Generate DO number for new DO - use timestamp as fallback
         const timestamp = Date.now().toString().slice(-6);
         setFormData(prev => ({ 
           ...prev, 
           do_number: `DO-${timestamp}` 
         }));
+        
+        // Fetch next DO number from backend and update
+        fetch('/api/delivery-orders/next-number')
+          .then(response => response.json())
+          .then(({ nextNumber }) => {
+            setFormData(prev => ({ ...prev, do_number: nextNumber }));
+          })
+          .catch(error => {
+            console.error('Error fetching next DO number:', error);
+            // Keep the timestamp fallback
+          });
       }
     } catch (error) {
       console.error("Error loading data:", error);
