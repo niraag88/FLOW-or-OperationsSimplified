@@ -487,6 +487,78 @@ export class BusinessStorage {
     return formattedNumber;
   }
 
+  async generateInvoiceNumber() {
+    // Get settings for configurable numbering
+    const settings = await this.getCompanySettings();
+    const prefix = settings?.invoiceNumberPrefix || 'INV';
+    const nextNumber = settings?.nextInvoiceNumber || 1;
+    
+    // Simple format: PREFIX-NUMBER (e.g., INV-1, INV-2025-001)
+    const formattedNumber = prefix.includes('-') 
+      ? `${prefix}-${String(nextNumber).padStart(3, '0')}`  // INV-2025-001 style
+      : `${prefix}-${nextNumber}`;  // INV-1 style
+    
+    // Update next number in settings
+    if (settings) {
+      await this.updateCompanySettings({
+        ...settings,
+        nextInvoiceNumber: nextNumber + 1
+      });
+    }
+    
+    return formattedNumber;
+  }
+
+  async getNextInvoiceNumber() {
+    // Preview the next number without incrementing it
+    const settings = await this.getCompanySettings();
+    const prefix = settings?.invoiceNumberPrefix || 'INV';
+    const nextNumber = settings?.nextInvoiceNumber || 1;
+    
+    // Simple format: PREFIX-NUMBER (e.g., INV-1, INV-2025-001)
+    const formattedNumber = prefix.includes('-') 
+      ? `${prefix}-${String(nextNumber).padStart(3, '0')}`  // INV-2025-001 style
+      : `${prefix}-${nextNumber}`;  // INV-1 style
+    
+    return formattedNumber;
+  }
+
+  async generateDoNumber() {
+    // Get settings for configurable numbering
+    const settings = await this.getCompanySettings();
+    const prefix = settings?.doNumberPrefix || 'DO';
+    const nextNumber = settings?.nextDoNumber || 1;
+    
+    // Simple format: PREFIX-NUMBER (e.g., DO-1, DO-2025-001)
+    const formattedNumber = prefix.includes('-') 
+      ? `${prefix}-${String(nextNumber).padStart(3, '0')}`  // DO-2025-001 style
+      : `${prefix}-${nextNumber}`;  // DO-1 style
+    
+    // Update next number in settings
+    if (settings) {
+      await this.updateCompanySettings({
+        ...settings,
+        nextDoNumber: nextNumber + 1
+      });
+    }
+    
+    return formattedNumber;
+  }
+
+  async getNextDoNumber() {
+    // Preview the next number without incrementing it
+    const settings = await this.getCompanySettings();
+    const prefix = settings?.doNumberPrefix || 'DO';
+    const nextNumber = settings?.nextDoNumber || 1;
+    
+    // Simple format: PREFIX-NUMBER (e.g., DO-1, DO-2025-001)
+    const formattedNumber = prefix.includes('-') 
+      ? `${prefix}-${String(nextNumber).padStart(3, '0')}`  // DO-2025-001 style
+      : `${prefix}-${nextNumber}`;  // DO-1 style
+    
+    return formattedNumber;
+  }
+
   // Stock Count operations
   async getStockCounts() {
     return await db.select({
