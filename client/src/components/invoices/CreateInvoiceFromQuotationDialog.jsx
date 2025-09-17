@@ -41,7 +41,7 @@ export default function CreateInvoiceFromQuotationDialog({ open, onClose, onQuot
       const [customersData, quotationsData] = await Promise.all([
         Customer.list(),
         Quotation.filter({ 
-          status: 'sent'  // Only load sent quotations
+          status: 'submitted'  // Only load submitted quotations
         }, '-updated_date')
       ]);
       
