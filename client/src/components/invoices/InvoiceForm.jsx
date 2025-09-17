@@ -144,6 +144,7 @@ export default function InvoiceForm({ open, onClose, editingInvoice, currentUser
         
         updatedData = { 
           ...updatedData, 
+          currency: "AED", // Always enforce AED currency
           tax_treatment: taxTreatment, 
           tax_rate: taxRate 
         };

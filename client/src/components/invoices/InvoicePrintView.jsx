@@ -51,7 +51,7 @@ export default function InvoicePrintView() {
     return new Date(dateString).toLocaleDateString('en-GB');
   };
 
-  const formatCurrency = (amount, currency = 'GBP') => {
+  const formatCurrency = (amount, currency = 'AED') => {
     return `${currency} ${parseFloat(amount || 0).toFixed(2)}`;
   };
 
