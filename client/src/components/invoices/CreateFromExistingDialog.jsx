@@ -191,7 +191,7 @@ export default function CreateFromExistingDialog({ open, onClose, onDocumentSele
                   {filteredQuotations.length > 0 ? (
                     filteredQuotations.map(q => (
                       <SelectItem key={q.id} value={String(q.id)}>
-                        {q.quotation_number} - {q.total_amount.toFixed(2)} {q.currency}
+                        {q.quotation_number} - {q.currency} {q.total_amount.toFixed(2)}
                       </SelectItem>
                     ))
                   ) : (
@@ -239,7 +239,7 @@ export default function CreateFromExistingDialog({ open, onClose, onDocumentSele
                   {filteredDOs.length > 0 ? (
                     filteredDOs.map(d => (
                       <SelectItem key={d.id} value={String(d.id)}>
-                        {d.do_number} - {d.total_amount.toFixed(2)} {d.currency} ({d.status})
+                        {d.do_number} - {d.currency} {d.total_amount.toFixed(2)} ({d.status})
                       </SelectItem>
                     ))
                   ) : (

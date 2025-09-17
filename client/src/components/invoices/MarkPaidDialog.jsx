@@ -64,7 +64,7 @@ export default function MarkPaidDialog({ open, onClose, invoice, onSuccess }) {
       minimumFractionDigits: 2,
       maximumFractionDigits: 2
     });
-    return `${formatter.format(amount)} ${invoice.currency}`;
+    return `${invoice.currency} ${formatter.format(amount)}`;
   };
 
   return (

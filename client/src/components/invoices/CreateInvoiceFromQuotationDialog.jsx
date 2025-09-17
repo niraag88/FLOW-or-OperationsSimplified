@@ -149,7 +149,7 @@ export default function CreateInvoiceFromQuotationDialog({ open, onClose, onQuot
                 {filteredQuotations.length > 0 ? (
                   filteredQuotations.map(q => (
                     <SelectItem key={q.id} value={q.id}>
-                      {q.quotation_number} - {q.total_amount.toFixed(2)} {q.currency}
+                      {q.quotation_number} - {q.currency} {q.total_amount.toFixed(2)}
                     </SelectItem>
                   ))
                 ) : (

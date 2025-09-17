@@ -51,7 +51,7 @@ export default function DOPrintView() {
     return new Date(dateString).toLocaleDateString('en-GB');
   };
 
-  const formatCurrency = (amount, currency = 'GBP') => {
+  const formatCurrency = (amount, currency = 'AED') => {
     return `${currency} ${parseFloat(amount || 0).toFixed(2)}`;
   };
 
@@ -106,8 +106,8 @@ export default function DOPrintView() {
                 <th className="col-description">Description</th>
                 <th className="col-size">Size</th>
                 <th className="col-qty">Qty</th>
-                <th className="col-price">Unit Price (GBP)</th>
-                <th className="col-total">Line Total (GBP)</th>
+                <th className="col-price">Unit Price (AED)</th>
+                <th className="col-total">Line Total (AED)</th>
               </tr>
             </thead>
             <tbody>

@@ -107,8 +107,8 @@ export default function InvoicePrintView() {
                 <th className="col-description">Description</th>
                 <th className="col-size">Size</th>
                 <th className="col-qty">Qty</th>
-                <th className="col-price">Unit Price (GBP)</th>
-                <th className="col-total">Line Total (GBP)</th>
+                <th className="col-price">Unit Price ({invoice.currency || 'AED'})</th>
+                <th className="col-total">Line Total ({invoice.currency || 'AED'})</th>
               </tr>
             </thead>
             <tbody>
