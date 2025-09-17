@@ -1,4 +1,3 @@
-
 import React, { useState, useEffect } from 'react';
 import {
   Dialog,
@@ -19,79 +18,71 @@ import { useToast } from '@/components/ui/use-toast';
 
 export default function CreateFromExistingDialog({ open, onClose, onDocumentSelected }) {
   const [loading, setLoading] = useState(false);
-  const [customers, setCustomers] = useState([]);
-  const [quotations, setQuotations] = useState([]);
-  const [invoices, setInvoices] = useState([]);
   const [activeTab, setActiveTab] = useState('quotation');
-  
-  // Quotation selection
-  const [quotationCustomerId, setQuotationCustomerId] = useState('');
-  const [filteredQuotations, setFilteredQuotations] = useState([]);
+  const [submittedQuotations, setSubmittedQuotations] = useState([]);
+  const [submittedInvoices, setSubmittedInvoices] = useState([]);
   const [selectedQuotationId, setSelectedQuotationId] = useState('');
-  
-  // Invoice selection
-  const [invoiceCustomerId, setInvoiceCustomerId] = useState('');
-  const [filteredInvoices, setFilteredInvoices] = useState([]);
   const [selectedInvoiceId, setSelectedInvoiceId] = useState('');
-  
   const { toast } = useToast();
 
   useEffect(() => {
     if (open) {
-      loadInitialData();
+      loadSubmittedDocuments();
     } else {
-      resetState();
+      // Reset state on close
+      setSelectedQuotationId('');
+      setSelectedInvoiceId('');
+      setActiveTab('quotation');
     }
   }, [open]);
 
-  const resetState = () => {
-    setQuotationCustomerId('');
-    setSelectedQuotationId('');
-    setFilteredQuotations([]);
-    setInvoiceCustomerId('');
-    setSelectedInvoiceId('');
-    setFilteredInvoices([]);
-    setActiveTab('quotation');
-  };
-
-  const loadInitialData = async () => {
+  const loadSubmittedDocuments = async () => {
     setLoading(true);
     try {
-      const [customersData, quotationsData, invoicesData] = await Promise.all([
-        Customer.list(),
-        Quotation.filter({ status: 'submitted' }, '-updated_date'),
-        Invoice.filter({ status: 'submitted' }, '-updated_date') // Load submitted invoices and quotations
-      ]);
+      console.log("Loading submitted quotations and invoices for delivery order creation");
       
-      setCustomers(customersData.filter(c => c.isActive !== false));
-      setQuotations(quotationsData);
-      setInvoices(invoicesData);
+      // Load all submitted quotations and invoices with customer data
+      const [quotationsData, invoicesData, customersData] = await Promise.all([
+        Quotation.filter({ status: 'submitted' }, '-updated_date'),
+        Invoice.filter({ status: 'submitted' }, '-updated_date'),
+        Customer.list()
+      ]);
+
+      // Create a map for quick customer lookup
+      const customerMap = {};
+      customersData.forEach(customer => {
+        customerMap[customer.id] = customer.customer_name || customer.name;
+      });
+
+      // Enrich quotations with customer names and sort by date (newest first)
+      const enrichedQuotations = quotationsData
+        .map(quotation => ({
+          ...quotation,
+          customerName: customerMap[quotation.customer_id] || 'Unknown Customer'
+        }))
+        .sort((a, b) => new Date(b.updated_date || b.updatedDate) - new Date(a.updated_date || a.updatedDate));
+
+      // Enrich invoices with customer names and sort by date (newest first)
+      const enrichedInvoices = invoicesData
+        .map(invoice => ({
+          ...invoice,
+          customerName: customerMap[invoice.customer_id] || 'Unknown Customer'
+        }))
+        .sort((a, b) => new Date(b.updated_date || b.updatedDate) - new Date(a.updated_date || a.updatedDate));
+
+      console.log("Loaded documents:", enrichedQuotations.length, "quotations,", enrichedInvoices.length, "invoices");
+      setSubmittedQuotations(enrichedQuotations);
+      setSubmittedInvoices(enrichedInvoices);
     } catch (error) {
-      console.error("Error loading data:", error);
+      console.error("Error loading submitted documents:", error);
       toast({
         title: "Error",
-        description: "Could not load documents.",
+        description: "Could not load documents. Please try again.",
         variant: "destructive",
       });
     } finally {
       setLoading(false);
     }
-  };
-
-  const handleQuotationCustomerChange = (customerId) => {
-    setQuotationCustomerId(customerId);
-    setSelectedQuotationId('');
-    const cid = String(customerId);
-    const customerQuotations = quotations.filter(q => String(q.customer_id ?? q.customerId) === cid);
-    setFilteredQuotations(customerQuotations);
-  };
-
-  const handleInvoiceCustomerChange = (customerId) => {
-    setInvoiceCustomerId(customerId);
-    setSelectedInvoiceId('');
-    const cid = String(customerId);
-    const customerInvoices = invoices.filter(i => String(i.customer_id ?? i.customerId) === cid);
-    setFilteredInvoices(customerInvoices);
   };
 
   const handleSubmit = async () => {
@@ -107,7 +98,7 @@ export default function CreateFromExistingDialog({ open, onClose, onDocumentSele
         });
         return;
       }
-      selectedDocument = quotations.find(q => String(q.id) === String(selectedQuotationId));
+      selectedDocument = submittedQuotations.find(q => String(q.id) === String(selectedQuotationId));
       documentType = 'quotation';
     } else {
       if (!selectedInvoiceId) {
@@ -118,7 +109,7 @@ export default function CreateFromExistingDialog({ open, onClose, onDocumentSele
         });
         return;
       }
-      selectedDocument = invoices.find(i => String(i.id) === String(selectedInvoiceId));
+      selectedDocument = submittedInvoices.find(i => String(i.id) === String(selectedInvoiceId));
       documentType = 'invoice';
     }
 
@@ -131,6 +122,7 @@ export default function CreateFromExistingDialog({ open, onClose, onDocumentSele
       return;
     }
 
+    console.log("Selected document for delivery order creation:", documentType, selectedDocument);
     onDocumentSelected(selectedDocument, documentType);
   };
 
@@ -140,122 +132,99 @@ export default function CreateFromExistingDialog({ open, onClose, onDocumentSele
         <DialogHeader>
           <DialogTitle>Create Delivery Order from Existing</DialogTitle>
           <DialogDescription>
-            Select a submitted quotation or submitted invoice to create a new delivery order.
+            Select a submitted quotation or invoice to create a new delivery order. All document details will be copied.
           </DialogDescription>
         </DialogHeader>
 
         <Tabs value={activeTab} onValueChange={setActiveTab} className="w-full">
           <TabsList className="grid w-full grid-cols-2">
-            <TabsTrigger value="quotation">From Quotation</TabsTrigger>
-            <TabsTrigger value="invoice">From Invoice</TabsTrigger>
+            <TabsTrigger value="quotation" data-testid="tab-quotation">From Quotation</TabsTrigger>
+            <TabsTrigger value="invoice" data-testid="tab-invoice">From Invoice</TabsTrigger>
           </TabsList>
 
           <TabsContent value="quotation" className="space-y-4 mt-4">
             <div className="space-y-2">
-              <Label>Customer</Label>
-              <Select
-                value={quotationCustomerId}
-                onValueChange={handleQuotationCustomerChange}
-                disabled={loading}
-              >
-                <SelectTrigger>
-                  <SelectValue placeholder="Select a customer" />
-                </SelectTrigger>
-                <SelectContent>
-                  {customers.map(c => (
-                    <SelectItem key={c.id} value={String(c.id)}>
-                      {c.customer_name}
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-            </div>
-
-            <div className="space-y-2">
-              <Label>Quotation</Label>
+              <Label htmlFor="quotation-select">Select Quotation</Label>
               <Select
                 value={selectedQuotationId}
                 onValueChange={setSelectedQuotationId}
-                disabled={loading || !quotationCustomerId || filteredQuotations.length === 0}
+                disabled={loading}
+                data-testid="select-quotation"
               >
-                <SelectTrigger>
-                  <SelectValue placeholder={!quotationCustomerId ? "Select a customer first" : "Select a quotation"} />
+                <SelectTrigger id="quotation-select">
+                  <SelectValue 
+                    placeholder={loading ? "Loading quotations..." : "Select a quotation"} 
+                  />
                 </SelectTrigger>
                 <SelectContent>
-                  {filteredQuotations.length > 0 ? (
-                    filteredQuotations.map(q => (
-                      <SelectItem key={q.id} value={String(q.id)}>
-                        {q.quotation_number} - {q.total_amount.toFixed(2)} {q.currency}
+                  {submittedQuotations.length > 0 ? (
+                    submittedQuotations.map(quotation => (
+                      <SelectItem key={quotation.id} value={String(quotation.id)}>
+                        {quotation.quotation_number || quotation.quoteNumber} - {quotation.customerName}
                       </SelectItem>
                     ))
                   ) : (
                     <SelectItem value="none" disabled>
-                      {quotationCustomerId ? "No submitted quotations for this customer" : "No quotations found"}
+                      {loading ? "Loading..." : "No submitted quotations available"}
                     </SelectItem>
                   )}
                 </SelectContent>
               </Select>
+              {submittedQuotations.length === 0 && !loading && (
+                <p className="text-sm text-muted-foreground">
+                  No submitted quotations found. Create and submit a quotation first.
+                </p>
+              )}
             </div>
           </TabsContent>
 
           <TabsContent value="invoice" className="space-y-4 mt-4">
             <div className="space-y-2">
-              <Label>Customer</Label>
-              <Select
-                value={invoiceCustomerId}
-                onValueChange={handleInvoiceCustomerChange}
-                disabled={loading}
-              >
-                <SelectTrigger>
-                  <SelectValue placeholder="Select a customer" />
-                </SelectTrigger>
-                <SelectContent>
-                  {customers.map(c => (
-                    <SelectItem key={c.id} value={String(c.id)}>
-                      {c.customer_name}
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-            </div>
-
-            <div className="space-y-2">
-              <Label>Invoice</Label>
+              <Label htmlFor="invoice-select">Select Invoice</Label>
               <Select
                 value={selectedInvoiceId}
                 onValueChange={setSelectedInvoiceId}
-                disabled={loading || !invoiceCustomerId || filteredInvoices.length === 0}
+                disabled={loading}
+                data-testid="select-invoice"
               >
-                <SelectTrigger>
-                  <SelectValue placeholder={!invoiceCustomerId ? "Select a customer first" : "Select an invoice"} />
+                <SelectTrigger id="invoice-select">
+                  <SelectValue 
+                    placeholder={loading ? "Loading invoices..." : "Select an invoice"} 
+                  />
                 </SelectTrigger>
                 <SelectContent>
-                  {filteredInvoices.length > 0 ? (
-                    filteredInvoices.map(i => (
-                      <SelectItem key={i.id} value={String(i.id)}>
-                        {i.invoice_number} - {i.total_amount.toFixed(2)} {i.currency}
+                  {submittedInvoices.length > 0 ? (
+                    submittedInvoices.map(invoice => (
+                      <SelectItem key={invoice.id} value={String(invoice.id)}>
+                        {invoice.invoice_number || invoice.invoiceNumber} - {invoice.customerName}
                       </SelectItem>
                     ))
                   ) : (
                     <SelectItem value="none" disabled>
-                      {invoiceCustomerId ? "No submitted invoices for this customer" : "No invoices found"}
+                      {loading ? "Loading..." : "No submitted invoices available"}
                     </SelectItem>
                   )}
                 </SelectContent>
               </Select>
+              {submittedInvoices.length === 0 && !loading && (
+                <p className="text-sm text-muted-foreground">
+                  No submitted invoices found. Create and submit an invoice first.
+                </p>
+              )}
             </div>
           </TabsContent>
         </Tabs>
 
         <DialogFooter>
-          <Button variant="outline" onClick={onClose} disabled={loading}>
+          <Button variant="outline" onClick={onClose} disabled={loading} data-testid="button-cancel">
             Cancel
           </Button>
           <Button 
             onClick={handleSubmit} 
             disabled={loading || (activeTab === 'quotation' ? !selectedQuotationId : !selectedInvoiceId)}
+            data-testid="button-create-delivery-order"
           >
-            {loading ? "Loading..." : "Create Delivery Order"}
+            {loading ? "Creating..." : "Create Delivery Order"}
           </Button>
         </DialogFooter>
       </DialogContent>

@@ -16,47 +16,51 @@ import { useToast } from '@/components/ui/use-toast';
 
 export default function CreateInvoiceFromQuotationDialog({ open, onClose, onQuotationSelected }) {
   const [loading, setLoading] = useState(false);
-  const [customers, setCustomers] = useState([]);
-  const [quotations, setQuotations] = useState([]);
-  const [filteredQuotations, setFilteredQuotations] = useState([]);
-  const [selectedCustomerId, setSelectedCustomerId] = useState('');
+  const [submittedQuotations, setSubmittedQuotations] = useState([]);
   const [selectedQuotationId, setSelectedQuotationId] = useState('');
   const { toast } = useToast();
 
   useEffect(() => {
     if (open) {
-      loadInitialData();
+      loadSubmittedQuotations();
     } else {
       // Reset state on close
-      setSelectedCustomerId('');
       setSelectedQuotationId('');
-      setFilteredQuotations([]);
     }
   }, [open]);
 
-  const loadInitialData = async () => {
+  const loadSubmittedQuotations = async () => {
     setLoading(true);
     try {
-      console.log("Loading customers and quotations for dialog");
-      const [customersData, quotationsData] = await Promise.all([
-        Customer.list(),
-        Quotation.filter({ 
-          status: 'submitted'  // Only load submitted quotations
-        }, '-updated_date')
+      console.log("Loading submitted quotations for invoice creation");
+      
+      // Load all submitted quotations with customer data
+      const [quotationsData, customersData] = await Promise.all([
+        Quotation.filter({ status: 'submitted' }, '-updated_date'),
+        Customer.list()
       ]);
-      
-      console.log("Loaded customers:", customersData.length);
-      console.log("Loaded submitted quotations:", quotationsData.length);
-      console.log("Sample quotation data:", quotationsData[0]);
-      console.log("Sample customer data:", customersData[0]);
-      
-      setCustomers(customersData.filter(c => c.isActive !== false));
-      setQuotations(quotationsData);
+
+      // Create a map for quick customer lookup
+      const customerMap = {};
+      customersData.forEach(customer => {
+        customerMap[customer.id] = customer.customer_name || customer.name;
+      });
+
+      // Combine quotations with customer names and sort by date (newest first)
+      const enrichedQuotations = quotationsData
+        .map(quotation => ({
+          ...quotation,
+          customerName: customerMap[quotation.customer_id] || 'Unknown Customer'
+        }))
+        .sort((a, b) => new Date(b.updated_date || b.updatedDate) - new Date(a.updated_date || a.updatedDate));
+
+      console.log("Loaded quotations with customer names:", enrichedQuotations.length, "items");
+      setSubmittedQuotations(enrichedQuotations);
     } catch (error) {
-      console.error("Error loading data:", error);
+      console.error("Error loading submitted quotations:", error);
       toast({
         title: "Error",
-        description: "Could not load customers or quotations.",
+        description: "Could not load submitted quotations. Please try again.",
         variant: "destructive",
       });
     } finally {
@@ -64,33 +68,11 @@ export default function CreateInvoiceFromQuotationDialog({ open, onClose, onQuot
     }
   };
 
-  const handleCustomerChange = (customerId) => {
-    console.log("Customer selected:", customerId);
-    console.log("Available quotations:", quotations.length);
-    console.log("Sample quotation customer fields:", quotations[0] ? {
-      customer_id: quotations[0].customer_id,
-      customerId: quotations[0].customerId,
-      customerName: quotations[0].customerName
-    } : "No quotations");
-    
-    setSelectedCustomerId(customerId);
-    setSelectedQuotationId(''); // Reset quotation selection
-    
-    // Try both field name possibilities
-    const customerQuotations = quotations.filter(q => 
-      String(q.customer_id) === String(customerId) || 
-      String(q.customerId) === String(customerId)
-    );
-    console.log("Filtered quotations for customer:", customerQuotations.length);
-    console.log("Filtered quotations:", customerQuotations);
-    setFilteredQuotations(customerQuotations);
-  };
-
   const handleSubmit = async () => {
     if (!selectedQuotationId) {
       toast({
         title: "Selection required",
-        description: "Please select a quotation.",
+        description: "Please select a quotation to create an invoice from.",
         variant: "destructive",
       });
       return;
@@ -98,20 +80,19 @@ export default function CreateInvoiceFromQuotationDialog({ open, onClose, onQuot
 
     setLoading(true);
     try {
-      console.log("Fetching selected quotation:", selectedQuotationId);
-      const selectedQuotation = quotations.find(q => String(q.id) === String(selectedQuotationId));
+      const selectedQuotation = submittedQuotations.find(q => String(q.id) === String(selectedQuotationId));
       
       if (!selectedQuotation) {
         throw new Error("Selected quotation not found");
       }
       
-      console.log("Selected quotation data:", selectedQuotation);
+      console.log("Selected quotation for invoice creation:", selectedQuotation);
       onQuotationSelected(selectedQuotation);
     } catch (error) {
-      console.error("Error fetching selected quotation:", error);
+      console.error("Error creating invoice from quotation:", error);
       toast({
         title: "Error",
-        description: "Could not fetch the selected quotation details.",
+        description: "Could not create invoice from the selected quotation.",
         variant: "destructive",
       });
     } finally {
@@ -121,68 +102,60 @@ export default function CreateInvoiceFromQuotationDialog({ open, onClose, onQuot
 
   return (
     <Dialog open={open} onOpenChange={onClose}>
-      <DialogContent>
+      <DialogContent className="max-w-md">
         <DialogHeader>
           <DialogTitle>Create Invoice from Quotation</DialogTitle>
           <DialogDescription>
-            Select a customer and then choose one of their submitted quotations to create a new invoice.
+            Select a submitted quotation to create a new invoice. All quotation details will be copied to the new invoice.
           </DialogDescription>
         </DialogHeader>
 
         <div className="space-y-4 py-4">
           <div className="space-y-2">
-            <Label htmlFor="customer-select">Customer</Label>
-            <Select
-              value={selectedCustomerId}
-              onValueChange={handleCustomerChange}
-              disabled={loading}
-            >
-              <SelectTrigger id="customer-select">
-                <SelectValue placeholder="Select a customer" />
-              </SelectTrigger>
-              <SelectContent>
-                {customers.map(c => (
-                  <SelectItem key={c.id} value={String(c.id)}>
-                    {c.customer_name}
-                  </SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
-          </div>
-
-          <div className="space-y-2">
-            <Label htmlFor="quotation-select">Quotation</Label>
+            <Label htmlFor="quotation-select">Select Quotation</Label>
             <Select
               value={selectedQuotationId}
               onValueChange={setSelectedQuotationId}
-              disabled={loading || !selectedCustomerId || filteredQuotations.length === 0}
+              disabled={loading}
+              data-testid="select-quotation"
             >
               <SelectTrigger id="quotation-select">
-                <SelectValue placeholder={!selectedCustomerId ? "Select a customer first" : "Select a quotation"} />
+                <SelectValue 
+                  placeholder={loading ? "Loading quotations..." : "Select a quotation"} 
+                />
               </SelectTrigger>
               <SelectContent>
-                {filteredQuotations.length > 0 ? (
-                  filteredQuotations.map(q => (
-                    <SelectItem key={q.id} value={String(q.id)}>
-                      {q.quotation_number} - {q.currency} {q.total_amount.toFixed(2)}
+                {submittedQuotations.length > 0 ? (
+                  submittedQuotations.map(quotation => (
+                    <SelectItem key={quotation.id} value={String(quotation.id)}>
+                      {quotation.quotation_number || quotation.quoteNumber} - {quotation.customerName}
                     </SelectItem>
                   ))
                 ) : (
                   <SelectItem value="none" disabled>
-                    {selectedCustomerId ? "No submitted quotations for this customer" : "No quotations found"}
+                    {loading ? "Loading..." : "No submitted quotations available"}
                   </SelectItem>
                 )}
               </SelectContent>
             </Select>
+            {submittedQuotations.length === 0 && !loading && (
+              <p className="text-sm text-muted-foreground">
+                No submitted quotations found. Create and submit a quotation first.
+              </p>
+            )}
           </div>
         </div>
 
         <DialogFooter>
-          <Button variant="outline" onClick={onClose} disabled={loading}>
+          <Button variant="outline" onClick={onClose} disabled={loading} data-testid="button-cancel">
             Cancel
           </Button>
-          <Button onClick={handleSubmit} disabled={loading || !selectedQuotationId}>
-            {loading ? "Loading..." : "Create Invoice"}
+          <Button 
+            onClick={handleSubmit} 
+            disabled={loading || !selectedQuotationId}
+            data-testid="button-create-invoice"
+          >
+            {loading ? "Creating..." : "Create Invoice"}
           </Button>
         </DialogFooter>
       </DialogContent>
