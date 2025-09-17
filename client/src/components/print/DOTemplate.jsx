@@ -153,17 +153,17 @@ export default function DOTemplate({ data, customer, settings }) {
         <div className="w-full md:w-1/3">
           <div className="flex justify-between py-2">
             <span className="text-gray-600">Subtotal:</span>
-            <span className="font-semibold">{(data.subtotal || 0).toFixed(2)} {data.currency}</span>
+            <span className="font-semibold">{data.currency} {(data.subtotal || 0).toFixed(2)}</span>
           </div>
           {showTax && (
             <div className="flex justify-between py-2">
               <span className="text-gray-600">VAT ({(data.tax_rate * 100).toFixed(1)}%):</span>
-              <span className="font-semibold">{(data.tax_amount || 0).toFixed(2)} {data.currency}</span>
+              <span className="font-semibold">{data.currency} {(data.tax_amount || 0).toFixed(2)}</span>
             </div>
           )}
           <div className="flex justify-between py-2 text-xl font-bold border-t-2 border-gray-400 mt-2">
             <span>Total:</span>
-            <span className="text-amber-600">{(data.total_amount || 0).toFixed(2)} {data.currency}</span>
+            <span className="text-amber-600">{data.currency} {(data.total_amount || 0).toFixed(2)}</span>
           </div>
         </div>
       </section>

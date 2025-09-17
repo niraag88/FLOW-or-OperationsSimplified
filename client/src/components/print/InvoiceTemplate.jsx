@@ -157,17 +157,17 @@ export default function InvoiceTemplate({ data, customer, settings }) {
           <div className="space-y-2">
             <div className="flex justify-between">
               <span className="text-gray-600">Subtotal:</span>
-              <span className="font-semibold">{(data.subtotal || 0).toFixed(2)} {data.currency}</span>
+              <span className="font-semibold">{data.currency} {(data.subtotal || 0).toFixed(2)}</span>
             </div>
             {showTax && (
               <div className="flex justify-between">
                 <span className="text-gray-600">VAT ({((data.tax_rate || 0) * 100).toFixed(0)}%):</span>
-                <span className="font-semibold">{(data.tax_amount || 0).toFixed(2)} {data.currency}</span>
+                <span className="font-semibold">{data.currency} {(data.tax_amount || 0).toFixed(2)}</span>
               </div>
             )}
             <div className="flex justify-between border-t-2 border-gray-800 pt-2 mt-2">
               <span className="font-bold text-lg">Total:</span>
-              <span className="font-bold text-lg">{(data.total_amount || 0).toFixed(2)} {data.currency}</span>
+              <span className="font-bold text-lg">{data.currency} {(data.total_amount || 0).toFixed(2)}</span>
             </div>
           </div>
         </div>
