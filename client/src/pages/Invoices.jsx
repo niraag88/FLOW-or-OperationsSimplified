@@ -112,18 +112,18 @@ export default function Invoices() {
     
     if (documentType === 'quotation') {
       newInvoiceData = {
-        customer_id: document.customer_id, // Ensure customer_id is set
+        customer_id: document.customer_id || document.customerId, // Handle both field name formats
         invoice_date: new Date().toISOString().split('T')[0],
         reference: document.reference,
-        reference_date: document.reference_date,
+        reference_date: document.reference_date || document.referenceDate,
         status: 'draft',
-        currency: document.currency,
-        tax_treatment: document.tax_treatment,
-        tax_rate: document.tax_rate,
-        subtotal: document.subtotal,
-        tax_amount: document.tax_amount,
-        total_amount: document.total_amount,
-        remarks: `Based on Quotation #${document.quotation_number}\n${document.remarks || ''}`.trim(),
+        currency: document.currency || 'AED', // Default currency
+        tax_treatment: document.tax_treatment || 'taxable', // Default tax treatment
+        tax_rate: document.tax_rate || 0.05, // Default 5% VAT
+        subtotal: parseFloat(document.subtotal || document.totalAmount || 0),
+        tax_amount: parseFloat(document.tax_amount || document.vatAmount || 0),
+        total_amount: parseFloat(document.total_amount || document.grandTotal || 0),
+        remarks: `Based on Quotation #${document.quotation_number || document.quoteNumber}\n${document.remarks || document.notes || ''}`.trim(),
         items: document.items ? document.items.map(item => ({ ...item })) : [],
         paid_amount: 0,
         payment_date: "",
