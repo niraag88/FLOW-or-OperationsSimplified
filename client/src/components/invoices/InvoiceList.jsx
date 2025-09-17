@@ -131,10 +131,10 @@ export default function InvoiceList({ invoices, loading, canEdit, canOverride, c
                   <TableHead>Customer</TableHead>
                   <TableHead>Invoice Date</TableHead>
                   <TableHead>Reference</TableHead>
+                  <TableHead>Subtotal</TableHead>
+                  <TableHead>VAT</TableHead>
+                  <TableHead>Total</TableHead>
                   <TableHead>Status</TableHead>
-                  <TableHead>Tax Treatment</TableHead>
-                  <TableHead>Total Amount</TableHead>
-                  <TableHead>Outstanding</TableHead>
                   <TableHead>Actions</TableHead>
                 </TableRow>
               </TableHeader>
@@ -150,24 +150,23 @@ export default function InvoiceList({ invoices, loading, canEdit, canOverride, c
                       <TableCell>{formatDate(invoice.invoice_date)}</TableCell>
                       <TableCell>{invoice.reference || '-'}</TableCell>
                       <TableCell>
-                        <Badge className={`${getStatusColor(derivedStatus)} border`}>
-                          {derivedStatus?.toUpperCase()}
-                        </Badge>
+                        {formatCurrency(invoice.subtotal || 0, invoice.currency)}
                       </TableCell>
                       <TableCell>
-                        {getTaxBadge(invoice)}
+                        {formatCurrency(invoice.tax_amount || 0, invoice.currency)}
                       </TableCell>
                       <TableCell>
                         {formatCurrency(invoice.total_amount || 0, invoice.currency)}
                       </TableCell>
                       <TableCell>
-                        {outstanding > 0.01 ? (
-                          <span className={outstanding === invoice.total_amount ? 'text-amber-600 font-medium' : 'text-gray-600'}>
-                            {formatCurrency(outstanding, invoice.currency)}
-                          </span>
-                        ) : (
-                          <span className="text-green-600 font-medium">Paid</span>
-                        )}
+                        <div className="flex items-center gap-2">
+                          <Badge className={`${getStatusColor(derivedStatus)} border`}>
+                            {derivedStatus?.toUpperCase()}
+                          </Badge>
+                          {outstanding > 0.01 && (
+                            <span className="text-xs text-amber-600">({formatCurrency(outstanding, invoice.currency)} due)</span>
+                          )}
+                        </div>
                       </TableCell>
                       <TableCell>
                         <div className="flex items-center gap-2">
@@ -229,19 +228,25 @@ export default function InvoiceList({ invoices, loading, canEdit, canOverride, c
                       <p className="font-medium">{invoice.reference || '-'}</p>
                     </div>
                     <div>
-                      <p className="text-gray-500">Total Amount</p>
-                      <p className="font-medium">{formatCurrency(invoice.total_amount || 0, invoice.currency)}</p>
+                      <p className="text-gray-500">Subtotal</p>
+                      <p className="font-medium">{formatCurrency(invoice.subtotal || 0, invoice.currency)}</p>
                     </div>
                     <div>
-                      <p className="text-gray-500">Outstanding</p>
-                      {outstanding > 0.01 ? (
+                      <p className="text-gray-500">VAT</p>
+                      <p className="font-medium">{formatCurrency(invoice.tax_amount || 0, invoice.currency)}</p>
+                    </div>
+                    <div>
+                      <p className="text-gray-500">Total</p>
+                      <p className="font-medium">{formatCurrency(invoice.total_amount || 0, invoice.currency)}</p>
+                    </div>
+                    {outstanding > 0.01 && (
+                      <div>
+                        <p className="text-gray-500">Outstanding</p>
                         <p className={`font-medium ${outstanding === invoice.total_amount ? 'text-amber-600' : 'text-gray-600'}`}>
                           {formatCurrency(outstanding, invoice.currency)}
                         </p>
-                      ) : (
-                        <p className="font-medium text-green-600">Paid</p>
-                      )}
-                    </div>
+                      </div>
+                    )}
                   </div>
 
                   <div className="flex items-center justify-between pt-3 border-t border-gray-200">

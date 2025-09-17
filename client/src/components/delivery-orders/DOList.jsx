@@ -99,9 +99,10 @@ export default function DOList({ deliveryOrders, loading, canEdit, currentUser, 
                 <TableHead>Customer</TableHead>
                 <TableHead>Order Date</TableHead>
                 <TableHead>Reference</TableHead>
+                <TableHead>Subtotal</TableHead>
+                <TableHead>VAT</TableHead>
+                <TableHead>Total</TableHead>
                 <TableHead>Status</TableHead>
-                <TableHead>Tax Treatment</TableHead>
-                <TableHead>Total Amount</TableHead>
                 <TableHead>Actions</TableHead>
               </TableRow>
             </TableHeader>
@@ -113,15 +114,18 @@ export default function DOList({ deliveryOrders, loading, canEdit, currentUser, 
                   <TableCell>{formatDate(doOrder.order_date)}</TableCell>
                   <TableCell>{doOrder.reference || '-'}</TableCell>
                   <TableCell>
-                    <Badge className={`${getStatusColor(doOrder.status)} border`}>
-                      {doOrder.status?.replace(/_/g, ' ').toUpperCase()}
-                    </Badge>
+                    {formatCurrency(doOrder.subtotal || 0, doOrder.currency)}
                   </TableCell>
                   <TableCell>
-                    {getTaxBadge(doOrder)}
+                    {formatCurrency(doOrder.tax_amount || 0, doOrder.currency)}
                   </TableCell>
                   <TableCell>
                     {formatCurrency(doOrder.total_amount || 0, doOrder.currency)}
+                  </TableCell>
+                  <TableCell>
+                    <Badge className={`${getStatusColor(doOrder.status)} border`}>
+                      {doOrder.status?.replace(/_/g, ' ').toUpperCase()}
+                    </Badge>
                   </TableCell>
                   <TableCell>
                     <DOActionsDropdown 
@@ -164,7 +168,15 @@ export default function DOList({ deliveryOrders, loading, canEdit, currentUser, 
                   <p className="font-medium">{doOrder.reference || '-'}</p>
                 </div>
                 <div>
-                  <p className="text-gray-500">Total Amount</p>
+                  <p className="text-gray-500">Subtotal</p>
+                  <p className="font-medium">{formatCurrency(doOrder.subtotal || 0, doOrder.currency)}</p>
+                </div>
+                <div>
+                  <p className="text-gray-500">VAT</p>
+                  <p className="font-medium">{formatCurrency(doOrder.tax_amount || 0, doOrder.currency)}</p>
+                </div>
+                <div>
+                  <p className="text-gray-500">Total</p>
                   <p className="font-medium">{formatCurrency(doOrder.total_amount || 0, doOrder.currency)}</p>
                 </div>
               </div>
