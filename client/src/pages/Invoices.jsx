@@ -203,25 +203,49 @@ export default function Invoices() {
   const handleDocumentSelect = async (document, documentType) => {
     console.log("📄 Document selected for invoice creation:", documentType, document);
     
-    // Use the robust normalizer
-    const newInvoiceData = normalizeDocumentToInvoice(document, documentType);
-    
-    // Validate critical fields
-    if (!newInvoiceData.customer_id) {
-      console.error("❌ Critical error: customer_id is missing after normalization");
+    try {
+      let fullDocument = document;
+      
+      // For quotations, fetch the complete data with line items
+      if (documentType === 'quotation') {
+        console.log("🔍 Fetching full quotation with line items for ID:", document.id);
+        const response = await fetch(`/api/quotations/${document.id}`);
+        if (response.ok) {
+          fullDocument = await response.json();
+          console.log("✅ Full quotation data retrieved:", fullDocument);
+        } else {
+          console.warn("⚠️ Failed to fetch full quotation, using basic data");
+        }
+      }
+      
+      // Use the robust normalizer with full document data
+      const newInvoiceData = normalizeDocumentToInvoice(fullDocument, documentType);
+      
+      // Validate critical fields
+      if (!newInvoiceData.customer_id) {
+        console.error("❌ Critical error: customer_id is missing after normalization");
+        toast({
+          title: "Data Error",
+          description: "Could not determine customer for this document. Please check the document data.",
+          variant: "destructive",
+        });
+        return;
+      }
+      
+      console.log("🎯 Final invoice data being passed to form:", newInvoiceData);
+      
+      setEditingInvoice(newInvoiceData);
+      setShowCreateFromExistingDialog(false);
+      setShowInvoiceForm(true);
+      
+    } catch (error) {
+      console.error("❌ Error processing document selection:", error);
       toast({
-        title: "Data Error",
-        description: "Could not determine customer for this document. Please check the document data.",
+        title: "Error",
+        description: "Failed to process the selected document. Please try again.",
         variant: "destructive",
       });
-      return;
     }
-    
-    console.log("🎯 Final invoice data being passed to form:", newInvoiceData);
-    
-    setEditingInvoice(newInvoiceData);
-    setShowCreateFromExistingDialog(false);
-    setShowInvoiceForm(true);
   };
 
   // Remove permission restrictions
