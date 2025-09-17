@@ -30,7 +30,6 @@ export default function Invoices() {
   const [currentUser, setCurrentUser] = useState(null);
   const [selectedStatuses, setSelectedStatuses] = useState([]);
   const [selectedCustomers, setSelectedCustomers] = useState([]);
-  const [selectedCurrencies, setSelectedCurrencies] = useState([]);
   const [selectedTaxTreatments, setSelectedTaxTreatments] = useState([]);
   const [dateRange, setDateRange] = useState("all");
   const [showCreateFromExistingDialog, setShowCreateFromExistingDialog] = useState(false);
@@ -171,7 +170,6 @@ export default function Invoices() {
     
     const matchesStatus = selectedStatuses.length === 0 || selectedStatuses.includes(invoice.status);
     const matchesCustomer = selectedCustomers.length === 0 || selectedCustomers.includes(invoice.customer_id);
-    const matchesCurrency = selectedCurrencies.length === 0 || selectedCurrencies.includes(invoice.currency);
     const matchesTaxTreatment = selectedTaxTreatments.length === 0 || selectedTaxTreatments.includes(invoice.tax_treatment);
     
     // Date range filtering
@@ -204,7 +202,7 @@ export default function Invoices() {
       }
     }
     
-    return matchesSearch && matchesStatus && matchesCustomer && matchesCurrency && matchesTaxTreatment && matchesDateRange;
+    return matchesSearch && matchesStatus && matchesCustomer && matchesTaxTreatment && matchesDateRange;
   });
 
   // Calculate pagination
@@ -318,8 +316,6 @@ export default function Invoices() {
           setSelectedStatuses={setSelectedStatuses}
           selectedCustomers={selectedCustomers}
           setSelectedCustomers={setSelectedCustomers}
-          selectedCurrencies={selectedCurrencies}
-          setSelectedCurrencies={setSelectedCurrencies}
           selectedTaxTreatments={selectedTaxTreatments}
           setSelectedTaxTreatments={setSelectedTaxTreatments}
           dateRange={dateRange}

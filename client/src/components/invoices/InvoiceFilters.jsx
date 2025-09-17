@@ -9,7 +9,7 @@ import { Badge } from "@/components/ui/badge";
 import { format } from "date-fns";
 import { cn } from "@/lib/utils";
 
-export default function InvoiceFilters({ selectedStatuses, setSelectedStatuses, selectedCustomers, setSelectedCustomers, selectedCurrencies, setSelectedCurrencies, selectedTaxTreatments, setSelectedTaxTreatments, dateRange, setDateRange, resetPagination, customers = [] }) {
+export default function InvoiceFilters({ selectedStatuses, setSelectedStatuses, selectedCustomers, setSelectedCustomers, selectedTaxTreatments, setSelectedTaxTreatments, dateRange, setDateRange, resetPagination, customers = [] }) {
   const [dateRangeOpen, setDateRangeOpen] = useState(false);
   const [customStartDate, setCustomStartDate] = useState(null);
   const [customEndDate, setCustomEndDate] = useState(null);
@@ -17,7 +17,6 @@ export default function InvoiceFilters({ selectedStatuses, setSelectedStatuses, 
   const clearFilters = () => {
     setSelectedStatuses([]);
     setSelectedCustomers([]);
-    setSelectedCurrencies([]);
     setSelectedTaxTreatments([]);
     setDateRange("all");
     setCustomStartDate(null);
@@ -26,12 +25,10 @@ export default function InvoiceFilters({ selectedStatuses, setSelectedStatuses, 
   };
 
   const hasActiveFilters = selectedStatuses.length > 0 || selectedCustomers.length > 0 || 
-                          selectedCurrencies.length > 0 || selectedTaxTreatments.length > 0 || 
-                          dateRange !== "all";
+                          selectedTaxTreatments.length > 0 || dateRange !== "all";
 
   // Get unique values
   const uniqueStatuses = ['draft', 'submitted'];
-  const uniqueCurrencies = ['AED']; // Invoices are AED-only per business requirements
   const uniqueTaxTreatments = ['standard', 'exempt', 'reverse_charge'];
 
   const handleDateRangeChange = (value) => {
@@ -145,44 +142,6 @@ export default function InvoiceFilters({ selectedStatuses, setSelectedStatuses, 
           </PopoverContent>
         </Popover>
 
-        {/* Currency Filter */}
-        <Popover>
-          <PopoverTrigger asChild>
-            <Button variant="outline" className="justify-between w-36">
-              {selectedCurrencies.length === 0 ? "All Currencies" : `${selectedCurrencies.length} selected`}
-              <ChevronDown className="ml-2 h-4 w-4" />
-            </Button>
-          </PopoverTrigger>
-          <PopoverContent className="w-60 p-4">
-            <div className="space-y-3">
-              <h4 className="font-medium leading-none">Select Currencies</h4>
-              <div className="space-y-2 max-h-60 overflow-y-auto">
-                {uniqueCurrencies.map(currency => (
-                  <div key={currency} className="flex items-center space-x-2">
-                    <Checkbox
-                      id={`invoice-currency-${currency}`}
-                      checked={selectedCurrencies.includes(currency)}
-                      onCheckedChange={(checked) => {
-                        if (checked) {
-                          setSelectedCurrencies(prev => [...prev, currency]);
-                        } else {
-                          setSelectedCurrencies(prev => prev.filter(c => c !== currency));
-                        }
-                        resetPagination();
-                      }}
-                    />
-                    <label
-                      htmlFor={`invoice-currency-${currency}`}
-                      className="text-sm leading-none peer-disabled:cursor-not-allowed peer-disabled:opacity-70 cursor-pointer"
-                    >
-                      {currency}
-                    </label>
-                  </div>
-                ))}
-              </div>
-            </div>
-          </PopoverContent>
-        </Popover>
 
         {/* Tax Treatment Filter */}
         <Popover>
@@ -299,7 +258,7 @@ export default function InvoiceFilters({ selectedStatuses, setSelectedStatuses, 
       </div>
       
       {/* Active filter badges */}
-      {(selectedStatuses.length > 0 || selectedCustomers.length > 0 || selectedCurrencies.length > 0 || selectedTaxTreatments.length > 0) && (
+      {(selectedStatuses.length > 0 || selectedCustomers.length > 0 || selectedTaxTreatments.length > 0) && (
         <div className="flex flex-wrap gap-2">
           {selectedStatuses.map(status => (
             <Badge key={status} variant="secondary" className="gap-1">
