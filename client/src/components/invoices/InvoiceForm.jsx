@@ -12,6 +12,7 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { Switch } from "@/components/ui/switch";
 import { Plus, Trash2 } from "lucide-react";
 import { Invoice } from "@/api/entities";
 import { Product } from "@/api/entities";
@@ -33,10 +34,8 @@ const getInitialFormData = (invoiceNumber) => ({
   subtotal: 0,
   tax_amount: 0,
   total_amount: 0,
-  paid_amount: 0,
-  payment_date: "",
-  payment_reference: "",
   remarks: "",
+  show_remarks: false,
   attachments: [],
   items: []
 });
@@ -92,9 +91,6 @@ export default function InvoiceForm({ open, onClose, editingInvoice, currentUser
         if (!editingInvoice.id) {
           // Set default values first
           dataToSet.status = 'draft';
-          dataToSet.paid_amount = 0;
-          dataToSet.payment_date = '';
-          dataToSet.payment_reference = '';
           dataToSet.invoice_date = new Date().toISOString().split('T')[0];
           
           // Use timestamp as fallback, we'll fetch proper number asynchronously
@@ -113,9 +109,9 @@ export default function InvoiceForm({ open, onClose, editingInvoice, currentUser
             });
         } else {
             // If editing an existing invoice, map old statuses to new simplified ones
-            // Any status other than 'draft' should be 'sent'
+            // Any status other than 'draft' should be 'submitted'
             if (dataToSet.status && dataToSet.status !== 'draft') {
-                dataToSet.status = 'sent';
+                dataToSet.status = 'submitted';
             }
         }
         setFormData(dataToSet);
@@ -291,10 +287,8 @@ export default function InvoiceForm({ open, onClose, editingInvoice, currentUser
         subtotal: parseFloat(formData.subtotal.toFixed(2)),
         tax_amount: parseFloat(formData.tax_amount.toFixed(2)),
         total_amount: parseFloat(formData.total_amount.toFixed(2)),
-        paid_amount: parseFloat(formData.paid_amount || 0),
-        payment_date: formData.payment_date,
-        payment_reference: formData.payment_reference,
         remarks: formData.remarks,
+        show_remarks: formData.show_remarks,
         attachments: formData.attachments || [],
         items: formData.items.map(item => ({
           brand_id: item.brand_id,
@@ -344,8 +338,7 @@ export default function InvoiceForm({ open, onClose, editingInvoice, currentUser
   };
 
   // Determine if the form is editable
-  const isFullyPaid = editingInvoice && (editingInvoice.total_amount - (editingInvoice.paid_amount || 0) <= 0.01);
-  const isCurrentlyEditable = !editingInvoice || !editingInvoice.id || canOverride || !isFullyPaid;
+  const isCurrentlyEditable = !editingInvoice || !editingInvoice.id || canOverride || ['draft', 'submitted'].includes(editingInvoice?.status);
 
   return (
     <Dialog open={open} onOpenChange={onClose}>
@@ -396,6 +389,7 @@ export default function InvoiceForm({ open, onClose, editingInvoice, currentUser
                 <SelectContent>
                   <SelectItem value="draft">Draft</SelectItem>
                   <SelectItem value="submitted">Submitted</SelectItem>
+                  <SelectItem value="delivered">Delivered</SelectItem>
                 </SelectContent>
               </Select>
             </div>
@@ -567,40 +561,22 @@ export default function InvoiceForm({ open, onClose, editingInvoice, currentUser
             </div>
           </div>
 
-          {/* Payment Info */}
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-            <div className="space-y-2">
-              <Label>Paid Amount</Label>
-              <Input 
-                type="number" 
-                step="0.01" 
-                value={formData.paid_amount} 
-                onChange={(e) => handleInputChange('paid_amount', parseFloat(e.target.value) || 0)} 
-                disabled={!isCurrentlyEditable} 
-              />
-            </div>
-            <div className="space-y-2">
-              <Label>Payment Date</Label>
-              <Input 
-                type="date" 
-                value={formData.payment_date || ''} 
-                onChange={(e) => handleInputChange('payment_date', e.target.value)} 
-                disabled={!isCurrentlyEditable} 
-              />
-            </div>
-            <div className="space-y-2">
-              <Label>Payment Reference</Label>
-              <Input 
-                value={formData.payment_reference || ''} 
-                onChange={(e) => handleInputChange('payment_reference', e.target.value)} 
-                disabled={!isCurrentlyEditable} 
-              />
-            </div>
-          </div>
-
           {/* Remarks */}
-          <div className="space-y-2">
-            <Label htmlFor="remarks">Remarks</Label>
+          <div className="space-y-4">
+            <div className="flex items-center justify-between">
+              <Label htmlFor="remarks">Remarks</Label>
+              <div className="flex items-center space-x-2">
+                <Label htmlFor="show_remarks" className="text-sm font-normal">
+                  Show in output
+                </Label>
+                <Switch 
+                  id="show_remarks"
+                  checked={formData.show_remarks || false}
+                  onCheckedChange={(checked) => handleInputChange('show_remarks', checked)}
+                  disabled={!isCurrentlyEditable}
+                />
+              </div>
+            </div>
             <Textarea
               id="remarks"
               value={formData.remarks || ''}

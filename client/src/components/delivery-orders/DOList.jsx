@@ -27,6 +27,7 @@ export default function DOList({ deliveryOrders, loading, canEdit, currentUser, 
     switch (status?.toLowerCase()) {
       case 'draft': return 'bg-gray-100 text-gray-800';
       case 'submitted': return 'bg-blue-100 text-blue-800';
+      case 'delivered': return 'bg-green-100 text-green-800';
       default: return 'bg-gray-100 text-gray-800';
     }
   };
@@ -43,9 +44,9 @@ export default function DOList({ deliveryOrders, loading, canEdit, currentUser, 
   const getTaxBadge = (doOrder) => {
     switch (doOrder.tax_treatment) {
       case 'StandardRated':
-        return <Badge variant="outline" className="text-green-700 border-green-300">VAT {((doOrder.tax_rate || 0) * 100).toFixed(0)}%</Badge>;
+        return <Badge variant="outline" className="text-green-700 border-green-300">Standard</Badge>;
       case 'ZeroRated':
-        return <Badge variant="outline" className="text-blue-700 border-blue-300">Zero-rated</Badge>;
+        return <Badge variant="outline" className="text-blue-700 border-blue-300">Exempt</Badge>;
       case 'Exempt':
         return <Badge variant="outline" className="text-gray-700 border-gray-300">Exempt</Badge>;
       case 'OutOfScope':

@@ -4,16 +4,12 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
-import { FileText, CreditCard } from "lucide-react";
+import { FileText } from "lucide-react";
 import { Skeleton } from "@/components/ui/skeleton";
 import { format, isValid, parseISO } from "date-fns";
 import InvoiceActionsDropdown from "./InvoiceActionsDropdown";
-import MarkPaidDialog from "./MarkPaidDialog";
-import { getDerivedInvoiceStatus } from "./invoiceUtils";
 
 export default function InvoiceList({ invoices, loading, canEdit, canOverride, currentUser, onEdit, onRefresh }) {
-  const [showMarkPaidDialog, setShowMarkPaidDialog] = useState(false);
-  const [selectedInvoice, setSelectedInvoice] = useState(null);
 
   const getCustomerName = (invoice) => {
     return invoice.customer_name || invoice.customerName || 'Unknown Customer';
@@ -34,8 +30,7 @@ export default function InvoiceList({ invoices, loading, canEdit, canOverride, c
     switch (status?.toLowerCase()) {
       case 'draft': return 'bg-gray-100 text-gray-800';
       case 'submitted': return 'bg-blue-100 text-blue-800';
-      case 'paid': return 'bg-green-100 text-green-800';
-      case 'overdue': return 'bg-red-100 text-red-800';
+      case 'delivered': return 'bg-green-100 text-green-800';
       default: return 'bg-gray-100 text-gray-800';
     }
   };
@@ -49,34 +44,19 @@ export default function InvoiceList({ invoices, loading, canEdit, canOverride, c
     return `${currency} ${formatter.format(amount || 0)}`;
   };
 
-  const getOutstandingAmount = (invoice) => {
-    return (invoice.total_amount || 0) - (invoice.paid_amount || 0);
-  };
-
-  const handleMarkPaid = (invoice) => {
-    setSelectedInvoice(invoice);
-    setShowMarkPaidDialog(true);
-  };
-
-  const handleMarkPaidSuccess = () => {
-    setShowMarkPaidDialog(false);
-    setSelectedInvoice(null);
-    onRefresh();
-  };
 
   const canPerformActions = (invoice) => {
     if (!canEdit) return false;
     if (canOverride) return true;
-    const outstanding = getOutstandingAmount(invoice);
-    return outstanding > 0.01;
+    return ['draft', 'submitted'].includes(invoice.status);
   };
 
   const getTaxBadge = (invoice) => {
     switch (invoice.tax_treatment) {
       case 'StandardRated':
-        return <Badge variant="outline" className="text-green-700 border-green-300">VAT {((invoice.tax_rate || 0) * 100).toFixed(0)}%</Badge>;
+        return <Badge variant="outline" className="text-green-700 border-green-300">Standard</Badge>;
       case 'ZeroRated':
-        return <Badge variant="outline" className="text-blue-700 border-blue-300">Zero-rated</Badge>;
+        return <Badge variant="outline" className="text-blue-700 border-blue-300">Exempt</Badge>;
       case 'Exempt':
         return <Badge variant="outline" className="text-gray-700 border-gray-300">Exempt</Badge>;
       case 'OutOfScope':
@@ -140,8 +120,6 @@ export default function InvoiceList({ invoices, loading, canEdit, canOverride, c
               </TableHeader>
               <TableBody>
                 {invoices.map((invoice) => {
-                  const outstanding = getOutstandingAmount(invoice);
-                  const derivedStatus = getDerivedInvoiceStatus(invoice);
                   
                   return (
                     <TableRow key={invoice.id} className="hover:bg-gray-50">
@@ -159,28 +137,12 @@ export default function InvoiceList({ invoices, loading, canEdit, canOverride, c
                         {formatCurrency(invoice.total_amount || 0, invoice.currency)}
                       </TableCell>
                       <TableCell>
-                        <div className="flex items-center gap-2">
-                          <Badge className={`${getStatusColor(derivedStatus)} border`}>
-                            {derivedStatus?.toUpperCase()}
-                          </Badge>
-                          {outstanding > 0.01 && (
-                            <span className="text-xs text-amber-600">({formatCurrency(outstanding, invoice.currency)} due)</span>
-                          )}
-                        </div>
+                        <Badge className={`${getStatusColor(invoice.status)} border`}>
+                          {invoice.status?.toUpperCase()}
+                        </Badge>
                       </TableCell>
                       <TableCell>
                         <div className="flex items-center gap-2">
-                          {canPerformActions(invoice) && outstanding > 0.01 && (
-                            <Button
-                              size="sm"
-                              variant="outline"
-                              onClick={() => handleMarkPaid(invoice)}
-                              className="text-green-600 border-green-200 hover:bg-green-50"
-                            >
-                              <CreditCard className="w-3 h-3 mr-1" />
-                              Mark Paid
-                            </Button>
-                          )}
                           <InvoiceActionsDropdown 
                             invoice={invoice}
                             canEdit={canPerformActions(invoice)}
@@ -200,8 +162,6 @@ export default function InvoiceList({ invoices, loading, canEdit, canOverride, c
           {/* Mobile Cards */}
           <div className="lg:hidden space-y-4">
             {invoices.map((invoice) => {
-              const outstanding = getOutstandingAmount(invoice);
-              const derivedStatus = getDerivedInvoiceStatus(invoice);
               
               return (
                 <Card key={invoice.id} className="p-4">
@@ -211,8 +171,8 @@ export default function InvoiceList({ invoices, loading, canEdit, canOverride, c
                       <p className="text-sm text-gray-600">{getCustomerName(invoice)}</p>
                     </div>
                     <div className="flex flex-col gap-2">
-                      <Badge className={`${getStatusColor(derivedStatus)} border`}>
-                        {derivedStatus?.toUpperCase()}
+                      <Badge className={`${getStatusColor(invoice.status)} border`}>
+                        {invoice.status?.toUpperCase()}
                       </Badge>
                       {getTaxBadge(invoice)}
                     </div>
@@ -239,28 +199,10 @@ export default function InvoiceList({ invoices, loading, canEdit, canOverride, c
                       <p className="text-gray-500">Total</p>
                       <p className="font-medium">{formatCurrency(invoice.total_amount || 0, invoice.currency)}</p>
                     </div>
-                    {outstanding > 0.01 && (
-                      <div>
-                        <p className="text-gray-500">Outstanding</p>
-                        <p className={`font-medium ${outstanding === invoice.total_amount ? 'text-amber-600' : 'text-gray-600'}`}>
-                          {formatCurrency(outstanding, invoice.currency)}
-                        </p>
-                      </div>
-                    )}
                   </div>
 
                   <div className="flex items-center justify-between pt-3 border-t border-gray-200">
-                    {canPerformActions(invoice) && outstanding > 0.01 ? (
-                      <Button
-                        size="sm"
-                        variant="outline"
-                        onClick={() => handleMarkPaid(invoice)}
-                        className="text-green-600 border-green-200 hover:bg-green-50"
-                      >
-                        <CreditCard className="w-3 h-3 mr-1" />
-                        Mark Paid
-                      </Button>
-                    ) : <div />}
+                    <div />
                     <InvoiceActionsDropdown 
                       invoice={invoice}
                       canEdit={canPerformActions(invoice)}
@@ -283,16 +225,6 @@ export default function InvoiceList({ invoices, loading, canEdit, canOverride, c
         </CardContent>
       </Card>
 
-      {/* Mark Paid Dialog */}
-      <MarkPaidDialog
-        open={showMarkPaidDialog}
-        onClose={() => {
-          setShowMarkPaidDialog(false);
-          setSelectedInvoice(null);
-        }}
-        invoice={selectedInvoice}
-        onSuccess={handleMarkPaidSuccess}
-      />
     </>
   );
 }

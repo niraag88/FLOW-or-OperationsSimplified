@@ -12,6 +12,7 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { Switch } from "@/components/ui/switch";
 import { Plus, Trash2 } from "lucide-react";
 import { DeliveryOrder } from "@/api/entities";
 import { Product } from "@/api/entities";
@@ -40,6 +41,7 @@ export default function DOForm({ open, onClose, editingDO, currentUser, onSucces
     tax_amount: 0,
     total_amount: 0,
     remarks: "",
+    show_remarks: false,
     attachments: [],
     items: []
   });
@@ -290,6 +292,7 @@ export default function DOForm({ open, onClose, editingDO, currentUser, onSucces
                 <SelectContent>
                   <SelectItem value="draft">Draft</SelectItem>
                   <SelectItem value="submitted">Submitted</SelectItem>
+                  <SelectItem value="delivered">Delivered</SelectItem>
                 </SelectContent>
               </Select>
             </div>
@@ -462,8 +465,21 @@ export default function DOForm({ open, onClose, editingDO, currentUser, onSucces
           </div>
 
           {/* Remarks */}
-          <div className="space-y-2">
-            <Label htmlFor="remarks">Remarks</Label>
+          <div className="space-y-4">
+            <div className="flex items-center justify-between">
+              <Label htmlFor="remarks">Remarks</Label>
+              <div className="flex items-center space-x-2">
+                <Label htmlFor="show_remarks" className="text-sm font-normal">
+                  Show in output
+                </Label>
+                <Switch 
+                  id="show_remarks"
+                  checked={formData.show_remarks || false}
+                  onCheckedChange={(checked) => handleInputChange('show_remarks', checked)}
+                  disabled={!isEditable}
+                />
+              </div>
+            </div>
             <Textarea
               id="remarks"
               value={formData.remarks || ''}
