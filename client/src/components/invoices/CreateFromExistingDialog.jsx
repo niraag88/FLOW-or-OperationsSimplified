@@ -54,23 +54,32 @@ export default function CreateFromExistingDialog({ open, onClose, onDocumentSele
       customersData.forEach(customer => {
         customerMap[customer.id] = customer.customer_name || customer.name;
       });
+      
+      console.log("Customer map:", customerMap);
 
       // Enrich quotations with customer names and sort by newest first
       const quotationsWithCustomers = quotationsData
-        .map(quotation => ({
-          ...quotation,
-          customerName: customerMap[quotation.customer_id] || 'Unknown Customer'
-        }))
+        .map(quotation => {
+          const customerId = quotation.customer_id || quotation.customerId;
+          console.log("Quotation customer lookup - ID:", customerId, "Name:", customerMap[customerId]);
+          return {
+            ...quotation,
+            customerName: customerMap[customerId] || 'Unknown Customer'
+          };
+        })
         .sort((a, b) => new Date(b.updated_date || b.updatedDate) - new Date(a.updated_date || a.updatedDate));
 
       // Combine and de-duplicate delivery orders, then enrich with customer names
       const allDos = [...deliveredDos, ...confirmedDos];
       const uniqueDos = Array.from(new Map(allDos.map(item => [item.id, item])).values());
       const deliveryOrdersWithCustomers = uniqueDos
-        .map(deliveryOrder => ({
-          ...deliveryOrder,
-          customerName: customerMap[deliveryOrder.customer_id] || 'Unknown Customer'
-        }))
+        .map(deliveryOrder => {
+          const customerId = deliveryOrder.customer_id || deliveryOrder.customerId;
+          return {
+            ...deliveryOrder,
+            customerName: customerMap[customerId] || 'Unknown Customer'
+          };
+        })
         .sort((a, b) => new Date(b.updated_date || b.updatedDate) - new Date(a.updated_date || a.updatedDate));
 
       console.log("Loaded documents:", quotationsWithCustomers.length, "quotations,", deliveryOrdersWithCustomers.length, "delivery orders");

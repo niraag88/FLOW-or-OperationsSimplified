@@ -284,9 +284,9 @@ export default function InvoiceForm({ open, onClose, editingInvoice, currentUser
         currency: formData.currency,
         tax_treatment: formData.tax_treatment,
         tax_rate: formData.tax_rate,
-        subtotal: parseFloat(formData.subtotal.toFixed(2)),
-        tax_amount: parseFloat(formData.tax_amount.toFixed(2)),
-        total_amount: parseFloat(formData.total_amount.toFixed(2)),
+        subtotal: parseFloat((formData.subtotal || 0).toFixed(2)),
+        tax_amount: parseFloat((formData.tax_amount || 0).toFixed(2)),
+        total_amount: parseFloat((formData.total_amount || 0).toFixed(2)),
         remarks: formData.remarks,
         show_remarks: formData.show_remarks,
         attachments: formData.attachments || [],
@@ -546,17 +546,17 @@ export default function InvoiceForm({ open, onClose, editingInvoice, currentUser
             <div className="space-y-2 max-w-sm ml-auto">
               <div className="flex justify-between">
                 <span className="text-gray-600">Subtotal:</span>
-                <span className="font-semibold">{formData.subtotal.toFixed(2)} AED</span>
+                <span className="font-semibold">{(formData.subtotal || 0).toFixed(2)} AED</span>
               </div>
-              {formData.tax_amount > 0 && (
+              {(formData.tax_amount || 0) > 0 && (
                 <div className="flex justify-between">
-                  <span className="text-gray-600">VAT ({(formData.tax_rate * 100).toFixed(1)}%):</span>
-                  <span className="font-semibold">{formData.tax_amount.toFixed(2)} AED</span>
+                  <span className="text-gray-600">VAT ({((formData.tax_rate || 0) * 100).toFixed(1)}%):</span>
+                  <span className="font-semibold">{(formData.tax_amount || 0).toFixed(2)} AED</span>
                 </div>
               )}
               <div className="flex justify-between border-t pt-2">
                 <span className="font-bold">Total:</span>
-                <span className="font-bold text-purple-600">{formData.total_amount.toFixed(2)} AED</span>
+                <span className="font-bold text-purple-600">{(formData.total_amount || 0).toFixed(2)} AED</span>
               </div>
             </div>
           </div>
