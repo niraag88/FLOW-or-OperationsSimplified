@@ -137,7 +137,7 @@ export default function InvoiceForm({ open, onClose, editingInvoice, currentUser
         let taxTreatment = "StandardRated";
         let taxRate = 0.05;
         
-        if (customer && customer.type === "International") {
+        if (customer && (customer.vatTreatment === "ZeroRated" || customer.type === "International")) {
           taxTreatment = "ZeroRated";
           taxRate = 0;
         }
