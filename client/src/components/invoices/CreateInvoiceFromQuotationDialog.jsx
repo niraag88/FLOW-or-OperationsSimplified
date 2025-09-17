@@ -41,7 +41,7 @@ export default function CreateInvoiceFromQuotationDialog({ open, onClose, onQuot
       const [customersData, quotationsData] = await Promise.all([
         Customer.list(),
         Quotation.filter({ 
-          status: 'submitted'  // Only load submitted quotations
+          status: 'sent'  // Only load sent quotations
         }, '-updated_date')
       ]);
       
@@ -66,7 +66,7 @@ export default function CreateInvoiceFromQuotationDialog({ open, onClose, onQuot
     console.log("Customer selected:", customerId);
     setSelectedCustomerId(customerId);
     setSelectedQuotationId(''); // Reset quotation selection
-    const customerQuotations = quotations.filter(q => q.customer_id === customerId);
+    const customerQuotations = quotations.filter(q => String(q.customer_id) === String(customerId));
     console.log("Filtered quotations for customer:", customerQuotations.length);
     setFilteredQuotations(customerQuotations);
   };

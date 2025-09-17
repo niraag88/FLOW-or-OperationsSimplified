@@ -39,7 +39,7 @@ export default function VATReportTab({ invoices, customers, books, companySettin
     const defaultFilters = {
       dateFrom: format(startOfMonth(new Date()), 'yyyy-MM-dd'),
       dateTo: format(endOfMonth(new Date()), 'yyyy-MM-dd'),
-      statuses: ['submitted'], // Changed from ['sent', 'paid', 'overdue'] to ['submitted']
+      statuses: ['sent'], // Changed back to 'sent' to match schema
       taxTreatments: ['StandardRated']
     };
     return saved ? { ...defaultFilters, ...JSON.parse(saved) } : defaultFilters;

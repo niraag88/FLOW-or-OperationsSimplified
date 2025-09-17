@@ -8,8 +8,8 @@ import { format } from 'date-fns';
 import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer } from 'recharts';
 
 export default function SalesAgedInvoicesReport({ invoices, customers, canExport }) {
-  // Only include submitted invoices for sales reporting
-  const submittedInvoices = invoices.filter(inv => inv.status === 'submitted');
+  // Only include sent invoices for sales reporting
+  const submittedInvoices = invoices.filter(inv => inv.status === 'sent');
 
   const agingData = useMemo(() => {
     const buckets = {

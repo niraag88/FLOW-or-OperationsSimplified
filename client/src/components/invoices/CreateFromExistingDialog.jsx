@@ -60,7 +60,7 @@ export default function CreateFromExistingDialog({ open, onClose, onDocumentSele
     try {
       const [customersData, quotationsData, deliveredDos, confirmedDos] = await Promise.all([
         Customer.list(),
-        Quotation.filter({ status: 'submitted' }, '-updated_date'),
+        Quotation.filter({ status: 'sent' }, '-updated_date'),
         DeliveryOrder.filter({ status: 'delivered' }, '-updated_date'),
         DeliveryOrder.filter({ status: 'confirmed' }, '-updated_date'),
       ]);

@@ -113,9 +113,9 @@ export default function InvoiceForm({ open, onClose, editingInvoice, currentUser
             });
         } else {
             // If editing an existing invoice, map old statuses to new simplified ones
-            // Any status other than 'draft' should be 'submitted'
+            // Any status other than 'draft' should be 'sent'
             if (dataToSet.status && dataToSet.status !== 'draft') {
-                dataToSet.status = 'submitted';
+                dataToSet.status = 'sent';
             }
         }
         setFormData(dataToSet);
