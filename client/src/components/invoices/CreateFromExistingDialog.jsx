@@ -1,4 +1,3 @@
-
 import React, { useState, useEffect } from 'react';
 import {
   Dialog,
@@ -16,88 +15,78 @@ import { Customer } from '@/api/entities';
 import { Quotation } from '@/api/entities';
 import { DeliveryOrder } from '@/api/entities';
 import { useToast } from '@/components/ui/use-toast';
-import { sortBy } from 'lodash';
 
 export default function CreateFromExistingDialog({ open, onClose, onDocumentSelected }) {
   const [loading, setLoading] = useState(false);
-  const [customers, setCustomers] = useState([]);
-  const [quotations, setQuotations] = useState([]);
-  const [deliveryOrders, setDeliveryOrders] = useState([]);
   const [activeTab, setActiveTab] = useState('quotation');
-  
-  // Quotation selection
-  const [quotationCustomerId, setQuotationCustomerId] = useState('');
-  const [filteredQuotations, setFilteredQuotations] = useState([]);
+  const [enrichedQuotations, setEnrichedQuotations] = useState([]);
+  const [enrichedDeliveryOrders, setEnrichedDeliveryOrders] = useState([]);
   const [selectedQuotationId, setSelectedQuotationId] = useState('');
-  
-  // DO selection
-  const [doCustomerId, setDoCustomerId] = useState('');
-  const [filteredDOs, setFilteredDOs] = useState([]);
-  const [selectedDOId, setSelectedDOId] = useState('');
-  
+  const [selectedDeliveryOrderId, setSelectedDeliveryOrderId] = useState('');
   const { toast } = useToast();
 
   useEffect(() => {
     if (open) {
-      loadInitialData();
+      loadDocuments();
     } else {
-      resetState();
+      // Reset state on close
+      setSelectedQuotationId('');
+      setSelectedDeliveryOrderId('');
+      setActiveTab('quotation');
     }
   }, [open]);
 
-  const resetState = () => {
-    setQuotationCustomerId('');
-    setSelectedQuotationId('');
-    setFilteredQuotations([]);
-    setDoCustomerId('');
-    setSelectedDOId('');
-    setFilteredDOs([]);
-    setActiveTab('quotation');
-  };
-
-  const loadInitialData = async () => {
+  const loadDocuments = async () => {
     setLoading(true);
     try {
-      const [customersData, quotationsData, deliveredDos, confirmedDos] = await Promise.all([
-        Customer.list(),
-        Quotation.filter({ status: 'sent' }, '-updated_date'),
+      console.log("Loading documents for Create from Existing dialog");
+      
+      // Load all required data in parallel
+      const [quotationsData, deliveredDos, confirmedDos, customersData] = await Promise.all([
+        Quotation.filter({ status: 'submitted' }, '-updated_date'),
         DeliveryOrder.filter({ status: 'delivered' }, '-updated_date'),
         DeliveryOrder.filter({ status: 'confirmed' }, '-updated_date'),
+        Customer.list()
       ]);
-      
-      setCustomers(customersData.filter(c => c.isActive !== false));
-      setQuotations(quotationsData);
 
-      // Combine and de-duplicate DOs
+      // Create customer lookup map
+      const customerMap = {};
+      customersData.forEach(customer => {
+        customerMap[customer.id] = customer.customer_name || customer.name;
+      });
+
+      // Enrich quotations with customer names and sort by newest first
+      const quotationsWithCustomers = quotationsData
+        .map(quotation => ({
+          ...quotation,
+          customerName: customerMap[quotation.customer_id] || 'Unknown Customer'
+        }))
+        .sort((a, b) => new Date(b.updated_date || b.updatedDate) - new Date(a.updated_date || a.updatedDate));
+
+      // Combine and de-duplicate delivery orders, then enrich with customer names
       const allDos = [...deliveredDos, ...confirmedDos];
       const uniqueDos = Array.from(new Map(allDos.map(item => [item.id, item])).values());
-      const sortedDos = sortBy(uniqueDos, 'updated_date').reverse(); // Sort in descending order of updated_date
-      setDeliveryOrders(sortedDos);
+      const deliveryOrdersWithCustomers = uniqueDos
+        .map(deliveryOrder => ({
+          ...deliveryOrder,
+          customerName: customerMap[deliveryOrder.customer_id] || 'Unknown Customer'
+        }))
+        .sort((a, b) => new Date(b.updated_date || b.updatedDate) - new Date(a.updated_date || a.updatedDate));
 
+      console.log("Loaded documents:", quotationsWithCustomers.length, "quotations,", deliveryOrdersWithCustomers.length, "delivery orders");
+      
+      setEnrichedQuotations(quotationsWithCustomers);
+      setEnrichedDeliveryOrders(deliveryOrdersWithCustomers);
     } catch (error) {
-      console.error("Error loading data:", error);
+      console.error("Error loading documents:", error);
       toast({
         title: "Error",
-        description: "Could not load documents.",
+        description: "Could not load documents. Please try again.",
         variant: "destructive",
       });
     } finally {
       setLoading(false);
     }
-  };
-
-  const handleQuotationCustomerChange = (customerId) => {
-    setQuotationCustomerId(customerId);
-    setSelectedQuotationId('');
-    const customerQuotations = quotations.filter(q => String(q.customer_id) === String(customerId));
-    setFilteredQuotations(customerQuotations);
-  };
-
-  const handleDOCustomerChange = (customerId) => {
-    setDoCustomerId(customerId);
-    setSelectedDOId('');
-    const customerDOs = deliveryOrders.filter(d => String(d.customer_id) === String(customerId));
-    setFilteredDOs(customerDOs);
   };
 
   const handleSubmit = async () => {
@@ -113,10 +102,10 @@ export default function CreateFromExistingDialog({ open, onClose, onDocumentSele
         });
         return;
       }
-      selectedDocument = quotations.find(q => String(q.id) === String(selectedQuotationId));
+      selectedDocument = enrichedQuotations.find(q => String(q.id) === String(selectedQuotationId));
       documentType = 'quotation';
     } else {
-      if (!selectedDOId) {
+      if (!selectedDeliveryOrderId) {
         toast({
           title: "Selection required",
           description: "Please select a delivery order.",
@@ -124,7 +113,7 @@ export default function CreateFromExistingDialog({ open, onClose, onDocumentSele
         });
         return;
       }
-      selectedDocument = deliveryOrders.find(d => String(d.id) === String(selectedDOId));
+      selectedDocument = enrichedDeliveryOrders.find(d => String(d.id) === String(selectedDeliveryOrderId));
       documentType = 'delivery_order';
     }
 
@@ -137,6 +126,7 @@ export default function CreateFromExistingDialog({ open, onClose, onDocumentSele
       return;
     }
 
+    console.log("Selected document for invoice creation:", documentType, selectedDocument);
     onDocumentSelected(selectedDocument, documentType);
   };
 
@@ -146,122 +136,99 @@ export default function CreateFromExistingDialog({ open, onClose, onDocumentSele
         <DialogHeader>
           <DialogTitle>Create Invoice from Existing</DialogTitle>
           <DialogDescription>
-            Select a submitted quotation or delivered delivery order to create a new invoice.
+            Select a submitted quotation or delivered delivery order to create a new invoice. All document details will be copied.
           </DialogDescription>
         </DialogHeader>
 
         <Tabs value={activeTab} onValueChange={setActiveTab} className="w-full">
           <TabsList className="grid w-full grid-cols-2">
-            <TabsTrigger value="quotation">From Quotation</TabsTrigger>
-            <TabsTrigger value="delivery_order">From Delivery Order</TabsTrigger>
+            <TabsTrigger value="quotation" data-testid="tab-quotation">From Quotation</TabsTrigger>
+            <TabsTrigger value="delivery_order" data-testid="tab-delivery-order">From Delivery Order</TabsTrigger>
           </TabsList>
 
           <TabsContent value="quotation" className="space-y-4 mt-4">
             <div className="space-y-2">
-              <Label>Customer</Label>
-              <Select
-                value={quotationCustomerId}
-                onValueChange={handleQuotationCustomerChange}
-                disabled={loading}
-              >
-                <SelectTrigger>
-                  <SelectValue placeholder="Select a customer" />
-                </SelectTrigger>
-                <SelectContent>
-                  {customers.map(c => (
-                    <SelectItem key={c.id} value={String(c.id)}>
-                      {c.customer_name}
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-            </div>
-
-            <div className="space-y-2">
-              <Label>Quotation</Label>
+              <Label htmlFor="quotation-select">Select Quotation</Label>
               <Select
                 value={selectedQuotationId}
                 onValueChange={setSelectedQuotationId}
-                disabled={loading || !quotationCustomerId || filteredQuotations.length === 0}
+                disabled={loading}
+                data-testid="select-quotation"
               >
-                <SelectTrigger>
-                  <SelectValue placeholder={!quotationCustomerId ? "Select a customer first" : "Select a quotation"} />
+                <SelectTrigger id="quotation-select">
+                  <SelectValue 
+                    placeholder={loading ? "Loading quotations..." : "Select a quotation"} 
+                  />
                 </SelectTrigger>
                 <SelectContent>
-                  {filteredQuotations.length > 0 ? (
-                    filteredQuotations.map(q => (
-                      <SelectItem key={q.id} value={String(q.id)}>
-                        {q.quotation_number} - {q.currency} {q.total_amount.toFixed(2)}
+                  {enrichedQuotations.length > 0 ? (
+                    enrichedQuotations.map(quotation => (
+                      <SelectItem key={quotation.id} value={String(quotation.id)}>
+                        {quotation.quotation_number || quotation.quoteNumber} - {quotation.customerName}
                       </SelectItem>
                     ))
                   ) : (
                     <SelectItem value="none" disabled>
-                      {quotationCustomerId ? "No submitted quotations for this customer" : "No quotations found"}
+                      {loading ? "Loading..." : "No submitted quotations available"}
                     </SelectItem>
                   )}
                 </SelectContent>
               </Select>
+              {enrichedQuotations.length === 0 && !loading && (
+                <p className="text-sm text-muted-foreground">
+                  No submitted quotations found. Create and submit a quotation first.
+                </p>
+              )}
             </div>
           </TabsContent>
 
           <TabsContent value="delivery_order" className="space-y-4 mt-4">
             <div className="space-y-2">
-              <Label>Customer</Label>
+              <Label htmlFor="delivery-order-select">Select Delivery Order</Label>
               <Select
-                value={doCustomerId}
-                onValueChange={handleDOCustomerChange}
+                value={selectedDeliveryOrderId}
+                onValueChange={setSelectedDeliveryOrderId}
                 disabled={loading}
+                data-testid="select-delivery-order"
               >
-                <SelectTrigger>
-                  <SelectValue placeholder="Select a customer" />
+                <SelectTrigger id="delivery-order-select">
+                  <SelectValue 
+                    placeholder={loading ? "Loading delivery orders..." : "Select a delivery order"} 
+                  />
                 </SelectTrigger>
                 <SelectContent>
-                  {customers.map(c => (
-                    <SelectItem key={c.id} value={String(c.id)}>
-                      {c.customer_name}
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-            </div>
-
-            <div className="space-y-2">
-              <Label>Delivery Order</Label>
-              <Select
-                value={selectedDOId}
-                onValueChange={setSelectedDOId}
-                disabled={loading || !doCustomerId || filteredDOs.length === 0}
-              >
-                <SelectTrigger>
-                  <SelectValue placeholder={!doCustomerId ? "Select a customer first" : "Select a delivery order"} />
-                </SelectTrigger>
-                <SelectContent>
-                  {filteredDOs.length > 0 ? (
-                    filteredDOs.map(d => (
-                      <SelectItem key={d.id} value={String(d.id)}>
-                        {d.do_number} - {d.currency} {d.total_amount.toFixed(2)} ({d.status})
+                  {enrichedDeliveryOrders.length > 0 ? (
+                    enrichedDeliveryOrders.map(deliveryOrder => (
+                      <SelectItem key={deliveryOrder.id} value={String(deliveryOrder.id)}>
+                        {deliveryOrder.do_number || deliveryOrder.deliveryOrderNumber} - {deliveryOrder.customerName}
                       </SelectItem>
                     ))
                   ) : (
                     <SelectItem value="none" disabled>
-                      {doCustomerId ? "No confirmed/delivered orders for this customer" : "No delivery orders found"}
+                      {loading ? "Loading..." : "No delivery orders available"}
                     </SelectItem>
                   )}
                 </SelectContent>
               </Select>
+              {enrichedDeliveryOrders.length === 0 && !loading && (
+                <p className="text-sm text-muted-foreground">
+                  No delivered or confirmed delivery orders found. Create and deliver a delivery order first.
+                </p>
+              )}
             </div>
           </TabsContent>
         </Tabs>
 
         <DialogFooter>
-          <Button variant="outline" onClick={onClose} disabled={loading}>
+          <Button variant="outline" onClick={onClose} disabled={loading} data-testid="button-cancel">
             Cancel
           </Button>
           <Button 
             onClick={handleSubmit} 
-            disabled={loading || (activeTab === 'quotation' ? !selectedQuotationId : !selectedDOId)}
+            disabled={loading || (activeTab === 'quotation' ? !selectedQuotationId : !selectedDeliveryOrderId)}
+            data-testid="button-create-invoice"
           >
-            {loading ? "Loading..." : "Create Invoice"}
+            {loading ? "Creating..." : "Create Invoice"}
           </Button>
         </DialogFooter>
       </DialogContent>
