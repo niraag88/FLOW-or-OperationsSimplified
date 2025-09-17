@@ -17,6 +17,7 @@ import { getDerivedInvoiceStatus } from "../components/invoices/invoiceUtils";
 import ExportDropdown from "../components/common/ExportDropdown";
 import InvoiceTemplate from "../components/print/InvoiceTemplate";
 import { createRoot } from 'react-dom/client';
+import { useToast } from '@/hooks/use-toast';
 
 export default function Invoices() {
   const [invoices, setInvoices] = useState([]);
@@ -38,6 +39,9 @@ export default function Invoices() {
   // Pagination state
   const [currentPage, setCurrentPage] = useState(1);
   const [itemsPerPage, setItemsPerPage] = useState(50);
+  
+  // Toast hook for error handling
+  const { toast } = useToast();
 
   useEffect(() => {
     loadData();
@@ -106,54 +110,114 @@ export default function Invoices() {
     setEditingInvoice(null);
   };
 
-  const handleDocumentSelect = async (document, documentType) => {
-    // Transform the selected document into a new invoice object
-    let newInvoiceData;
+  // Robust document-to-invoice normalizer function
+  const normalizeDocumentToInvoice = (document, documentType) => {
+    console.log("🔄 Normalizing document:", documentType, document);
     
+    // Helper function to safely get numeric value
+    const safeNumber = (value) => {
+      if (value === null || value === undefined || value === '') return 0;
+      const num = parseFloat(value);
+      return isNaN(num) ? 0 : num;
+    };
+    
+    // Helper function to safely get string value
+    const safeString = (value, fallback = '') => {
+      return value !== null && value !== undefined ? String(value) : fallback;
+    };
+    
+    // Helper function to format date
+    const formatDate = (dateValue) => {
+      if (!dateValue) return '';
+      try {
+        return new Date(dateValue).toISOString().split('T')[0];
+      } catch {
+        return '';
+      }
+    };
+
+    // Extract common fields with fallbacks for both camelCase and snake_case
+    const normalizedData = {
+      // Customer ID - critical field for form functionality
+      customer_id: document.customer_id || document.customerId || null,
+      
+      // Invoice metadata
+      invoice_date: new Date().toISOString().split('T')[0],
+      status: 'draft',
+      
+      // Reference information
+      reference: safeString(document.reference),
+      reference_date: formatDate(document.reference_date || document.referenceDate),
+      
+      // Financial defaults
+      currency: document.currency || 'AED',
+      tax_treatment: document.tax_treatment || document.taxTreatment || 'taxable',
+      tax_rate: safeNumber(document.tax_rate || document.taxRate || 0.05), // Default 5% VAT
+      
+      // Amounts - handle multiple possible field names
+      subtotal: safeNumber(document.subtotal || document.totalAmount || document.subTotal),
+      tax_amount: safeNumber(document.tax_amount || document.vatAmount || document.taxAmount),
+      total_amount: safeNumber(document.total_amount || document.grandTotal || document.totalAmount),
+      
+      // Payment fields
+      paid_amount: 0,
+      payment_date: "",
+      payment_reference: "",
+      
+      // Attachments
+      attachments: document.attachments || []
+    };
+
+    // Document-specific fields
     if (documentType === 'quotation') {
-      newInvoiceData = {
-        customer_id: document.customer_id || document.customerId, // Handle both field name formats
-        invoice_date: new Date().toISOString().split('T')[0],
-        reference: document.reference,
-        reference_date: document.reference_date || document.referenceDate,
-        status: 'draft',
-        currency: document.currency || 'AED', // Default currency
-        tax_treatment: document.tax_treatment || 'taxable', // Default tax treatment
-        tax_rate: document.tax_rate || 0.05, // Default 5% VAT
-        subtotal: parseFloat(document.subtotal || document.totalAmount || 0),
-        tax_amount: parseFloat(document.tax_amount || document.vatAmount || 0),
-        total_amount: parseFloat(document.total_amount || document.grandTotal || 0),
-        remarks: `Based on Quotation #${document.quotation_number || document.quoteNumber}\n${document.remarks || document.notes || ''}`.trim(),
-        items: document.items ? document.items.map(item => ({ ...item })) : [],
-        paid_amount: 0,
-        payment_date: "",
-        payment_reference: "",
-        attachments: []
-      };
+      const quotationNumber = document.quotation_number || document.quoteNumber || 'Unknown';
+      const notes = document.remarks || document.notes || '';
+      normalizedData.remarks = `Based on Quotation #${quotationNumber}${notes ? '\n' + notes : ''}`.trim();
+      
+      // Handle quotation-specific items
+      normalizedData.items = document.items || document.lineItems || [];
+      
     } else if (documentType === 'delivery_order') {
-      newInvoiceData = {
-        customer_id: document.customer_id, // Ensure customer_id is set
-        invoice_date: new Date().toISOString().split('T')[0],
-        reference: document.reference,
-        reference_date: document.reference_date,
-        status: 'draft',
-        currency: document.currency,
-        tax_treatment: document.tax_treatment,
-        tax_rate: document.tax_rate,
-        subtotal: document.subtotal,
-        tax_amount: document.tax_amount,
-        total_amount: document.total_amount,
-        remarks: `Based on Delivery Order #${document.do_number}\n${document.remarks || ''}`.trim(),
-        items: document.items ? document.items.map(item => ({ ...item })) : [],
-        paid_amount: 0,
-        payment_date: "",
-        payment_reference: "",
-        attachments: []
-      };
+      const doNumber = document.do_number || document.deliveryOrderNumber || 'Unknown';
+      const notes = document.remarks || document.notes || '';
+      normalizedData.remarks = `Based on Delivery Order #${doNumber}${notes ? '\n' + notes : ''}`.trim();
+      
+      // Handle delivery order-specific items
+      normalizedData.items = document.items || document.lineItems || [];
+    }
+
+    // Log the transformation for debugging
+    console.log("✅ Normalized invoice data:", {
+      customer_id: normalizedData.customer_id,
+      reference_date: normalizedData.reference_date,
+      subtotal: normalizedData.subtotal,
+      tax_amount: normalizedData.tax_amount,
+      total_amount: normalizedData.total_amount,
+      remarks: normalizedData.remarks,
+      items_count: normalizedData.items.length
+    });
+
+    return normalizedData;
+  };
+
+  const handleDocumentSelect = async (document, documentType) => {
+    console.log("📄 Document selected for invoice creation:", documentType, document);
+    
+    // Use the robust normalizer
+    const newInvoiceData = normalizeDocumentToInvoice(document, documentType);
+    
+    // Validate critical fields
+    if (!newInvoiceData.customer_id) {
+      console.error("❌ Critical error: customer_id is missing after normalization");
+      toast({
+        title: "Data Error",
+        description: "Could not determine customer for this document. Please check the document data.",
+        variant: "destructive",
+      });
+      return;
     }
     
-    // Ensure the customer_id is properly set before passing to the form
-    console.log("Setting customer_id:", newInvoiceData.customer_id);
+    console.log("🎯 Final invoice data being passed to form:", newInvoiceData);
     
     setEditingInvoice(newInvoiceData);
     setShowCreateFromExistingDialog(false);
