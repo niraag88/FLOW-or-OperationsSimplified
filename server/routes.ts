@@ -1133,6 +1133,17 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  // Get next invoice number (preview only, doesn't increment)
+  app.get('/api/invoices/next-number', requireAuth(), async (req: AuthenticatedRequest, res) => {
+    try {
+      const nextNumber = await businessStorage.getNextInvoiceNumber();
+      res.json({ nextNumber });
+    } catch (error) {
+      console.error('Error getting next invoice number:', error);
+      res.status(500).json({ error: 'Failed to get next invoice number' });
+    }
+  });
+
   // GET /api/delivery-orders
   app.get('/api/delivery-orders', requireAuth(), async (req: AuthenticatedRequest, res) => {
     try {
@@ -1141,6 +1152,17 @@ export async function registerRoutes(app: Express): Promise<Server> {
     } catch (error) {
       console.error('Error fetching delivery orders:', error);
       res.status(500).json({ error: 'Failed to fetch delivery orders' });
+    }
+  });
+
+  // Get next delivery order number (preview only, doesn't increment)
+  app.get('/api/delivery-orders/next-number', requireAuth(), async (req: AuthenticatedRequest, res) => {
+    try {
+      const nextNumber = await businessStorage.getNextDoNumber();
+      res.json({ nextNumber });
+    } catch (error) {
+      console.error('Error getting next delivery order number:', error);
+      res.status(500).json({ error: 'Failed to get next delivery order number' });
     }
   });
 

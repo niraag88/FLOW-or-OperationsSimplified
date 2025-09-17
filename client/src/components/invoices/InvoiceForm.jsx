@@ -90,13 +90,27 @@ export default function InvoiceForm({ open, onClose, editingInvoice, currentUser
         
         // If it's a new invoice from a document, it won't have an ID. Set defaults.
         if (!editingInvoice.id) {
-          const timestamp = Date.now().toString().slice(-6);
-          dataToSet.invoice_number = `INV-${timestamp}`;
+          // Set default values first
           dataToSet.status = 'draft';
           dataToSet.paid_amount = 0;
           dataToSet.payment_date = '';
           dataToSet.payment_reference = '';
           dataToSet.invoice_date = new Date().toISOString().split('T')[0];
+          
+          // Use timestamp as fallback, we'll fetch proper number asynchronously
+          const timestamp = Date.now().toString().slice(-6);
+          dataToSet.invoice_number = `INV-${timestamp}`;
+          
+          // Fetch next invoice number from backend and update
+          fetch('/api/invoices/next-number')
+            .then(response => response.json())
+            .then(({ nextNumber }) => {
+              setFormData(prev => ({ ...prev, invoice_number: nextNumber }));
+            })
+            .catch(error => {
+              console.error('Error fetching next invoice number:', error);
+              // Keep the timestamp fallback
+            });
         } else {
             // If editing an existing invoice, map old statuses to new simplified ones
             // Any status other than 'draft' should be 'submitted'
@@ -107,8 +121,20 @@ export default function InvoiceForm({ open, onClose, editingInvoice, currentUser
         setFormData(dataToSet);
       } else {
         // Creating a completely new blank invoice
+        // Set initial form data with timestamp fallback
         const timestamp = Date.now().toString().slice(-6);
         setFormData(getInitialFormData(`INV-${timestamp}`));
+        
+        // Fetch next invoice number from backend and update
+        fetch('/api/invoices/next-number')
+          .then(response => response.json())
+          .then(({ nextNumber }) => {
+            setFormData(prev => ({ ...prev, invoice_number: nextNumber }));
+          })
+          .catch(error => {
+            console.error('Error fetching next invoice number:', error);
+            // Keep the timestamp fallback
+          });
       }
     }
   }, [open, editingInvoice]);
