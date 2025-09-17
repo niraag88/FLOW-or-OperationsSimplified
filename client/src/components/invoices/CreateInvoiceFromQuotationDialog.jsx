@@ -47,6 +47,8 @@ export default function CreateInvoiceFromQuotationDialog({ open, onClose, onQuot
       
       console.log("Loaded customers:", customersData.length);
       console.log("Loaded submitted quotations:", quotationsData.length);
+      console.log("Sample quotation data:", quotationsData[0]);
+      console.log("Sample customer data:", customersData[0]);
       
       setCustomers(customersData.filter(c => c.isActive !== false));
       setQuotations(quotationsData);
@@ -64,10 +66,23 @@ export default function CreateInvoiceFromQuotationDialog({ open, onClose, onQuot
 
   const handleCustomerChange = (customerId) => {
     console.log("Customer selected:", customerId);
+    console.log("Available quotations:", quotations.length);
+    console.log("Sample quotation customer fields:", quotations[0] ? {
+      customer_id: quotations[0].customer_id,
+      customerId: quotations[0].customerId,
+      customerName: quotations[0].customerName
+    } : "No quotations");
+    
     setSelectedCustomerId(customerId);
     setSelectedQuotationId(''); // Reset quotation selection
-    const customerQuotations = quotations.filter(q => String(q.customer_id) === String(customerId));
+    
+    // Try both field name possibilities
+    const customerQuotations = quotations.filter(q => 
+      String(q.customer_id) === String(customerId) || 
+      String(q.customerId) === String(customerId)
+    );
     console.log("Filtered quotations for customer:", customerQuotations.length);
+    console.log("Filtered quotations:", customerQuotations);
     setFilteredQuotations(customerQuotations);
   };
 
@@ -84,7 +99,7 @@ export default function CreateInvoiceFromQuotationDialog({ open, onClose, onQuot
     setLoading(true);
     try {
       console.log("Fetching selected quotation:", selectedQuotationId);
-      const selectedQuotation = quotations.find(q => q.id === selectedQuotationId);
+      const selectedQuotation = quotations.find(q => String(q.id) === String(selectedQuotationId));
       
       if (!selectedQuotation) {
         throw new Error("Selected quotation not found");
@@ -127,7 +142,7 @@ export default function CreateInvoiceFromQuotationDialog({ open, onClose, onQuot
               </SelectTrigger>
               <SelectContent>
                 {customers.map(c => (
-                  <SelectItem key={c.id} value={c.id}>
+                  <SelectItem key={c.id} value={String(c.id)}>
                     {c.customer_name}
                   </SelectItem>
                 ))}
@@ -148,7 +163,7 @@ export default function CreateInvoiceFromQuotationDialog({ open, onClose, onQuot
               <SelectContent>
                 {filteredQuotations.length > 0 ? (
                   filteredQuotations.map(q => (
-                    <SelectItem key={q.id} value={q.id}>
+                    <SelectItem key={q.id} value={String(q.id)}>
                       {q.quotation_number} - {q.currency} {q.total_amount.toFixed(2)}
                     </SelectItem>
                   ))

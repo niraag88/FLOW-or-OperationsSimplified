@@ -81,14 +81,16 @@ export default function CreateFromExistingDialog({ open, onClose, onDocumentSele
   const handleQuotationCustomerChange = (customerId) => {
     setQuotationCustomerId(customerId);
     setSelectedQuotationId('');
-    const customerQuotations = quotations.filter(q => String(q.customer_id) === String(customerId));
+    const cid = String(customerId);
+    const customerQuotations = quotations.filter(q => String(q.customer_id ?? q.customerId) === cid);
     setFilteredQuotations(customerQuotations);
   };
 
   const handleInvoiceCustomerChange = (customerId) => {
     setInvoiceCustomerId(customerId);
     setSelectedInvoiceId('');
-    const customerInvoices = invoices.filter(i => String(i.customer_id) === String(customerId));
+    const cid = String(customerId);
+    const customerInvoices = invoices.filter(i => String(i.customer_id ?? i.customerId) === cid);
     setFilteredInvoices(customerInvoices);
   };
 
