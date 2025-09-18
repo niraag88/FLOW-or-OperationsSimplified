@@ -111,8 +111,10 @@ export default function Invoices() {
   };
 
   // Robust document-to-invoice normalizer function
-  const normalizeDocumentToInvoice = (document, documentType) => {
+  const normalizeDocumentToInvoice = (document, documentType, dropdownData = {}) => {
     console.log("🔄 Normalizing document:", documentType, document);
+    
+    const { availableCustomers = [], availableBrands = [], availableProducts = [] } = dropdownData;
     
     // Helper function to safely get numeric value
     const safeNumber = (value) => {
@@ -137,9 +139,18 @@ export default function Invoices() {
     };
 
     // Extract common fields with fallbacks for both camelCase and snake_case
+    const rawCustomerId = document.customer_id || document.customerId;
+    
+    // Validate customer exists in current dropdown options
+    const validCustomer = availableCustomers.find(c => c.id === rawCustomerId);
+    if (!validCustomer && rawCustomerId) {
+      console.warn(`⚠️ Customer ID ${rawCustomerId} not found in current customers. Available:`, 
+        availableCustomers.map(c => ({ id: c.id, name: c.name || c.customer_name })));
+    }
+    
     const normalizedData = {
-      // Customer ID - critical field for form functionality
-      customer_id: document.customer_id || document.customerId || null,
+      // Customer ID - only use if it exists in current dropdown options
+      customer_id: validCustomer ? rawCustomerId : null,
       
       // Invoice metadata
       invoice_date: new Date().toISOString().split('T')[0],
@@ -176,16 +187,36 @@ export default function Invoices() {
       
       // Handle quotation-specific items - map field names to what InvoiceForm expects
       const quotationItems = document.items || document.lineItems || [];
-      normalizedData.items = quotationItems.map(item => ({
-        product_id: item.productId || item.product_id || null,
-        brand_id: item.brandId || item.brand_id || null, // Extract from productId lookup if needed
-        brand_name: item.brandName || item.brand_name || '',
-        product_code: item.productCode || item.product_code || '',
-        description: item.description || '',
-        quantity: parseInt(item.quantity) || 0,
-        unit_price: parseFloat(item.unitPrice || item.unit_price) || 0,
-        line_total: parseFloat(item.lineTotal || item.line_total) || 0
-      }));
+      normalizedData.items = quotationItems.map(item => {
+        const productId = item.productId || item.product_id;
+        const brandName = item.brandName || item.brand_name;
+        
+        // Lookup brand_id from brand name
+        let brandId = item.brandId || item.brand_id;
+        if (!brandId && brandName && availableBrands.length > 0) {
+          const foundBrand = availableBrands.find(b => 
+            b.name && b.name.toLowerCase() === brandName.toLowerCase()
+          );
+          if (foundBrand) {
+            brandId = foundBrand.id;
+            console.log(`✅ Mapped brand "${brandName}" to ID ${brandId}`);
+          } else {
+            console.warn(`⚠️ Brand "${brandName}" not found in available brands:`, 
+              availableBrands.map(b => b.name));
+          }
+        }
+        
+        return {
+          product_id: productId,
+          brand_id: brandId,
+          brand_name: brandName,
+          product_code: item.productCode || item.product_code || '',
+          description: item.description || '',
+          quantity: parseInt(item.quantity) || 0,
+          unit_price: parseFloat(item.unitPrice || item.unit_price) || 0,
+          line_total: parseFloat(item.lineTotal || item.line_total) || 0
+        };
+      });
       
     } else if (documentType === 'delivery_order') {
       const doNumber = document.do_number || document.deliveryOrderNumber || 'Unknown';
@@ -238,19 +269,24 @@ export default function Invoices() {
         }
       }
       
-      // Use the robust normalizer with full document data
-      const newInvoiceData = normalizeDocumentToInvoice(fullDocument, documentType);
+      // Load current dropdown data for validation and mapping
+      const [currentCustomers, currentBrands, currentProducts] = await Promise.all([
+        Customer.list().catch(() => []),
+        Brand.list().catch(() => []),
+        Product.list().catch(() => [])
+      ]);
       
-      // Validate critical fields
-      if (!newInvoiceData.customer_id) {
-        console.error("❌ Critical error: customer_id is missing after normalization");
-        toast({
-          title: "Data Error",
-          description: "Could not determine customer for this document. Please check the document data.",
-          variant: "destructive",
-        });
-        return;
-      }
+      console.log("🔍 Current dropdown data:", {
+        customers: currentCustomers.map(c => ({ id: c.id, name: c.name || c.customer_name })),
+        brands: currentBrands.map(b => ({ id: b.id, name: b.name }))
+      });
+      
+      // Use the robust normalizer with full document data and validation
+      const newInvoiceData = normalizeDocumentToInvoice(fullDocument, documentType, {
+        availableCustomers: currentCustomers,
+        availableBrands: currentBrands,
+        availableProducts: currentProducts
+      });
       
       console.log("🎯 Final invoice data being passed to form:", newInvoiceData);
       
