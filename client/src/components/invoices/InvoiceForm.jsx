@@ -260,7 +260,7 @@ export default function InvoiceForm({ open, onClose, editingInvoice, currentUser
 
   const getFilteredProducts = (brandId) => {
     if (!brandId) return [];
-    return products.filter(product => product.brandId === brandId);
+    return products.filter(product => Number(product.brand_id ?? product.brandId) === Number(brandId));
   };
 
   const removeItem = (index) => {
@@ -459,7 +459,7 @@ export default function InvoiceForm({ open, onClose, editingInvoice, currentUser
                       <div className="space-y-2">
                         <Label>Brand</Label>
                         <Select 
-                          value={item.brand_id || ''} 
+                          value={item.brand_id ? String(item.brand_id) : ''} 
                           onValueChange={(v) => updateItem(index, 'brand_id', v)} 
                           disabled={!isCurrentlyEditable}
                         >
@@ -477,7 +477,7 @@ export default function InvoiceForm({ open, onClose, editingInvoice, currentUser
                       <div className="space-y-2">
                         <Label>Product</Label>
                         <Select 
-                          value={item.product_id || ''} 
+                          value={item.product_id ? String(item.product_id) : ''} 
                           onValueChange={(v) => updateItem(index, 'product_id', v)} 
                           disabled={!isCurrentlyEditable || !item.brand_id}
                         >
