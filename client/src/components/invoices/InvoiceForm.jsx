@@ -211,9 +211,12 @@ export default function InvoiceForm({ open, onClose, editingInvoice, currentUser
       value = parseInt(value);
     }
     
+    // Check if brand_id is actually changing to prevent clearing during form initialization
+    const isChangingBrand = field === 'brand_id' && newItems[index].brand_id !== value;
+    
     newItems[index] = { ...newItems[index], [field]: value };
 
-    if (field === 'brand_id') {
+    if (isChangingBrand) {
       const brand = brands.find(b => b.id === value);
       newItems[index] = {
         ...newItems[index],
@@ -223,6 +226,13 @@ export default function InvoiceForm({ open, onClose, editingInvoice, currentUser
         description: "",
         unit_price: 0,
         line_total: 0
+      };
+    } else if (field === 'brand_id') {
+      // Just update brand_name without clearing other fields
+      const brand = brands.find(b => b.id === value);
+      newItems[index] = {
+        ...newItems[index],
+        brand_name: brand?.name || "",
       };
     }
 
