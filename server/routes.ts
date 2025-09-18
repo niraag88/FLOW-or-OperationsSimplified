@@ -4,7 +4,7 @@ import { storage } from "./storage";
 import { businessStorage } from "./businessStorage";
 import { Client } from '@replit/object-storage';
 import { invoices, deliveryOrders, auditLog, users, type InsertAuditLog, type InsertUser, type UpdateUser, type User } from "@shared/schema";
-import { insertBrandSchema, insertSupplierSchema, insertCustomerSchema, insertProductSchema, insertPurchaseOrderSchema, insertQuotationSchema, stockCounts, stockCountItems, goodsReceipts, goodsReceiptItems, stockMovements, products, purchaseOrders, purchaseOrderItems, enhancedInvoices, invoiceItems, suppliers, brands, quotations, quotationItems, customers } from "@shared/schema";
+import { insertBrandSchema, insertSupplierSchema, insertCustomerSchema, insertProductSchema, insertPurchaseOrderSchema, insertQuotationSchema, insertInvoiceSchema, stockCounts, stockCountItems, goodsReceipts, goodsReceiptItems, stockMovements, products, purchaseOrders, purchaseOrderItems, enhancedInvoices, invoiceItems, suppliers, brands, quotations, quotationItems, customers } from "@shared/schema";
 import { db } from "./db";
 import { eq, desc } from "drizzle-orm";
 import pkg from 'pg';
@@ -1141,6 +1141,34 @@ export async function registerRoutes(app: Express): Promise<Server> {
     } catch (error) {
       console.error('Error getting next invoice number:', error);
       res.status(500).json({ error: 'Failed to get next invoice number' });
+    }
+  });
+
+  // POST /api/invoices - Create new invoice
+  app.post('/api/invoices', requireAuth(['Admin', 'Manager']), async (req: AuthenticatedRequest, res) => {
+    try {
+      // Basic invoice data structure for the database
+      const invoiceData = {
+        invoiceNumber: req.body.invoice_number,
+        customerName: req.body.customer_name || 'Unknown Customer',
+        amount: req.body.total_amount || 0,
+        status: req.body.status || 'draft',
+        createdBy: req.user!.id,
+        objectKey: null,
+        scanKey: null
+      };
+      
+      console.log('Creating invoice with data:', invoiceData);
+      const invoice = await businessStorage.createInvoice(invoiceData);
+      
+      res.status(201).json(invoice);
+    } catch (error) {
+      console.error('Error creating invoice:', error);
+      if (error instanceof Error) {
+        res.status(400).json({ error: error.message });
+      } else {
+        res.status(500).json({ error: 'Failed to create invoice' });
+      }
     }
   });
 
