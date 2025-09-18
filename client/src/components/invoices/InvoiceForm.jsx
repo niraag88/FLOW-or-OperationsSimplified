@@ -374,7 +374,7 @@ export default function InvoiceForm({ open, onClose, editingInvoice, currentUser
                 <SelectContent>
                   {customers.map(c => (
                     <SelectItem key={c.id} value={c.id.toString()}>
-                      {c.customer_name} ({c.type})
+                      {c.customer_name || c.name} ({c.type})
                     </SelectItem>
                   ))}
                 </SelectContent>

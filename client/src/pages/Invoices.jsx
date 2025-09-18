@@ -174,16 +174,36 @@ export default function Invoices() {
       const notes = document.remarks || document.notes || '';
       normalizedData.remarks = `Based on Quotation #${quotationNumber}${notes ? '\n' + notes : ''}`.trim();
       
-      // Handle quotation-specific items
-      normalizedData.items = document.items || document.lineItems || [];
+      // Handle quotation-specific items - map field names to what InvoiceForm expects
+      const quotationItems = document.items || document.lineItems || [];
+      normalizedData.items = quotationItems.map(item => ({
+        product_id: item.productId || item.product_id || null,
+        brand_id: item.brandId || item.brand_id || null, // Extract from productId lookup if needed
+        brand_name: item.brandName || item.brand_name || '',
+        product_code: item.productCode || item.product_code || '',
+        description: item.description || '',
+        quantity: parseInt(item.quantity) || 0,
+        unit_price: parseFloat(item.unitPrice || item.unit_price) || 0,
+        line_total: parseFloat(item.lineTotal || item.line_total) || 0
+      }));
       
     } else if (documentType === 'delivery_order') {
       const doNumber = document.do_number || document.deliveryOrderNumber || 'Unknown';
       const notes = document.remarks || document.notes || '';
       normalizedData.remarks = `Based on Delivery Order #${doNumber}${notes ? '\n' + notes : ''}`.trim();
       
-      // Handle delivery order-specific items
-      normalizedData.items = document.items || document.lineItems || [];
+      // Handle delivery order-specific items - map field names to what InvoiceForm expects
+      const deliveryOrderItems = document.items || document.lineItems || [];
+      normalizedData.items = deliveryOrderItems.map(item => ({
+        product_id: item.productId || item.product_id || null,
+        brand_id: item.brandId || item.brand_id || null,
+        brand_name: item.brandName || item.brand_name || '',
+        product_code: item.productCode || item.product_code || '',
+        description: item.description || '',
+        quantity: parseInt(item.quantity) || 0,
+        unit_price: parseFloat(item.unitPrice || item.unit_price) || 0,
+        line_total: parseFloat(item.lineTotal || item.line_total) || 0
+      }));
     }
 
     // Log the transformation for debugging
