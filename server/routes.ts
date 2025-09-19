@@ -1125,8 +1125,9 @@ export async function registerRoutes(app: Express): Promise<Server> {
   // GET /api/invoices
   app.get('/api/invoices', requireAuth(), async (req: AuthenticatedRequest, res) => {
     try {
-      const invoices = await businessStorage.getInvoices();
-      res.json(invoices);
+      // Use enhanced invoices for full functionality
+      const enhancedInvoices = await businessStorage.getEnhancedInvoices();
+      res.json(enhancedInvoices);
     } catch (error) {
       console.error('Error fetching invoices:', error);
       res.status(500).json({ error: 'Failed to fetch invoices' });
@@ -1144,7 +1145,37 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  // POST /api/invoices - Create new invoice
+  // POST /api/invoices/from-quotation - Create invoice from quotation
+  app.post('/api/invoices/from-quotation', requireAuth(['Admin', 'Manager']), async (req: AuthenticatedRequest, res) => {
+    try {
+      const { quotationId } = req.body;
+      
+      if (!quotationId) {
+        return res.status(400).json({ error: 'Quotation ID is required' });
+      }
+      
+      // Generate unique invoice number
+      const nextNumber = await businessStorage.generateInvoiceNumber();
+      
+      console.log('Creating enhanced invoice from quotation:', quotationId);
+      const invoice = await businessStorage.createEnhancedInvoiceFromQuotation(
+        quotationId, 
+        nextNumber, 
+        req.user!.id
+      );
+      
+      res.status(201).json(invoice);
+    } catch (error) {
+      console.error('Error creating invoice from quotation:', error);
+      if (error instanceof Error) {
+        res.status(400).json({ error: error.message });
+      } else {
+        res.status(500).json({ error: 'Failed to create invoice' });
+      }
+    }
+  });
+
+  // POST /api/invoices - Create new invoice (basic)
   app.post('/api/invoices', requireAuth(['Admin', 'Manager']), async (req: AuthenticatedRequest, res) => {
     try {
       // Generate unique invoice number (and increment the counter)
@@ -1154,7 +1185,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       let customerName = 'Unknown Customer';
       if (req.body.customer_id) {
         const customer = await businessStorage.getCustomerById(req.body.customer_id);
-        customerName = customer?.name || customer?.customer_name || 'Unknown Customer';
+        customerName = customer?.name || 'Unknown Customer';
       }
       
       // Basic invoice data structure for the database
@@ -1168,7 +1199,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
         scanKey: null
       };
       
-      console.log('Creating invoice with data:', invoiceData);
+      console.log('Creating basic invoice with data:', invoiceData);
       const invoice = await businessStorage.createInvoice(invoiceData);
       
       res.status(201).json(invoice);

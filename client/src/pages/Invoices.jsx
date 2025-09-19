@@ -256,19 +256,41 @@ export default function Invoices() {
     console.log("📄 Document selected for invoice creation:", documentType, document);
     
     try {
-      let fullDocument = document;
-      
-      // For quotations, fetch the complete data with line items
+      // For quotations, use the new enhanced invoice endpoint
       if (documentType === 'quotation') {
-        console.log("🔍 Fetching full quotation with line items for ID:", document.id);
-        const response = await fetch(`/api/quotations/${document.id}`);
+        const response = await fetch('/api/invoices/from-quotation', {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+          },
+          body: JSON.stringify({
+            quotationId: document.id
+          })
+        });
+
         if (response.ok) {
-          fullDocument = await response.json();
-          console.log("✅ Full quotation data retrieved:", fullDocument);
+          const createdInvoice = await response.json();
+          console.log("✅ Enhanced invoice created:", createdInvoice);
+          
+          // Refresh the invoice list to show the new invoice
+          handleRefresh();
+          
+          toast({
+            title: "Success",
+            description: `Invoice ${createdInvoice.invoiceNumber} created successfully from quotation.`,
+            variant: "default",
+          });
+          
+          setShowCreateFromExistingDialog(false);
+          return;
         } else {
-          console.warn("⚠️ Failed to fetch full quotation, using basic data");
+          const error = await response.json();
+          throw new Error(error.error || 'Failed to create invoice');
         }
       }
+      
+      // Legacy path for delivery orders (keep existing logic)
+      let fullDocument = document;
       
       // Load current dropdown data for validation and mapping
       const [currentCustomers, currentBrands, currentProducts] = await Promise.all([
@@ -299,7 +321,7 @@ export default function Invoices() {
       console.error("❌ Error processing document selection:", error);
       toast({
         title: "Error",
-        description: "Failed to process the selected document. Please try again.",
+        description: error.message || "Failed to process the selected document. Please try again.",
         variant: "destructive",
       });
     }

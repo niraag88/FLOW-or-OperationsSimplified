@@ -4,7 +4,7 @@ import {
   brands, suppliers, customers, products, purchaseOrders, quotations,
   vatReturns, companySettings, purchaseOrderItems, quotationItems,
   stockCounts, stockCountItems, users, goodsReceipts, goodsReceiptItems,
-  invoices, deliveryOrders,
+  invoices, deliveryOrders, enhancedInvoices, invoiceItems,
   type Brand, type Supplier, type Customer, type Product, 
   type PurchaseOrder, type Quotation, type VatReturn, type CompanySettings,
   type StockCount, type StockCountItem, type Invoice, type DeliveryOrder,
@@ -777,6 +777,79 @@ export class BusinessStorage {
   async deleteInvoice(id: number) {
     const [deletedInvoice] = await db.delete(invoices).where(eq(invoices.id, id)).returning();
     return deletedInvoice;
+  }
+
+  // Enhanced Invoice operations
+  async getEnhancedInvoices() {
+    return await db.select().from(enhancedInvoices).orderBy(desc(enhancedInvoices.createdAt));
+  }
+
+  async getEnhancedInvoiceById(id: number) {
+    const [invoice] = await db.select().from(enhancedInvoices).where(eq(enhancedInvoices.id, id));
+    return invoice;
+  }
+
+  async getEnhancedInvoiceWithItems(id: number) {
+    const invoice = await this.getEnhancedInvoiceById(id);
+    if (!invoice) return null;
+    
+    const items = await db.select().from(invoiceItems).where(eq(invoiceItems.invoiceId, id));
+    return { ...invoice, items };
+  }
+
+  async createEnhancedInvoiceFromQuotation(quotationId: number, invoiceNumber: string, createdBy: string) {
+    // Get the full quotation with items
+    const quotation = await this.getQuotationWithItems(quotationId);
+    if (!quotation) {
+      throw new Error('Quotation not found');
+    }
+
+    // Get customer details
+    const customer = await this.getCustomerById(quotation.customerId);
+    
+    // Create enhanced invoice
+    const dueDate = new Date();
+    dueDate.setDate(dueDate.getDate() + 30); // Default 30 days payment terms
+
+    const enhancedInvoiceData = {
+      invoiceNumber,
+      customerId: quotation.customerId,
+      customerName: customer?.name || 'Unknown Customer',
+      quoteId: quotation.id,
+      status: 'draft' as const,
+      invoiceDate: new Date(),
+      dueDate: dueDate,
+      reference: quotation.reference || null,
+      referenceDate: quotation.referenceDate || null,
+      totalAmount: quotation.totalAmount,
+      vatAmount: quotation.vatAmount,
+      grandTotal: quotation.grandTotal,
+      paidAmount: '0.00',
+      currency: 'AED',
+      notes: quotation.notes || null,
+      paymentTerms: quotation.terms || 'Net 30',
+      createdBy,
+    };
+
+    const [invoice] = await db.insert(enhancedInvoices).values(enhancedInvoiceData).returning();
+
+    // Create invoice items from quotation items
+    if (quotation.items && quotation.items.length > 0) {
+      const invoiceItemsData = quotation.items.map((item) => ({
+        invoiceId: invoice.id,
+        productId: item.productId,
+        description: item.description || '',
+        quantity: item.quantity,
+        unitPrice: item.unitPrice,
+        discount: item.discount || '0.00',
+        vatRate: item.vatRate || '0.00',
+        lineTotal: item.lineTotal,
+      }));
+
+      await db.insert(invoiceItems).values(invoiceItemsData);
+    }
+
+    return await this.getEnhancedInvoiceWithItems(invoice.id);
   }
 
   // Delivery Order operations

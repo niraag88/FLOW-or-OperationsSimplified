@@ -266,11 +266,13 @@ export const enhancedInvoices = pgTable("enhanced_invoices", {
   status: text("status").notNull().default("draft"), // draft, sent, paid, overdue, cancelled
   invoiceDate: timestamp("invoice_date").defaultNow().notNull(),
   dueDate: timestamp("due_date").notNull(),
+  reference: text("reference"), // Reference from quotation
+  referenceDate: timestamp("reference_date"), // Reference date from quotation
   totalAmount: decimal("total_amount", { precision: 10, scale: 2 }).default("0.00"),
   vatAmount: decimal("vat_amount", { precision: 10, scale: 2 }).default("0.00"),
   grandTotal: decimal("grand_total", { precision: 10, scale: 2 }).default("0.00"),
   paidAmount: decimal("paid_amount", { precision: 10, scale: 2 }).default("0.00"),
-  currency: text("currency").default("USD"),
+  currency: text("currency").default("AED"), // Default to AED for UAE
   notes: text("notes"),
   paymentTerms: text("payment_terms"),
   objectKey: text("object_key"), // Storage key for uploaded PDF
