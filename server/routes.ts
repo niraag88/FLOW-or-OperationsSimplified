@@ -1147,10 +1147,20 @@ export async function registerRoutes(app: Express): Promise<Server> {
   // POST /api/invoices - Create new invoice
   app.post('/api/invoices', requireAuth(['Admin', 'Manager']), async (req: AuthenticatedRequest, res) => {
     try {
+      // Generate unique invoice number (and increment the counter)
+      const nextNumber = await businessStorage.generateInvoiceNumber();
+      
+      // Look up customer name from customer_id
+      let customerName = 'Unknown Customer';
+      if (req.body.customer_id) {
+        const customer = await businessStorage.getCustomerById(req.body.customer_id);
+        customerName = customer?.name || customer?.customer_name || 'Unknown Customer';
+      }
+      
       // Basic invoice data structure for the database
       const invoiceData = {
-        invoiceNumber: req.body.invoice_number,
-        customerName: req.body.customer_name || 'Unknown Customer',
+        invoiceNumber: nextNumber,
+        customerName: customerName,
         amount: req.body.total_amount || 0,
         status: req.body.status || 'draft',
         createdBy: req.user!.id,
