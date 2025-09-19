@@ -146,7 +146,7 @@ export default function InvoiceForm({ open, onClose, editingInvoice, currentUser
           });
       }
     }
-  }, [open, editingInvoice]);
+  }, [open, editingInvoice, customers, brands, products]);
 
   useEffect(() => {
     // Effect to update the selected customer object whenever the customer_id in formData changes
