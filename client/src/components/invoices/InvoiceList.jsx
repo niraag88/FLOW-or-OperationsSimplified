@@ -29,7 +29,8 @@ export default function InvoiceList({ invoices, loading, canEdit, canOverride, c
   const getStatusColor = (status) => {
     switch (status?.toLowerCase()) {
       case 'draft': return 'bg-gray-100 text-gray-800';
-      case 'submitted': return 'bg-blue-100 text-blue-800';
+      case 'submitted':
+      case 'sent': return 'bg-blue-100 text-blue-800';
       case 'delivered': return 'bg-green-100 text-green-800';
       default: return 'bg-gray-100 text-gray-800';
     }
@@ -123,18 +124,18 @@ export default function InvoiceList({ invoices, loading, canEdit, canOverride, c
                   
                   return (
                     <TableRow key={invoice.id} className="hover:bg-gray-50">
-                      <TableCell className="font-medium">{invoice.invoice_number}</TableCell>
+                      <TableCell className="font-medium">{invoice.invoiceNumber || invoice.invoice_number || '-'}</TableCell>
                       <TableCell>{getCustomerName(invoice)}</TableCell>
-                      <TableCell>{formatDate(invoice.invoice_date)}</TableCell>
+                      <TableCell>{formatDate(invoice.invoiceDate || invoice.invoice_date || invoice.createdAt)}</TableCell>
                       <TableCell>{invoice.reference || '-'}</TableCell>
                       <TableCell>
-                        {formatCurrency(invoice.subtotal || 0, invoice.currency)}
+                        {formatCurrency(invoice.subtotal || (invoice.totalAmount && invoice.taxAmount ? invoice.totalAmount - invoice.taxAmount : 0), invoice.currency)}
                       </TableCell>
                       <TableCell>
-                        {formatCurrency(invoice.tax_amount || 0, invoice.currency)}
+                        {formatCurrency(invoice.tax_amount || invoice.taxAmount || invoice.vatAmount || 0, invoice.currency)}
                       </TableCell>
                       <TableCell>
-                        {formatCurrency(invoice.total_amount || 0, invoice.currency)}
+                        {formatCurrency(invoice.total_amount || invoice.totalAmount || invoice.amount || 0, invoice.currency)}
                       </TableCell>
                       <TableCell>
                         <Badge className={`${getStatusColor(invoice.status)} border`}>
@@ -167,7 +168,7 @@ export default function InvoiceList({ invoices, loading, canEdit, canOverride, c
                 <Card key={invoice.id} className="p-4">
                   <div className="flex items-start justify-between mb-3">
                     <div>
-                      <h3 className="font-semibold text-gray-900">{invoice.invoice_number}</h3>
+                      <h3 className="font-semibold text-gray-900">{invoice.invoiceNumber || invoice.invoice_number || '-'}</h3>
                       <p className="text-sm text-gray-600">{getCustomerName(invoice)}</p>
                     </div>
                     <div className="flex flex-col gap-2">
@@ -181,7 +182,7 @@ export default function InvoiceList({ invoices, loading, canEdit, canOverride, c
                   <div className="grid grid-cols-2 gap-4 text-sm mb-4">
                     <div>
                       <p className="text-gray-500">Invoice Date</p>
-                      <p className="font-medium">{formatDate(invoice.invoice_date)}</p>
+                      <p className="font-medium">{formatDate(invoice.invoiceDate || invoice.invoice_date || invoice.createdAt)}</p>
                     </div>
                     <div>
                       <p className="text-gray-500">Reference</p>
@@ -189,15 +190,15 @@ export default function InvoiceList({ invoices, loading, canEdit, canOverride, c
                     </div>
                     <div>
                       <p className="text-gray-500">Subtotal</p>
-                      <p className="font-medium">{formatCurrency(invoice.subtotal || 0, invoice.currency)}</p>
+                      <p className="font-medium">{formatCurrency(invoice.subtotal || (invoice.totalAmount && invoice.taxAmount ? invoice.totalAmount - invoice.taxAmount : 0), invoice.currency)}</p>
                     </div>
                     <div>
                       <p className="text-gray-500">VAT</p>
-                      <p className="font-medium">{formatCurrency(invoice.tax_amount || 0, invoice.currency)}</p>
+                      <p className="font-medium">{formatCurrency(invoice.tax_amount || invoice.taxAmount || invoice.vatAmount || 0, invoice.currency)}</p>
                     </div>
                     <div>
                       <p className="text-gray-500">Total</p>
-                      <p className="font-medium">{formatCurrency(invoice.total_amount || 0, invoice.currency)}</p>
+                      <p className="font-medium">{formatCurrency(invoice.total_amount || invoice.totalAmount || invoice.amount || 0, invoice.currency)}</p>
                     </div>
                   </div>
 

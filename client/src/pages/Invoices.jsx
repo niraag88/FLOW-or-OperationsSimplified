@@ -428,28 +428,6 @@ export default function Invoices() {
         </div>
       </div>
 
-      {/* AED Totals Summary - Single Currency */}
-      {filteredInvoices.length > 0 && (
-        <div className="bg-purple-50 border border-purple-200 rounded-lg p-6">
-          <div className="text-center">
-            <h3 className="font-semibold text-purple-900 mb-4">AED Summary</h3>
-            <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-              <div>
-                <p className="text-gray-600">Total Invoiced</p>
-                <p className="font-bold text-2xl text-gray-900">{totals.total.toFixed(2)} AED</p>
-              </div>
-              <div>
-                <p className="text-gray-600">Paid Amount</p>
-                <p className="font-bold text-2xl text-green-600">{totals.paid.toFixed(2)} AED</p>
-              </div>
-              <div>
-                <p className="font-bold text-2xl text-amber-600">Outstanding</p>
-                <p className="font-bold text-2xl text-amber-600">{totals.outstanding.toFixed(2)} AED</p>
-              </div>
-            </div>
-          </div>
-        </div>
-      )}
 
       {/* Search and Filters */}
       <div className="flex flex-col sm:flex-row gap-4">
