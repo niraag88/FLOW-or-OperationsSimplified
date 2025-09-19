@@ -92,6 +92,7 @@ export default function Invoices() {
   }, [customers]);
 
   const handleRefresh = () => {
+    console.log('🔄 handleRefresh called - triggering data reload');
     setRefreshTrigger(prev => prev + 1);
   };
 
