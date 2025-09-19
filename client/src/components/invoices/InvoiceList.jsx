@@ -129,10 +129,18 @@ export default function InvoiceList({ invoices, loading, canEdit, canOverride, c
                       <TableCell>{formatDate(invoice.invoiceDate || invoice.invoice_date || invoice.createdAt)}</TableCell>
                       <TableCell>{invoice.reference || '-'}</TableCell>
                       <TableCell>
-                        {formatCurrency(invoice.subtotal || (invoice.totalAmount && invoice.taxAmount ? invoice.totalAmount - invoice.taxAmount : 0), invoice.currency)}
+                        {(() => {
+                          const total = invoice.total_amount || invoice.totalAmount || invoice.amount || 0;
+                          const tax = invoice.tax_amount || invoice.taxAmount || invoice.vatAmount || 0;
+                          const subtotal = invoice.subtotal || (total && tax ? total - tax : total);
+                          return subtotal ? formatCurrency(subtotal, invoice.currency) : '-';
+                        })()}
                       </TableCell>
                       <TableCell>
-                        {formatCurrency(invoice.tax_amount || invoice.taxAmount || invoice.vatAmount || 0, invoice.currency)}
+                        {(() => {
+                          const tax = invoice.tax_amount || invoice.taxAmount || invoice.vatAmount || 0;
+                          return tax ? formatCurrency(tax, invoice.currency) : '-';
+                        })()}
                       </TableCell>
                       <TableCell>
                         {formatCurrency(invoice.total_amount || invoice.totalAmount || invoice.amount || 0, invoice.currency)}
@@ -190,11 +198,19 @@ export default function InvoiceList({ invoices, loading, canEdit, canOverride, c
                     </div>
                     <div>
                       <p className="text-gray-500">Subtotal</p>
-                      <p className="font-medium">{formatCurrency(invoice.subtotal || (invoice.totalAmount && invoice.taxAmount ? invoice.totalAmount - invoice.taxAmount : 0), invoice.currency)}</p>
+                      <p className="font-medium">{(() => {
+                        const total = invoice.total_amount || invoice.totalAmount || invoice.amount || 0;
+                        const tax = invoice.tax_amount || invoice.taxAmount || invoice.vatAmount || 0;
+                        const subtotal = invoice.subtotal || (total && tax ? total - tax : total);
+                        return subtotal ? formatCurrency(subtotal, invoice.currency) : '-';
+                      })()}</p>
                     </div>
                     <div>
                       <p className="text-gray-500">VAT</p>
-                      <p className="font-medium">{formatCurrency(invoice.tax_amount || invoice.taxAmount || invoice.vatAmount || 0, invoice.currency)}</p>
+                      <p className="font-medium">{(() => {
+                        const tax = invoice.tax_amount || invoice.taxAmount || invoice.vatAmount || 0;
+                        return tax ? formatCurrency(tax, invoice.currency) : '-';
+                      })()}</p>
                     </div>
                     <div>
                       <p className="text-gray-500">Total</p>
