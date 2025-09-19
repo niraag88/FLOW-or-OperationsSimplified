@@ -87,6 +87,13 @@ export default function InvoiceForm({ open, onClose, editingInvoice, currentUser
           attachments: editingInvoice.attachments || [],
         };
         
+        console.log('🔧 InvoiceForm - Form initialization:', {
+          editingInvoice_customer_id: editingInvoice.customer_id,
+          dataToSet_customer_id: dataToSet.customer_id,
+          dataToSet_invoice_number: dataToSet.invoice_number,
+          hasId: !!editingInvoice.id
+        });
+        
         // If it's a new invoice from a document, it won't have an ID. Set defaults.
         if (!editingInvoice.id) {
           // Set default values first
@@ -115,6 +122,12 @@ export default function InvoiceForm({ open, onClose, editingInvoice, currentUser
             }
         }
         setFormData(dataToSet);
+        
+        console.log('🔧 InvoiceForm - After setFormData:', {
+          final_customer_id: dataToSet.customer_id,
+          final_invoice_number: dataToSet.invoice_number,
+          final_status: dataToSet.status
+        });
       } else {
         // Creating a completely new blank invoice
         // Set initial form data with timestamp fallback
