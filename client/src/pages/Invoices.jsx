@@ -310,17 +310,27 @@ export default function Invoices() {
   const canOverride = true;
 
   const filteredInvoices = invoices.filter(invoice => {
-    const matchesSearch = invoice.invoice_number?.toLowerCase().includes(searchTerm.toLowerCase()) ||
-                         invoice.notes?.toLowerCase().includes(searchTerm.toLowerCase());
+    // Normalize field names (backend returns camelCase, frontend expects snake_case)
+    const invoiceNumber = invoice.invoiceNumber || invoice.invoice_number;
+    const customerName = invoice.customerName || invoice.customer_name;
+    const notes = invoice.notes || invoice.remarks;
+    const status = invoice.status;
+    const customerId = invoice.customerId || invoice.customer_id;
+    const taxTreatment = invoice.taxTreatment || invoice.tax_treatment;
     
-    const matchesStatus = selectedStatuses.length === 0 || selectedStatuses.includes(invoice.status);
-    const matchesCustomer = selectedCustomers.length === 0 || selectedCustomers.includes(invoice.customer_id);
-    const matchesTaxTreatment = selectedTaxTreatments.length === 0 || selectedTaxTreatments.includes(invoice.tax_treatment);
+    const matchesSearch = searchTerm === '' || 
+                         invoiceNumber?.toLowerCase().includes(searchTerm.toLowerCase()) ||
+                         customerName?.toLowerCase().includes(searchTerm.toLowerCase()) ||
+                         notes?.toLowerCase().includes(searchTerm.toLowerCase());
+    
+    const matchesStatus = selectedStatuses.length === 0 || selectedStatuses.includes(status);
+    const matchesCustomer = selectedCustomers.length === 0 || selectedCustomers.includes(String(customerId));
+    const matchesTaxTreatment = selectedTaxTreatments.length === 0 || selectedTaxTreatments.includes(taxTreatment);
     
     // Date range filtering
     let matchesDateRange = true;
     if (dateRange !== "all") {
-      const invoiceDate = new Date(invoice.invoice_date);
+      const invoiceDate = new Date(invoice.invoiceDate || invoice.invoice_date || invoice.createdAt);
       const today = new Date();
       const startOfToday = new Date(today.getFullYear(), today.getMonth(), today.getDate());
       
