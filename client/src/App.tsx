@@ -28,6 +28,7 @@ import Print from "@/pages/Print.jsx";
 import Quotations from "@/pages/Quotations.jsx";
 import POPrintView from "@/components/purchase-orders/POPrintView.jsx";
 import QuotationPrintView from "@/components/quotations/QuotationPrintView.jsx";
+import InvoicePrintView from "@/components/invoices/InvoicePrintView.jsx";
 import DOPrintView from "@/components/delivery-orders/DOPrintView.jsx";
 import PrintSandboxPage from "@/pages/PrintSandboxPage.jsx";
 
@@ -170,6 +171,11 @@ function PagesContent() {
       <Route path="/quotations/:id/print" element={
         <ProtectedRoute>
           <QuotationPrintView />
+        </ProtectedRoute>
+      } />
+      <Route path="/invoices/:id/print" element={
+        <ProtectedRoute>
+          <InvoicePrintView />
         </ProtectedRoute>
       } />
       <Route path="/delivery-orders/:id/print" element={
