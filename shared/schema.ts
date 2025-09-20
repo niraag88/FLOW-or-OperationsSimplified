@@ -1,5 +1,5 @@
 import { sql } from "drizzle-orm";
-import { pgTable, text, varchar, timestamp, boolean, serial, decimal, integer, bigint } from "drizzle-orm/pg-core";
+import { pgTable, text, varchar, timestamp, boolean, serial, decimal, integer, bigint, date } from "drizzle-orm/pg-core";
 import { createInsertSchema } from "drizzle-zod";
 import { z } from "zod";
 
@@ -52,6 +52,9 @@ export const invoices = pgTable("invoices", {
   customerName: text("customer_name").notNull(),
   amount: text("amount").notNull(),
   status: text("status").notNull().default("pending"),
+  reference: text("reference"), // Reference from source document
+  referenceDate: date("reference_date"), // Reference date from source document  
+  vatAmount: text("vat_amount"), // VAT amount
   objectKey: text("object_key"), // Storage key for uploaded PDF
   scanKey: text("scan_key"), // Storage key for PDF scan
   createdAt: timestamp("created_at").defaultNow().notNull(),
@@ -90,6 +93,10 @@ export const insertInvoiceSchema = createInsertSchema(invoices).pick({
   status: true,
   objectKey: true,
   scanKey: true,
+}).extend({
+  reference: z.string().optional(),
+  referenceDate: z.date().optional(),
+  vatAmount: z.string().optional(),
 });
 
 export type InsertInvoice = z.infer<typeof insertInvoiceSchema>;
