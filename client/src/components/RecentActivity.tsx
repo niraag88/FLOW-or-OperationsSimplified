@@ -12,40 +12,8 @@ interface ActivityItem {
   icon: "purchase-order" | "delivery-order" | "invoice" | "product";
 }
 
-const mockActivities: ActivityItem[] = [
-  {
-    id: "PO-2025-0019",
-    type: "Purchase Order",
-    amount: "GBP 300.00",
-    status: "closed",
-    timestamp: "Aug 22, 13:08",
-    icon: "purchase-order"
-  },
-  {
-    id: "DO-482415",
-    type: "Delivery Order",
-    amount: "AED 10109.40",
-    status: "draft",
-    timestamp: "Aug 17, 11:18",
-    icon: "delivery-order"
-  },
-  {
-    id: "INV-008744",
-    type: "Invoice",
-    amount: "AED 1264.00",
-    status: "draft",
-    timestamp: "Aug 17, 05:04",
-    icon: "invoice"
-  },
-  {
-    id: "INV-761429",
-    type: "Invoice",
-    amount: "AED 8856.00",
-    status: "pending",
-    timestamp: "Aug 16, 09:22",
-    icon: "product"
-  }
-];
+// No mock activities - component will show actual recent activity data when implemented
+const mockActivities: ActivityItem[] = [];
 
 const getIcon = (type: ActivityItem["icon"]) => {
   switch (type) {
@@ -102,34 +70,42 @@ export function RecentActivity() {
       
       <CardContent className="p-0">
         <div className="divide-y divide-slate-100">
-          {mockActivities.map((activity) => (
-            <div
-              key={activity.id}
-              className="px-6 py-4 flex items-center justify-between hover:bg-slate-50 transition-colors"
-              data-testid={`activity-item-${activity.id}`}
-            >
-              <div className="flex items-center space-x-4">
-                <div className={`w-10 h-10 ${getIconBackground(activity.icon)} rounded-lg flex items-center justify-center`}>
-                  {getIcon(activity.icon)}
-                </div>
-                <div>
-                  <div className="flex items-center space-x-2">
-                    <span className="font-semibold text-slate-900" data-testid={`activity-id-${activity.id}`}>
-                      {activity.id}
-                    </span>
-                    <span className="text-slate-500 text-sm">{activity.type}</span>
-                  </div>
-                  <p className="text-slate-600 text-sm">{activity.amount}</p>
-                </div>
-              </div>
-              <div className="text-right">
-                <div className="flex items-center space-x-2">
-                  {getStatusBadge(activity.status)}
-                </div>
-                <p className="text-slate-500 text-sm mt-1">{activity.timestamp}</p>
-              </div>
+          {mockActivities.length === 0 ? (
+            <div className="px-6 py-8 text-center text-slate-500">
+              <Clock className="w-8 h-8 mx-auto mb-2 text-slate-400" />
+              <p>No recent activity</p>
+              <p className="text-sm">Activity will appear here when you start creating documents</p>
             </div>
-          ))}
+          ) : (
+            mockActivities.map((activity) => (
+              <div
+                key={activity.id}
+                className="px-6 py-4 flex items-center justify-between hover:bg-slate-50 transition-colors"
+                data-testid={`activity-item-${activity.id}`}
+              >
+                <div className="flex items-center space-x-4">
+                  <div className={`w-10 h-10 ${getIconBackground(activity.icon)} rounded-lg flex items-center justify-center`}>
+                    {getIcon(activity.icon)}
+                  </div>
+                  <div>
+                    <div className="flex items-center space-x-2">
+                      <span className="font-semibold text-slate-900" data-testid={`activity-id-${activity.id}`}>
+                        {activity.id}
+                      </span>
+                      <span className="text-slate-500 text-sm">{activity.type}</span>
+                    </div>
+                    <p className="text-slate-600 text-sm">{activity.amount}</p>
+                  </div>
+                </div>
+                <div className="text-right">
+                  <div className="flex items-center space-x-2">
+                    {getStatusBadge(activity.status)}
+                  </div>
+                  <p className="text-slate-500 text-sm mt-1">{activity.timestamp}</p>
+                </div>
+              </div>
+            ))
+          )}
         </div>
 
         {/* View All Activity Button */}
