@@ -4,6 +4,7 @@ import { PurchaseOrder } from '@/api/entities';
 import { Invoice } from '@/api/entities';
 import { DeliveryOrder } from '@/api/entities';
 import { Quotation } from '@/api/entities';
+import { StockCount } from '@/api/entities';
 import { Brand } from '@/api/entities'; // Changed from Supplier to Brand
 import { Customer } from '@/api/entities';
 import { CompanySettings } from '@/api/entities';
@@ -51,41 +52,41 @@ export default function Print() {
 
         switch (type) {
           case 'po':
-            doc = await PurchaseOrder.get(id);
+            doc = await PurchaseOrder.getById(id);
             if (doc.supplier_id) {
               try {
                 // supplier_id in PO actually refers to brand_id
-                related.brand = await Brand.get(doc.supplier_id);
+                related.brand = await Brand.getById(doc.supplier_id);
               } catch (err) {
                 console.warn('Could not load brand for PO:', err);
               }
             }
             break;
           case 'invoice':
-            doc = await Invoice.get(id);
+            doc = await Invoice.getById(id);
             if (doc.customer_id) {
               try {
-                related.customer = await Customer.get(doc.customer_id);
+                related.customer = await Customer.getById(doc.customer_id);
               } catch (err) {
                 console.warn('Could not load customer for invoice:', err);
               }
             }
             break;
           case 'do':
-            doc = await DeliveryOrder.get(id);
+            doc = await DeliveryOrder.getById(id);
             if (doc.customer_id) {
               try {
-                related.customer = await Customer.get(doc.customer_id);
+                related.customer = await Customer.getById(doc.customer_id);
               } catch (err) {
                 console.warn('Could not load customer for DO:', err);
               }
             }
             break;
           case 'quotation':
-            doc = await Quotation.get(id);
+            doc = await Quotation.getById(id);
             if (doc.customer_id) {
               try {
-                related.customer = await Customer.get(doc.customer_id);
+                related.customer = await Customer.getById(doc.customer_id);
               } catch (err) {
                 console.warn('Could not load customer for quotation:', err);
               }
