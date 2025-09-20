@@ -106,35 +106,8 @@ const getIconForEntityType = (type) => {
   }
 };
 
-const getMockNotifications = () => [
-  {
-    id: '1',
-    entity_type: 'Product',
-    action: 'create',
-    user_email: 'admin@opsuite.com',
-    timestamp: new Date(Date.now() - 5 * 60 * 1000).toISOString(), // 5 minutes ago
-    changes: { created_product: { product_code: 'ABC123' } }
-  },
-  {
-    id: '2',
-    entity_type: 'PurchaseOrder',
-    action: 'status_change',
-    user_email: 'manager@opsuite.com',
-    timestamp: new Date(Date.now() - 15 * 60 * 1000).toISOString(), // 15 minutes ago
-    changes: { 
-      status: { from: 'draft', to: 'submitted' },
-      created_po: { po_number: 'PO-001' }
-    }
-  },
-  {
-    id: '3',
-    entity_type: 'Invoice',
-    action: 'create',
-    user_email: 'admin@opsuite.com',
-    timestamp: new Date(Date.now() - 30 * 60 * 1000).toISOString(), // 30 minutes ago
-    changes: { created_document: { invoice_number: 'INV-001' } }
-  }
-];
+// No mock notifications - using real audit log data when available
+const getMockNotifications = () => [];
 
 const getNotificationDetails = (log) => {
     let title = 'New Activity';
