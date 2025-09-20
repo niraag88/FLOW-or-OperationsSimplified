@@ -111,7 +111,7 @@ export default function DOForm({ open, onClose, editingDO, currentUser, onSucces
         let taxTreatment = "StandardRated";
         let taxRate = 0.05;
         
-        if (customer && (customer.vatTreatment === "ZeroRated" || customer.type === "International")) {
+        if (customer && (customer.vatTreatment === "ZeroRated" || customer.vatTreatment === "International" || customer.type === "International")) {
           taxTreatment = "ZeroRated";
           taxRate = 0;
         }
