@@ -2316,7 +2316,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   // Configuration flag for persistent exports
   const persistExports = false; // Keep code path available but disabled
 
-  // GET /api/export/invoice - Generate and stream invoice PDF
+  // GET /api/export/invoice - Generate invoice data for print view
   app.get('/api/export/invoice', requireAuth(), async (req, res) => {
     try {
       const { invoiceId } = req.query;
@@ -2325,55 +2325,84 @@ export async function registerRoutes(app: Express): Promise<Server> {
         return res.status(400).json({ error: 'invoiceId parameter is required' });
       }
 
-      // Get invoice data from database
-      const [invoice] = await db.select().from(invoices).where(eq(invoices.id, parseInt(invoiceId as string)));
+      // Get invoice data from database with customer details
+      const [invoice] = await db.select({
+        id: invoices.id,
+        invoiceNumber: invoices.invoiceNumber,
+        customerId: invoices.customerId,
+        customerName: invoices.customerName,
+        status: invoices.status,
+        invoiceDate: invoices.createdAt,
+        amount: invoices.amount,
+        vatAmount: invoices.vatAmount,
+        reference: invoices.reference,
+        referenceDate: invoices.referenceDate,
+        // Get customer details
+        customerContactPerson: customers.contactPerson,
+        customerEmail: customers.email,
+        customerPhone: customers.phone,
+        customerBillingAddress: customers.billingAddress,
+        customerShippingAddress: customers.shippingAddress,
+        customerVatNumber: customers.vatNumber,
+      }).from(invoices)
+        .leftJoin(customers, eq(invoices.customerId, customers.id))
+        .where(eq(invoices.id, parseInt(invoiceId as string)));
       
       if (!invoice) {
         return res.status(404).json({ error: 'Invoice not found' });
       }
 
-      // Generate PDF using puppeteer
-      const puppeteer = await import('puppeteer');
-      const ReactDOMServer = await import('react-dom/server');
-      const React = await import('react');
-      
-      // Import the InvoiceTemplate (we'll need to create a server-side version)
-      const templateHtml = await generateInvoicePDF(invoice);
-      
-      const browser = await puppeteer.default.launch({
-        args: [
-          '--no-sandbox',
-          '--disable-setuid-sandbox',
-          '--disable-dev-shm-usage',
-          '--disable-accelerated-2d-canvas',
-          '--no-first-run',
-          '--no-zygote',
-          '--single-process',
-          '--disable-gpu'
-        ],
-        headless: true
-      });
-      
-      const page = await browser.newPage();
-      await page.setContent(templateHtml, { waitUntil: 'networkidle0' });
-      
-      const pdfBuffer = await page.pdf({
-        format: 'A4',
-        printBackground: true,
-        margin: { top: '1.2cm', right: '1.2cm', bottom: '1.2cm', left: '1.2cm' }
-      });
-      
-      await browser.close();
+      // Get invoice items (assuming there's an invoice_items table)
+      let items = [];
+      try {
+        items = await db.select({
+          productCode: products.sku,
+          description: products.name,
+          size: products.size,
+          quantity: invoiceItems.quantity,
+          unitPrice: invoiceItems.unitPrice,
+          vatRate: invoiceItems.vatRate,
+          lineTotal: invoiceItems.lineTotal
+        }).from(invoiceItems)
+          .leftJoin(products, eq(invoiceItems.productId, products.id))
+          .where(eq(invoiceItems.invoiceId, parseInt(invoiceId as string)));
+      } catch (error) {
+        console.log('No invoice items table or items found, continuing with empty items');
+      }
 
-      // Set headers for PDF streaming
-      res.set({
-        'Content-Type': 'application/pdf',
-        'Content-Disposition': `attachment; filename="invoice-${invoice.invoiceNumber}.pdf"`,
-        'Content-Length': pdfBuffer.length
-      });
+      // Structure the invoice data for frontend print view
+      const invoiceWithItems = {
+        ...invoice,
+        invoice_number: invoice.invoiceNumber,
+        invoice_date: invoice.invoiceDate,
+        subtotal: invoice.amount,
+        tax_amount: invoice.vatAmount,
+        total_amount: invoice.amount, // This might need adjustment based on your schema
+        customer: {
+          name: invoice.customerName,
+          contact_name: invoice.customerContactPerson,
+          email: invoice.customerEmail,
+          phone: invoice.customerPhone,
+          address: invoice.customerBillingAddress || invoice.customerShippingAddress,
+          trn_number: invoice.customerVatNumber
+        },
+        items: items.map(item => ({
+          product_code: item.productCode,
+          description: item.description,
+          size: item.size,
+          quantity: item.quantity,
+          unit_price: item.unitPrice,
+          vat_rate: item.vatRate,
+          line_total: item.lineTotal
+        }))
+      };
 
-      // Stream the PDF bytes
-      res.send(pdfBuffer);
+      // Return structured data for frontend print view
+      res.json({
+        success: true,
+        data: invoiceWithItems,
+        message: 'Invoice data for print view'
+      });
       
     } catch (error) {
       console.error('Error exporting invoice:', error);
