@@ -2325,76 +2325,40 @@ export async function registerRoutes(app: Express): Promise<Server> {
         return res.status(400).json({ error: 'invoiceId parameter is required' });
       }
 
-      // Get invoice data from database with customer details
-      const [invoice] = await db.select({
-        id: invoices.id,
-        invoiceNumber: invoices.invoiceNumber,
-        customerId: invoices.customerId,
-        customerName: invoices.customerName,
-        status: invoices.status,
-        invoiceDate: invoices.createdAt,
-        amount: invoices.amount,
-        vatAmount: invoices.vatAmount,
-        reference: invoices.reference,
-        referenceDate: invoices.referenceDate,
-        // Get customer details
-        customerContactPerson: customers.contactPerson,
-        customerEmail: customers.email,
-        customerPhone: customers.phone,
-        customerBillingAddress: customers.billingAddress,
-        customerShippingAddress: customers.shippingAddress,
-        customerVatNumber: customers.vatNumber,
-      }).from(invoices)
-        .leftJoin(customers, eq(invoices.customerId, customers.id))
-        .where(eq(invoices.id, parseInt(invoiceId as string)));
+      // Get invoice data from database (no joins needed - customer stored as text)
+      const [invoice] = await db.select().from(invoices).where(eq(invoices.id, parseInt(invoiceId as string)));
       
       if (!invoice) {
         return res.status(404).json({ error: 'Invoice not found' });
       }
 
-      // Get invoice items (assuming there's an invoice_items table)
-      let items = [];
-      try {
-        items = await db.select({
-          productCode: products.sku,
-          description: products.name,
-          size: products.size,
-          quantity: invoiceItems.quantity,
-          unitPrice: invoiceItems.unitPrice,
-          vatRate: invoiceItems.vatRate,
-          lineTotal: invoiceItems.lineTotal
-        }).from(invoiceItems)
-          .leftJoin(products, eq(invoiceItems.productId, products.id))
-          .where(eq(invoiceItems.invoiceId, parseInt(invoiceId as string)));
-      } catch (error) {
-        console.log('No invoice items table or items found, continuing with empty items');
-      }
+      // Calculate totals (invoice stores amounts as text)
+      const subtotal = parseFloat(invoice.amount) || 0;
+      const taxAmount = parseFloat(invoice.vatAmount) || 0;
+      const totalAmount = subtotal + taxAmount;
 
-      // Structure the invoice data for frontend print view
+      // Structure the invoice data for frontend print view (matching what InvoicePrintView expects)
       const invoiceWithItems = {
-        ...invoice,
+        id: invoice.id,
         invoice_number: invoice.invoiceNumber,
-        invoice_date: invoice.invoiceDate,
-        subtotal: invoice.amount,
-        tax_amount: invoice.vatAmount,
-        total_amount: invoice.amount, // This might need adjustment based on your schema
+        invoice_date: invoice.createdAt,
+        reference: invoice.reference,
+        reference_date: invoice.referenceDate,
+        subtotal: subtotal,
+        tax_amount: taxAmount,
+        total_amount: totalAmount,
+        status: invoice.status,
         customer: {
           name: invoice.customerName,
-          contact_name: invoice.customerContactPerson,
-          email: invoice.customerEmail,
-          phone: invoice.customerPhone,
-          address: invoice.customerBillingAddress || invoice.customerShippingAddress,
-          trn_number: invoice.customerVatNumber
+          // Since customer is stored as text only, provide empty values for missing fields
+          contact_name: '',
+          email: '',
+          phone: '',
+          address: '',
+          trn_number: ''
         },
-        items: items.map(item => ({
-          product_code: item.productCode,
-          description: item.description,
-          size: item.size,
-          quantity: item.quantity,
-          unit_price: item.unitPrice,
-          vat_rate: item.vatRate,
-          line_total: item.lineTotal
-        }))
+        // Empty items array since no line items exist in database
+        items: []
       };
 
       // Return structured data for frontend print view
