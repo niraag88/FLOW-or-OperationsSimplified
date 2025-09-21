@@ -45,14 +45,7 @@ export default function InvoicePrintView() {
     loadData();
   }, [id, navigate]);
 
-  useEffect(() => {
-    if (!loading && invoice && companySettings) {
-      // Auto-trigger print dialog after data loads
-      setTimeout(() => {
-        window.print();
-      }, 500);
-    }
-  }, [loading, invoice, companySettings]);
+  // Remove auto-print behavior to match quotations - let user choose when to print
 
   const formatDate = (dateString) => {
     if (!dateString) return '';

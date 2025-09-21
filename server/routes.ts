@@ -2325,8 +2325,27 @@ export async function registerRoutes(app: Express): Promise<Server> {
         return res.status(400).json({ error: 'invoiceId parameter is required' });
       }
 
-      // Get invoice data from database (no joins needed - customer stored as text)
-      const [invoice] = await db.select().from(invoices).where(eq(invoices.id, parseInt(invoiceId as string)));
+      // Get invoice data from database with customer details (same pattern as quotations)
+      const [invoice] = await db.select({
+        id: invoices.id,
+        invoiceNumber: invoices.invoiceNumber,
+        customerName: invoices.customerName,
+        status: invoices.status,
+        invoiceDate: invoices.createdAt,
+        amount: invoices.amount,
+        vatAmount: invoices.vatAmount,
+        reference: invoices.reference,
+        referenceDate: invoices.referenceDate,
+        // Get customer details by joining with customers table
+        customerContactPerson: customers.contactPerson,
+        customerEmail: customers.email,
+        customerPhone: customers.phone,
+        customerBillingAddress: customers.billingAddress,
+        customerShippingAddress: customers.shippingAddress,
+        customerVatNumber: customers.vatNumber,
+      }).from(invoices)
+        .leftJoin(customers, eq(customers.name, invoices.customerName))
+        .where(eq(invoices.id, parseInt(invoiceId as string)));
       
       if (!invoice) {
         return res.status(404).json({ error: 'Invoice not found' });
@@ -2334,14 +2353,23 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
       // Calculate totals (invoice stores amounts as text)
       const subtotal = parseFloat(invoice.amount) || 0;
-      const taxAmount = parseFloat(invoice.vatAmount) || 0;
+      const taxAmount = parseFloat(invoice.vatAmount || '0') || 0;
       const totalAmount = subtotal + taxAmount;
 
-      // Structure the invoice data for frontend print view (matching what InvoicePrintView expects)
+      // Create a single line item from the invoice total (since no detailed items exist)
+      const invoiceItems = [{
+        product_code: 'SERVICE',
+        description: `Invoice ${invoice.invoiceNumber} - Services`,
+        quantity: 1,
+        unit_price: subtotal,
+        line_total: subtotal
+      }];
+
+      // Structure the invoice data for frontend print view (matching quotation format)
       const invoiceWithItems = {
         id: invoice.id,
         invoice_number: invoice.invoiceNumber,
-        invoice_date: invoice.createdAt,
+        invoice_date: invoice.invoiceDate,
         reference: invoice.reference,
         reference_date: invoice.referenceDate,
         subtotal: subtotal,
@@ -2350,15 +2378,13 @@ export async function registerRoutes(app: Express): Promise<Server> {
         status: invoice.status,
         customer: {
           name: invoice.customerName,
-          // Since customer is stored as text only, provide empty values for missing fields
-          contact_name: '',
-          email: '',
-          phone: '',
-          address: '',
-          trn_number: ''
+          contact_name: invoice.customerContactPerson || '',
+          email: invoice.customerEmail || '',
+          phone: invoice.customerPhone || '',
+          address: invoice.customerBillingAddress || invoice.customerShippingAddress || '',
+          trn_number: invoice.customerVatNumber || ''
         },
-        // Empty items array since no line items exist in database
-        items: []
+        items: invoiceItems
       };
 
       // Return structured data for frontend print view
