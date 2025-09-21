@@ -83,123 +83,150 @@ export default function InvoicePrintView() {
   return (
     <div className="print-container">
       <div className="print-page">
-        {/* Header with Logo and Title */}
+        {/* Header with Logo and Title - EXACT COPY from QuotationPrintView */}
         <div className="print-header">
-          <div className="print-logo-container">
+          <div className="header-content">
             {companySettings?.logo && (
-              <img 
-                src={companySettings.logo} 
-                alt="Company Logo" 
-                className="print-logo"
-              />
+              <div className="header-logo">
+                <img src={companySettings.logo} alt="Company Logo" />
+              </div>
             )}
+            <h1 className="print-title">TAX INVOICE</h1>
           </div>
-          <div className="print-title">TAX INVOICE</div>
         </div>
 
-        {/* Company and Invoice Info Section */}
+        {/* Company and Invoice Info Section - EXACT COPY from QuotationPrintView */}
         <div className="print-info-section">
-          <div className="print-supplier-info">
-            <div className="print-section-title">From:</div>
-            <div className="print-company-details">
-              <div className="print-company-name">{companySettings?.companyName}</div>
-              {companySettings?.address && <div>{companySettings.address}</div>}
-              {companySettings?.phone && <div>Tel: {companySettings.phone}</div>}
-              {companySettings?.email && <div>Email: {companySettings.email}</div>}
-              {companySettings?.taxNumber && <div>TRN: {companySettings.taxNumber}</div>}
+          {/* Left Column - Company Info */}
+          <div className="print-company-info">
+            <div className="company-name">{companySettings?.companyName}</div>
+            {companySettings?.address && (
+              <div className="company-address">{companySettings.address}</div>
+            )}
+            {companySettings?.phone && (
+              <div className="company-contact">Tel: {companySettings.phone}</div>
+            )}
+            {companySettings?.email && (
+              <div className="company-contact">Email: {companySettings.email}</div>
+            )}
+            {companySettings?.taxNumber && (
+              <div className="company-contact">TRN: {companySettings.taxNumber}</div>
+            )}
+          </div>
+
+          {/* Right Column - Invoice Info */}
+          <div className="print-po-info">
+            <div className="po-info-row">
+              <span className="po-label">Invoice Number</span>
+              <span className="po-value">{invoice.invoice_number}</span>
+            </div>
+            <div className="po-info-row">
+              <span className="po-label">Invoice Date</span>
+              <span className="po-value">{formatDate(invoice.invoice_date)}</span>
             </div>
           </div>
-          <div className="print-invoice-info">
-            <div className="print-section-title">Invoice Details:</div>
-            <div className="print-info-item">
-              <span>Invoice Number:</span>
-              <span>{invoice.invoice_number}</span>
-            </div>
-            <div className="print-info-item">
-              <span>Invoice Date:</span>
-              <span>{formatDate(invoice.invoice_date)}</span>
-            </div>
+        </div>
+
+        {/* Customer Section - EXACT COPY from QuotationPrintView */}
+        <div className="print-info-section">
+          {/* Left Column - Customer Info */}
+          <div className="print-company-info">
+            <div className="company-name">BILL TO</div>
+            <div className="company-name">{invoice.customer?.name || 'Unknown Customer'}</div>
+            {invoice.customer?.address && (
+              <div className="company-address">{invoice.customer.address}</div>
+            )}
+            {invoice.customer?.contact_name && (
+              <div className="company-contact">Contact: {invoice.customer.contact_name}</div>
+            )}
+            {invoice.customer?.email && (
+              <div className="company-contact">Email: {invoice.customer.email}</div>
+            )}
+            {invoice.customer?.phone && (
+              <div className="company-contact">Tel: {invoice.customer.phone}</div>
+            )}
+            {invoice.customer?.trn_number && (
+              <div className="company-contact">TRN: {invoice.customer.trn_number}</div>
+            )}
+          </div>
+
+          {/* Right Column - Invoice Meta Info */}
+          <div className="print-po-info">
             {invoice.reference && (
-              <div className="print-info-item">
-                <span>Reference:</span>
-                <span>{invoice.reference}</span>
+              <div className="po-info-row">
+                <span className="po-label">Reference</span>
+                <span className="po-value">{invoice.reference}</span>
               </div>
             )}
             {invoice.reference_date && (
-              <div className="print-info-item">
-                <span>Reference Date:</span>
-                <span>{formatDate(invoice.reference_date)}</span>
+              <div className="po-info-row">
+                <span className="po-label">Reference Date</span>
+                <span className="po-value">{formatDate(invoice.reference_date)}</span>
               </div>
             )}
           </div>
         </div>
 
-        {/* Customer Information */}
-        <div className="print-customer-section">
-          <div className="print-section-title">Bill To:</div>
-          <div className="print-customer-details">
-            <div className="print-customer-name">{invoice.customer?.name}</div>
-            {invoice.customer?.contact_name && <div>Contact: {invoice.customer.contact_name}</div>}
-            {invoice.customer?.address && <div>{invoice.customer.address}</div>}
-            {invoice.customer?.phone && <div>Tel: {invoice.customer.phone}</div>}
-            {invoice.customer?.email && <div>Email: {invoice.customer.email}</div>}
-            {invoice.customer?.trn_number && <div>TRN: {invoice.customer.trn_number}</div>}
-          </div>
-        </div>
-
-        {/* Items Table */}
+        {/* Items Table - EXACT COPY from QuotationPrintView */}
         <div className="print-table-section">
           <table className="print-table">
             <thead>
               <tr>
-                <th>Product Code</th>
-                <th>Description</th>
-                <th>Qty</th>
-                <th>Unit Price (AED)</th>
-                <th>Line Total (AED)</th>
+                <th className="col-code">Product Code</th>
+                <th className="col-description">Description</th>
+                <th className="col-size">Size</th>
+                <th className="col-qty">Qty</th>
+                <th className="col-price">Unit Price (AED)</th>
+                <th className="col-total">Line Total (AED)</th>
               </tr>
             </thead>
             <tbody>
               {invoice.items && invoice.items.map((item, index) => (
                 <tr key={index}>
-                  <td>{item.product_code || '-'}</td>
+                  <td className="text-center">{item.product_code || '-'}</td>
                   <td>{item.description}</td>
-                  <td className="print-qty">{item.quantity}</td>
-                  <td className="print-amount">{parseFloat(item.unit_price || 0).toFixed(2)}</td>
-                  <td className="print-amount">{parseFloat(item.line_total || 0).toFixed(2)}</td>
+                  <td className="text-center">{item.size || '-'}</td>
+                  <td className="text-center">{item.quantity}</td>
+                  <td className="text-right">{parseFloat(item.unit_price || 0).toFixed(2)}</td>
+                  <td className="text-right">{parseFloat(item.line_total || 0).toFixed(2)}</td>
                 </tr>
               ))}
             </tbody>
           </table>
         </div>
 
-        {/* Totals Section */}
+        {/* Totals Section - EXACT COPY from QuotationPrintView */}
         <div className="print-totals-section">
-          <div className="print-totals">
-            <div className="print-total-row">
-              <span>Subtotal:</span>
-              <span>{formatCurrency(invoice.subtotal)}</span>
+          <div className="totals-row">
+            <span className="totals-label">Subtotal</span>
+            <span className="totals-value">{formatCurrency(invoice.subtotal)}</span>
+          </div>
+          {showTax && (
+            <div className="totals-row">
+              <span className="totals-label">VAT</span>
+              <span className="totals-value">{formatCurrency(invoice.tax_amount)}</span>
             </div>
-            {showTax && (
-              <div className="print-total-row">
-                <span>VAT:</span>
-                <span>{formatCurrency(invoice.tax_amount)}</span>
-              </div>
-            )}
-            <div className="print-total-row print-grand-total">
-              <span>Total:</span>
-              <span>{formatCurrency(invoice.total_amount)}</span>
-            </div>
+          )}
+          <div className="totals-row total-final">
+            <span className="totals-label">Total</span>
+            <span className="totals-value">{formatCurrency(invoice.total_amount)}</span>
           </div>
         </div>
 
-        {/* Remarks */}
+        {/* Notes Section */}
         {invoice.remarks && (
-          <div className="print-remarks">
-            <div className="print-section-title">Remarks:</div>
-            <div className="print-remarks-content">{invoice.remarks}</div>
+          <div className="print-remarks-section">
+            <div className="supplier-title">REMARKS</div>
+            <div style={{fontSize: '11px', color: '#333', marginTop: '5px'}}>
+              {invoice.remarks}
+            </div>
           </div>
         )}
+
+        {/* Footer */}
+        <div className="print-footer">
+          <div className="page-number">Page 1/1</div>
+        </div>
       </div>
     </div>
   );
