@@ -2605,7 +2605,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
       // Calculate VAT based on customer type (Local vs International)
       const isInternational = quotation.customerVatTreatment === 'International';
-      const subtotal = parseFloat(quotation.totalAmount) || 0;
+      const subtotal = parseFloat(quotation.totalAmount || '0') || 0;
       
       // Apply VAT: 0% for International, company rate for Local
       const applicableVatRate = (isInternational || !vatEnabled) ? 0 : defaultVatRate;
