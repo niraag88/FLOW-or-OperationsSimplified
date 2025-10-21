@@ -201,12 +201,10 @@ export default function InvoicePrintView() {
             <span className="totals-label">Subtotal</span>
             <span className="totals-value">{formatCurrency(invoice.subtotal)}</span>
           </div>
-          {showTax && (
-            <div className="totals-row">
-              <span className="totals-label">VAT</span>
-              <span className="totals-value">{formatCurrency(invoice.tax_amount)}</span>
-            </div>
-          )}
+          <div className="totals-row">
+            <span className="totals-label">VAT ({invoice.vat_rate || 0}%)</span>
+            <span className="totals-value">{formatCurrency(invoice.tax_amount)}</span>
+          </div>
           <div className="totals-row total-final">
             <span className="totals-label">Total</span>
             <span className="totals-value">{formatCurrency(invoice.total_amount)}</span>

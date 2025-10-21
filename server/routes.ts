@@ -2343,6 +2343,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
         customerBillingAddress: customers.billingAddress,
         customerShippingAddress: customers.shippingAddress,
         customerVatNumber: customers.vatNumber,
+        customerVatTreatment: customers.vatTreatment, // Add vat treatment for auto-calculation
       }).from(invoices)
         .leftJoin(customers, eq(customers.name, invoices.customerName))
         .where(eq(invoices.id, parseInt(invoiceId as string)));
@@ -2351,9 +2352,18 @@ export async function registerRoutes(app: Express): Promise<Server> {
         return res.status(404).json({ error: 'Invoice not found' });
       }
 
-      // Calculate totals (invoice stores amounts as text)
+      // Get company settings for default VAT rate
+      const [companySettings] = await db.select().from(companySettingsTable).limit(1);
+      const defaultVatRate = companySettings?.defaultVatRate ? parseFloat(companySettings.defaultVatRate) : 0.05;
+      const vatEnabled = companySettings?.vatEnabled ?? true;
+
+      // Calculate VAT based on customer type (Local vs International)
+      const isInternational = invoice.customerVatTreatment === 'International';
       const subtotal = parseFloat(invoice.amount) || 0;
-      const taxAmount = parseFloat(invoice.vatAmount || '0') || 0;
+      
+      // Apply VAT: 0% for International, company rate for Local
+      const applicableVatRate = (isInternational || !vatEnabled) ? 0 : defaultVatRate;
+      const taxAmount = subtotal * applicableVatRate;
       const totalAmount = subtotal + taxAmount;
 
       // Create realistic line items based on the invoice amount (1674.00 matches quotation QUO-2025-003)
@@ -2386,6 +2396,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
         reference_date: invoice.referenceDate,
         subtotal: subtotal,
         tax_amount: taxAmount,
+        vat_rate: applicableVatRate * 100, // Convert to percentage for display (5% for local, 0% for international)
         total_amount: totalAmount,
         status: invoice.status,
         customer: {
@@ -2394,7 +2405,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
           email: invoice.customerEmail || '',
           phone: invoice.customerPhone || '',
           address: invoice.customerBillingAddress || invoice.customerShippingAddress || '',
-          trn_number: invoice.customerVatNumber || ''
+          trn_number: invoice.customerVatNumber || '',
+          type: invoice.customerVatTreatment || 'Local' // Add customer type for reference
         },
         items: invoiceItems
       };
