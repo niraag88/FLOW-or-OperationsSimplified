@@ -206,12 +206,10 @@ export default function QuotationPrintView() {
             <span className="totals-label">Subtotal</span>
             <span className="totals-value">{formatCurrency(quotation.totalAmount, quotation.currency)}</span>
           </div>
-          {quotation.vatAmount && parseFloat(quotation.vatAmount) > 0 && (
-            <div className="totals-row">
-              <span className="totals-label">VAT</span>
-              <span className="totals-value">{formatCurrency(quotation.vatAmount, quotation.currency)}</span>
-            </div>
-          )}
+          <div className="totals-row">
+            <span className="totals-label">VAT ({quotation.vat_rate_percentage || 0}%)</span>
+            <span className="totals-value">{formatCurrency(quotation.vatAmount, quotation.currency)}</span>
+          </div>
           <div className="totals-row total-final">
             <span className="totals-label">Total</span>
             <span className="totals-value">{formatCurrency(quotation.grandTotal, quotation.currency)}</span>

@@ -4,7 +4,7 @@ import { storage } from "./storage";
 import { businessStorage } from "./businessStorage";
 import { Client } from '@replit/object-storage';
 import { invoices, deliveryOrders, auditLog, users, type InsertAuditLog, type InsertUser, type UpdateUser, type User } from "@shared/schema";
-import { insertBrandSchema, insertSupplierSchema, insertCustomerSchema, insertProductSchema, insertPurchaseOrderSchema, insertQuotationSchema, insertInvoiceSchema, stockCounts, stockCountItems, goodsReceipts, goodsReceiptItems, stockMovements, products, purchaseOrders, purchaseOrderItems, enhancedInvoices, invoiceItems, suppliers, brands, quotations, quotationItems, customers } from "@shared/schema";
+import { insertBrandSchema, insertSupplierSchema, insertCustomerSchema, insertProductSchema, insertPurchaseOrderSchema, insertQuotationSchema, insertInvoiceSchema, stockCounts, stockCountItems, goodsReceipts, goodsReceiptItems, stockMovements, products, purchaseOrders, purchaseOrderItems, enhancedInvoices, invoiceItems, suppliers, brands, quotations, quotationItems, customers, companySettings } from "@shared/schema";
 import { db } from "./db";
 import { eq, desc } from "drizzle-orm";
 import pkg from 'pg';
@@ -2353,9 +2353,9 @@ export async function registerRoutes(app: Express): Promise<Server> {
       }
 
       // Get company settings for default VAT rate
-      const [companySettings] = await db.select().from(companySettingsTable).limit(1);
-      const defaultVatRate = companySettings?.defaultVatRate ? parseFloat(companySettings.defaultVatRate) : 0.05;
-      const vatEnabled = companySettings?.vatEnabled ?? true;
+      const [companySettingsData] = await db.select().from(companySettings).limit(1);
+      const defaultVatRate = companySettingsData?.defaultVatRate ? parseFloat(companySettingsData.defaultVatRate) : 0.05;
+      const vatEnabled = companySettingsData?.vatEnabled ?? true;
 
       // Calculate VAT based on customer type (Local vs International)
       const isInternational = invoice.customerVatTreatment === 'International';
@@ -2589,6 +2589,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
         customerEmail: customers.email,
         customerPhone: customers.phone,
         customerVatNumber: customers.vatNumber,
+        customerVatTreatment: customers.vatTreatment, // Add vat treatment for auto-calculation
       }).from(quotations)
         .leftJoin(customers, eq(quotations.customerId, customers.id))
         .where(eq(quotations.id, parseInt(quotationId as string)));
@@ -2596,6 +2597,20 @@ export async function registerRoutes(app: Express): Promise<Server> {
       if (!quotation) {
         return res.status(404).json({ error: 'Quotation not found' });
       }
+
+      // Get company settings for default VAT rate
+      const [companySettingsData] = await db.select().from(companySettings).limit(1);
+      const defaultVatRate = companySettingsData?.defaultVatRate ? parseFloat(companySettingsData.defaultVatRate) : 0.05;
+      const vatEnabled = companySettingsData?.vatEnabled ?? true;
+
+      // Calculate VAT based on customer type (Local vs International)
+      const isInternational = quotation.customerVatTreatment === 'International';
+      const subtotal = parseFloat(quotation.totalAmount) || 0;
+      
+      // Apply VAT: 0% for International, company rate for Local
+      const applicableVatRate = (isInternational || !vatEnabled) ? 0 : defaultVatRate;
+      const recalculatedVatAmount = subtotal * applicableVatRate;
+      const recalculatedGrandTotal = subtotal + recalculatedVatAmount;
 
       // Get quotation items
       const items = await db.select({
@@ -2611,9 +2626,12 @@ export async function registerRoutes(app: Express): Promise<Server> {
         .leftJoin(products, eq(quotationItems.productId, products.id))
         .where(eq(quotationItems.quoteId, parseInt(quotationId as string)));
 
-      // Add items to quotation object
+      // Add items to quotation object with recalculated VAT
       const quotationWithItems = {
         ...quotation,
+        vatAmount: recalculatedVatAmount, // Use recalculated VAT based on customer type
+        grandTotal: recalculatedGrandTotal, // Use recalculated grand total
+        vat_rate_percentage: applicableVatRate * 100, // Add VAT rate percentage for display
         items: items.map(item => ({
           product_code: item.productCode,
           description: item.description,
