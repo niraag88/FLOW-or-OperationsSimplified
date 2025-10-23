@@ -1145,6 +1145,80 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  // Get specific invoice with items for editing
+  app.get('/api/invoices/:id', requireAuth(), async (req: AuthenticatedRequest, res) => {
+    try {
+      const id = parseInt(req.params.id);
+      
+      // Get the invoice with customer details
+      const [invoice] = await db.select({
+        id: invoices.id,
+        invoiceNumber: invoices.invoiceNumber,
+        customerId: invoices.customerId,
+        customerName: customers.name,
+        invoiceDate: invoices.invoiceDate,
+        dueDate: invoices.dueDate,
+        totalAmount: invoices.totalAmount,
+        vatAmount: invoices.vatAmount,
+        grandTotal: invoices.grandTotal,
+        status: invoices.status,
+        notes: invoices.notes,
+        showRemarks: invoices.showRemarks,
+        terms: invoices.terms,
+        reference: invoices.reference,
+        referenceDate: invoices.referenceDate,
+        createdAt: invoices.createdAt,
+        createdBy: invoices.createdBy,
+      }).from(invoices)
+        .leftJoin(customers, eq(invoices.customerId, customers.id))
+        .where(eq(invoices.id, id));
+      
+      if (!invoice) {
+        return res.status(404).json({ error: 'Invoice not found' });
+      }
+
+      // Get invoice items with product details
+      const items = await db.select({
+        id: invoiceItems.id,
+        productId: invoiceItems.productId,
+        productName: products.name,
+        productSku: products.sku,
+        productSize: products.size,
+        brandId: products.brandId,
+        quantity: invoiceItems.quantity,
+        unitPrice: invoiceItems.unitPrice,
+        discount: invoiceItems.discount,
+        vatRate: invoiceItems.vatRate,
+        lineTotal: invoiceItems.lineTotal
+      }).from(invoiceItems)
+        .leftJoin(products, eq(invoiceItems.productId, products.id))
+        .where(eq(invoiceItems.invoiceId, id));
+
+      // Format the response
+      const invoiceWithItems = {
+        ...invoice,
+        items: items.map(item => ({
+          id: item.id,
+          product_id: item.productId,
+          product_name: item.productName,
+          product_code: item.productSku,
+          size: item.productSize,
+          brand_id: item.brandId,
+          quantity: item.quantity,
+          unit_price: item.unitPrice,
+          discount: item.discount,
+          vat_rate: item.vatRate,
+          line_total: item.lineTotal
+        }))
+      };
+      
+      res.json(invoiceWithItems);
+    } catch (error) {
+      console.error('Error fetching invoice:', error);
+      res.status(500).json({ error: 'Failed to fetch invoice' });
+    }
+  });
+
   // POST /api/invoices/from-quotation - Create invoice from quotation (DISABLED - Enhanced system under development)
   // app.post('/api/invoices/from-quotation', requireAuth(['Admin', 'Manager']), async (req: AuthenticatedRequest, res) => {
   //   try {
