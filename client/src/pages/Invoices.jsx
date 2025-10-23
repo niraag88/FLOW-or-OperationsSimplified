@@ -101,9 +101,24 @@ export default function Invoices() {
     setShowInvoiceForm(true);
   };
 
-  const handleEditInvoice = (invoice) => {
-    setEditingInvoice(invoice);
-    setShowInvoiceForm(true);
+  const handleEditInvoice = async (invoice) => {
+    try {
+      // Fetch complete invoice data with line items
+      const response = await fetch(`/api/invoices/${invoice.id}`);
+      if (response.ok) {
+        const fullInvoice = await response.json();
+        console.log("✅ Full invoice data retrieved:", fullInvoice);
+        setEditingInvoice(fullInvoice);
+      } else {
+        console.warn("⚠️ Failed to fetch full invoice, using basic data");
+        setEditingInvoice(invoice);
+      }
+      setShowInvoiceForm(true);
+    } catch (error) {
+      console.error("❌ Error fetching invoice details:", error);
+      setEditingInvoice(invoice);
+      setShowInvoiceForm(true);
+    }
   };
 
   const handleCloseInvoiceForm = () => {

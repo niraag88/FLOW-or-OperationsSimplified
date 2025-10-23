@@ -1152,26 +1152,25 @@ export async function registerRoutes(app: Express): Promise<Server> {
       
       // Get the invoice with customer details
       const [invoice] = await db.select({
-        id: invoices.id,
-        invoiceNumber: invoices.invoiceNumber,
-        customerId: invoices.customerId,
+        id: enhancedInvoices.id,
+        invoiceNumber: enhancedInvoices.invoiceNumber,
+        customerId: enhancedInvoices.customerId,
         customerName: customers.name,
-        invoiceDate: invoices.invoiceDate,
-        dueDate: invoices.dueDate,
-        totalAmount: invoices.totalAmount,
-        vatAmount: invoices.vatAmount,
-        grandTotal: invoices.grandTotal,
-        status: invoices.status,
-        notes: invoices.notes,
-        showRemarks: invoices.showRemarks,
-        terms: invoices.terms,
-        reference: invoices.reference,
-        referenceDate: invoices.referenceDate,
-        createdAt: invoices.createdAt,
-        createdBy: invoices.createdBy,
-      }).from(invoices)
-        .leftJoin(customers, eq(invoices.customerId, customers.id))
-        .where(eq(invoices.id, id));
+        invoiceDate: enhancedInvoices.invoiceDate,
+        dueDate: enhancedInvoices.dueDate,
+        totalAmount: enhancedInvoices.totalAmount,
+        vatAmount: enhancedInvoices.vatAmount,
+        grandTotal: enhancedInvoices.grandTotal,
+        status: enhancedInvoices.status,
+        notes: enhancedInvoices.notes,
+        terms: enhancedInvoices.paymentTerms,
+        reference: enhancedInvoices.reference,
+        referenceDate: enhancedInvoices.referenceDate,
+        createdAt: enhancedInvoices.createdAt,
+        createdBy: enhancedInvoices.createdBy,
+      }).from(enhancedInvoices)
+        .leftJoin(customers, eq(enhancedInvoices.customerId, customers.id))
+        .where(eq(enhancedInvoices.id, id));
       
       if (!invoice) {
         return res.status(404).json({ error: 'Invoice not found' });
