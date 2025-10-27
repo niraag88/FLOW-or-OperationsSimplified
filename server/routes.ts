@@ -1193,14 +1193,30 @@ export async function registerRoutes(app: Express): Promise<Server> {
         .leftJoin(products, eq(invoiceItems.productId, products.id))
         .where(eq(invoiceItems.invoiceId, id));
 
-      // Format the response
+      // Format the response with snake_case field names to match InvoiceForm expectations
       const invoiceWithItems = {
-        ...invoice,
+        id: invoice.id,
+        invoice_number: invoice.invoiceNumber,
+        customer_id: invoice.customerId,
+        customer_name: invoice.customerName,
+        invoice_date: invoice.invoiceDate ? new Date(invoice.invoiceDate).toISOString().split('T')[0] : '',
+        due_date: invoice.dueDate ? new Date(invoice.dueDate).toISOString().split('T')[0] : '',
+        subtotal: invoice.totalAmount,
+        tax_amount: invoice.vatAmount,
+        total_amount: invoice.grandTotal,
+        status: invoice.status,
+        remarks: invoice.notes,
+        show_remarks: false,
+        terms: invoice.terms,
+        reference: invoice.reference,
+        reference_date: invoice.referenceDate ? new Date(invoice.referenceDate).toISOString().split('T')[0] : '',
+        attachments: [],
         items: items.map(item => ({
           id: item.id,
           product_id: item.productId,
           product_name: item.productName,
           product_code: item.productSku,
+          description: item.productName,
           size: item.productSize,
           brand_id: item.brandId,
           quantity: item.quantity,
