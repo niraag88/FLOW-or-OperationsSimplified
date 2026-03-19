@@ -2847,6 +2847,37 @@ export async function registerRoutes(app: Express): Promise<Server> {
   });
 
 
+  // Download project as zip (Admin only)
+  app.get('/api/download-project', requireAuth(['Admin']), async (req: AuthenticatedRequest, res) => {
+    try {
+      const { exec } = await import('child_process');
+      const path = await import('path');
+      const fs = await import('fs');
+      
+      const projectRoot = process.cwd();
+      const zipPath = path.join('/tmp', 'flow-project.zip');
+      
+      // Remove old zip if exists
+      if (fs.existsSync(zipPath)) fs.unlinkSync(zipPath);
+      
+      await new Promise<void>((resolve, reject) => {
+        exec(
+          `zip -r ${zipPath} . -x "node_modules/*" -x ".git/*" -x "dist/*" -x ".cache/*" -x "*.log"`,
+          { cwd: projectRoot },
+          (err) => { if (err) reject(err); else resolve(); }
+        );
+      });
+      
+      res.setHeader('Content-Disposition', 'attachment; filename="flow-project.zip"');
+      res.setHeader('Content-Type', 'application/zip');
+      const fileStream = (await import('fs')).createReadStream(zipPath);
+      fileStream.pipe(res);
+    } catch (error) {
+      console.error('Error creating project zip:', error);
+      res.status(500).json({ error: 'Failed to create zip file' });
+    }
+  });
+
   // use storage to perform CRUD operations on the storage interface
   // e.g. storage.insertUser(user) or storage.getUserByUsername(username)
 
