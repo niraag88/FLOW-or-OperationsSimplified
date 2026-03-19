@@ -2847,7 +2847,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   });
 
 
-  // Download project as zip (Admin only)
+  // Download project as tar.gz (Admin only)
   app.get('/api/download-project', requireAuth(['Admin']), async (req: AuthenticatedRequest, res) => {
     try {
       const { exec } = await import('child_process');
@@ -2855,26 +2855,26 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const fs = await import('fs');
       
       const projectRoot = process.cwd();
-      const zipPath = path.join('/tmp', 'flow-project.zip');
+      const tarPath = path.join('/tmp', 'flow-project.tar.gz');
       
-      // Remove old zip if exists
-      if (fs.existsSync(zipPath)) fs.unlinkSync(zipPath);
+      // Remove old archive if exists
+      if (fs.existsSync(tarPath)) fs.unlinkSync(tarPath);
       
       await new Promise<void>((resolve, reject) => {
         exec(
-          `zip -r ${zipPath} . -x "node_modules/*" -x ".git/*" -x "dist/*" -x ".cache/*" -x "*.log"`,
+          `tar --exclude=node_modules --exclude=.git --exclude=dist --exclude=.cache -czf ${tarPath} .`,
           { cwd: projectRoot },
           (err) => { if (err) reject(err); else resolve(); }
         );
       });
       
-      res.setHeader('Content-Disposition', 'attachment; filename="flow-project.zip"');
-      res.setHeader('Content-Type', 'application/zip');
-      const fileStream = (await import('fs')).createReadStream(zipPath);
+      res.setHeader('Content-Disposition', 'attachment; filename="flow-project.tar.gz"');
+      res.setHeader('Content-Type', 'application/gzip');
+      const fileStream = (await import('fs')).createReadStream(tarPath);
       fileStream.pipe(res);
     } catch (error) {
-      console.error('Error creating project zip:', error);
-      res.status(500).json({ error: 'Failed to create zip file' });
+      console.error('Error creating project archive:', error);
+      res.status(500).json({ error: 'Failed to create archive' });
     }
   });
 
