@@ -1,8 +1,7 @@
 import React, { useState } from "react";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { Button } from "@/components/ui/button";
-import { Settings as SettingsIcon, Users, Building2, Package2, Database, HardDrive, Trash2, Package, Trash, Archive, FolderMinus, Download } from "lucide-react";
+import { Settings as SettingsIcon, Users, Building2, Package2, Database, HardDrive, Trash2, Package, Trash, Archive, FolderMinus } from "lucide-react";
 
 // Import setting components
 import CompanySettings from "../components/settings/CompanySettings";
@@ -17,48 +16,15 @@ import InventorySettings from "../components/settings/InventorySettings";
 
 export default function Settings() {
   const [activeTab, setActiveTab] = useState("company");
-  const [downloading, setDownloading] = useState(false);
-
-  const handleDownload = async () => {
-    setDownloading(true);
-    try {
-      const response = await fetch('/api/download-project');
-      if (!response.ok) throw new Error('Download failed');
-      const blob = await response.blob();
-      const url = window.URL.createObjectURL(blob);
-      const a = document.createElement('a');
-      a.href = url;
-      a.download = 'flow-project.tar.gz';
-      document.body.appendChild(a);
-      a.click();
-      window.URL.revokeObjectURL(url);
-      document.body.removeChild(a);
-    } catch (error) {
-      alert('Download failed. Please try again.');
-    } finally {
-      setDownloading(false);
-    }
-  };
 
   return (
     <div className="space-y-4 sm:space-y-6">
-      <div className="flex items-start justify-between">
-        <div>
-          <h1 className="text-xl sm:text-2xl font-bold text-gray-900 flex items-center gap-2">
-            <SettingsIcon className="w-5 h-5 sm:w-6 sm:h-6" />
-            Settings
-          </h1>
-          <p className="text-gray-600 text-sm sm:text-base">Manage your application settings and preferences</p>
-        </div>
-        <Button
-          variant="outline"
-          onClick={handleDownload}
-          disabled={downloading}
-          className="flex items-center gap-2 shrink-0"
-        >
-          <Download className="w-4 h-4" />
-          {downloading ? 'Preparing...' : 'Download Project'}
-        </Button>
+      <div>
+        <h1 className="text-xl sm:text-2xl font-bold text-gray-900 flex items-center gap-2">
+          <SettingsIcon className="w-5 h-5 sm:w-6 sm:h-6" />
+          Settings
+        </h1>
+        <p className="text-gray-600 text-sm sm:text-base">Manage your application settings and preferences</p>
       </div>
 
       <Tabs value={activeTab} onValueChange={setActiveTab} className="w-full">

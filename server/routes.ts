@@ -2847,37 +2847,6 @@ export async function registerRoutes(app: Express): Promise<Server> {
   });
 
 
-  // Download project as tar.gz (Admin only)
-  app.get('/api/download-project', requireAuth(['Admin']), async (req: AuthenticatedRequest, res) => {
-    try {
-      const { exec } = await import('child_process');
-      const path = await import('path');
-      const fs = await import('fs');
-      
-      const projectRoot = process.cwd();
-      const tarPath = path.join('/tmp', 'flow-project.tar.gz');
-      
-      // Remove old archive if exists
-      if (fs.existsSync(tarPath)) fs.unlinkSync(tarPath);
-      
-      await new Promise<void>((resolve, reject) => {
-        exec(
-          `tar --exclude=node_modules --exclude=.git --exclude=dist --exclude=.cache -czf ${tarPath} .`,
-          { cwd: projectRoot },
-          (err) => { if (err) reject(err); else resolve(); }
-        );
-      });
-      
-      res.setHeader('Content-Disposition', 'attachment; filename="flow-project.tar.gz"');
-      res.setHeader('Content-Type', 'application/gzip');
-      const fileStream = (await import('fs')).createReadStream(tarPath);
-      fileStream.pipe(res);
-    } catch (error) {
-      console.error('Error creating project archive:', error);
-      res.status(500).json({ error: 'Failed to create archive' });
-    }
-  });
-
   // use storage to perform CRUD operations on the storage interface
   // e.g. storage.insertUser(user) or storage.getUserByUsername(username)
 
