@@ -64,8 +64,7 @@ export const invoices = pgTable("invoices", {
   createdAt: timestamp("created_at").defaultNow().notNull(),
   legalHold: boolean("legal_hold").default(false).notNull(),
 }, (table) => ({
-  invoicesStatusIdx: index("invoices_status_idx").on(table.status),
-  invoicesCustomerIdIdx: index("invoices_customer_id_idx").on(table.customerId),
+  invoicesStatusCustomerIdx: index("invoices_status_customer_idx").on(table.status, table.customerId),
 }));
 
 // Delivery Orders table  
@@ -90,8 +89,7 @@ export const deliveryOrders = pgTable("delivery_orders", {
   createdAt: timestamp("created_at").defaultNow().notNull(),
   legalHold: boolean("legal_hold").default(false).notNull(),
 }, (table) => ({
-  doStatusIdx: index("delivery_orders_status_idx").on(table.status),
-  doCustomerIdIdx: index("delivery_orders_customer_id_idx").on(table.customerId),
+  doStatusCustomerIdx: index("delivery_orders_status_customer_idx").on(table.status, table.customerId),
 }));
 
 // Audit Log table
@@ -104,8 +102,7 @@ export const auditLog = pgTable("audit_log", {
   action: text("action").notNull(), // "DELETE", "CREATE", "UPDATE"
   timestamp: timestamp("timestamp").defaultNow().notNull(),
 }, (table) => ({
-  auditLogTargetTypeIdx: index("audit_log_target_type_idx").on(table.targetType),
-  auditLogTargetIdIdx: index("audit_log_target_id_idx").on(table.targetId),
+  auditLogEntityIdx: index("audit_log_entity_idx").on(table.targetType, table.targetId),
 }));
 
 // Schema exports for invoices
@@ -329,8 +326,7 @@ export const quotations = pgTable("quotations", {
   createdAt: timestamp("created_at").defaultNow().notNull(),
   updatedAt: timestamp("updated_at").defaultNow().notNull(),
 }, (table) => ({
-  quotationsStatusIdx: index("quotations_status_idx").on(table.status),
-  quotationsCustomerIdIdx: index("quotations_customer_id_idx").on(table.customerId),
+  quotationsStatusCustomerIdx: index("quotations_status_customer_idx").on(table.status, table.customerId),
 }));
 
 // Quotation Items table
