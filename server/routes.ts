@@ -2732,7 +2732,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   });
 
   // DELETE /api/recycle-bin/:id — permanently delete from recycle bin
-  app.delete('/api/recycle-bin/:id', requireAuth(['Admin']), async (req: AuthenticatedRequest, res) => {
+  app.delete('/api/recycle-bin/:id', requireAuth(['Admin', 'Manager']), async (req: AuthenticatedRequest, res) => {
     try {
       const id = parseInt(req.params.id);
       await db.delete(recycleBin).where(eq(recycleBin.id, id));

@@ -469,17 +469,14 @@ export class BusinessStorage {
   }
 
   async getNextQuotationNumber() {
-    // Preview the next number without incrementing it
     const settings = await this.getCompanySettings();
     const prefix = settings?.quotationNumberPrefix || 'QUO';
-    
-    // Use same helper logic for consistency
-    const nextNumber = await this.computeNextNumberForPrefix(prefix);
-    
-    const formattedNumber = prefix.includes('-') 
-      ? `${prefix}-${String(nextNumber).padStart(3, '0')}`  // QUO-2025-001 style
-      : `${prefix}-${nextNumber}`;  // QUO-1 style
-    
+    const nextNumber = settings?.nextQuotationNumber || 1;
+
+    const formattedNumber = prefix.includes('-')
+      ? `${prefix}-${String(nextNumber).padStart(3, '0')}`
+      : `${prefix}-${nextNumber}`;
+
     return formattedNumber;
   }
 
