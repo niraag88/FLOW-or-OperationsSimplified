@@ -1,14 +1,49 @@
 import React from "react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { Badge } from "@/components/ui/badge";
 import { 
   Package, 
   ShoppingCart, 
   Truck, 
   FileText,
   TrendingUp,
-  TrendingDown
+  TrendingDown,
+  Minus
 } from "lucide-react";
+
+const getMonthBounds = (monthOffset = 0) => {
+  const now = new Date();
+  const start = new Date(now.getFullYear(), now.getMonth() + monthOffset, 1);
+  const end = new Date(now.getFullYear(), now.getMonth() + monthOffset + 1, 1);
+  return { start, end };
+};
+
+const countInMonth = (items, monthOffset) => {
+  const { start, end } = getMonthBounds(monthOffset);
+  return items.filter(item => {
+    const d = new Date(item.createdAt || item.created_at);
+    return !isNaN(d) && d >= start && d < end;
+  }).length;
+};
+
+const computeChange = (items) => {
+  const thisMonth = countInMonth(items, 0);
+  const lastMonth = countInMonth(items, -1);
+  const diff = thisMonth - lastMonth;
+
+  if (thisMonth === 0 && lastMonth === 0) {
+    return { label: "No activity", type: "neutral" };
+  }
+  if (lastMonth === 0 && thisMonth > 0) {
+    return { label: `+${thisMonth} new this month`, type: "increase" };
+  }
+  if (diff === 0) {
+    return { label: "No change this month", type: "neutral" };
+  }
+  if (diff > 0) {
+    return { label: `+${diff} this month`, type: "increase" };
+  }
+  return { label: `${diff} this month`, type: "decrease" };
+};
 
 export default function DashboardStats({ data }) {
   const stats = [
@@ -17,36 +52,30 @@ export default function DashboardStats({ data }) {
       value: data.products.length,
       icon: Package,
       color: "bg-blue-500",
-      change: "+12%",
-      changeType: "increase"
+      items: data.products
     },
     {
       title: "Purchase Orders",
       value: data.purchaseOrders.length,
       icon: ShoppingCart,
       color: "bg-emerald-500",
-      change: "+8%",
-      changeType: "increase"
+      items: data.purchaseOrders
     },
     {
       title: "Delivery Orders",
       value: data.deliveryOrders.length,
       icon: Truck,
       color: "bg-amber-500",
-      change: "+15%",
-      changeType: "increase"
+      items: data.deliveryOrders
     },
     {
       title: "Invoices",
       value: data.invoices.length,
       icon: FileText,
       color: "bg-purple-500",
-      change: "-3%",
-      changeType: "decrease"
+      items: data.invoices
     }
-  ];
-
-  const totalValue = data.invoices.reduce((sum, inv) => sum + (inv.total_amount || 0), 0);
+  ].map(s => ({ ...s, ...computeChange(s.items) }));
 
   return (
     <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
@@ -66,17 +95,20 @@ export default function DashboardStats({ data }) {
               {stat.value.toLocaleString()}
             </div>
             <div className="flex items-center mt-1">
-              {stat.changeType === 'increase' ? (
-                <TrendingUp className="w-4 h-4 text-emerald-500 mr-1" />
+              {stat.type === 'increase' ? (
+                <TrendingUp className="w-4 h-4 text-emerald-500 mr-1 flex-shrink-0" />
+              ) : stat.type === 'decrease' ? (
+                <TrendingDown className="w-4 h-4 text-red-500 mr-1 flex-shrink-0" />
               ) : (
-                <TrendingDown className="w-4 h-4 text-red-500 mr-1" />
+                <Minus className="w-4 h-4 text-gray-400 mr-1 flex-shrink-0" />
               )}
               <span className={`text-xs font-medium ${
-                stat.changeType === 'increase' ? 'text-emerald-600' : 'text-red-600'
+                stat.type === 'increase' ? 'text-emerald-600' :
+                stat.type === 'decrease' ? 'text-red-600' :
+                'text-gray-400'
               }`}>
-                {stat.change}
+                {stat.label}
               </span>
-              <span className="text-xs text-gray-500 ml-1">this month</span>
             </div>
           </CardContent>
         </Card>

@@ -274,11 +274,13 @@ export default function Layout({ children, currentPageName }) {
                 {mobileMenuOpen ? <X className="w-5 h-5" /> : <Menu className="w-5 h-5" />}
               </Button>
               
-              <img 
-                src="/flow-logo-new.png" 
-                alt="FLOW Logo" 
-                className="h-8 sm:h-10 w-auto object-contain"
-              />
+              <Link to="/">
+                <img 
+                  src="/flow-logo-new.png" 
+                  alt="FLOW Logo" 
+                  className="h-8 sm:h-10 w-auto object-contain"
+                />
+              </Link>
             </div>
 
             {/* Desktop Navigation */}
