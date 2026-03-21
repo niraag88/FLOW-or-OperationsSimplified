@@ -2825,7 +2825,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
         totalAmount = storedTotal;
         taxAmount = storedVat;
         subtotal = totalAmount - taxAmount;
-        applicableVatRate = totalAmount > 0 ? taxAmount / (totalAmount - taxAmount) : 0;
+        applicableVatRate = subtotal > 0 ? taxAmount / subtotal : 0;
       } else {
         // Legacy path: recalculate
         subtotal = storedTotal;

@@ -20,6 +20,25 @@ import { Customer } from "@/api/entities";
 import { Brand } from "@/api/entities";
 import { Card } from "@/components/ui/card";
 
+const getInitialDOFormData = () => ({
+  do_number: "",
+  customer_id: "",
+  order_date: new Date().toISOString().split('T')[0],
+  reference: "",
+  reference_date: "",
+  status: "draft",
+  currency: "AED",
+  tax_treatment: "StandardRated",
+  tax_rate: 0.05,
+  subtotal: 0,
+  tax_amount: 0,
+  total_amount: 0,
+  remarks: "",
+  show_remarks: false,
+  attachments: [],
+  items: []
+});
+
 export default function DOForm({ open, onClose, editingDO, currentUser, onSuccess }) {
   const [loading, setLoading] = useState(false);
   const [customers, setCustomers] = useState([]);
@@ -27,24 +46,7 @@ export default function DOForm({ open, onClose, editingDO, currentUser, onSucces
   const [brands, setBrands] = useState([]);
   const [selectedCustomer, setSelectedCustomer] = useState(null);
 
-  const [formData, setFormData] = useState({
-    do_number: "",
-    customer_id: "",
-    order_date: new Date().toISOString().split('T')[0],
-    reference: "",
-    reference_date: "",
-    status: "draft",
-    currency: "AED",
-    tax_treatment: "StandardRated",
-    tax_rate: 0.05,
-    subtotal: 0,
-    tax_amount: 0,
-    total_amount: 0,
-    remarks: "",
-    show_remarks: false,
-    attachments: [],
-    items: []
-  });
+  const [formData, setFormData] = useState(getInitialDOFormData);
 
   useEffect(() => {
     if (open) {
@@ -75,7 +77,7 @@ export default function DOForm({ open, onClose, editingDO, currentUser, onSucces
               const customer = customersData.find(c => c.id === fullDO.customer_id);
               setSelectedCustomer(customer);
               setFormData({
-                ...formData,
+                ...getInitialDOFormData(),
                 ...fullDO,
                 items: fullDO.items || []
               });
