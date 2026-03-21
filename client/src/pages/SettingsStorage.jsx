@@ -117,7 +117,7 @@ export default function SettingsStorage() {
             />
             <div className="flex justify-between text-xs text-muted-foreground">
               <span>{loading ? '—' : `${usagePercentage.toFixed(2)}% used`}</span>
-              <span>{loading ? '—' : `${formatBytes(QUOTA_BYTES - totalUsed)} remaining`}</span>
+              <span>{loading ? '—' : `${formatBytes(Math.max(0, QUOTA_BYTES - totalUsed))} remaining`}</span>
             </div>
           </div>
 
