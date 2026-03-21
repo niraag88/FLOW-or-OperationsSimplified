@@ -3,7 +3,7 @@ import { createServer, type Server } from "http";
 import { storage } from "./storage";
 import { businessStorage } from "./businessStorage";
 import { Client } from '@replit/object-storage';
-import { invoices, deliveryOrders, auditLog, users, type InsertAuditLog, type InsertUser, type UpdateUser, type User, type InsertInvoice } from "@shared/schema";
+import { invoices, deliveryOrders, auditLog, users, recycleBin, type InsertAuditLog, type InsertUser, type UpdateUser, type User, type InsertInvoice } from "@shared/schema";
 import { insertBrandSchema, insertSupplierSchema, insertCustomerSchema, insertProductSchema, insertPurchaseOrderSchema, insertQuotationSchema, insertInvoiceSchema, insertDeliveryOrderSchema, stockCounts, stockCountItems, goodsReceipts, goodsReceiptItems, stockMovements, products, purchaseOrders, purchaseOrderItems, invoiceLineItems, deliveryOrderItems, suppliers, brands, quotations, quotationItems, customers, companySettings } from "@shared/schema";
 import { db } from "./db";
 import { eq, desc } from "drizzle-orm";
@@ -1118,6 +1118,26 @@ export async function registerRoutes(app: Express): Promise<Server> {
   app.delete('/api/purchase-orders/:id', requireAuth(['Admin', 'Manager']), async (req: AuthenticatedRequest, res) => {
     try {
       const poId = parseInt(req.params.id);
+      const userEmail = req.user?.email || req.user?.username || 'unknown';
+
+      // Fetch PO header and line items before deleting
+      const [po] = await db.select().from(purchaseOrders).where(eq(purchaseOrders.id, poId));
+      if (!po) {
+        return res.status(404).json({ error: 'Purchase order not found' });
+      }
+      const items = await db.select().from(purchaseOrderItems).where(eq(purchaseOrderItems.poId, poId));
+
+      // Save to recycle bin
+      await db.insert(recycleBin).values({
+        documentType: 'PurchaseOrder',
+        documentId: poId.toString(),
+        documentNumber: po.poNumber,
+        documentData: JSON.stringify({ header: po, items }),
+        deletedBy: userEmail,
+        originalStatus: po.status,
+        canRestore: true,
+      });
+
       const deletedPO = await businessStorage.deletePurchaseOrder(poId);
       res.json({ success: true, deletedPO });
     } catch (error) {
@@ -1814,6 +1834,26 @@ export async function registerRoutes(app: Express): Promise<Server> {
   app.delete('/api/quotations/:id', requireAuth(['Admin', 'Manager']), async (req: AuthenticatedRequest, res) => {
     try {
       const id = parseInt(req.params.id);
+      const userEmail = req.user?.email || req.user?.username || 'unknown';
+
+      // Fetch quotation header and line items before deleting
+      const quoteWithItems = await businessStorage.getQuotationWithItems(id);
+      if (!quoteWithItems) {
+        return res.status(404).json({ error: 'Quotation not found' });
+      }
+      const { items: lineItems, ...header } = quoteWithItems;
+
+      // Save to recycle bin
+      await db.insert(recycleBin).values({
+        documentType: 'Quotation',
+        documentId: id.toString(),
+        documentNumber: header.quoteNumber,
+        documentData: JSON.stringify({ header, items: lineItems || [] }),
+        deletedBy: userEmail,
+        originalStatus: header.status,
+        canRestore: true,
+      });
+
       const deletedQuote = await businessStorage.deleteQuotation(id);
       res.json({ success: true, message: 'Quotation deleted successfully', data: deletedQuote });
     } catch (error) {
@@ -2658,11 +2698,123 @@ export async function registerRoutes(app: Express): Promise<Server> {
     await db.insert(auditLog).values(auditData);
   };
 
+  // ── Recycle Bin routes ──────────────────────────────────────────────────────
+
+  // GET /api/recycle-bin — list all items, newest first
+  app.get('/api/recycle-bin', requireAuth(), async (req: AuthenticatedRequest, res) => {
+    try {
+      const items = await db.select().from(recycleBin).orderBy(desc(recycleBin.deletedDate));
+      // Return snake_case to match what the frontend expects
+      const mapped = items.map(item => ({
+        id: item.id,
+        document_type: item.documentType,
+        document_id: item.documentId,
+        document_number: item.documentNumber,
+        deleted_by: item.deletedBy,
+        deleted_date: item.deletedDate,
+        reason: item.reason,
+        original_status: item.originalStatus,
+        can_restore: item.canRestore,
+        created_at: item.createdAt,
+      }));
+      res.json(mapped);
+    } catch (error) {
+      console.error('Error fetching recycle bin:', error);
+      res.status(500).json({ error: 'Failed to fetch recycle bin' });
+    }
+  });
+
+  // DELETE /api/recycle-bin/:id — permanently delete from recycle bin
+  app.delete('/api/recycle-bin/:id', requireAuth(['Admin']), async (req: AuthenticatedRequest, res) => {
+    try {
+      const id = parseInt(req.params.id);
+      await db.delete(recycleBin).where(eq(recycleBin.id, id));
+      res.json({ success: true, message: 'Permanently deleted from recycle bin' });
+    } catch (error) {
+      console.error('Error permanently deleting from recycle bin:', error);
+      res.status(500).json({ error: 'Failed to permanently delete' });
+    }
+  });
+
+  // POST /api/recycle-bin/:id/restore — restore a document to its original table
+  app.post('/api/recycle-bin/:id/restore', requireAuth(['Admin', 'Manager']), async (req: AuthenticatedRequest, res) => {
+    try {
+      const id = parseInt(req.params.id);
+      const [item] = await db.select().from(recycleBin).where(eq(recycleBin.id, id));
+
+      if (!item) {
+        return res.status(404).json({ error: 'Recycle bin item not found' });
+      }
+
+      const { header, items: lineItems = [] } = JSON.parse(item.documentData);
+
+      if (item.documentType === 'Invoice') {
+        const { id: _id, createdAt: _ca, ...headerData } = header;
+        const [restored] = await db.insert(invoices).values(headerData).returning();
+        if (lineItems.length > 0) {
+          for (const li of lineItems) {
+            const { id: _lid, createdAt: _lca, invoiceId: _inv, ...liData } = li;
+            await db.insert(invoiceLineItems).values({ ...liData, invoiceId: restored.id });
+          }
+        }
+      } else if (item.documentType === 'DeliveryOrder') {
+        const { id: _id, createdAt: _ca, ...headerData } = header;
+        const [restored] = await db.insert(deliveryOrders).values(headerData).returning();
+        if (lineItems.length > 0) {
+          for (const li of lineItems) {
+            const { id: _lid, createdAt: _lca, doId: _did, ...liData } = li;
+            await db.insert(deliveryOrderItems).values({ ...liData, doId: restored.id });
+          }
+        }
+      } else if (item.documentType === 'Quotation') {
+        const { id: _id, createdAt: _ca, updatedAt: _ua, customerName: _cn, ...headerData } = header;
+        const [restored] = await db.insert(quotations).values({
+          ...headerData,
+          quoteDate: headerData.quoteDate ? new Date(headerData.quoteDate) : new Date(),
+          validUntil: headerData.validUntil ? new Date(headerData.validUntil) : new Date(),
+          referenceDate: headerData.referenceDate ? new Date(headerData.referenceDate) : null,
+        }).returning();
+        if (lineItems.length > 0) {
+          for (const li of lineItems) {
+            const { id: _lid, createdAt: _lca, quoteId: _qid, ...liData } = li;
+            await db.insert(quotationItems).values({ ...liData, quoteId: restored.id });
+          }
+        }
+      } else if (item.documentType === 'PurchaseOrder') {
+        const { id: _id, createdAt: _ca, updatedAt: _ua, supplierName: _sn, ...headerData } = header;
+        const [restored] = await db.insert(purchaseOrders).values({
+          ...headerData,
+          orderDate: headerData.orderDate ? new Date(headerData.orderDate) : new Date(),
+          expectedDelivery: headerData.expectedDelivery ? new Date(headerData.expectedDelivery) : null,
+        }).returning();
+        if (lineItems.length > 0) {
+          for (const li of lineItems) {
+            const { id: _lid, createdAt: _lca, poId: _pid, ...liData } = li;
+            await db.insert(purchaseOrderItems).values({ ...liData, poId: restored.id });
+          }
+        }
+      } else {
+        return res.status(400).json({ error: `Unknown document type: ${item.documentType}` });
+      }
+
+      // Remove from recycle bin after successful restore
+      await db.delete(recycleBin).where(eq(recycleBin.id, id));
+
+      res.json({ success: true, message: `${item.documentNumber} has been restored successfully` });
+    } catch (error) {
+      console.error('Error restoring document:', error);
+      res.status(500).json({ error: 'Failed to restore document' });
+    }
+  });
+
+  // ── Document delete routes (send to Recycle Bin first) ────────────────────
+
   // DELETE /api/invoices/:id
   app.delete('/api/invoices/:id', requireAuth(['Admin']), async (req: AuthenticatedRequest, res) => {
     try {
       const { id } = req.params;
       const userId = req.user?.id || 'unknown';
+      const userEmail = req.user?.email || req.user?.username || 'unknown';
       
       // Get the invoice
       const [invoice] = await db.select().from(invoices).where(eq(invoices.id, parseInt(id)));
@@ -2675,6 +2827,25 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const retentionCheck = checkLegalHoldForDeletion(invoice.legalHold);
       if (!retentionCheck.canDelete) {
         return res.status(403).json({ error: retentionCheck.error });
+      }
+
+      // Fetch line items for this invoice
+      const items = await db.select().from(invoiceLineItems).where(eq(invoiceLineItems.invoiceId, parseInt(id)));
+
+      // Save to recycle bin before deleting
+      await db.insert(recycleBin).values({
+        documentType: 'Invoice',
+        documentId: id,
+        documentNumber: invoice.invoiceNumber,
+        documentData: JSON.stringify({ header: invoice, items }),
+        deletedBy: userEmail,
+        originalStatus: invoice.status,
+        canRestore: true,
+      });
+
+      // Delete line items first (FK constraint)
+      if (items.length > 0) {
+        await db.delete(invoiceLineItems).where(eq(invoiceLineItems.invoiceId, parseInt(id)));
       }
       
       // Delete from storage if object exists
@@ -2710,6 +2881,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
     try {
       const { id } = req.params;
       const userId = req.user?.id || 'unknown';
+      const userEmail = req.user?.email || req.user?.username || 'unknown';
       
       // Get the delivery order
       const [deliveryOrder] = await db.select().from(deliveryOrders).where(eq(deliveryOrders.id, parseInt(id)));
@@ -2722,6 +2894,25 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const retentionCheck = checkLegalHoldForDeletion(deliveryOrder.legalHold);
       if (!retentionCheck.canDelete) {
         return res.status(403).json({ error: retentionCheck.error });
+      }
+
+      // Fetch line items for this delivery order
+      const items = await db.select().from(deliveryOrderItems).where(eq(deliveryOrderItems.doId, parseInt(id)));
+
+      // Save to recycle bin before deleting
+      await db.insert(recycleBin).values({
+        documentType: 'DeliveryOrder',
+        documentId: id,
+        documentNumber: deliveryOrder.orderNumber,
+        documentData: JSON.stringify({ header: deliveryOrder, items }),
+        deletedBy: userEmail,
+        originalStatus: deliveryOrder.status,
+        canRestore: true,
+      });
+
+      // Delete line items first (FK constraint)
+      if (items.length > 0) {
+        await db.delete(deliveryOrderItems).where(eq(deliveryOrderItems.doId, parseInt(id)));
       }
       
       // Delete from storage if object exists

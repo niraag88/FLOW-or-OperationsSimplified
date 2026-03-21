@@ -23,14 +23,6 @@ import {
 import { useToast } from '@/components/ui/use-toast';
 import { format } from 'date-fns';
 import { RecycleBin } from '@/api/entities';
-import { PurchaseOrder } from '@/api/entities';
-import { Invoice } from '@/api/entities';
-import { DeliveryOrder } from '@/api/entities';
-import { Quotation } from '@/api/entities';
-import { Customer } from '@/api/entities';
-import { Product } from '@/api/entities';
-import { Brand } from '@/api/entities';
-import { AuditLog } from '@/api/entities';
 import { User } from '@/api/entities';
 import SimpleConfirmDialog from '../common/SimpleConfirmDialog';
 
@@ -67,63 +59,11 @@ export default function RecycleBinComponent() {
   const loadDeletedItems = async () => {
     setLoading(true);
     try {
-      const items = await RecycleBin.list('-deleted_date');
+      const items = await RecycleBin.list();
       setDeletedItems(items);
     } catch (error) {
       console.error('Error loading deleted items:', error);
-      // Generate some mock data for preview
-      setDeletedItems([
-        {
-          id: '1',
-          document_type: 'Invoice',
-          document_number: 'INV-2024-001',
-          deleted_by: 'admin@example.com',
-          deleted_date: new Date(Date.now() - 24 * 60 * 60 * 1000).toISOString(),
-          reason: 'Duplicate invoice created by mistake',
-          original_status: 'draft',
-          can_restore: true
-        },
-        {
-          id: '2',
-          document_type: 'PurchaseOrder',
-          document_number: 'PO-2024-045',
-          deleted_by: 'manager@example.com',
-          deleted_date: new Date(Date.now() - 3 * 24 * 60 * 60 * 1000).toISOString(),
-          reason: 'Cancelled order - supplier unavailable',
-          original_status: 'draft',
-          can_restore: true
-        },
-        {
-          id: '3',
-          document_type: 'Quotation',
-          document_number: 'QUO-2024-012',
-          deleted_by: 'admin@example.com',
-          deleted_date: new Date(Date.now() - 5 * 24 * 60 * 60 * 1000).toISOString(),
-          reason: 'Customer decided not to proceed',
-          original_status: 'draft',
-          can_restore: true
-        },
-        {
-          id: '4',
-          document_type: 'DeliveryOrder',
-          document_number: 'DO-2024-007',
-          deleted_by: 'sales@example.com',
-          deleted_date: new Date(Date.now() - 1 * 24 * 60 * 60 * 1000).toISOString(),
-          reason: 'Customer requested cancellation before delivery',
-          original_status: 'pending',
-          can_restore: true
-        },
-        {
-          id: '5',
-          document_type: 'Invoice',
-          document_number: 'INV-2024-002',
-          deleted_by: 'admin@example.com',
-          deleted_date: new Date(Date.now() - 7 * 24 * 60 * 60 * 1000).toISOString(),
-          reason: 'Incorrect billing details, new invoice issued',
-          original_status: 'pending',
-          can_restore: true
-        }
-      ]);
+      setDeletedItems([]);
     } finally {
       setLoading(false);
     }
@@ -151,22 +91,7 @@ export default function RecycleBinComponent() {
   const handleBulkPermanentDelete = async () => {
     try {
       const itemsToDelete = Array.from(selectedItems);
-      
-      // Log bulk deletion
-      await AuditLog.create({
-        entity_type: 'RecycleBin',
-        entity_id: 'bulk_operation',
-        action: 'bulk_permanent_delete',
-        user_email: currentUser?.email || 'unknown',
-        changes: { 
-          deleted_count: itemsToDelete.length,
-          document_ids: itemsToDelete,
-          bulk_deletion_reason: 'Bulk permanent deletion from Recycle Bin'
-        },
-        timestamp: new Date().toISOString()
-      });
 
-      // Delete items from recycle bin
       for (const itemId of itemsToDelete) {
         await RecycleBin.delete(itemId);
       }
@@ -191,22 +116,8 @@ export default function RecycleBinComponent() {
 
   const handleClearAll = async () => {
     try {
-      const allItemsToClear = filteredItems.map(item => item.id); // Operate on currently filtered items
-      
-      // Log clear all operation
-      await AuditLog.create({
-        entity_type: 'RecycleBin',
-        entity_id: 'clear_all_operation',
-        action: 'clear_all_recycle_bin',
-        user_email: currentUser?.email || 'unknown',
-        changes: { 
-          cleared_count: allItemsToClear.length,
-          clear_all_reason: 'Cleared entire recycle bin from UI'
-        },
-        timestamp: new Date().toISOString()
-      });
+      const allItemsToClear = filteredItems.map(item => item.id);
 
-      // Delete all items from recycle bin that are currently filtered/displayed
       for (const itemId of allItemsToClear) {
         await RecycleBin.delete(itemId);
       }
@@ -233,32 +144,7 @@ export default function RecycleBinComponent() {
     if (!selectedItem) return;
 
     try {
-      const EntityClass = getEntityClass(selectedItem.document_type);
-      if (!EntityClass) {
-        toast({
-          title: 'Error',
-          description: 'Unknown document type',
-          variant: 'destructive'
-        });
-        return;
-      }
-
-      // Restore the document to its original entity
-      // Note: This assumes document_data contains all necessary fields for creation
-      await EntityClass.create(selectedItem.document_data);
-
-      // Log the restoration
-      await AuditLog.create({
-        entity_type: selectedItem.document_type,
-        entity_id: selectedItem.document_id,
-        action: 'restored',
-        user_email: currentUser?.email || 'unknown',
-        changes: { restored_from_recycle_bin: true, restore_reason: 'Restored from UI' },
-        timestamp: new Date().toISOString()
-      });
-
-      // Remove from recycle bin
-      await RecycleBin.delete(selectedItem.id);
+      await RecycleBin.restore(selectedItem.id);
 
       toast({
         title: 'Document Restored',
@@ -267,7 +153,7 @@ export default function RecycleBinComponent() {
 
       setShowRestoreDialog(false);
       setSelectedItem(null);
-      loadDeletedItems(); // Reload list to reflect changes
+      loadDeletedItems();
     } catch (error) {
       console.error('Error restoring document:', error);
       toast({
@@ -282,21 +168,6 @@ export default function RecycleBinComponent() {
     if (!selectedItem) return;
 
     try {
-      // Log the permanent deletion
-      await AuditLog.create({
-        entity_type: selectedItem.document_type,
-        entity_id: selectedItem.document_id,
-        action: 'permanently_deleted',
-        user_email: currentUser?.email || 'unknown',
-        changes: { 
-          document_number: selectedItem.document_number,
-          permanent_deletion_reason: 'Deleted permanently from Recycle Bin',
-          original_deletion_reason: selectedItem.reason
-        },
-        timestamp: new Date().toISOString()
-      });
-
-      // Remove from recycle bin permanently
       await RecycleBin.delete(selectedItem.id);
 
       toast({
@@ -609,18 +480,5 @@ const getDocumentColor = (type) => {
     case 'DeliveryOrder': return 'bg-amber-100 text-amber-800';
     case 'Quotation': return 'bg-sky-100 text-sky-800';
     default: return 'bg-gray-100 text-gray-800';
-  }
-};
-
-const getEntityClass = (type) => {
-  switch (type) {
-    case 'PurchaseOrder': return PurchaseOrder;
-    case 'Invoice': return Invoice;
-    case 'DeliveryOrder': return DeliveryOrder;
-    case 'Quotation': return Quotation;
-    case 'Customer': return Customer;
-    case 'Product': return Product;
-    case 'Brand': return Brand;
-    default: return null;
   }
 };

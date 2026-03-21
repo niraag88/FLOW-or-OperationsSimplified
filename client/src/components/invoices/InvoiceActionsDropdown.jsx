@@ -13,8 +13,6 @@ import { useToast } from "@/components/ui/use-toast";
 import { exportInvoiceToXLSX } from "../utils/export";
 import { format } from 'date-fns';
 import { Invoice } from "@/api/entities";
-import { RecycleBin } from "@/api/entities";
-import { AuditLog } from "@/api/entities";
 import { User } from "@/api/entities";
 import MarkPaidDialog from "./MarkPaidDialog"; // Added
 import SimpleConfirmDialog from "../common/SimpleConfirmDialog"; // Added, replaces ConfirmDeleteDialog
@@ -65,33 +63,8 @@ export default function InvoiceActionsDropdown({ invoice, canEdit, onEdit, onRef
     window.open(`/invoices/${invoice.id}/print`, '_blank');
   };
 
-  const handleDelete = async () => { // Removed 'reason' parameter
+  const handleDelete = async () => {
     try {
-      await RecycleBin.create({
-        document_type: 'Invoice',
-        document_id: invoice.id,
-        document_number: invoice.invoice_number,
-        document_data: invoice,
-        deleted_by: currentUser?.email || 'unknown',
-        deleted_date: new Date().toISOString(),
-        reason: '', // Reason is now an empty string as it's not required by SimpleConfirmDialog
-        original_status: invoice.status,
-        can_restore: true
-      });
-
-      await AuditLog.create({
-        entity_type: 'Invoice',
-        entity_id: invoice.id,
-        action: 'deleted',
-        user_email: currentUser?.email || 'unknown',
-        changes: { 
-          document_number: invoice.invoice_number,
-          deletion_reason: 'Deleted from UI', // Fixed reason for audit log
-          moved_to_recycle_bin: true
-        },
-        timestamp: new Date().toISOString()
-      });
-
       await Invoice.delete(invoice.id);
 
       toast({

@@ -13,8 +13,6 @@ import { exportToCsv, exportQuotationToXLSX } from "../utils/export";
 import { format, isValid, parseISO } from 'date-fns';
 import { useToast } from "@/components/ui/use-toast";
 import { Quotation } from "@/api/entities";
-import { RecycleBin } from "@/api/entities";
-import { AuditLog } from "@/api/entities";
 import { User } from "@/api/entities";
 import SimpleConfirmDialog from "../common/SimpleConfirmDialog";
 
@@ -84,34 +82,6 @@ export default function QuotationActionsDropdown({ quotation, canEdit, onEdit, o
 
   const handleDelete = async () => {
     try {
-      // Move to recycle bin
-      await RecycleBin.create({
-        document_type: 'Quotation',
-        document_id: quotation.id,
-        document_number: quotation.quotation_number || quotation.quoteNumber,
-        document_data: quotation,
-        deleted_by: currentUser?.email || 'unknown',
-        deleted_date: new Date().toISOString(),
-        reason: '', // Reason is not collected from SimpleConfirmDialog
-        original_status: quotation.status,
-        can_restore: true
-      });
-
-      // Log the deletion
-      await AuditLog.create({
-        entity_type: 'Quotation',
-        entity_id: quotation.id,
-        action: 'deleted',
-        user_email: currentUser?.email || 'unknown',
-        changes: { 
-          document_number: quotation.quotation_number || quotation.quoteNumber,
-          deletion_reason: 'Deleted from UI',
-          moved_to_recycle_bin: true
-        },
-        timestamp: new Date().toISOString()
-      });
-
-      // Delete from main table
       await Quotation.delete(quotation.id);
 
       toast({

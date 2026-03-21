@@ -14,8 +14,6 @@ import { exportDeliveryOrderToXLSX } from "../utils/export";
 import { format, isValid, parseISO } from 'date-fns';
 import SimpleConfirmDialog from "../common/SimpleConfirmDialog"; // Changed import from ConfirmDeleteDialog
 import { DeliveryOrder } from "@/api/entities"; // New import
-import { RecycleBin } from "@/api/entities"; // New import
-import { AuditLog } from "@/api/entities"; // New import
 import { User } from "@/api/entities"; // New import
 
 export default function DOActionsDropdown({ doOrder, canEdit, onEdit, onRefresh }) {
@@ -72,36 +70,8 @@ export default function DOActionsDropdown({ doOrder, canEdit, onEdit, onRefresh 
     window.open(`/delivery-orders/${doOrder.id}/print`, '_blank');
   };
 
-  // Modified handleDelete function - no longer accepts a 'reason' parameter
   const handleDelete = async () => {
     try {
-      await RecycleBin.create({
-        document_type: 'DeliveryOrder',
-        document_id: doOrder.id,
-        document_number: doOrder.do_number,
-        document_data: doOrder,
-        deleted_by: currentUser?.email || 'unknown',
-        deleted_date: new Date().toISOString(),
-        reason: '', // Set reason to empty string as per simplification
-        original_status: doOrder.status,
-        can_restore: true
-      });
-
-      await AuditLog.create({
-        entity_type: 'DeliveryOrder',
-        entity_id: doOrder.id,
-        action: 'deleted',
-        user_email: currentUser?.email || 'unknown',
-        changes: { 
-          document_number: doOrder.do_number,
-          deletion_reason: 'Deleted from UI', // Set specific deletion reason
-          moved_to_recycle_bin: true
-        },
-        timestamp: new Date().toISOString()
-      });
-
-      // Assuming DeliveryOrder.delete marks the order as inactive/deleted
-      // or removes it from the primary list view, as it's moved to recycle bin.
       await DeliveryOrder.delete(doOrder.id);
 
       toast({

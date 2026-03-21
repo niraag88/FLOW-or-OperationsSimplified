@@ -170,7 +170,18 @@ export const CompanySettings = {
 export const Books = new FallbackEntity('Books');
 export const StorageSettings = new FallbackEntity('StorageSettings');
 export const StorageUsage = new FallbackEntity('StorageUsage');
-export const RecycleBin = new FallbackEntity('RecycleBin');
+export const RecycleBin = {
+  ...new ApiEntity('recycle-bin'),
+  async restore(id) {
+    const response = await fetch(`/api/recycle-bin/${id}/restore`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      credentials: 'include',
+    });
+    if (!response.ok) throw new Error('Failed to restore document');
+    return await response.json();
+  }
+};
 export const AuditLog = new FallbackEntity('AuditLog');
 export const InventoryAudit = new FallbackEntity('InventoryAudit');
 

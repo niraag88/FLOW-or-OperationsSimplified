@@ -13,8 +13,6 @@ import { useToast } from "@/components/ui/use-toast";
 import { exportToCsv, exportToXLSX, exportPurchaseOrderToPDF } from "../utils/export";
 import { format } from 'date-fns';
 import { PurchaseOrder } from "@/api/entities";
-import { RecycleBin } from "@/api/entities";
-import { AuditLog } from "@/api/entities";
 import { User } from "@/api/entities";
 import SimpleConfirmDialog from "../common/SimpleConfirmDialog";
 
@@ -146,34 +144,6 @@ export default function POActionsDropdown({ po, canEdit, onEdit, onRefresh }) {
 
   const handleDelete = async () => {
     try {
-      // Move to recycle bin
-      await RecycleBin.create({
-        document_type: 'PurchaseOrder',
-        document_id: po.id,
-        document_number: po.poNumber,
-        document_data: po,
-        deleted_by: currentUser?.email || 'unknown',
-        deleted_date: new Date().toISOString(),
-        reason: '', // Reason is no longer collected
-        original_status: po.status,
-        can_restore: true
-      });
-
-      // Log the deletion
-      await AuditLog.create({
-        entity_type: 'PurchaseOrder',
-        entity_id: po.id,
-        action: 'deleted',
-        user_email: currentUser?.email || 'unknown',
-        changes: { 
-          document_number: po.poNumber,
-          deletion_reason: 'Deleted from UI',
-          moved_to_recycle_bin: true
-        },
-        timestamp: new Date().toISOString()
-      });
-
-      // Delete from main table
       await PurchaseOrder.delete(po.id);
 
       toast({
