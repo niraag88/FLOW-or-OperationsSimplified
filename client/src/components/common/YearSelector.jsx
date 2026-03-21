@@ -1,7 +1,7 @@
 import React from "react";
 
 export default function YearSelector({ financialYears, selectedYearId, onYearChange }) {
-  if (!financialYears || financialYears.length === 0) return null;
+  const years = financialYears || [];
 
   return (
     <div className="flex items-center gap-2 flex-wrap">

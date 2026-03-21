@@ -474,13 +474,11 @@ export default function Invoices() {
       </div>
 
 
-      {financialYears.length > 0 && (
-        <YearSelector
-          financialYears={financialYears}
-          selectedYearId={selectedYearId}
-          onYearChange={(id) => { setSelectedYearId(id); resetPagination(); }}
-        />
-      )}
+      <YearSelector
+        financialYears={financialYears}
+        selectedYearId={selectedYearId}
+        onYearChange={(id) => { setSelectedYearId(id); resetPagination(); }}
+      />
 
       {/* Search and Filters */}
       <div className="flex flex-col sm:flex-row gap-4">

@@ -205,13 +205,11 @@ export default function Quotations() {
         </div>
       </div>
 
-      {financialYears.length > 0 && (
-        <YearSelector
-          financialYears={financialYears}
-          selectedYearId={selectedYearId}
-          onYearChange={(id) => { setSelectedYearId(id); resetPagination(); }}
-        />
-      )}
+      <YearSelector
+        financialYears={financialYears}
+        selectedYearId={selectedYearId}
+        onYearChange={(id) => { setSelectedYearId(id); resetPagination(); }}
+      />
 
       <div className="flex flex-col sm:flex-row gap-4">
         <div className="relative flex-1 max-w-md">
