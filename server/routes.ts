@@ -1265,11 +1265,19 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const vatAmount = parseFloat(invoice.vatAmount || '0') || 0;
       const subtotal = totalAmount - vatAmount;
 
-      // Derive tax_rate and tax_treatment from stored amounts
-      const derivedTaxRate = (vatAmount > 0 && subtotal > 0)
-        ? Math.round(vatAmount / subtotal * 10000) / 10000
-        : 0.05;
-      const derivedTaxTreatment = vatAmount > 0 ? 'StandardRated' : 'ZeroRated';
+      // Derive tax_rate and tax_treatment — if VAT is stored use it;
+      // otherwise fall back to the customer's VAT treatment (Local = StandardRated)
+      let derivedTaxRate: number;
+      let derivedTaxTreatment: string;
+      if (vatAmount > 0 && subtotal > 0) {
+        derivedTaxTreatment = 'StandardRated';
+        derivedTaxRate = Math.round(vatAmount / subtotal * 10000) / 10000;
+      } else {
+        const localTreatments = ['Local', 'standard', 'Standard', 'local'];
+        const isLocal = localTreatments.includes(invoice.customerVatTreatment || '');
+        derivedTaxTreatment = isLocal ? 'StandardRated' : 'ZeroRated';
+        derivedTaxRate = 0.05;
+      }
 
       // Format the response with snake_case field names to match InvoiceForm expectations
       // All numeric fields returned as actual numbers to avoid string/number mismatch in forms
@@ -1526,7 +1534,10 @@ export async function registerRoutes(app: Express): Promise<Server> {
         notes: deliveryOrders.notes,
         taxRate: deliveryOrders.taxRate,
         status: deliveryOrders.status,
-      }).from(deliveryOrders).where(eq(deliveryOrders.id, id));
+        customerVatTreatment: customers.vatTreatment,
+      }).from(deliveryOrders)
+        .leftJoin(customers, eq(customers.id, deliveryOrders.customerId))
+        .where(eq(deliveryOrders.id, id));
 
       if (!doRecord) {
         return res.status(404).json({ error: 'Delivery order not found' });
@@ -1568,7 +1579,11 @@ export async function registerRoutes(app: Express): Promise<Server> {
         remarks: doRecord.notes || '',
         show_remarks: !!(doRecord.notes),
         tax_rate: taxRt,
-        tax_treatment: taxAmt > 0 ? 'StandardRated' : 'ZeroRated',
+        tax_treatment: (() => {
+          if (taxAmt > 0) return 'StandardRated';
+          const localTreatments = ['Local', 'standard', 'Standard', 'local'];
+          return localTreatments.includes(doRecord.customerVatTreatment || '') ? 'StandardRated' : 'ZeroRated';
+        })(),
         status: doRecord.status,
         attachments: [],
         items: lineItems.map(item => ({
