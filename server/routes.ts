@@ -2646,24 +2646,11 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  // Retention policy helpers
+  // Legal hold check helper
   const checkRetentionPolicy = (createdAt: Date, legalHold: boolean) => {
     if (legalHold) {
       return { canDelete: false, error: 'Cannot delete: Record is under legal hold' };
     }
-    
-    // 5-year retention policy
-    const fiveYearsLater = new Date(createdAt);
-    fiveYearsLater.setFullYear(fiveYearsLater.getFullYear() + 5);
-    
-    if (fiveYearsLater > new Date()) {
-      const retentionDate = fiveYearsLater.toISOString().split('T')[0];
-      return { 
-        canDelete: false, 
-        error: `Retention policy: cannot delete until ${retentionDate}` 
-      };
-    }
-    
     return { canDelete: true };
   };
 
