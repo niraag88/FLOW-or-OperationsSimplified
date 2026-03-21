@@ -238,7 +238,7 @@ export const products = pgTable("products", {
   createdAt: timestamp("created_at").defaultNow().notNull(),
   updatedAt: timestamp("updated_at").defaultNow().notNull(),
 }, (table) => ({
-  productsNameIdx: index("products_name_idx").on(table.name),
+  productsSkuIdx: index("products_sku_idx").on(table.sku),
 }));
 
 // Invoice Line Items table
@@ -395,6 +395,17 @@ export const companySettings = pgTable("company_settings", {
   updatedAt: timestamp("updated_at").defaultNow().notNull(),
 });
 
+// Storage monitoring table
+export const storageMonitoring = pgTable("storage_monitoring", {
+  id: serial("id").primaryKey(),
+  databaseSize: bigint("database_size", { mode: "number" }).notNull(),
+  objectStorageSize: bigint("object_storage_size", { mode: "number" }).default(0),
+  totalDocuments: integer("total_documents").default(0),
+  backupStatus: text("backup_status").default("pending"), // pending, running, completed, failed
+  lastBackup: timestamp("last_backup"),
+  retentionDays: integer("retention_days").default(2555), // 7 years
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+});
 
 // Stock Counts table
 export const stockCounts = pgTable("stock_counts", {
@@ -662,3 +673,4 @@ export type InsertRecycleBin = z.infer<typeof insertRecycleBinSchema>;
 
 export type VatReturn = typeof vatReturns.$inferSelect;
 export type CompanySettings = typeof companySettings.$inferSelect;
+export type StorageMonitoring = typeof storageMonitoring.$inferSelect;
