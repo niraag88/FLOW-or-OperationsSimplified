@@ -27,6 +27,7 @@ export default function BookClosingManager({ currentUser }) {
   const [newYear, setNewYear] = useState(getYear(new Date()));
   const [validationErrors, setValidationErrors] = useState([]);
   const [showValidationError, setShowValidationError] = useState(false);
+  const [pendingCloseBook, setPendingCloseBook] = useState(null);
   const [exportingId, setExportingId] = useState(null);
   const { toast } = useToast();
 
@@ -136,12 +137,9 @@ export default function BookClosingManager({ currentUser }) {
     return errors.length === 0;
   };
 
-  const handleCloseYear = async (book) => {
-    const ok = await validateYearEnd(book);
-    if (!ok) {
-      setShowValidationError(true);
-      return;
-    }
+  const doCloseYear = async (book) => {
+    setShowValidationError(false);
+    setPendingCloseBook(null);
     try {
       const res = await fetch(`/api/books/${book.id}`, {
         method: 'PUT',
@@ -155,6 +153,16 @@ export default function BookClosingManager({ currentUser }) {
       console.error("Error closing year:", error);
       toast({ title: "Error", description: error.message, variant: "destructive" });
     }
+  };
+
+  const handleCloseYear = async (book) => {
+    const ok = await validateYearEnd(book);
+    if (!ok) {
+      setPendingCloseBook(book);
+      setShowValidationError(true);
+      return;
+    }
+    doCloseYear(book);
   };
 
   const handleReopenYear = async (book) => {
@@ -303,20 +311,28 @@ export default function BookClosingManager({ currentUser }) {
         <AlertDialogContent>
           <AlertDialogHeader>
             <AlertDialogTitle className="flex items-center gap-2">
-              <AlertTriangle className="text-red-500" />
-              Year-End Validation Failed
+              <AlertTriangle className="text-amber-500" />
+              Pending Items Before Closing
             </AlertDialogTitle>
             <AlertDialogDescription asChild>
               <div>
-                <p>The financial year cannot be closed. Please resolve the following items first:</p>
-                <ul className="list-disc pl-5 mt-3 space-y-1 text-sm text-gray-700 bg-gray-50 p-3 rounded-md">
+                <p>The following items are still pending. Would you still like to proceed with closing the year?</p>
+                <ul className="list-disc pl-5 mt-3 space-y-1 text-sm text-gray-700 bg-amber-50 border border-amber-200 p-3 rounded-md">
                   {validationErrors.map((error, i) => <li key={i}>{error}</li>)}
                 </ul>
               </div>
             </AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>
-            <AlertDialogAction onClick={() => setShowValidationError(false)}>Acknowledge</AlertDialogAction>
+            <AlertDialogCancel onClick={() => { setShowValidationError(false); setPendingCloseBook(null); }}>
+              Go Fix
+            </AlertDialogCancel>
+            <AlertDialogAction
+              className="bg-red-600 hover:bg-red-700"
+              onClick={() => pendingCloseBook && doCloseYear(pendingCloseBook)}
+            >
+              Close Anyway
+            </AlertDialogAction>
           </AlertDialogFooter>
         </AlertDialogContent>
       </AlertDialog>
