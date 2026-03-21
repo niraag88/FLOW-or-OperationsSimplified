@@ -30,19 +30,16 @@ const computeChange = (items) => {
   const lastMonth = countInMonth(items, -1);
   const diff = thisMonth - lastMonth;
 
-  if (thisMonth === 0 && lastMonth === 0) {
-    return { label: "No activity", type: "neutral" };
-  }
   if (lastMonth === 0 && thisMonth > 0) {
-    return { label: `+${thisMonth} new this month`, type: "increase" };
-  }
-  if (diff === 0) {
-    return { label: "No change this month", type: "neutral" };
+    return { label: "New", type: "increase" };
   }
   if (diff > 0) {
-    return { label: `+${diff} this month`, type: "increase" };
+    return { label: `+${diff}`, type: "increase" };
   }
-  return { label: `${diff} this month`, type: "decrease" };
+  if (diff < 0) {
+    return { label: `${diff}`, type: "decrease" };
+  }
+  return { label: "No change", type: "neutral" };
 };
 
 export default function DashboardStats({ data }) {
@@ -109,6 +106,7 @@ export default function DashboardStats({ data }) {
               }`}>
                 {stat.label}
               </span>
+              <span className="text-xs text-gray-500 ml-1">this month</span>
             </div>
           </CardContent>
         </Card>
