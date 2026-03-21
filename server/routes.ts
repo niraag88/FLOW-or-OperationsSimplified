@@ -13,6 +13,7 @@ import multer from 'multer';
 import bcrypt from 'bcrypt';
 import session from 'express-session';
 import connectPg from 'connect-pg-simple';
+import { execSync } from 'child_process';
 const { Pool } = pkg;
 
 // Initialize clients with the bucket ID from environment
@@ -2653,6 +2654,19 @@ export async function registerRoutes(app: Express): Promise<Server> {
     } catch (error) {
       console.error('Error getting database size:', error);
       res.status(500).json({ error: 'Failed to get database size' });
+    }
+  });
+
+  // GET /api/system/app-size
+  // Returns total workspace filesystem size in bytes using du
+  app.get('/api/system/app-size', requireAuth(['Admin']), async (req, res) => {
+    try {
+      const output = execSync('du -sb /home/runner/workspace 2>/dev/null').toString();
+      const bytes = parseInt(output.split('\t')[0]);
+      res.json({ bytes });
+    } catch (error) {
+      console.error('Error getting app size:', error);
+      res.status(500).json({ error: 'Failed to get app size' });
     }
   });
 
