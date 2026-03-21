@@ -167,7 +167,7 @@ export const CompanySettings = {
     return await response.json();
   }
 };
-export const Books = new FallbackEntity('Books');
+export const Books = new ApiEntity('books');
 export const StorageSettings = new FallbackEntity('StorageSettings');
 export const StorageUsage = new FallbackEntity('StorageUsage');
 const _recycleBinEntity = new ApiEntity('recycle-bin');

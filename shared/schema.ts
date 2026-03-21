@@ -670,3 +670,16 @@ export type InsertRecycleBin = z.infer<typeof insertRecycleBinSchema>;
 export type VatReturn = typeof vatReturns.$inferSelect;
 export type CompanySettings = typeof companySettings.$inferSelect;
 export type StorageMonitoring = typeof storageMonitoring.$inferSelect;
+
+// Financial Years (Books) table
+export const financialYears = pgTable("financial_years", {
+  id: serial("id").primaryKey(),
+  year: integer("year").notNull().unique(),
+  startDate: text("start_date").notNull(),
+  endDate: text("end_date").notNull(),
+  status: text("status").notNull().default("Open"),
+});
+
+export const insertFinancialYearSchema = createInsertSchema(financialYears).omit({ id: true });
+export type InsertFinancialYear = z.infer<typeof insertFinancialYearSchema>;
+export type FinancialYear = typeof financialYears.$inferSelect;

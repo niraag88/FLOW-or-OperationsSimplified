@@ -76,8 +76,7 @@ export default function DOList({ deliveryOrders, loading, canEdit, currentUser, 
         </CardTitle>
       </CardHeader>
       <CardContent>
-        {/* Table - Always visible */}
-        <div className="w-full">
+        <div className="w-full overflow-x-auto">
           <Table>
             <TableHeader>
               <TableRow>

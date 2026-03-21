@@ -82,7 +82,7 @@ export default function QuotationList({ quotations, totalCount, loading, canEdit
           </CardTitle>
         </CardHeader>
         <CardContent>
-          <div className="w-full">
+          <div className="w-full overflow-x-auto">
             <Table>
               <TableHeader>
                 <TableRow>

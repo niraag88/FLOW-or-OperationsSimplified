@@ -1,5 +1,5 @@
 
-import React, { useState, useEffect } from "react";
+import React, { useState, useEffect, useRef } from "react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
@@ -14,6 +14,7 @@ import DOForm from "../components/delivery-orders/DOForm";
 import DOFilters from "../components/delivery-orders/DOFilters";
 import CreateFromExistingDialog from "../components/delivery-orders/CreateFromExistingDialog"; // New import
 import ExportDropdown from "../components/common/ExportDropdown";
+import YearSelector from "../components/common/YearSelector";
 import DOTemplate from "../components/print/DOTemplate";
 import { createRoot } from 'react-dom/client';
 
@@ -33,6 +34,9 @@ export default function DeliveryOrders() {
   const [dateRange, setDateRange] = useState("all");
   const [refreshTrigger, setRefreshTrigger] = useState(0);
   const [showCreateFromExistingDialog, setShowCreateFromExistingDialog] = useState(false);
+  const [financialYears, setFinancialYears] = useState([]);
+  const [selectedYearId, setSelectedYearId] = useState(null);
+  const yearInitializedRef = useRef(false);
 
   // Pagination state
   const [currentPage, setCurrentPage] = useState(1);
@@ -54,11 +58,12 @@ export default function DeliveryOrders() {
     try {
       console.time('📡 API Calls - Parallel Loading');
       // Load all necessary data in parallel like the optimized quotations page
-      const [dosData, customersData, productsData, brandsData] = await Promise.all([
+      const [dosData, customersData, productsData, brandsData, booksData] = await Promise.all([
         DeliveryOrder.list('-updated_date'),
         Customer.list().catch(() => []),
         Product.list().catch(() => []),
-        Brand.list().catch(() => [])
+        Brand.list().catch(() => []),
+        fetch('/api/books').then(r => r.json()).catch(() => []),
       ]);
       console.timeEnd('📡 API Calls - Parallel Loading');
 
@@ -67,6 +72,12 @@ export default function DeliveryOrders() {
       setCustomers(customersData.filter(c => c.is_active !== false));
       setProducts(productsData);
       setBrands(brandsData.filter(b => b.isActive !== false));
+      setFinancialYears(booksData);
+      if (!yearInitializedRef.current) {
+        const openBook = booksData.find(b => b.status === 'Open');
+        setSelectedYearId(openBook ? openBook.id : null);
+        yearInitializedRef.current = true;
+      }
       console.timeEnd('⚡ State Updates');
       
       console.log('📊 Data loaded:', dosData.length, 'delivery orders,', customersData.length, 'customers,', productsData.length, 'products,', brandsData.length, 'brands');
@@ -160,6 +171,17 @@ export default function DeliveryOrders() {
   const canEdit = true;
 
   const filteredDOs = deliveryOrders.filter(doOrder => {
+    // Year filter
+    if (selectedYearId !== null) {
+      const selectedBook = financialYears.find(b => b.id === selectedYearId);
+      if (selectedBook) {
+        const startDate = new Date(selectedBook.startDate);
+        const endDate = new Date(selectedBook.endDate);
+        endDate.setHours(23, 59, 59, 999);
+        const d = new Date(doOrder.order_date);
+        if (d < startDate || d > endDate) return false;
+      }
+    }
     const matchesSearch = doOrder.do_number?.toLowerCase().includes(searchTerm.toLowerCase()) ||
                          doOrder.remarks?.toLowerCase().includes(searchTerm.toLowerCase());
     
@@ -259,6 +281,14 @@ export default function DeliveryOrders() {
           )}
         </div>
       </div>
+
+      {financialYears.length > 0 && (
+        <YearSelector
+          financialYears={financialYears}
+          selectedYearId={selectedYearId}
+          onYearChange={(id) => { setSelectedYearId(id); resetPagination(); }}
+        />
+      )}
 
       {/* Search and Filters */}
       <div className="flex flex-col sm:flex-row gap-4">

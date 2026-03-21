@@ -88,8 +88,7 @@ export default function InvoiceList({ invoices, loading, canEdit, canOverride, c
           </CardTitle>
         </CardHeader>
         <CardContent>
-          {/* Table - Always visible */}
-          <div className="w-full">
+          <div className="w-full overflow-x-auto">
             <Table>
               <TableHeader>
                 <TableRow>

@@ -1,5 +1,5 @@
 
-import React, { useState, useEffect } from "react";
+import React, { useState, useEffect, useRef } from "react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
@@ -15,6 +15,7 @@ import InvoiceFilters from "../components/invoices/InvoiceFilters";
 import CreateFromExistingDialog from "../components/invoices/CreateFromExistingDialog";
 import { getDerivedInvoiceStatus } from "../components/invoices/invoiceUtils";
 import ExportDropdown from "../components/common/ExportDropdown";
+import YearSelector from "../components/common/YearSelector";
 import InvoiceTemplate from "../components/print/InvoiceTemplate";
 import { createRoot } from 'react-dom/client';
 import { useToast } from '@/hooks/use-toast';
@@ -35,6 +36,9 @@ export default function Invoices() {
   const [dateRange, setDateRange] = useState("all");
   const [showCreateFromExistingDialog, setShowCreateFromExistingDialog] = useState(false);
   const [refreshTrigger, setRefreshTrigger] = useState(0);
+  const [financialYears, setFinancialYears] = useState([]);
+  const [selectedYearId, setSelectedYearId] = useState(null);
+  const yearInitializedRef = useRef(false);
 
   // Pagination state
   const [currentPage, setCurrentPage] = useState(1);
@@ -59,11 +63,12 @@ export default function Invoices() {
     try {
       console.time('📡 API Calls - Parallel Loading');
       // Load all necessary data in parallel like the optimized quotations page
-      const [invoicesData, customersData, productsData, brandsData] = await Promise.all([
+      const [invoicesData, customersData, productsData, brandsData, booksData] = await Promise.all([
         Invoice.list('-updated_date'),
         Customer.list().catch(() => []),
         Product.list().catch(() => []),
-        Brand.list().catch(() => [])
+        Brand.list().catch(() => []),
+        fetch('/api/books').then(r => r.json()).catch(() => []),
       ]);
       console.timeEnd('📡 API Calls - Parallel Loading');
 
@@ -72,6 +77,12 @@ export default function Invoices() {
       setCustomers(customersData.filter(c => c.is_active !== false));
       setProducts(productsData);
       setBrands(brandsData.filter(b => b.isActive !== false));
+      setFinancialYears(booksData);
+      if (!yearInitializedRef.current) {
+        const openBook = booksData.find(b => b.status === 'Open');
+        setSelectedYearId(openBook ? openBook.id : null);
+        yearInitializedRef.current = true;
+      }
       console.timeEnd('⚡ State Updates');
       
       console.log('📊 Data loaded:', invoicesData.length, 'invoices,', customersData.length, 'customers,', productsData.length, 'products,', brandsData.length, 'brands');
@@ -333,6 +344,17 @@ export default function Invoices() {
   const canOverride = true;
 
   const filteredInvoices = invoices.filter(invoice => {
+    // Year filter
+    if (selectedYearId !== null) {
+      const selectedBook = financialYears.find(b => b.id === selectedYearId);
+      if (selectedBook) {
+        const startDate = new Date(selectedBook.startDate);
+        const endDate = new Date(selectedBook.endDate);
+        endDate.setHours(23, 59, 59, 999);
+        const d = new Date(invoice.invoiceDate || invoice.invoice_date || invoice.createdAt);
+        if (d < startDate || d > endDate) return false;
+      }
+    }
     // Normalize field names (backend returns camelCase, frontend expects snake_case)
     const invoiceNumber = invoice.invoiceNumber || invoice.invoice_number;
     const customerName = invoice.customerName || invoice.customer_name;
@@ -451,6 +473,14 @@ export default function Invoices() {
         </div>
       </div>
 
+
+      {financialYears.length > 0 && (
+        <YearSelector
+          financialYears={financialYears}
+          selectedYearId={selectedYearId}
+          onYearChange={(id) => { setSelectedYearId(id); resetPagination(); }}
+        />
+      )}
 
       {/* Search and Filters */}
       <div className="flex flex-col sm:flex-row gap-4">

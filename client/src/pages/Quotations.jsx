@@ -1,5 +1,5 @@
 
-import React, { useState, useEffect } from "react";
+import React, { useState, useEffect, useRef } from "react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
@@ -12,6 +12,7 @@ import QuotationList from "../components/quotations/QuotationList";
 import QuotationForm from "../components/quotations/QuotationForm";
 import QuotationFilters from "../components/quotations/QuotationFilters";
 import ExportDropdown from "../components/common/ExportDropdown";
+import YearSelector from "../components/common/YearSelector";
 import QuotationTemplate from "../components/print/QuotationTemplate";
 import { createRoot } from 'react-dom/client';
 
@@ -28,7 +29,10 @@ export default function Quotations() {
   const [selectedCustomers, setSelectedCustomers] = useState([]);
   const [dateRange, setDateRange] = useState("all");
   const [refreshTrigger, setRefreshTrigger] = useState(0);
-  
+  const [financialYears, setFinancialYears] = useState([]);
+  const [selectedYearId, setSelectedYearId] = useState(null);
+  const yearInitializedRef = useRef(false);
+
   // Pagination state
   const [currentPage, setCurrentPage] = useState(1);
   const [itemsPerPage, setItemsPerPage] = useState(50);
@@ -43,11 +47,12 @@ export default function Quotations() {
     try {
       console.time('📡 API Calls - Parallel Loading');
       // Load all necessary data in parallel like the optimized PO page
-      const [quotationsData, customersData, productsData, brandsData] = await Promise.all([
+      const [quotationsData, customersData, productsData, brandsData, booksData] = await Promise.all([
         Quotation.list('-updated_date'),
         Customer.list().catch(() => []),
         Product.list().catch(() => []),
-        Brand.list().catch(() => [])
+        Brand.list().catch(() => []),
+        fetch('/api/books').then(r => r.json()).catch(() => []),
       ]);
       console.timeEnd('📡 API Calls - Parallel Loading');
 
@@ -56,6 +61,12 @@ export default function Quotations() {
       setCustomers(customersData.filter(c => c.is_active !== false));
       setProducts(productsData);
       setBrands(brandsData.filter(b => b.isActive !== false));
+      setFinancialYears(booksData);
+      if (!yearInitializedRef.current) {
+        const openBook = booksData.find(b => b.status === 'Open');
+        setSelectedYearId(openBook ? openBook.id : null);
+        yearInitializedRef.current = true;
+      }
       console.timeEnd('⚡ State Updates');
 
       console.log(`📊 Data loaded: ${quotationsData.length} quotations, ${customersData.length} customers, ${productsData.length} products, ${brandsData.length} brands`);
@@ -94,6 +105,17 @@ export default function Quotations() {
   const currentUser = { role: 'Admin', email: 'public@opsuite.com' }; // Mock user for optimization
 
   const filteredQuotations = quotations.filter(quotation => {
+    // Year filter
+    if (selectedYearId !== null) {
+      const selectedBook = financialYears.find(b => b.id === selectedYearId);
+      if (selectedBook) {
+        const startDate = new Date(selectedBook.startDate);
+        const endDate = new Date(selectedBook.endDate);
+        endDate.setHours(23, 59, 59, 999);
+        const d = new Date(quotation.quoteDate);
+        if (d < startDate || d > endDate) return false;
+      }
+    }
     const matchesSearch = quotation.quoteNumber?.toLowerCase().includes(searchTerm.toLowerCase()) ||
                          quotation.notes?.toLowerCase().includes(searchTerm.toLowerCase());
     
@@ -182,6 +204,14 @@ export default function Quotations() {
           )}
         </div>
       </div>
+
+      {financialYears.length > 0 && (
+        <YearSelector
+          financialYears={financialYears}
+          selectedYearId={selectedYearId}
+          onYearChange={(id) => { setSelectedYearId(id); resetPagination(); }}
+        />
+      )}
 
       <div className="flex flex-col sm:flex-row gap-4">
         <div className="relative flex-1 max-w-md">

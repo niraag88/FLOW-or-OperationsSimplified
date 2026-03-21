@@ -1,5 +1,5 @@
 
-import React, { useState, useEffect } from "react";
+import React, { useState, useEffect, useRef } from "react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
@@ -13,6 +13,7 @@ import POForm from "../components/purchase-orders/POForm";
 import GoodsReceiptsTab from "../components/purchase-orders/GoodsReceiptsTab"; // Changed import
 import POFilters from "../components/purchase-orders/POFilters";
 import ExportDropdown from "../components/common/ExportDropdown";
+import YearSelector from "../components/common/YearSelector";
 
 export default function PurchaseOrders() {
   const [purchaseOrders, setPurchaseOrders] = useState([]);
@@ -29,6 +30,9 @@ export default function PurchaseOrders() {
     dateRange: "all"
   });
   const [refreshTrigger, setRefreshTrigger] = useState(0);
+  const [financialYears, setFinancialYears] = useState([]);
+  const [selectedYearId, setSelectedYearId] = useState(null);
+  const yearInitializedRef = useRef(false);
 
   // Pagination state
   const [currentPage, setCurrentPage] = useState(1);
@@ -41,15 +45,22 @@ export default function PurchaseOrders() {
   const loadData = async () => {
     setLoading(true);
     try {
-      const [posData, grnsData, productsData] = await Promise.all([ // Added productsData
+      const [posData, grnsData, productsData, booksData] = await Promise.all([
         PurchaseOrder.list('-updated_date'),
         GoodsReceipt.list('-updated_date'),
-        Product.list() // Load all products
+        Product.list(),
+        fetch('/api/books').then(r => r.json()).catch(() => []),
       ]);
 
       setPurchaseOrders(posData);
       setGoodsReceipts(grnsData);
-      setProducts(productsData); // Set products
+      setProducts(productsData);
+      setFinancialYears(booksData);
+      if (!yearInitializedRef.current) {
+        const openBook = booksData.find(b => b.status === 'Open');
+        setSelectedYearId(openBook ? openBook.id : null);
+        yearInitializedRef.current = true;
+      }
     } catch (error) {
       console.error("Error loading purchase orders data:", error);
     } finally {
@@ -80,6 +91,17 @@ export default function PurchaseOrders() {
   const currentUser = { role: 'Admin', email: 'admin@opsuite.com' }; // Mock user
 
   const filteredPOs = purchaseOrders.filter(po => {
+    // Year filter
+    if (selectedYearId !== null) {
+      const selectedBook = financialYears.find(b => b.id === selectedYearId);
+      if (selectedBook) {
+        const startDate = new Date(selectedBook.startDate);
+        const endDate = new Date(selectedBook.endDate);
+        endDate.setHours(23, 59, 59, 999);
+        const d = new Date(po.order_date);
+        if (d < startDate || d > endDate) return false;
+      }
+    }
     const matchesSearch = po.po_number?.toLowerCase().includes(searchTerm.toLowerCase()) ||
                          po.notes?.toLowerCase().includes(searchTerm.toLowerCase());
     
@@ -216,6 +238,14 @@ export default function PurchaseOrders() {
           )}
         </div>
       </div>
+
+      {financialYears.length > 0 && (
+        <YearSelector
+          financialYears={financialYears}
+          selectedYearId={selectedYearId}
+          onYearChange={(id) => { setSelectedYearId(id); resetPagination(); }}
+        />
+      )}
 
       {/* Search and Filters */}
       <div className="flex flex-col sm:flex-row gap-4">

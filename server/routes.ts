@@ -4,7 +4,8 @@ import { storage } from "./storage";
 import { businessStorage } from "./businessStorage";
 import { Client } from '@replit/object-storage';
 import { invoices, deliveryOrders, auditLog, users, recycleBin, type InsertAuditLog, type InsertUser, type UpdateUser, type User, type InsertInvoice } from "@shared/schema";
-import { insertBrandSchema, insertSupplierSchema, insertCustomerSchema, insertProductSchema, insertPurchaseOrderSchema, insertQuotationSchema, insertInvoiceSchema, insertDeliveryOrderSchema, stockCounts, stockCountItems, goodsReceipts, goodsReceiptItems, stockMovements, products, purchaseOrders, purchaseOrderItems, invoiceLineItems, deliveryOrderItems, suppliers, brands, quotations, quotationItems, customers, companySettings } from "@shared/schema";
+import { insertBrandSchema, insertSupplierSchema, insertCustomerSchema, insertProductSchema, insertPurchaseOrderSchema, insertQuotationSchema, insertInvoiceSchema, insertDeliveryOrderSchema, stockCounts, stockCountItems, goodsReceipts, goodsReceiptItems, stockMovements, products, purchaseOrders, purchaseOrderItems, invoiceLineItems, deliveryOrderItems, suppliers, brands, quotations, quotationItems, customers, companySettings, financialYears, insertFinancialYearSchema } from "@shared/schema";
+import * as XLSX from 'xlsx';
 import { db } from "./db";
 import { eq, desc } from "drizzle-orm";
 import pkg from 'pg';
@@ -3427,6 +3428,171 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+
+  // ============================================================
+  // Financial Years (Books) API
+  // ============================================================
+
+  // GET /api/books — list all financial years sorted by year descending
+  app.get('/api/books', requireAuth(), async (req, res) => {
+    try {
+      const years = await db.select().from(financialYears).orderBy(desc(financialYears.year));
+      res.json(years);
+    } catch (error) {
+      console.error('Error fetching financial years:', error);
+      res.status(500).json({ error: 'Failed to fetch financial years' });
+    }
+  });
+
+  // POST /api/books — create a new financial year
+  app.post('/api/books', requireAuth(['Admin', 'Manager']), async (req, res) => {
+    try {
+      const body = req.body;
+      const year = parseInt(body.year);
+      if (isNaN(year) || year < 2000 || year > 2100) {
+        return res.status(400).json({ error: 'Invalid year' });
+      }
+      // Check for duplicate
+      const existing = await db.select().from(financialYears).where(eq(financialYears.year, year));
+      if (existing.length > 0) {
+        return res.status(409).json({ error: `Financial year ${year} already exists` });
+      }
+      const [created] = await db.insert(financialYears).values({
+        year,
+        startDate: body.start_date || `${year}-01-01`,
+        endDate: body.end_date || `${year}-12-31`,
+        status: 'Open',
+      }).returning();
+      res.status(201).json(created);
+    } catch (error) {
+      console.error('Error creating financial year:', error);
+      res.status(500).json({ error: 'Failed to create financial year' });
+    }
+  });
+
+  // PUT /api/books/:id — update a financial year (close/reopen)
+  app.put('/api/books/:id', requireAuth(['Admin', 'Manager']), async (req, res) => {
+    try {
+      const id = parseInt(req.params.id);
+      if (isNaN(id)) return res.status(400).json({ error: 'Invalid id' });
+      const { status } = req.body;
+      if (!['Open', 'Closed'].includes(status)) {
+        return res.status(400).json({ error: 'Status must be Open or Closed' });
+      }
+      const [updated] = await db.update(financialYears)
+        .set({ status })
+        .where(eq(financialYears.id, id))
+        .returning();
+      if (!updated) return res.status(404).json({ error: 'Financial year not found' });
+      res.json(updated);
+    } catch (error) {
+      console.error('Error updating financial year:', error);
+      res.status(500).json({ error: 'Failed to update financial year' });
+    }
+  });
+
+  // GET /api/books/:id/export — export all records for this year as Excel
+  app.get('/api/books/:id/export', requireAuth(), async (req, res) => {
+    try {
+      const id = parseInt(req.params.id);
+      if (isNaN(id)) return res.status(400).json({ error: 'Invalid id' });
+
+      const [book] = await db.select().from(financialYears).where(eq(financialYears.id, id));
+      if (!book) return res.status(404).json({ error: 'Financial year not found' });
+
+      const startDate = new Date(book.startDate);
+      const endDate = new Date(book.endDate);
+      endDate.setHours(23, 59, 59, 999);
+
+      // Fetch all records for the year
+      const [allInvoices, allQuotations, allPOs, allDOs] = await Promise.all([
+        db.select().from(invoices),
+        db.select().from(quotations),
+        db.select().from(purchaseOrders),
+        db.select().from(deliveryOrders),
+      ]);
+
+      const inRange = (dateVal: string | Date | null | undefined) => {
+        if (!dateVal) return false;
+        const d = new Date(dateVal);
+        return d >= startDate && d <= endDate;
+      };
+
+      const yearInvoices = allInvoices.filter(r => inRange(r.invoiceDate));
+      const yearQuotations = allQuotations.filter(r => inRange(r.quoteDate));
+      const yearPOs = allPOs.filter(r => inRange(r.orderDate));
+      const yearDOs = allDOs.filter(r => inRange(r.orderDate));
+
+      const fmtDate = (d: any) => d ? new Date(d).toLocaleDateString('en-GB') : '';
+      const fmtNum = (n: any) => n ? parseFloat(String(n)).toFixed(2) : '0.00';
+
+      const wb = XLSX.utils.book_new();
+
+      // Invoices sheet
+      const invRows = yearInvoices.map(r => ({
+        'Invoice Number': r.invoiceNumber,
+        'Customer': r.customerName,
+        'Date': fmtDate(r.invoiceDate),
+        'Status': r.status,
+        'Subtotal (AED)': fmtNum(r.amount),
+        'VAT (AED)': fmtNum(r.vatAmount),
+        'Total (AED)': fmtNum(r.amount),
+        'Reference': r.reference || '',
+        'Notes': r.notes || '',
+      }));
+      XLSX.utils.book_append_sheet(wb, XLSX.utils.json_to_sheet(invRows.length ? invRows : [{ 'Note': 'No invoices in this period' }]), 'Invoices');
+
+      // Quotations sheet
+      const quoteRows = yearQuotations.map(r => ({
+        'Quote Number': r.quoteNumber,
+        'Customer ID': r.customerId,
+        'Date': fmtDate(r.quoteDate),
+        'Status': r.status,
+        'Subtotal (AED)': fmtNum(r.totalAmount),
+        'VAT (AED)': fmtNum(r.vatAmount),
+        'Total (AED)': fmtNum(r.grandTotal),
+        'Reference': r.reference || '',
+        'Notes': r.notes || '',
+      }));
+      XLSX.utils.book_append_sheet(wb, XLSX.utils.json_to_sheet(quoteRows.length ? quoteRows : [{ 'Note': 'No quotations in this period' }]), 'Quotations');
+
+      // Purchase Orders sheet
+      const poRows = yearPOs.map(r => ({
+        'PO Number': r.poNumber,
+        'Date': fmtDate(r.orderDate),
+        'Status': r.status,
+        'Total (GBP)': fmtNum(r.totalAmount),
+        'VAT': fmtNum(r.vatAmount),
+        'Grand Total (GBP)': fmtNum(r.grandTotal),
+        'Notes': r.notes || '',
+      }));
+      XLSX.utils.book_append_sheet(wb, XLSX.utils.json_to_sheet(poRows.length ? poRows : [{ 'Note': 'No purchase orders in this period' }]), 'Purchase Orders');
+
+      // Delivery Orders sheet
+      const doRows = yearDOs.map(r => ({
+        'DO Number': r.orderNumber,
+        'Customer': r.customerName,
+        'Date': fmtDate(r.orderDate),
+        'Status': r.status,
+        'Subtotal (AED)': fmtNum(r.subtotal),
+        'VAT (AED)': fmtNum(r.taxAmount),
+        'Total (AED)': fmtNum(r.totalAmount),
+        'Reference': r.reference || '',
+        'Notes': r.notes || '',
+      }));
+      XLSX.utils.book_append_sheet(wb, XLSX.utils.json_to_sheet(doRows.length ? doRows : [{ 'Note': 'No delivery orders in this period' }]), 'Delivery Orders');
+
+      const xlsxBuffer = XLSX.write(wb, { type: 'buffer', bookType: 'xlsx' });
+      const filename = `FLOW_Year_${book.year}_Export.xlsx`;
+
+      res.setHeader('Content-Type', 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet');
+      res.setHeader('Content-Disposition', `attachment; filename="${filename}"`);
+      res.send(xlsxBuffer);
+    } catch (error) {
+      console.error('Error exporting financial year:', error);
+      res.status(500).json({ error: 'Failed to export financial year' });
+    }
+  });
 
   // use storage to perform CRUD operations on the storage interface
   // e.g. storage.insertUser(user) or storage.getUserByUsername(username)
