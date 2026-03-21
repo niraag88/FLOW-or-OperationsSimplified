@@ -1837,11 +1837,12 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const userEmail = req.user?.email || req.user?.username || 'unknown';
 
       // Fetch quotation header and line items before deleting
-      const quoteWithItems = await businessStorage.getQuotationWithItems(id);
-      if (!quoteWithItems) {
+      const [quoteHeader] = await db.select().from(quotations).where(eq(quotations.id, id));
+      if (!quoteHeader) {
         return res.status(404).json({ error: 'Quotation not found' });
       }
-      const { items: lineItems, ...header } = quoteWithItems;
+      const lineItems = await db.select().from(quotationItems).where(eq(quotationItems.quoteId, id));
+      const header = quoteHeader;
 
       // Save to recycle bin
       await db.insert(recycleBin).values({
