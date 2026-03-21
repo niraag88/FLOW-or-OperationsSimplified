@@ -112,9 +112,18 @@ export default function InvoiceForm({ open, onClose, editingInvoice, currentUser
           fetch(`/api/invoices/${editingInvoice.id}`, { credentials: 'include' })
             .then(r => r.json())
             .then(full => {
+              // If customer_id is missing but customer_name is set, resolve it by name
+              let resolvedCustomerId = full.customer_id;
+              if (!resolvedCustomerId && full.customer_name && customers.length > 0) {
+                const matched = customers.find(c =>
+                  c.name?.trim().toLowerCase() === full.customer_name?.trim().toLowerCase()
+                );
+                if (matched) resolvedCustomerId = matched.id;
+              }
               const merged = {
                 ...getInitialFormData(),
                 ...full,
+                customer_id: resolvedCustomerId || full.customer_id || null,
                 status: (full.status && full.status !== 'draft') ? 'submitted' : (full.status || 'draft'),
               };
               setFormData(merged);
@@ -283,7 +292,7 @@ export default function InvoiceForm({ open, onClose, editingInvoice, currentUser
   const handleSubmit = async (e) => {
     e.preventDefault();
     
-    if (!formData.customer_id || !formData.invoice_number) {
+    if (!formData.customer_id || isNaN(formData.customer_id) || !formData.invoice_number) {
       toast({
         title: "Validation Error",
         description: "Please fill in all required fields (Customer and Invoice Number).",

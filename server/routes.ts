@@ -1445,9 +1445,9 @@ export async function registerRoutes(app: Express): Promise<Server> {
         currency: body.currency || 'AED',
       }).where(eq(invoices.id, id));
 
-      // Replace line items: delete old, insert new
-      await db.delete(invoiceLineItems).where(eq(invoiceLineItems.invoiceId, id));
+      // Replace line items only when new items are explicitly provided
       if (body.items && Array.isArray(body.items) && body.items.length > 0) {
+        await db.delete(invoiceLineItems).where(eq(invoiceLineItems.invoiceId, id));
         for (const item of body.items) {
           if (Number(item.quantity) > 0 && Number(item.unit_price) >= 0) {
             await db.insert(invoiceLineItems).values({
