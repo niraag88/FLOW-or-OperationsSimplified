@@ -16,7 +16,7 @@ export default function YearSelector({ financialYears, selectedYearId, onYearCha
       >
         All Years
       </button>
-      {financialYears.map(book => (
+      {years.map(book => (
         <button
           key={book.id}
           onClick={() => onYearChange(book.id)}
