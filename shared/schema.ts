@@ -1,5 +1,5 @@
 import { sql } from "drizzle-orm";
-import { pgTable, text, varchar, timestamp, boolean, serial, decimal, integer, bigint, date } from "drizzle-orm/pg-core";
+import { pgTable, text, varchar, timestamp, boolean, serial, decimal, integer, bigint, date, index } from "drizzle-orm/pg-core";
 import { createInsertSchema } from "drizzle-zod";
 import { z } from "zod";
 
@@ -52,7 +52,7 @@ export const invoices = pgTable("invoices", {
   customerName: text("customer_name").notNull(),
   customerId: integer("customer_id"),
   amount: text("amount").notNull(),
-  status: text("status").notNull().default("pending"),
+  status: text("status").notNull().default("draft"),
   invoiceDate: date("invoice_date"),
   reference: text("reference"),
   referenceDate: date("reference_date"),
@@ -63,7 +63,10 @@ export const invoices = pgTable("invoices", {
   scanKey: text("scan_key"),
   createdAt: timestamp("created_at").defaultNow().notNull(),
   legalHold: boolean("legal_hold").default(false).notNull(),
-});
+}, (table) => ({
+  invoicesStatusIdx: index("invoices_status_idx").on(table.status),
+  invoicesCustomerIdIdx: index("invoices_customer_id_idx").on(table.customerId),
+}));
 
 // Delivery Orders table  
 export const deliveryOrders = pgTable("delivery_orders", {
@@ -86,7 +89,10 @@ export const deliveryOrders = pgTable("delivery_orders", {
   scanKey: text("scan_key"),
   createdAt: timestamp("created_at").defaultNow().notNull(),
   legalHold: boolean("legal_hold").default(false).notNull(),
-});
+}, (table) => ({
+  doStatusIdx: index("delivery_orders_status_idx").on(table.status),
+  doCustomerIdIdx: index("delivery_orders_customer_id_idx").on(table.customerId),
+}));
 
 // Audit Log table
 export const auditLog = pgTable("audit_log", {
@@ -97,7 +103,10 @@ export const auditLog = pgTable("audit_log", {
   objectKey: text("object_key"), // Storage key that was affected
   action: text("action").notNull(), // "DELETE", "CREATE", "UPDATE"
   timestamp: timestamp("timestamp").defaultNow().notNull(),
-});
+}, (table) => ({
+  auditLogTargetTypeIdx: index("audit_log_target_type_idx").on(table.targetType),
+  auditLogTargetIdIdx: index("audit_log_target_id_idx").on(table.targetId),
+}));
 
 // Schema exports for invoices
 export const insertInvoiceSchema = createInsertSchema(invoices).pick({
@@ -205,7 +214,9 @@ export const customers = pgTable("customers", {
   isActive: boolean("is_active").notNull().default(true),
   createdAt: timestamp("created_at").defaultNow().notNull(),
   updatedAt: timestamp("updated_at").defaultNow().notNull(),
-});
+}, (table) => ({
+  customersNameIdx: index("customers_name_idx").on(table.name),
+}));
 
 // Products table
 export const products = pgTable("products", {
@@ -226,7 +237,9 @@ export const products = pgTable("products", {
   isActive: boolean("is_active").notNull().default(true),
   createdAt: timestamp("created_at").defaultNow().notNull(),
   updatedAt: timestamp("updated_at").defaultNow().notNull(),
-});
+}, (table) => ({
+  productsNameIdx: index("products_name_idx").on(table.name),
+}));
 
 // Invoice Line Items table
 export const invoiceLineItems = pgTable("invoice_line_items", {
@@ -278,7 +291,9 @@ export const purchaseOrders = pgTable("purchase_orders", {
   createdBy: varchar("created_by").references(() => users.id).notNull(),
   createdAt: timestamp("created_at").defaultNow().notNull(),
   updatedAt: timestamp("updated_at").defaultNow().notNull(),
-});
+}, (table) => ({
+  poStatusIdx: index("purchase_orders_status_idx").on(table.status),
+}));
 
 // Purchase Order Items table
 export const purchaseOrderItems = pgTable("purchase_order_items", {
@@ -313,54 +328,16 @@ export const quotations = pgTable("quotations", {
   createdBy: varchar("created_by").references(() => users.id).notNull(),
   createdAt: timestamp("created_at").defaultNow().notNull(),
   updatedAt: timestamp("updated_at").defaultNow().notNull(),
-});
+}, (table) => ({
+  quotationsStatusIdx: index("quotations_status_idx").on(table.status),
+  quotationsCustomerIdIdx: index("quotations_customer_id_idx").on(table.customerId),
+}));
 
 // Quotation Items table
 export const quotationItems = pgTable("quotation_items", {
   id: serial("id").primaryKey(),
   quoteId: integer("quote_id").references(() => quotations.id).notNull(),
   productId: integer("product_id").references(() => products.id).notNull(),
-  quantity: integer("quantity").notNull(),
-  unitPrice: decimal("unit_price", { precision: 10, scale: 2 }).notNull(),
-  discount: decimal("discount", { precision: 5, scale: 2 }).default("0.00"),
-  vatRate: decimal("vat_rate", { precision: 5, scale: 2 }).default("0.00"),
-  lineTotal: decimal("line_total", { precision: 10, scale: 2 }).notNull(),
-  createdAt: timestamp("created_at").defaultNow().notNull(),
-});
-
-// Enhanced Invoices table (updating existing)
-export const enhancedInvoices = pgTable("enhanced_invoices", {
-  id: serial("id").primaryKey(),
-  invoiceNumber: text("invoice_number").notNull().unique(),
-  customerId: integer("customer_id").references(() => customers.id),
-  customerName: text("customer_name").notNull(), // Keep for backward compatibility
-  quoteId: integer("quote_id").references(() => quotations.id), // Link to quotation
-  status: text("status").notNull().default("draft"), // draft, sent, paid, overdue, cancelled
-  invoiceDate: timestamp("invoice_date").defaultNow().notNull(),
-  dueDate: timestamp("due_date").notNull(),
-  reference: text("reference"), // Reference from quotation
-  referenceDate: timestamp("reference_date"), // Reference date from quotation
-  totalAmount: decimal("total_amount", { precision: 10, scale: 2 }).default("0.00"),
-  vatAmount: decimal("vat_amount", { precision: 10, scale: 2 }).default("0.00"),
-  grandTotal: decimal("grand_total", { precision: 10, scale: 2 }).default("0.00"),
-  paidAmount: decimal("paid_amount", { precision: 10, scale: 2 }).default("0.00"),
-  currency: text("currency").default("AED"), // Default to AED for UAE
-  notes: text("notes"),
-  paymentTerms: text("payment_terms"),
-  objectKey: text("object_key"), // Storage key for uploaded PDF
-  scanKey: text("scan_key"), // Storage key for PDF scan
-  legalHold: boolean("legal_hold").default(false).notNull(),
-  createdBy: varchar("created_by").references(() => users.id).notNull(),
-  createdAt: timestamp("created_at").defaultNow().notNull(),
-  updatedAt: timestamp("updated_at").defaultNow().notNull(),
-});
-
-// Invoice Items table
-export const invoiceItems = pgTable("invoice_items", {
-  id: serial("id").primaryKey(),
-  invoiceId: integer("invoice_id").references(() => enhancedInvoices.id).notNull(),
-  productId: integer("product_id").references(() => products.id).notNull(),
-  description: text("description").notNull(),
   quantity: integer("quantity").notNull(),
   unitPrice: decimal("unit_price", { precision: 10, scale: 2 }).notNull(),
   discount: decimal("discount", { precision: 5, scale: 2 }).default("0.00"),
@@ -418,17 +395,6 @@ export const companySettings = pgTable("company_settings", {
   updatedAt: timestamp("updated_at").defaultNow().notNull(),
 });
 
-// Storage monitoring table
-export const storageMonitoring = pgTable("storage_monitoring", {
-  id: serial("id").primaryKey(),
-  databaseSize: bigint("database_size", { mode: "number" }).notNull(),
-  objectStorageSize: bigint("object_storage_size", { mode: "number" }).default(0),
-  totalDocuments: integer("total_documents").default(0),
-  backupStatus: text("backup_status").default("pending"), // pending, running, completed, failed
-  lastBackup: timestamp("last_backup"),
-  retentionDays: integer("retention_days").default(2555), // 7 years
-  createdAt: timestamp("created_at").defaultNow().notNull(),
-});
 
 // Stock Counts table
 export const stockCounts = pgTable("stock_counts", {
@@ -696,4 +662,3 @@ export type InsertRecycleBin = z.infer<typeof insertRecycleBinSchema>;
 
 export type VatReturn = typeof vatReturns.$inferSelect;
 export type CompanySettings = typeof companySettings.$inferSelect;
-export type StorageMonitoring = typeof storageMonitoring.$inferSelect;
