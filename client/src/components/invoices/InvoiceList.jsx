@@ -114,16 +114,16 @@ export default function InvoiceList({ invoices, loading, canEdit, canOverride, c
                       <TableCell>{invoice.reference || '-'}</TableCell>
                       <TableCell>
                         {(() => {
-                          const total = invoice.total_amount || invoice.totalAmount || invoice.amount || 0;
-                          const tax = invoice.tax_amount || invoice.taxAmount || invoice.vatAmount || 0;
-                          const subtotal = invoice.subtotal || (total && tax ? total - tax : total);
-                          return subtotal ? formatCurrency(subtotal, invoice.currency) : '-';
+                          const total = parseFloat(invoice.total_amount ?? invoice.totalAmount ?? invoice.amount ?? 0) || 0;
+                          const tax = parseFloat(invoice.tax_amount ?? invoice.taxAmount ?? invoice.vatAmount ?? 0) || 0;
+                          const subtotal = parseFloat(invoice.subtotal ?? 0) || (total - tax);
+                          return formatCurrency(subtotal, invoice.currency);
                         })()}
                       </TableCell>
                       <TableCell>
                         {(() => {
-                          const tax = invoice.tax_amount || invoice.taxAmount || invoice.vatAmount || 0;
-                          return tax ? formatCurrency(tax, invoice.currency) : '-';
+                          const tax = parseFloat(invoice.tax_amount ?? invoice.taxAmount ?? invoice.vatAmount ?? 0) || 0;
+                          return formatCurrency(tax, invoice.currency);
                         })()}
                       </TableCell>
                       <TableCell>

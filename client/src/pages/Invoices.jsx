@@ -178,7 +178,7 @@ export default function Invoices() {
       
       // Financial defaults
       currency: document.currency || 'AED',
-      tax_treatment: document.tax_treatment || document.taxTreatment || 'taxable',
+      tax_treatment: document.tax_treatment || document.taxTreatment || 'StandardRated',
       tax_rate: safeNumber(document.tax_rate || document.taxRate || 0.05), // Default 5% VAT
       
       // Amounts - handle multiple possible field names
