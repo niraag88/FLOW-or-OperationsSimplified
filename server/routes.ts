@@ -2647,7 +2647,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   });
 
   // Legal hold check helper
-  const checkRetentionPolicy = (createdAt: Date, legalHold: boolean) => {
+  const checkLegalHoldForDeletion = (legalHold: boolean) => {
     if (legalHold) {
       return { canDelete: false, error: 'Cannot delete: Record is under legal hold' };
     }
@@ -2659,7 +2659,6 @@ export async function registerRoutes(app: Express): Promise<Server> {
   };
 
   // DELETE /api/invoices/:id
-  // Delete an invoice with retention policy checks
   app.delete('/api/invoices/:id', requireAuth(['Admin']), async (req: AuthenticatedRequest, res) => {
     try {
       const { id } = req.params;
@@ -2672,8 +2671,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
         return res.status(404).json({ error: 'Invoice not found' });
       }
       
-      // Check retention policy
-      const retentionCheck = checkRetentionPolicy(invoice.createdAt, invoice.legalHold);
+      // Check legal hold
+      const retentionCheck = checkLegalHoldForDeletion(invoice.legalHold);
       if (!retentionCheck.canDelete) {
         return res.status(403).json({ error: retentionCheck.error });
       }
@@ -2706,8 +2705,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  // DELETE /api/delivery-orders/:id  
-  // Delete a delivery order with retention policy checks
+  // DELETE /api/delivery-orders/:id
   app.delete('/api/delivery-orders/:id', requireAuth(['Admin']), async (req: AuthenticatedRequest, res) => {
     try {
       const { id } = req.params;
@@ -2720,8 +2718,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
         return res.status(404).json({ error: 'Delivery order not found' });
       }
       
-      // Check retention policy
-      const retentionCheck = checkRetentionPolicy(deliveryOrder.createdAt, deliveryOrder.legalHold);
+      // Check legal hold
+      const retentionCheck = checkLegalHoldForDeletion(deliveryOrder.legalHold);
       if (!retentionCheck.canDelete) {
         return res.status(403).json({ error: retentionCheck.error });
       }
