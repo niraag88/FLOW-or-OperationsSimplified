@@ -281,15 +281,21 @@ export default function CustomerManagement() {
                         </div>
                       </div>
                       
-                      {customer.contactPerson && (
-                        <div className="text-sm">
-                          <strong>Contact:</strong> {customer.contactPerson}
-                        </div>
-                      )}
-                      
-                      {customer.vatNumber && (
-                        <div className="text-sm">
-                          <strong>TRN:</strong> {customer.vatNumber}
+                      {(customer.contactPerson || customer.vatNumber || customer.paymentTerms) && (
+                        <div className="grid grid-cols-2 gap-x-4 text-sm">
+                          <div className="space-y-1">
+                            {customer.contactPerson && (
+                              <div><strong>Contact:</strong> {customer.contactPerson}</div>
+                            )}
+                            {customer.vatNumber && (
+                              <div><strong>TRN:</strong> {customer.vatNumber}</div>
+                            )}
+                          </div>
+                          {customer.paymentTerms && (
+                            <div className="text-right">
+                              <strong>Terms:</strong> {customer.paymentTerms}
+                            </div>
+                          )}
                         </div>
                       )}
                     </div>
