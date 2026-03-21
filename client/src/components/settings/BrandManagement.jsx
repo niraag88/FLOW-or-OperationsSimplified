@@ -134,6 +134,23 @@ export default function BrandManagement() {
     setShowForm(true);
   };
 
+  const handleToggleActive = async (brand) => {
+    try {
+      await Brand.update(brand.id, {
+        name: brand.name,
+        description: brand.description,
+        contactPerson: brand.contactPerson,
+        contactEmail: brand.contactEmail,
+        contactPhone: brand.contactPhone,
+        isActive: !brand.isActive,
+        sortOrder: brand.sortOrder
+      });
+      loadBrands();
+    } catch (error) {
+      console.error("Error updating brand status:", error);
+    }
+  };
+
   const handleDeleteClick = (brand) => {
     setBrandToDelete(brand);
     setDialogOpen(true);
@@ -291,13 +308,16 @@ export default function BrandManagement() {
                       <div className="flex justify-between items-start">
                         <div className="min-w-0 flex-1 pr-2">
                           <h3 className="font-semibold text-gray-900 truncate">{brand.name}</h3>
-                          <span className={`inline-flex items-center px-2 py-1 rounded-full text-xs font-medium mt-1 ${
-                            brand.isActive 
-                              ? 'bg-green-100 text-green-800' 
-                              : 'bg-red-100 text-red-800'
-                          }`}>
-                            {brand.isActive ? 'Active' : 'Inactive'}
-                          </span>
+                          <div className="flex items-center gap-2 mt-1">
+                            <Switch
+                              checked={brand.isActive}
+                              onCheckedChange={() => handleToggleActive(brand)}
+                              size="sm"
+                            />
+                            <span className={`text-xs ${brand.isActive ? 'text-green-600' : 'text-gray-400'}`}>
+                              {brand.isActive ? 'Active' : 'Inactive'}
+                            </span>
+                          </div>
                         </div>
                         <div className="flex gap-2 flex-shrink-0">
                           <Button size="sm" variant="ghost" onClick={() => handleEdit(brand)}>
