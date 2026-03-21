@@ -82,7 +82,7 @@ export default function QuotationList({ quotations, totalCount, loading, canEdit
           </CardTitle>
         </CardHeader>
         <CardContent>
-          <div className="hidden lg:block">
+          <div className="w-full">
             <Table>
               <TableHeader>
                 <TableRow>
@@ -131,55 +131,6 @@ export default function QuotationList({ quotations, totalCount, loading, canEdit
                 ))}
               </TableBody>
             </Table>
-          </div>
-
-          <div className="lg:hidden space-y-4">
-            {quotations.map((quotation) => (
-              <Card key={quotation.id} className="p-4">
-                <div className="flex items-start justify-between mb-3">
-                  <div>
-                    <h3 className="font-semibold text-gray-900">{quotation.quoteNumber}</h3>
-                    <p className="text-sm text-gray-600">{getCustomerName(quotation)}</p>
-                  </div>
-                  <Badge className={`${getStatusColor(quotation.status)} border`}>
-                    {quotation.status?.toUpperCase()}
-                  </Badge>
-                </div>
-
-                <div className="grid grid-cols-2 gap-4 text-sm mb-4">
-                  <div>
-                    <p className="text-gray-500">Quotation Date</p>
-                    <p className="font-medium">{formatDate(quotation.quoteDate)}</p>
-                  </div>
-                  <div>
-                    <p className="text-gray-500">Reference</p>
-                    <p className="font-medium">{quotation.reference || '-'}</p>
-                  </div>
-                  <div>
-                    <p className="text-gray-500">Subtotal</p>
-                    <p className="font-medium">{formatCurrency(quotation.totalAmount || 0, quotation.currency)}</p>
-                  </div>
-                  <div>
-                    <p className="text-gray-500">VAT</p>
-                    <p className="font-medium">{formatCurrency(quotation.vatAmount || 0, quotation.currency)}</p>
-                  </div>
-                  <div>
-                    <p className="text-gray-500">Total</p>
-                    <p className="font-medium">{formatCurrency(quotation.grandTotal || 0, quotation.currency)}</p>
-                  </div>
-                </div>
-
-                <div className="flex items-center justify-end pt-3 border-t border-gray-200">
-                  <QuotationActionsDropdown 
-                    quotation={quotation}
-                    canEdit={canPerformActions(quotation)}
-                    canOverride={canOverride}
-                    onEdit={onEdit}
-                    onRefresh={onRefresh}
-                  />
-                </div>
-              </Card>
-            ))}
           </div>
 
           {quotations.length === 0 && (

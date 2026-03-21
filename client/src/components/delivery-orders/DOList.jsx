@@ -41,21 +41,6 @@ export default function DOList({ deliveryOrders, loading, canEdit, currentUser, 
     return `${currency} ${formatter.format(amount || 0)}`;
   };
 
-  const getTaxBadge = (doOrder) => {
-    switch (doOrder.tax_treatment) {
-      case 'StandardRated':
-        return <Badge variant="outline" className="text-green-700 border-green-300">Standard</Badge>;
-      case 'ZeroRated':
-        return <Badge variant="outline" className="text-blue-700 border-blue-300">Exempt</Badge>;
-      case 'Exempt':
-        return <Badge variant="outline" className="text-gray-700 border-gray-300">Exempt</Badge>;
-      case 'OutOfScope':
-        return <Badge variant="outline" className="text-gray-700 border-gray-300">OOS</Badge>;
-      default:
-        return <Badge variant="outline" className="text-green-700 border-green-300">VAT 5%</Badge>;
-    }
-  };
-
   if (loading) {
     return (
       <Card className="border-0 shadow-lg">
@@ -91,8 +76,8 @@ export default function DOList({ deliveryOrders, loading, canEdit, currentUser, 
         </CardTitle>
       </CardHeader>
       <CardContent>
-        {/* Desktop Table */}
-        <div className="hidden lg:block">
+        {/* Table - Always visible */}
+        <div className="w-full">
           <Table>
             <TableHeader>
               <TableRow>
@@ -140,58 +125,6 @@ export default function DOList({ deliveryOrders, loading, canEdit, currentUser, 
               ))}
             </TableBody>
           </Table>
-        </div>
-
-        {/* Mobile Cards */}
-        <div className="lg:hidden space-y-4">
-          {deliveryOrders.map((doOrder) => (
-            <Card key={doOrder.id} className="p-4">
-              <div className="flex items-start justify-between mb-3">
-                <div>
-                  <h3 className="font-semibold text-gray-900">{doOrder.do_number}</h3>
-                  <p className="text-sm text-gray-600">{getCustomerName(doOrder)}</p>
-                </div>
-                <div className="flex flex-col gap-2">
-                  <Badge className={`${getStatusColor(doOrder.status)} border`}>
-                    {doOrder.status?.replace(/_/g, ' ').toUpperCase()}
-                  </Badge>
-                  {getTaxBadge(doOrder)}
-                </div>
-              </div>
-
-              <div className="grid grid-cols-2 gap-4 text-sm mb-4">
-                <div>
-                  <p className="text-gray-500">Order Date</p>
-                  <p className="font-medium">{formatDate(doOrder.order_date)}</p>
-                </div>
-                <div>
-                  <p className="text-gray-500">Reference</p>
-                  <p className="font-medium">{doOrder.reference || '-'}</p>
-                </div>
-                <div>
-                  <p className="text-gray-500">Subtotal</p>
-                  <p className="font-medium">{formatCurrency(doOrder.subtotal || 0, doOrder.currency)}</p>
-                </div>
-                <div>
-                  <p className="text-gray-500">VAT</p>
-                  <p className="font-medium">{formatCurrency(doOrder.tax_amount || 0, doOrder.currency)}</p>
-                </div>
-                <div>
-                  <p className="text-gray-500">Total</p>
-                  <p className="font-medium">{formatCurrency(doOrder.total_amount || 0, doOrder.currency)}</p>
-                </div>
-              </div>
-
-              <div className="flex items-center justify-end pt-3 border-t border-gray-200">
-                <DOActionsDropdown 
-                  doOrder={doOrder}
-                  canEdit={canEdit}
-                  onEdit={onEdit}
-                  onRefresh={onRefresh}
-                />
-              </div>
-            </Card>
-          ))}
         </div>
 
         {deliveryOrders.length === 0 && (
