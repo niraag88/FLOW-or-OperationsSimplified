@@ -1127,19 +1127,22 @@ export async function registerRoutes(app: Express): Promise<Server> {
       }
       const items = await db.select().from(purchaseOrderItems).where(eq(purchaseOrderItems.poId, poId));
 
-      // Save to recycle bin
-      await db.insert(recycleBin).values({
-        documentType: 'PurchaseOrder',
-        documentId: poId.toString(),
-        documentNumber: po.poNumber,
-        documentData: JSON.stringify({ header: po, items }),
-        deletedBy: userEmail,
-        originalStatus: po.status,
-        canRestore: true,
+      // Atomically save to recycle bin and delete
+      await db.transaction(async (tx) => {
+        await tx.insert(recycleBin).values({
+          documentType: 'PurchaseOrder',
+          documentId: poId.toString(),
+          documentNumber: po.poNumber,
+          documentData: JSON.stringify({ header: po, items }),
+          deletedBy: userEmail,
+          originalStatus: po.status,
+          canRestore: true,
+        });
+        await tx.delete(purchaseOrderItems).where(eq(purchaseOrderItems.poId, poId));
+        await tx.delete(purchaseOrders).where(eq(purchaseOrders.id, poId));
       });
 
-      const deletedPO = await businessStorage.deletePurchaseOrder(poId);
-      res.json({ success: true, deletedPO });
+      res.json({ success: true });
     } catch (error) {
       console.error('Error deleting purchase order:', error);
       res.status(500).json({ error: 'Failed to delete purchase order' });
@@ -1844,19 +1847,22 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const lineItems = await db.select().from(quotationItems).where(eq(quotationItems.quoteId, id));
       const header = quoteHeader;
 
-      // Save to recycle bin
-      await db.insert(recycleBin).values({
-        documentType: 'Quotation',
-        documentId: id.toString(),
-        documentNumber: header.quoteNumber,
-        documentData: JSON.stringify({ header, items: lineItems || [] }),
-        deletedBy: userEmail,
-        originalStatus: header.status,
-        canRestore: true,
+      // Atomically save to recycle bin and delete
+      await db.transaction(async (tx) => {
+        await tx.insert(recycleBin).values({
+          documentType: 'Quotation',
+          documentId: id.toString(),
+          documentNumber: header.quoteNumber,
+          documentData: JSON.stringify({ header, items: lineItems }),
+          deletedBy: userEmail,
+          originalStatus: header.status,
+          canRestore: true,
+        });
+        await tx.delete(quotationItems).where(eq(quotationItems.quoteId, id));
+        await tx.delete(quotations).where(eq(quotations.id, id));
       });
 
-      const deletedQuote = await businessStorage.deleteQuotation(id);
-      res.json({ success: true, message: 'Quotation deleted successfully', data: deletedQuote });
+      res.json({ success: true, message: 'Quotation deleted successfully' });
     } catch (error) {
       console.error('Error deleting quotation:', error);
       res.status(500).json({ error: 'Failed to delete quotation' });
@@ -2749,57 +2755,53 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
       const { header, items: lineItems = [] } = JSON.parse(item.documentData);
 
-      if (item.documentType === 'Invoice') {
-        const { id: _id, createdAt: _ca, ...headerData } = header;
-        const [restored] = await db.insert(invoices).values(headerData).returning();
-        if (lineItems.length > 0) {
-          for (const li of lineItems) {
-            const { id: _lid, createdAt: _lca, invoiceId: _inv, ...liData } = li;
-            await db.insert(invoiceLineItems).values({ ...liData, invoiceId: restored.id });
-          }
-        }
-      } else if (item.documentType === 'DeliveryOrder') {
-        const { id: _id, createdAt: _ca, ...headerData } = header;
-        const [restored] = await db.insert(deliveryOrders).values(headerData).returning();
-        if (lineItems.length > 0) {
-          for (const li of lineItems) {
-            const { id: _lid, createdAt: _lca, doId: _did, ...liData } = li;
-            await db.insert(deliveryOrderItems).values({ ...liData, doId: restored.id });
-          }
-        }
-      } else if (item.documentType === 'Quotation') {
-        const { id: _id, createdAt: _ca, updatedAt: _ua, customerName: _cn, ...headerData } = header;
-        const [restored] = await db.insert(quotations).values({
-          ...headerData,
-          quoteDate: headerData.quoteDate ? new Date(headerData.quoteDate) : new Date(),
-          validUntil: headerData.validUntil ? new Date(headerData.validUntil) : new Date(),
-          referenceDate: headerData.referenceDate ? new Date(headerData.referenceDate) : null,
-        }).returning();
-        if (lineItems.length > 0) {
-          for (const li of lineItems) {
-            const { id: _lid, createdAt: _lca, quoteId: _qid, ...liData } = li;
-            await db.insert(quotationItems).values({ ...liData, quoteId: restored.id });
-          }
-        }
-      } else if (item.documentType === 'PurchaseOrder') {
-        const { id: _id, createdAt: _ca, updatedAt: _ua, supplierName: _sn, ...headerData } = header;
-        const [restored] = await db.insert(purchaseOrders).values({
-          ...headerData,
-          orderDate: headerData.orderDate ? new Date(headerData.orderDate) : new Date(),
-          expectedDelivery: headerData.expectedDelivery ? new Date(headerData.expectedDelivery) : null,
-        }).returning();
-        if (lineItems.length > 0) {
-          for (const li of lineItems) {
-            const { id: _lid, createdAt: _lca, poId: _pid, ...liData } = li;
-            await db.insert(purchaseOrderItems).values({ ...liData, poId: restored.id });
-          }
-        }
-      } else {
+      if (!['Invoice', 'DeliveryOrder', 'Quotation', 'PurchaseOrder'].includes(item.documentType)) {
         return res.status(400).json({ error: `Unknown document type: ${item.documentType}` });
       }
 
-      // Remove from recycle bin after successful restore
-      await db.delete(recycleBin).where(eq(recycleBin.id, id));
+      // Atomically restore document and remove from recycle bin
+      await db.transaction(async (tx) => {
+        if (item.documentType === 'Invoice') {
+          const { id: _id, createdAt: _ca, ...headerData } = header;
+          const [restored] = await tx.insert(invoices).values(headerData).returning();
+          for (const li of lineItems) {
+            const { id: _lid, createdAt: _lca, invoiceId: _inv, ...liData } = li;
+            await tx.insert(invoiceLineItems).values({ ...liData, invoiceId: restored.id });
+          }
+        } else if (item.documentType === 'DeliveryOrder') {
+          const { id: _id, createdAt: _ca, ...headerData } = header;
+          const [restored] = await tx.insert(deliveryOrders).values(headerData).returning();
+          for (const li of lineItems) {
+            const { id: _lid, createdAt: _lca, doId: _did, ...liData } = li;
+            await tx.insert(deliveryOrderItems).values({ ...liData, doId: restored.id });
+          }
+        } else if (item.documentType === 'Quotation') {
+          const { id: _id, createdAt: _ca, updatedAt: _ua, customerName: _cn, ...headerData } = header;
+          const [restored] = await tx.insert(quotations).values({
+            ...headerData,
+            quoteDate: headerData.quoteDate ? new Date(headerData.quoteDate) : new Date(),
+            validUntil: headerData.validUntil ? new Date(headerData.validUntil) : new Date(),
+            referenceDate: headerData.referenceDate ? new Date(headerData.referenceDate) : null,
+          }).returning();
+          for (const li of lineItems) {
+            const { id: _lid, createdAt: _lca, quoteId: _qid, ...liData } = li;
+            await tx.insert(quotationItems).values({ ...liData, quoteId: restored.id });
+          }
+        } else if (item.documentType === 'PurchaseOrder') {
+          const { id: _id, createdAt: _ca, updatedAt: _ua, supplierName: _sn, ...headerData } = header;
+          const [restored] = await tx.insert(purchaseOrders).values({
+            ...headerData,
+            orderDate: headerData.orderDate ? new Date(headerData.orderDate) : new Date(),
+            expectedDelivery: headerData.expectedDelivery ? new Date(headerData.expectedDelivery) : null,
+          }).returning();
+          for (const li of lineItems) {
+            const { id: _lid, createdAt: _lca, poId: _pid, ...liData } = li;
+            await tx.insert(purchaseOrderItems).values({ ...liData, poId: restored.id });
+          }
+        }
+        // Remove from recycle bin atomically with the restore
+        await tx.delete(recycleBin).where(eq(recycleBin.id, id));
+      });
 
       res.json({ success: true, message: `${item.documentNumber} has been restored successfully` });
     } catch (error) {
@@ -2833,23 +2835,22 @@ export async function registerRoutes(app: Express): Promise<Server> {
       // Fetch line items for this invoice
       const items = await db.select().from(invoiceLineItems).where(eq(invoiceLineItems.invoiceId, parseInt(id)));
 
-      // Save to recycle bin before deleting
-      await db.insert(recycleBin).values({
-        documentType: 'Invoice',
-        documentId: id,
-        documentNumber: invoice.invoiceNumber,
-        documentData: JSON.stringify({ header: invoice, items }),
-        deletedBy: userEmail,
-        originalStatus: invoice.status,
-        canRestore: true,
+      // Atomically save to recycle bin and delete
+      await db.transaction(async (tx) => {
+        await tx.insert(recycleBin).values({
+          documentType: 'Invoice',
+          documentId: id,
+          documentNumber: invoice.invoiceNumber,
+          documentData: JSON.stringify({ header: invoice, items }),
+          deletedBy: userEmail,
+          originalStatus: invoice.status,
+          canRestore: true,
+        });
+        await tx.delete(invoiceLineItems).where(eq(invoiceLineItems.invoiceId, parseInt(id)));
+        await tx.delete(invoices).where(eq(invoices.id, parseInt(id)));
       });
 
-      // Delete line items first (FK constraint)
-      if (items.length > 0) {
-        await db.delete(invoiceLineItems).where(eq(invoiceLineItems.invoiceId, parseInt(id)));
-      }
-      
-      // Delete from storage if object exists
+      // Delete from object storage (non-DB, outside transaction)
       if (invoice.objectKey) {
         try {
           await objectStorageClient.delete(invoice.objectKey);
@@ -2857,9 +2858,6 @@ export async function registerRoutes(app: Express): Promise<Server> {
           console.warn(`Failed to delete object ${invoice.objectKey}:`, error);
         }
       }
-      
-      // Delete from database
-      await db.delete(invoices).where(eq(invoices.id, parseInt(id)));
       
       // Write audit log
       await writeAuditLog({
@@ -2900,23 +2898,22 @@ export async function registerRoutes(app: Express): Promise<Server> {
       // Fetch line items for this delivery order
       const items = await db.select().from(deliveryOrderItems).where(eq(deliveryOrderItems.doId, parseInt(id)));
 
-      // Save to recycle bin before deleting
-      await db.insert(recycleBin).values({
-        documentType: 'DeliveryOrder',
-        documentId: id,
-        documentNumber: deliveryOrder.orderNumber,
-        documentData: JSON.stringify({ header: deliveryOrder, items }),
-        deletedBy: userEmail,
-        originalStatus: deliveryOrder.status,
-        canRestore: true,
+      // Atomically save to recycle bin and delete
+      await db.transaction(async (tx) => {
+        await tx.insert(recycleBin).values({
+          documentType: 'DeliveryOrder',
+          documentId: id,
+          documentNumber: deliveryOrder.orderNumber,
+          documentData: JSON.stringify({ header: deliveryOrder, items }),
+          deletedBy: userEmail,
+          originalStatus: deliveryOrder.status,
+          canRestore: true,
+        });
+        await tx.delete(deliveryOrderItems).where(eq(deliveryOrderItems.doId, parseInt(id)));
+        await tx.delete(deliveryOrders).where(eq(deliveryOrders.id, parseInt(id)));
       });
 
-      // Delete line items first (FK constraint)
-      if (items.length > 0) {
-        await db.delete(deliveryOrderItems).where(eq(deliveryOrderItems.doId, parseInt(id)));
-      }
-      
-      // Delete from storage if object exists
+      // Delete from object storage (non-DB, outside transaction)
       if (deliveryOrder.objectKey) {
         try {
           await objectStorageClient.delete(deliveryOrder.objectKey);
@@ -2924,9 +2921,6 @@ export async function registerRoutes(app: Express): Promise<Server> {
           console.warn(`Failed to delete object ${deliveryOrder.objectKey}:`, error);
         }
       }
-      
-      // Delete from database
-      await db.delete(deliveryOrders).where(eq(deliveryOrders.id, parseInt(id)));
       
       // Write audit log
       await writeAuditLog({

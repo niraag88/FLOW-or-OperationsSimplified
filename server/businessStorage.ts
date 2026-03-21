@@ -450,25 +450,21 @@ export class BusinessStorage {
   }
 
   async generateQuotationNumber() {
-    // Get settings for configurable numbering
     const settings = await this.getCompanySettings();
     const prefix = settings?.quotationNumberPrefix || 'QUO';
-    
-    // Use helper to get next available number for this prefix
-    const nextNumber = await this.computeNextNumberForPrefix(prefix);
-    
-    const formattedNumber = prefix.includes('-') 
-      ? `${prefix}-${String(nextNumber).padStart(3, '0')}`  // QUO-2025-001 style
-      : `${prefix}-${nextNumber}`;  // QUO-1 style
-    
-    // Update settings to track the highest number + 1 for future reference
+    const nextNumber = settings?.nextQuotationNumber || 1;
+
+    const formattedNumber = prefix.includes('-')
+      ? `${prefix}-${String(nextNumber).padStart(3, '0')}`
+      : `${prefix}-${nextNumber}`;
+
     if (settings) {
       await this.updateCompanySettings({
         ...settings,
         nextQuotationNumber: nextNumber + 1
       });
     }
-    
+
     return formattedNumber;
   }
 
