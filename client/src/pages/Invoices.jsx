@@ -178,8 +178,16 @@ export default function Invoices() {
       
       // Financial defaults
       currency: document.currency || 'AED',
-      tax_treatment: document.tax_treatment || document.taxTreatment || 'StandardRated',
-      tax_rate: safeNumber(document.tax_rate || document.taxRate || 0.05), // Default 5% VAT
+      tax_treatment: (() => {
+        if (document.tax_treatment || document.taxTreatment) {
+          return document.tax_treatment || document.taxTreatment;
+        }
+        const isZeroRated = validCustomer &&
+          (validCustomer.vatTreatment === 'ZeroRated' ||
+           validCustomer.vatTreatment === 'International');
+        return isZeroRated ? 'ZeroRated' : 'StandardRated';
+      })(),
+      tax_rate: safeNumber(document.tax_rate ?? document.taxRate ?? 0.05), // Default 5% VAT; use ?? to preserve explicit 0
       
       // Amounts - handle multiple possible field names
       subtotal: safeNumber(document.subtotal || document.totalAmount || document.subTotal),
