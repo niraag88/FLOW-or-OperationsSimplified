@@ -2029,8 +2029,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
     try {
       const invoiceId = parseInt(req.params.id);
       
-      // Get invoice items
-      const items = await db.select().from(invoiceItems).where(eq(invoiceItems.invoiceId, invoiceId));
+      // Get invoice items (from invoiceLineItems table)
+      const items = await db.select().from(invoiceLineItems).where(eq(invoiceLineItems.invoiceId, invoiceId));
       
       if (items.length === 0) {
         return res.status(400).json({ error: 'No items found for this invoice' });
@@ -2038,6 +2038,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
       // Process each item and deduct from stock
       for (const item of items) {
+        if (!item.productId) continue;
         await updateProductStock(
           item.productId,
           -item.quantity, // Deduct from stock (negative quantity)
@@ -2050,10 +2051,10 @@ export async function registerRoutes(app: Express): Promise<Server> {
         );
       }
 
-      // Update invoice status to mark as stock-processed
-      await db.update(enhancedInvoices)
-        .set({ status: 'confirmed', updatedAt: new Date() })
-        .where(eq(enhancedInvoices.id, invoiceId));
+      // Update invoice status to mark as stock-processed (on basic invoices table)
+      await db.update(invoices)
+        .set({ status: 'confirmed' })
+        .where(eq(invoices.id, invoiceId));
 
       res.json({
         message: `Stock deducted for ${items.length} products from invoice #${invoiceId}`
