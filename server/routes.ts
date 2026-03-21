@@ -1242,16 +1242,25 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const vatAmount = parseFloat(invoice.vatAmount || '0') || 0;
       const subtotal = totalAmount - vatAmount;
 
+      // Derive tax_rate and tax_treatment from stored amounts
+      const derivedTaxRate = (vatAmount > 0 && subtotal > 0)
+        ? Math.round(vatAmount / subtotal * 10000) / 10000
+        : 0.05;
+      const derivedTaxTreatment = vatAmount > 0 ? 'StandardRated' : 'ZeroRated';
+
       // Format the response with snake_case field names to match InvoiceForm expectations
+      // All numeric fields returned as actual numbers to avoid string/number mismatch in forms
       const invoiceWithItems = {
         id: invoice.id,
         invoice_number: invoice.invoiceNumber,
         customer_id: invoice.customerId,
         customer_name: invoice.customerName,
         invoice_date: invoice.invoiceDate ? String(invoice.invoiceDate).split('T')[0] : '',
-        subtotal: subtotal.toFixed(2),
-        tax_amount: vatAmount.toFixed(2),
-        total_amount: totalAmount.toFixed(2),
+        subtotal,
+        tax_amount: vatAmount,
+        total_amount: totalAmount,
+        tax_rate: derivedTaxRate,
+        tax_treatment: derivedTaxTreatment,
         currency: invoice.currency || 'AED',
         status: invoice.status,
         remarks: invoice.notes || '',
@@ -1275,9 +1284,9 @@ export async function registerRoutes(app: Express): Promise<Server> {
           description: item.description || item.productName || '',
           size: item.productSize || '',
           brand_id: item.brandId,
-          quantity: item.quantity,
-          unit_price: item.unitPrice,
-          line_total: item.lineTotal,
+          quantity: Number(item.quantity),
+          unit_price: parseFloat(item.unitPrice) || 0,
+          line_total: parseFloat(item.lineTotal) || 0,
         }))
       };
       
@@ -1516,8 +1525,11 @@ export async function registerRoutes(app: Express): Promise<Server> {
         .leftJoin(products, eq(products.id, deliveryOrderItems.productId))
         .where(eq(deliveryOrderItems.doId, id));
 
+      // All numeric fields returned as actual numbers to avoid string/number mismatch in forms
       const taxAmt = parseFloat(doRecord.taxAmount || '0');
       const taxRt = doRecord.taxRate ? parseFloat(doRecord.taxRate) : 0.05;
+      const doSubtotal = parseFloat(doRecord.subtotal || '0');
+      const doTotal = parseFloat(doRecord.totalAmount || '0');
       res.json({
         id: doRecord.id,
         do_number: doRecord.orderNumber,
@@ -1526,9 +1538,9 @@ export async function registerRoutes(app: Express): Promise<Server> {
         order_date: doRecord.orderDate ? String(doRecord.orderDate).split('T')[0] : '',
         reference: doRecord.reference || '',
         reference_date: doRecord.referenceDate ? String(doRecord.referenceDate).split('T')[0] : '',
-        subtotal: doRecord.subtotal || '0',
-        tax_amount: doRecord.taxAmount || '0',
-        total_amount: doRecord.totalAmount || '0',
+        subtotal: doSubtotal,
+        tax_amount: taxAmt,
+        total_amount: doTotal,
         currency: doRecord.currency || 'AED',
         remarks: doRecord.notes || '',
         show_remarks: !!(doRecord.notes),
@@ -1544,9 +1556,9 @@ export async function registerRoutes(app: Express): Promise<Server> {
           description: item.description || item.productName || '',
           size: item.productSize || '',
           brand_id: item.brandId,
-          quantity: item.quantity,
-          unit_price: item.unitPrice,
-          line_total: item.lineTotal,
+          quantity: Number(item.quantity),
+          unit_price: parseFloat(item.unitPrice) || 0,
+          line_total: parseFloat(item.lineTotal) || 0,
         }))
       });
     } catch (error) {
