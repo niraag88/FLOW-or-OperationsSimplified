@@ -3,7 +3,7 @@ import { createServer, type Server } from "http";
 import { storage } from "./storage";
 import { businessStorage } from "./businessStorage";
 import { Client } from '@replit/object-storage';
-import { invoices, deliveryOrders, auditLog, users, type InsertAuditLog, type InsertUser, type UpdateUser, type User } from "@shared/schema";
+import { invoices, deliveryOrders, auditLog, users, type InsertAuditLog, type InsertUser, type UpdateUser, type User, type InsertInvoice } from "@shared/schema";
 import { insertBrandSchema, insertSupplierSchema, insertCustomerSchema, insertProductSchema, insertPurchaseOrderSchema, insertQuotationSchema, insertInvoiceSchema, insertDeliveryOrderSchema, stockCounts, stockCountItems, goodsReceipts, goodsReceiptItems, stockMovements, products, purchaseOrders, purchaseOrderItems, invoiceLineItems, deliveryOrderItems, suppliers, brands, quotations, quotationItems, customers, companySettings } from "@shared/schema";
 import { db } from "./db";
 import { eq, desc } from "drizzle-orm";
@@ -248,12 +248,36 @@ async function generatePOPDF(purchaseOrder: any): Promise<string> {
   `;
 }
 
-async function generateDOPDF(deliveryOrder: any): Promise<string> {
-  const formatDate = (dateString: string | Date) => {
+async function generateDOPDF(
+  deliveryOrder: any,
+  items: Array<{ productCode: string | null; description: string | null; quantity: number; unitPrice: string; lineTotal: string }>,
+  company: { name?: string; address?: string; phone?: string; email?: string } | null
+): Promise<string> {
+  const formatDate = (dateString: string | Date | null | undefined) => {
     if (!dateString) return '';
     const date = new Date(dateString);
     return date.toLocaleDateString('en-GB');
   };
+
+  const fmt = (n: string | number | null | undefined) =>
+    Number(n || 0).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+
+  const currency = deliveryOrder.currency || 'AED';
+
+  const itemRows = items.map((item, idx) => `
+    <tr>
+      <td class="text-center">${idx + 1}</td>
+      <td>${item.productCode || '-'}</td>
+      <td>${item.description || '-'}</td>
+      <td class="text-right">${item.quantity}</td>
+      <td class="text-right">${fmt(item.unitPrice)}</td>
+      <td class="text-right">${fmt(item.lineTotal)}</td>
+    </tr>
+  `).join('');
+
+  const subtotal = parseFloat(deliveryOrder.subtotal || '0');
+  const taxAmount = parseFloat(deliveryOrder.taxAmount || '0');
+  const totalAmount = parseFloat(deliveryOrder.totalAmount || '0');
 
   return `
     <!DOCTYPE html>
@@ -262,19 +286,26 @@ async function generateDOPDF(deliveryOrder: any): Promise<string> {
       <meta charset="utf-8">
       <title>Delivery Order ${deliveryOrder.orderNumber}</title>
       <style>
-        body { font-family: Arial, sans-serif; margin: 0; padding: 20px; }
-        .header { display: flex; justify-content: space-between; margin-bottom: 30px; border-bottom: 2px solid #333; padding-bottom: 20px; }
-        .do-title { font-size: 32px; font-weight: bold; color: #333; }
-        .do-details { margin-top: 10px; }
+        body { font-family: Arial, sans-serif; margin: 0; padding: 20px; font-size: 13px; }
+        .header { display: flex; justify-content: space-between; margin-bottom: 24px; border-bottom: 2px solid #333; padding-bottom: 16px; }
+        .do-title { font-size: 28px; font-weight: bold; color: #333; }
+        .do-details { margin-top: 8px; }
+        .do-details p { margin: 2px 0; }
         .company-info { text-align: right; }
-        .section { margin-bottom: 20px; }
-        .grid { display: grid; grid-template-columns: 1fr 1fr; gap: 30px; }
-        table { width: 100%; border-collapse: collapse; margin-top: 20px; }
-        th, td { border: 1px solid #ddd; padding: 12px; text-align: left; }
+        .company-info h2 { margin: 0 0 4px 0; font-size: 16px; }
+        .company-info p { margin: 2px 0; }
+        .section { margin-bottom: 16px; }
+        .grid { display: grid; grid-template-columns: 1fr 1fr; gap: 24px; }
+        table { width: 100%; border-collapse: collapse; margin-top: 16px; }
+        th, td { border: 1px solid #ddd; padding: 8px 10px; }
         th { background-color: #f5f5f5; font-weight: bold; }
         .text-right { text-align: right; }
-        .signature-section { margin-top: 50px; display: grid; grid-template-columns: 1fr 1fr; gap: 50px; }
-        .signature-box { text-align: center; border-top: 1px solid #333; padding-top: 10px; }
+        .text-center { text-align: center; }
+        .totals-table { width: 300px; margin-left: auto; margin-top: 16px; }
+        .totals-table td { border: none; padding: 4px 8px; }
+        .totals-table .total-row { font-weight: bold; border-top: 2px solid #333; }
+        .signature-section { margin-top: 48px; display: grid; grid-template-columns: 1fr 1fr; gap: 48px; }
+        .signature-box { text-align: center; border-top: 1px solid #333; padding-top: 8px; }
       </style>
     </head>
     <body>
@@ -283,53 +314,64 @@ async function generateDOPDF(deliveryOrder: any): Promise<string> {
           <h1 class="do-title">DELIVERY ORDER</h1>
           <div class="do-details">
             <p>DO Number: <strong>${deliveryOrder.orderNumber}</strong></p>
-            <p>Order Date: <strong>${formatDate(deliveryOrder.createdAt)}</strong></p>
+            <p>Order Date: <strong>${formatDate(deliveryOrder.orderDate)}</strong></p>
+            ${deliveryOrder.reference ? `<p>Reference: <strong>${deliveryOrder.reference}</strong></p>` : ''}
           </div>
         </div>
         <div class="company-info">
-          <h2>Company Name</h2>
-          <p>Company Address</p>
-          <p>Tel: Company Phone</p>
-          <p>Email: company@email.com</p>
+          <h2>${company?.name || ''}</h2>
+          ${company?.address ? `<p>${company.address}</p>` : ''}
+          ${company?.phone ? `<p>Tel: ${company.phone}</p>` : ''}
+          ${company?.email ? `<p>Email: ${company.email}</p>` : ''}
         </div>
       </div>
 
       <div class="section grid">
         <div>
-          <h3>Deliver To:</h3>
-          <p><strong>${deliveryOrder.customerName}</strong></p>
-          <p>${deliveryOrder.deliveryAddress}</p>
+          <strong>Deliver To:</strong><br/>
+          ${deliveryOrder.customerName}<br/>
+          ${deliveryOrder.deliveryAddress || ''}
         </div>
         <div>
-          <h3>Delivery Details:</h3>
-          <p>Status: ${deliveryOrder.status}</p>
+          <strong>Status:</strong> ${deliveryOrder.status}<br/>
         </div>
       </div>
 
       <table>
         <thead>
           <tr>
+            <th class="text-center" style="width:40px">No.</th>
+            <th style="width:120px">Product Code</th>
             <th>Description</th>
-            <th>Customer</th>
-            <th>Status</th>
+            <th class="text-right" style="width:70px">Qty</th>
+            <th class="text-right" style="width:110px">Unit Price (${currency})</th>
+            <th class="text-right" style="width:110px">Total (${currency})</th>
           </tr>
         </thead>
         <tbody>
+          ${itemRows || `<tr><td colspan="6" style="text-align:center;color:#999">No items</td></tr>`}
+        </tbody>
+      </table>
+
+      <table class="totals-table">
+        <tbody>
           <tr>
-            <td>Delivery Items</td>
-            <td>${deliveryOrder.customerName}</td>
-            <td>${deliveryOrder.status}</td>
+            <td>Subtotal:</td>
+            <td class="text-right">${currency} ${fmt(subtotal)}</td>
+          </tr>
+          ${taxAmount > 0 ? `<tr><td>VAT:</td><td class="text-right">${currency} ${fmt(taxAmount)}</td></tr>` : ''}
+          <tr class="total-row">
+            <td>Total:</td>
+            <td class="text-right">${currency} ${fmt(totalAmount)}</td>
           </tr>
         </tbody>
       </table>
 
+      ${deliveryOrder.notes ? `<div class="section" style="margin-top:20px"><strong>Remarks:</strong><br/>${deliveryOrder.notes}</div>` : ''}
+
       <div class="signature-section">
-        <div class="signature-box">
-          <p>Delivered By</p>
-        </div>
-        <div class="signature-box">
-          <p>Received By</p>
-        </div>
+        <div class="signature-box"><p>Delivered By</p></div>
+        <div class="signature-box"><p>Received By</p></div>
       </div>
     </body>
     </html>
@@ -1293,20 +1335,20 @@ export async function registerRoutes(app: Express): Promise<Server> {
         }
       }
 
-      const invoiceData: any = {
+      const invoiceData: InsertInvoice = {
         invoiceNumber: nextNumber,
         customerName,
-        customerId: customerId || null,
         amount: body.total_amount ? body.total_amount.toString() : '0',
-        vatAmount: body.tax_amount ? body.tax_amount.toString() : '0',
         status: body.status || 'draft',
-        invoiceDate: body.invoice_date || null,
-        reference: body.reference || null,
-        referenceDate: body.reference_date || null,
-        notes: body.remarks || body.notes || null,
+        customerId: customerId,
+        vatAmount: body.tax_amount ? body.tax_amount.toString() : undefined,
+        invoiceDate: body.invoice_date || undefined,
+        reference: body.reference || undefined,
+        referenceDate: body.reference_date || undefined,
+        notes: body.remarks || body.notes || undefined,
         currency: body.currency || 'AED',
-        objectKey: null,
-        scanKey: null,
+        objectKey: undefined,
+        scanKey: undefined,
       };
 
       const invoice = await businessStorage.createInvoice(invoiceData);
@@ -2857,11 +2899,30 @@ export async function registerRoutes(app: Express): Promise<Server> {
         return res.status(404).json({ error: 'Delivery order not found' });
       }
 
+      // Load line items joined to products
+      const doItems = await db.select({
+        productCode: products.sku,
+        description: deliveryOrderItems.description,
+        quantity: deliveryOrderItems.quantity,
+        unitPrice: deliveryOrderItems.unitPrice,
+        lineTotal: deliveryOrderItems.lineTotal,
+      }).from(deliveryOrderItems)
+        .leftJoin(products, eq(products.id, deliveryOrderItems.productId))
+        .where(eq(deliveryOrderItems.doId, deliveryOrder.id));
+
+      // Load company settings
+      const [companySetting] = await db.select().from(companySettings).limit(1);
+      const company = companySetting ? {
+        name: companySetting.companyName || '',
+        address: companySetting.address || '',
+        phone: companySetting.phone || '',
+        email: companySetting.email || '',
+      } : null;
+
       // Generate PDF using puppeteer
       const puppeteer = await import('puppeteer');
       
-      // Import the DOTemplate (we'll need to create a server-side version)
-      const templateHtml = await generateDOPDF(deliveryOrder);
+      const templateHtml = await generateDOPDF(deliveryOrder, doItems, company);
       
       const browser = await puppeteer.default.launch({
         args: [
