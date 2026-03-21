@@ -19,7 +19,7 @@ Preferred communication style: Simple, everyday language.
 - **Framework**: React with TypeScript using Vite as the build tool
 - **UI Components**: shadcn/ui component library with Radix UI primitives
 - **Styling**: Tailwind CSS with custom CSS variables for theming
-- **Routing**: Wouter for client-side routing
+- **Routing**: React Router v6 (react-router-dom) for client-side routing
 - **State Management**: TanStack Query for server state management
 - **Forms**: React Hook Form with Zod validation
 

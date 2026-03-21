@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
-import { useParams } from 'wouter';
+import { useParams } from 'react-router-dom';
 import { DeliveryOrder, CompanySettings } from '@/api/entities';
+import "../../styles/print.css";
 
 export default function DOPrintView() {
   const { id } = useParams();
@@ -11,12 +12,12 @@ export default function DOPrintView() {
   useEffect(() => {
     const loadData = async () => {
       try {
-        const [doData, companyData] = await Promise.all([
+        const [doData, companyResponse] = await Promise.all([
           DeliveryOrder.getById(id),
-          CompanySettings.get()
+          fetch('/api/company-settings', { credentials: 'include' }).then(r => r.json())
         ]);
         setDeliveryOrder(doData);
-        setCompanySettings(companyData);
+        setCompanySettings(companyResponse);
       } catch (error) {
         console.error('Error loading data:', error);
       } finally {

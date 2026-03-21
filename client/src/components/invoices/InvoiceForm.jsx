@@ -80,7 +80,7 @@ export default function InvoiceForm({ open, onClose, editingInvoice, currentUser
     if (open) {
       if (editingInvoice) {
         // Covers both editing an existing invoice and creating one from a quotation/DO
-        const dataToSet = {
+        let dataToSet = {
           ...getInitialFormData(),
           ...editingInvoice,
           items: editingInvoice.items || [],
@@ -105,16 +105,26 @@ export default function InvoiceForm({ open, onClose, editingInvoice, currentUser
             })
             .catch(error => {
               console.error('Error fetching next invoice number:', error);
-              // Keep the timestamp fallback
             });
+          setFormData(dataToSet);
         } else {
-            // If editing an existing invoice, map old statuses to new simplified ones
-            // Any status other than 'draft' should be 'submitted'
-            if (dataToSet.status && dataToSet.status !== 'draft') {
-                dataToSet.status = 'submitted';
-            }
+          // Fetch full invoice with items from API
+          fetch(`/api/invoices/${editingInvoice.id}`, { credentials: 'include' })
+            .then(r => r.json())
+            .then(full => {
+              const merged = {
+                ...getInitialFormData(),
+                ...full,
+                status: (full.status && full.status !== 'draft') ? 'submitted' : (full.status || 'draft'),
+              };
+              setFormData(merged);
+            })
+            .catch(err => {
+              console.error('Error fetching invoice:', err);
+              setFormData(dataToSet);
+            });
+          return; // wait for async fetch
         }
-        setFormData(dataToSet);
       } else {
         // Creating a completely new blank invoice
         // Set initial form data with timestamp fallback

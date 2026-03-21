@@ -66,12 +66,36 @@ export default function DOForm({ open, onClose, editingDO, currentUser, onSucces
       setBrands(brandsData.filter(b => b.isActive !== false));
 
       if (editingDO) {
-        const customer = customersData.find(c => c.id === editingDO.customer_id);
-        setSelectedCustomer(customer);
-        setFormData({
-          ...editingDO,
-          items: editingDO.items || []
-        });
+        if (editingDO.id) {
+          // Fetch full DO with items from API
+          try {
+            const response = await fetch(`/api/delivery-orders/${editingDO.id}`, { credentials: 'include' });
+            if (response.ok) {
+              const fullDO = await response.json();
+              const customer = customersData.find(c => c.id === fullDO.customer_id);
+              setSelectedCustomer(customer);
+              setFormData({
+                ...formData,
+                ...fullDO,
+                items: fullDO.items || []
+              });
+            } else {
+              // Fallback to passed data
+              const customer = customersData.find(c => c.id === editingDO.customer_id);
+              setSelectedCustomer(customer);
+              setFormData({ ...editingDO, items: editingDO.items || [] });
+            }
+          } catch (err) {
+            console.error('Error fetching DO:', err);
+            const customer = customersData.find(c => c.id === editingDO.customer_id);
+            setSelectedCustomer(customer);
+            setFormData({ ...editingDO, items: editingDO.items || [] });
+          }
+        } else {
+          const customer = customersData.find(c => c.id === editingDO.customer_id);
+          setSelectedCustomer(customer);
+          setFormData({ ...editingDO, items: editingDO.items || [] });
+        }
       } else {
         // Generate DO number for new DO - use timestamp as fallback
         const timestamp = Date.now().toString().slice(-6);

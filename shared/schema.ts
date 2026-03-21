@@ -50,13 +50,17 @@ export const invoices = pgTable("invoices", {
   id: serial("id").primaryKey(),
   invoiceNumber: text("invoice_number").notNull().unique(),
   customerName: text("customer_name").notNull(),
+  customerId: integer("customer_id"),
   amount: text("amount").notNull(),
   status: text("status").notNull().default("pending"),
-  reference: text("reference"), // Reference from source document
-  referenceDate: date("reference_date"), // Reference date from source document  
-  vatAmount: text("vat_amount"), // VAT amount
-  objectKey: text("object_key"), // Storage key for uploaded PDF
-  scanKey: text("scan_key"), // Storage key for PDF scan
+  invoiceDate: date("invoice_date"),
+  reference: text("reference"),
+  referenceDate: date("reference_date"),
+  vatAmount: text("vat_amount"),
+  notes: text("notes"),
+  currency: text("currency").default("AED"),
+  objectKey: text("object_key"),
+  scanKey: text("scan_key"),
   createdAt: timestamp("created_at").defaultNow().notNull(),
   legalHold: boolean("legal_hold").default(false).notNull(),
 });
@@ -66,10 +70,20 @@ export const deliveryOrders = pgTable("delivery_orders", {
   id: serial("id").primaryKey(),
   orderNumber: text("order_number").notNull().unique(),
   customerName: text("customer_name").notNull(),
-  deliveryAddress: text("delivery_address").notNull(),
-  status: text("status").notNull().default("pending"),
-  objectKey: text("object_key"), // Storage key for uploaded PDF
-  scanKey: text("scan_key"), // Storage key for PDF scan
+  customerId: integer("customer_id"),
+  deliveryAddress: text("delivery_address").notNull().default(""),
+  status: text("status").notNull().default("draft"),
+  orderDate: date("order_date"),
+  reference: text("reference"),
+  referenceDate: date("reference_date"),
+  subtotal: decimal("subtotal", { precision: 10, scale: 2 }),
+  taxAmount: decimal("tax_amount", { precision: 10, scale: 2 }),
+  totalAmount: decimal("total_amount", { precision: 10, scale: 2 }),
+  currency: text("currency").default("AED"),
+  notes: text("notes"),
+  taxRate: decimal("tax_rate", { precision: 5, scale: 4 }),
+  objectKey: text("object_key"),
+  scanKey: text("scan_key"),
   createdAt: timestamp("created_at").defaultNow().notNull(),
   legalHold: boolean("legal_hold").default(false).notNull(),
 });
@@ -94,13 +108,18 @@ export const insertInvoiceSchema = createInsertSchema(invoices).pick({
   objectKey: true,
   scanKey: true,
 }).extend({
+  customerId: z.number().optional(),
+  invoiceDate: z.string().optional(),
   reference: z.string().optional(),
-  referenceDate: z.date().optional(),
+  referenceDate: z.string().optional(),
   vatAmount: z.string().optional(),
+  notes: z.string().optional(),
+  currency: z.string().optional(),
 });
 
 export type InsertInvoice = z.infer<typeof insertInvoiceSchema>;
 export type Invoice = typeof invoices.$inferSelect;
+
 
 // Schema exports for delivery orders
 export const insertDeliveryOrderSchema = createInsertSchema(deliveryOrders).pick({
@@ -110,10 +129,22 @@ export const insertDeliveryOrderSchema = createInsertSchema(deliveryOrders).pick
   status: true,
   objectKey: true,
   scanKey: true,
+}).extend({
+  customerId: z.number().optional(),
+  orderDate: z.string().optional(),
+  reference: z.string().optional(),
+  referenceDate: z.string().optional(),
+  subtotal: z.string().optional(),
+  taxAmount: z.string().optional(),
+  totalAmount: z.string().optional(),
+  currency: z.string().optional(),
+  notes: z.string().optional(),
+  taxRate: z.string().optional(),
 });
 
 export type InsertDeliveryOrder = z.infer<typeof insertDeliveryOrderSchema>;
 export type DeliveryOrder = typeof deliveryOrders.$inferSelect;
+
 
 // Schema exports for audit log
 export const insertAuditLogSchema = createInsertSchema(auditLog).pick({
@@ -196,6 +227,40 @@ export const products = pgTable("products", {
   createdAt: timestamp("created_at").defaultNow().notNull(),
   updatedAt: timestamp("updated_at").defaultNow().notNull(),
 });
+
+// Invoice Line Items table
+export const invoiceLineItems = pgTable("invoice_line_items", {
+  id: serial("id").primaryKey(),
+  invoiceId: integer("invoice_id").references(() => invoices.id).notNull(),
+  productId: integer("product_id").references(() => products.id),
+  brandId: integer("brand_id"),
+  productCode: text("product_code"),
+  description: text("description").notNull().default(""),
+  quantity: integer("quantity").notNull(),
+  unitPrice: decimal("unit_price", { precision: 10, scale: 2 }).notNull(),
+  lineTotal: decimal("line_total", { precision: 10, scale: 2 }).notNull(),
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+});
+
+export const insertInvoiceLineItemSchema = createInsertSchema(invoiceLineItems).omit({ id: true, createdAt: true });
+export type InsertInvoiceLineItem = z.infer<typeof insertInvoiceLineItemSchema>;
+
+// Delivery Order Items table
+export const deliveryOrderItems = pgTable("delivery_order_items", {
+  id: serial("id").primaryKey(),
+  doId: integer("do_id").references(() => deliveryOrders.id).notNull(),
+  productId: integer("product_id").references(() => products.id),
+  brandId: integer("brand_id"),
+  productCode: text("product_code"),
+  description: text("description").notNull().default(""),
+  quantity: integer("quantity").notNull(),
+  unitPrice: decimal("unit_price", { precision: 10, scale: 2 }).notNull(),
+  lineTotal: decimal("line_total", { precision: 10, scale: 2 }).notNull(),
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+});
+
+export const insertDeliveryOrderItemSchema = createInsertSchema(deliveryOrderItems).omit({ id: true, createdAt: true });
+export type InsertDeliveryOrderItem = z.infer<typeof insertDeliveryOrderItemSchema>;
 
 // Purchase Orders table
 export const purchaseOrders = pgTable("purchase_orders", {

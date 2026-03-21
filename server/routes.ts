@@ -4,7 +4,7 @@ import { storage } from "./storage";
 import { businessStorage } from "./businessStorage";
 import { Client } from '@replit/object-storage';
 import { invoices, deliveryOrders, auditLog, users, type InsertAuditLog, type InsertUser, type UpdateUser, type User } from "@shared/schema";
-import { insertBrandSchema, insertSupplierSchema, insertCustomerSchema, insertProductSchema, insertPurchaseOrderSchema, insertQuotationSchema, insertInvoiceSchema, stockCounts, stockCountItems, goodsReceipts, goodsReceiptItems, stockMovements, products, purchaseOrders, purchaseOrderItems, enhancedInvoices, invoiceItems, suppliers, brands, quotations, quotationItems, customers, companySettings } from "@shared/schema";
+import { insertBrandSchema, insertSupplierSchema, insertCustomerSchema, insertProductSchema, insertPurchaseOrderSchema, insertQuotationSchema, insertInvoiceSchema, insertDeliveryOrderSchema, stockCounts, stockCountItems, goodsReceipts, goodsReceiptItems, stockMovements, products, purchaseOrders, purchaseOrderItems, invoiceLineItems, deliveryOrderItems, suppliers, brands, quotations, quotationItems, customers, companySettings } from "@shared/schema";
 import { db } from "./db";
 import { eq, desc } from "drizzle-orm";
 import pkg from 'pg';
@@ -1150,48 +1150,55 @@ export async function registerRoutes(app: Express): Promise<Server> {
     try {
       const id = parseInt(req.params.id);
       
-      // Get the invoice with customer details
+      // Get the invoice with customer details (using basic invoices table)
       const [invoice] = await db.select({
-        id: enhancedInvoices.id,
-        invoiceNumber: enhancedInvoices.invoiceNumber,
-        customerId: enhancedInvoices.customerId,
-        customerName: customers.name,
-        invoiceDate: enhancedInvoices.invoiceDate,
-        dueDate: enhancedInvoices.dueDate,
-        totalAmount: enhancedInvoices.totalAmount,
-        vatAmount: enhancedInvoices.vatAmount,
-        grandTotal: enhancedInvoices.grandTotal,
-        status: enhancedInvoices.status,
-        notes: enhancedInvoices.notes,
-        terms: enhancedInvoices.paymentTerms,
-        reference: enhancedInvoices.reference,
-        referenceDate: enhancedInvoices.referenceDate,
-        createdAt: enhancedInvoices.createdAt,
-        createdBy: enhancedInvoices.createdBy,
-      }).from(enhancedInvoices)
-        .leftJoin(customers, eq(enhancedInvoices.customerId, customers.id))
-        .where(eq(enhancedInvoices.id, id));
+        id: invoices.id,
+        invoiceNumber: invoices.invoiceNumber,
+        customerId: invoices.customerId,
+        customerName: invoices.customerName,
+        invoiceDate: invoices.invoiceDate,
+        amount: invoices.amount,
+        vatAmount: invoices.vatAmount,
+        status: invoices.status,
+        notes: invoices.notes,
+        currency: invoices.currency,
+        reference: invoices.reference,
+        referenceDate: invoices.referenceDate,
+        createdAt: invoices.createdAt,
+        customerContactPerson: customers.contactPerson,
+        customerEmail: customers.email,
+        customerPhone: customers.phone,
+        customerBillingAddress: customers.billingAddress,
+        customerVatNumber: customers.vatNumber,
+        customerVatTreatment: customers.vatTreatment,
+      }).from(invoices)
+        .leftJoin(customers, eq(customers.id, invoices.customerId))
+        .where(eq(invoices.id, id));
       
       if (!invoice) {
         return res.status(404).json({ error: 'Invoice not found' });
       }
 
-      // Get invoice items with product details
-      const items = await db.select({
-        id: invoiceItems.id,
-        productId: invoiceItems.productId,
+      // Get line items with product details
+      const lineItems = await db.select({
+        id: invoiceLineItems.id,
+        productId: invoiceLineItems.productId,
+        brandId: invoiceLineItems.brandId,
+        productCode: invoiceLineItems.productCode,
+        description: invoiceLineItems.description,
         productName: products.name,
         productSku: products.sku,
         productSize: products.size,
-        brandId: products.brandId,
-        quantity: invoiceItems.quantity,
-        unitPrice: invoiceItems.unitPrice,
-        discount: invoiceItems.discount,
-        vatRate: invoiceItems.vatRate,
-        lineTotal: invoiceItems.lineTotal
-      }).from(invoiceItems)
-        .leftJoin(products, eq(invoiceItems.productId, products.id))
-        .where(eq(invoiceItems.invoiceId, id));
+        quantity: invoiceLineItems.quantity,
+        unitPrice: invoiceLineItems.unitPrice,
+        lineTotal: invoiceLineItems.lineTotal,
+      }).from(invoiceLineItems)
+        .leftJoin(products, eq(products.id, invoiceLineItems.productId))
+        .where(eq(invoiceLineItems.invoiceId, id));
+
+      const totalAmount = parseFloat(invoice.amount) || 0;
+      const vatAmount = parseFloat(invoice.vatAmount || '0') || 0;
+      const subtotal = totalAmount - vatAmount;
 
       // Format the response with snake_case field names to match InvoiceForm expectations
       const invoiceWithItems = {
@@ -1199,31 +1206,36 @@ export async function registerRoutes(app: Express): Promise<Server> {
         invoice_number: invoice.invoiceNumber,
         customer_id: invoice.customerId,
         customer_name: invoice.customerName,
-        invoice_date: invoice.invoiceDate ? new Date(invoice.invoiceDate).toISOString().split('T')[0] : '',
-        due_date: invoice.dueDate ? new Date(invoice.dueDate).toISOString().split('T')[0] : '',
-        subtotal: invoice.totalAmount,
-        tax_amount: invoice.vatAmount,
-        total_amount: invoice.grandTotal,
+        invoice_date: invoice.invoiceDate ? String(invoice.invoiceDate).split('T')[0] : '',
+        subtotal: subtotal.toFixed(2),
+        tax_amount: vatAmount.toFixed(2),
+        total_amount: totalAmount.toFixed(2),
+        currency: invoice.currency || 'AED',
         status: invoice.status,
-        remarks: invoice.notes,
-        show_remarks: false,
-        terms: invoice.terms,
-        reference: invoice.reference,
-        reference_date: invoice.referenceDate ? new Date(invoice.referenceDate).toISOString().split('T')[0] : '',
+        remarks: invoice.notes || '',
+        show_remarks: !!(invoice.notes),
+        reference: invoice.reference || '',
+        reference_date: invoice.referenceDate ? String(invoice.referenceDate).split('T')[0] : '',
         attachments: [],
-        items: items.map(item => ({
+        customer: invoice.customerId ? {
+          contact_name: invoice.customerContactPerson || '',
+          email: invoice.customerEmail || '',
+          phone: invoice.customerPhone || '',
+          address: invoice.customerBillingAddress || '',
+          trn_number: invoice.customerVatNumber || '',
+          vat_treatment: invoice.customerVatTreatment || 'Local',
+        } : null,
+        items: lineItems.map(item => ({
           id: item.id,
           product_id: item.productId,
-          product_name: item.productName,
-          product_code: item.productSku,
-          description: item.productName,
-          size: item.productSize,
+          product_name: item.productName || item.description,
+          product_code: item.productCode || item.productSku || '',
+          description: item.description || item.productName || '',
+          size: item.productSize || '',
           brand_id: item.brandId,
           quantity: item.quantity,
           unit_price: item.unitPrice,
-          discount: item.discount,
-          vat_rate: item.vatRate,
-          line_total: item.lineTotal
+          line_total: item.lineTotal,
         }))
       };
       
@@ -1264,34 +1276,60 @@ export async function registerRoutes(app: Express): Promise<Server> {
   //   }
   // });
 
-  // POST /api/invoices - Create new invoice (basic)
+  // POST /api/invoices - Create new invoice
   app.post('/api/invoices', requireAuth(['Admin', 'Manager']), async (req: AuthenticatedRequest, res) => {
     try {
-      // Generate unique invoice number (and increment the counter)
       const nextNumber = await businessStorage.generateInvoiceNumber();
-      
+      const body = req.body;
+
       // Look up customer name from customer_id
-      let customerName = 'Unknown Customer';
-      if (req.body.customer_id) {
-        const customer = await businessStorage.getCustomerById(req.body.customer_id);
-        customerName = customer?.name || 'Unknown Customer';
+      let customerName = body.customer_name || 'Unknown Customer';
+      let customerId: number | undefined = undefined;
+      if (body.customer_id) {
+        const customer = await businessStorage.getCustomerById(parseInt(body.customer_id));
+        if (customer) {
+          customerName = customer.name;
+          customerId = customer.id;
+        }
       }
-      
-      // Basic invoice data structure for the database
-      const invoiceData = {
+
+      const invoiceData: any = {
         invoiceNumber: nextNumber,
-        customerName: customerName,
-        amount: req.body.total_amount || 0,
-        status: req.body.status || 'draft',
-        createdBy: req.user!.id,
+        customerName,
+        customerId: customerId || null,
+        amount: body.total_amount ? body.total_amount.toString() : '0',
+        vatAmount: body.tax_amount ? body.tax_amount.toString() : '0',
+        status: body.status || 'draft',
+        invoiceDate: body.invoice_date || null,
+        reference: body.reference || null,
+        referenceDate: body.reference_date || null,
+        notes: body.remarks || body.notes || null,
+        currency: body.currency || 'AED',
         objectKey: null,
-        scanKey: null
+        scanKey: null,
       };
-      
-      console.log('Creating basic invoice with data:', invoiceData);
+
       const invoice = await businessStorage.createInvoice(invoiceData);
-      
-      res.status(201).json(invoice);
+
+      // Save line items
+      if (body.items && Array.isArray(body.items) && body.items.length > 0) {
+        for (const item of body.items) {
+          if (Number(item.quantity) > 0 && Number(item.unit_price) >= 0) {
+            await db.insert(invoiceLineItems).values({
+              invoiceId: invoice.id,
+              productId: item.product_id ? parseInt(item.product_id) : null,
+              brandId: item.brand_id ? parseInt(item.brand_id) : null,
+              productCode: item.product_code || null,
+              description: item.description || item.product_name || '',
+              quantity: Number(item.quantity),
+              unitPrice: item.unit_price.toString(),
+              lineTotal: item.line_total.toString(),
+            });
+          }
+        }
+      }
+
+      res.status(201).json({ ...invoice, items: body.items || [] });
     } catch (error) {
       console.error('Error creating invoice:', error);
       if (error instanceof Error) {
@@ -1302,11 +1340,82 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  // PUT /api/invoices/:id - Update existing invoice
+  app.put('/api/invoices/:id', requireAuth(['Admin', 'Manager']), async (req: AuthenticatedRequest, res) => {
+    try {
+      const id = parseInt(req.params.id);
+      const body = req.body;
+
+      // Look up customer name from customer_id
+      let customerName = body.customer_name || 'Unknown Customer';
+      let customerId: number | undefined = undefined;
+      if (body.customer_id) {
+        const customer = await businessStorage.getCustomerById(parseInt(body.customer_id));
+        if (customer) {
+          customerName = customer.name;
+          customerId = customer.id;
+        }
+      }
+
+      // Update the invoice record
+      await db.update(invoices).set({
+        customerName,
+        customerId: customerId || null,
+        amount: body.total_amount ? body.total_amount.toString() : '0',
+        vatAmount: body.tax_amount ? body.tax_amount.toString() : '0',
+        status: body.status || 'draft',
+        invoiceDate: body.invoice_date || null,
+        reference: body.reference || null,
+        referenceDate: body.reference_date || null,
+        notes: body.remarks || body.notes || null,
+        currency: body.currency || 'AED',
+      }).where(eq(invoices.id, id));
+
+      // Replace line items: delete old, insert new
+      await db.delete(invoiceLineItems).where(eq(invoiceLineItems.invoiceId, id));
+      if (body.items && Array.isArray(body.items) && body.items.length > 0) {
+        for (const item of body.items) {
+          if (Number(item.quantity) > 0 && Number(item.unit_price) >= 0) {
+            await db.insert(invoiceLineItems).values({
+              invoiceId: id,
+              productId: item.product_id ? parseInt(item.product_id) : null,
+              brandId: item.brand_id ? parseInt(item.brand_id) : null,
+              productCode: item.product_code || null,
+              description: item.description || item.product_name || '',
+              quantity: Number(item.quantity),
+              unitPrice: item.unit_price.toString(),
+              lineTotal: item.line_total.toString(),
+            });
+          }
+        }
+      }
+
+      const [updated] = await db.select().from(invoices).where(eq(invoices.id, id));
+      res.json({ ...updated, items: body.items || [] });
+    } catch (error) {
+      console.error('Error updating invoice:', error);
+      if (error instanceof Error) {
+        res.status(400).json({ error: error.message });
+      } else {
+        res.status(500).json({ error: 'Failed to update invoice' });
+      }
+    }
+  });
+
   // GET /api/delivery-orders
   app.get('/api/delivery-orders', requireAuth(), async (req: AuthenticatedRequest, res) => {
     try {
-      const deliveryOrders = await businessStorage.getDeliveryOrders();
-      res.json(deliveryOrders);
+      const rows = await businessStorage.getDeliveryOrders();
+      // Transform to snake_case field names the frontend expects
+      const result = rows.map((d: any) => ({
+        ...d,
+        do_number: d.orderNumber,
+        customer_name: d.customerName,
+        order_date: d.orderDate,
+        tax_amount: d.taxAmount,
+        total_amount: d.totalAmount,
+      }));
+      res.json(result);
     } catch (error) {
       console.error('Error fetching delivery orders:', error);
       res.status(500).json({ error: 'Failed to fetch delivery orders' });
@@ -1321,6 +1430,208 @@ export async function registerRoutes(app: Express): Promise<Server> {
     } catch (error) {
       console.error('Error getting next delivery order number:', error);
       res.status(500).json({ error: 'Failed to get next delivery order number' });
+    }
+  });
+
+  // GET /api/delivery-orders/:id - Get delivery order with items for editing
+  app.get('/api/delivery-orders/:id', requireAuth(), async (req: AuthenticatedRequest, res) => {
+    try {
+      const id = parseInt(req.params.id);
+      const [doRecord] = await db.select({
+        id: deliveryOrders.id,
+        orderNumber: deliveryOrders.orderNumber,
+        customerId: deliveryOrders.customerId,
+        customerName: deliveryOrders.customerName,
+        orderDate: deliveryOrders.orderDate,
+        reference: deliveryOrders.reference,
+        referenceDate: deliveryOrders.referenceDate,
+        subtotal: deliveryOrders.subtotal,
+        taxAmount: deliveryOrders.taxAmount,
+        totalAmount: deliveryOrders.totalAmount,
+        currency: deliveryOrders.currency,
+        notes: deliveryOrders.notes,
+        taxRate: deliveryOrders.taxRate,
+        status: deliveryOrders.status,
+      }).from(deliveryOrders).where(eq(deliveryOrders.id, id));
+
+      if (!doRecord) {
+        return res.status(404).json({ error: 'Delivery order not found' });
+      }
+
+      const lineItems = await db.select({
+        id: deliveryOrderItems.id,
+        productId: deliveryOrderItems.productId,
+        brandId: deliveryOrderItems.brandId,
+        productCode: deliveryOrderItems.productCode,
+        description: deliveryOrderItems.description,
+        productName: products.name,
+        productSku: products.sku,
+        productSize: products.size,
+        quantity: deliveryOrderItems.quantity,
+        unitPrice: deliveryOrderItems.unitPrice,
+        lineTotal: deliveryOrderItems.lineTotal,
+      }).from(deliveryOrderItems)
+        .leftJoin(products, eq(products.id, deliveryOrderItems.productId))
+        .where(eq(deliveryOrderItems.doId, id));
+
+      const taxAmt = parseFloat(doRecord.taxAmount || '0');
+      const taxRt = doRecord.taxRate ? parseFloat(doRecord.taxRate) : 0.05;
+      res.json({
+        id: doRecord.id,
+        do_number: doRecord.orderNumber,
+        customer_id: doRecord.customerId,
+        customer_name: doRecord.customerName,
+        order_date: doRecord.orderDate ? String(doRecord.orderDate).split('T')[0] : '',
+        reference: doRecord.reference || '',
+        reference_date: doRecord.referenceDate ? String(doRecord.referenceDate).split('T')[0] : '',
+        subtotal: doRecord.subtotal || '0',
+        tax_amount: doRecord.taxAmount || '0',
+        total_amount: doRecord.totalAmount || '0',
+        currency: doRecord.currency || 'AED',
+        remarks: doRecord.notes || '',
+        show_remarks: !!(doRecord.notes),
+        tax_rate: taxRt,
+        tax_treatment: taxAmt > 0 ? 'StandardRated' : 'ZeroRated',
+        status: doRecord.status,
+        attachments: [],
+        items: lineItems.map(item => ({
+          id: item.id,
+          product_id: item.productId,
+          product_name: item.productName || item.description,
+          product_code: item.productCode || item.productSku || '',
+          description: item.description || item.productName || '',
+          size: item.productSize || '',
+          brand_id: item.brandId,
+          quantity: item.quantity,
+          unit_price: item.unitPrice,
+          line_total: item.lineTotal,
+        }))
+      });
+    } catch (error) {
+      console.error('Error fetching delivery order:', error);
+      res.status(500).json({ error: 'Failed to fetch delivery order' });
+    }
+  });
+
+  // POST /api/delivery-orders - Create new delivery order
+  app.post('/api/delivery-orders', requireAuth(['Admin', 'Manager']), async (req: AuthenticatedRequest, res) => {
+    try {
+      const nextNumber = await businessStorage.generateDoNumber();
+      const body = req.body;
+
+      let customerName = body.customer_name || 'Unknown Customer';
+      let customerId: number | undefined = undefined;
+      if (body.customer_id) {
+        const customer = await businessStorage.getCustomerById(parseInt(body.customer_id));
+        if (customer) {
+          customerName = customer.name;
+          customerId = customer.id;
+        }
+      }
+
+      const [doRecord] = await db.insert(deliveryOrders).values({
+        orderNumber: body.do_number || nextNumber,
+        customerName,
+        customerId: customerId || null,
+        deliveryAddress: '',
+        status: body.status || 'draft',
+        orderDate: body.order_date || null,
+        reference: body.reference || null,
+        referenceDate: body.reference_date || null,
+        subtotal: body.subtotal ? body.subtotal.toString() : '0',
+        taxAmount: body.tax_amount ? body.tax_amount.toString() : '0',
+        totalAmount: body.total_amount ? body.total_amount.toString() : '0',
+        currency: body.currency || 'AED',
+        notes: body.remarks || body.notes || null,
+        taxRate: body.tax_rate ? body.tax_rate.toString() : '0.05',
+      }).returning();
+
+      if (body.items && Array.isArray(body.items) && body.items.length > 0) {
+        for (const item of body.items) {
+          if (Number(item.quantity) > 0 && Number(item.unit_price) >= 0) {
+            await db.insert(deliveryOrderItems).values({
+              doId: doRecord.id,
+              productId: item.product_id ? parseInt(item.product_id) : null,
+              brandId: item.brand_id ? parseInt(item.brand_id) : null,
+              productCode: item.product_code || null,
+              description: item.description || item.product_name || '',
+              quantity: Number(item.quantity),
+              unitPrice: item.unit_price.toString(),
+              lineTotal: item.line_total.toString(),
+            });
+          }
+        }
+      }
+
+      res.status(201).json({ ...doRecord, do_number: doRecord.orderNumber, items: body.items || [] });
+    } catch (error) {
+      console.error('Error creating delivery order:', error);
+      if (error instanceof Error) {
+        res.status(400).json({ error: error.message });
+      } else {
+        res.status(500).json({ error: 'Failed to create delivery order' });
+      }
+    }
+  });
+
+  // PUT /api/delivery-orders/:id - Update existing delivery order
+  app.put('/api/delivery-orders/:id', requireAuth(['Admin', 'Manager']), async (req: AuthenticatedRequest, res) => {
+    try {
+      const id = parseInt(req.params.id);
+      const body = req.body;
+
+      let customerName = body.customer_name || 'Unknown Customer';
+      let customerId: number | undefined = undefined;
+      if (body.customer_id) {
+        const customer = await businessStorage.getCustomerById(parseInt(body.customer_id));
+        if (customer) {
+          customerName = customer.name;
+          customerId = customer.id;
+        }
+      }
+
+      await db.update(deliveryOrders).set({
+        customerName,
+        customerId: customerId || null,
+        status: body.status || 'draft',
+        orderDate: body.order_date || null,
+        reference: body.reference || null,
+        referenceDate: body.reference_date || null,
+        subtotal: body.subtotal ? body.subtotal.toString() : '0',
+        taxAmount: body.tax_amount ? body.tax_amount.toString() : '0',
+        totalAmount: body.total_amount ? body.total_amount.toString() : '0',
+        currency: body.currency || 'AED',
+        notes: body.remarks || body.notes || null,
+        taxRate: body.tax_rate ? body.tax_rate.toString() : '0.05',
+      }).where(eq(deliveryOrders.id, id));
+
+      await db.delete(deliveryOrderItems).where(eq(deliveryOrderItems.doId, id));
+      if (body.items && Array.isArray(body.items) && body.items.length > 0) {
+        for (const item of body.items) {
+          if (Number(item.quantity) > 0 && Number(item.unit_price) >= 0) {
+            await db.insert(deliveryOrderItems).values({
+              doId: id,
+              productId: item.product_id ? parseInt(item.product_id) : null,
+              brandId: item.brand_id ? parseInt(item.brand_id) : null,
+              productCode: item.product_code || null,
+              description: item.description || item.product_name || '',
+              quantity: Number(item.quantity),
+              unitPrice: item.unit_price.toString(),
+              lineTotal: item.line_total.toString(),
+            });
+          }
+        }
+      }
+
+      const [updated] = await db.select().from(deliveryOrders).where(eq(deliveryOrders.id, id));
+      res.json({ ...updated, do_number: updated.orderNumber, items: body.items || [] });
+    } catch (error) {
+      console.error('Error updating delivery order:', error);
+      if (error instanceof Error) {
+        res.status(400).json({ error: error.message });
+      } else {
+        res.status(500).json({ error: 'Failed to update delivery order' });
+      }
     }
   });
 
@@ -2414,27 +2725,29 @@ export async function registerRoutes(app: Express): Promise<Server> {
         return res.status(400).json({ error: 'invoiceId parameter is required' });
       }
 
-      // Get invoice data from database with customer details (same pattern as quotations)
+      // Get invoice data from database with customer details
       const [invoice] = await db.select({
         id: invoices.id,
         invoiceNumber: invoices.invoiceNumber,
         customerName: invoices.customerName,
+        customerId: invoices.customerId,
         status: invoices.status,
-        invoiceDate: invoices.createdAt,
+        invoiceDate: invoices.invoiceDate,
+        createdAt: invoices.createdAt,
         amount: invoices.amount,
         vatAmount: invoices.vatAmount,
+        notes: invoices.notes,
         reference: invoices.reference,
         referenceDate: invoices.referenceDate,
-        // Get customer details by joining with customers table
         customerContactPerson: customers.contactPerson,
         customerEmail: customers.email,
         customerPhone: customers.phone,
         customerBillingAddress: customers.billingAddress,
         customerShippingAddress: customers.shippingAddress,
         customerVatNumber: customers.vatNumber,
-        customerVatTreatment: customers.vatTreatment, // Add vat treatment for auto-calculation
+        customerVatTreatment: customers.vatTreatment,
       }).from(invoices)
-        .leftJoin(customers, eq(customers.name, invoices.customerName))
+        .leftJoin(customers, eq(customers.id, invoices.customerId))
         .where(eq(invoices.id, parseInt(invoiceId as string)));
       
       if (!invoice) {
@@ -2446,48 +2759,62 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const defaultVatRate = companySettingsData?.defaultVatRate ? parseFloat(companySettingsData.defaultVatRate) : 0.05;
       const vatEnabled = companySettingsData?.vatEnabled ?? true;
 
-      // Calculate VAT based on customer type (Local vs International)
+      // Use stored VAT values; fall back to calculation only if vatAmount is null
+      const storedTotal = parseFloat(invoice.amount) || 0;
+      const storedVat = parseFloat(invoice.vatAmount || '0') || 0;
       const isInternational = invoice.customerVatTreatment === 'International';
-      const subtotal = parseFloat(invoice.amount) || 0;
-      
-      // Apply VAT: 0% for International, company rate for Local
-      const applicableVatRate = (isInternational || !vatEnabled) ? 0 : defaultVatRate;
-      const taxAmount = subtotal * applicableVatRate;
-      const totalAmount = subtotal + taxAmount;
 
-      // Create realistic line items based on the invoice amount (1674.00 matches quotation QUO-2025-003)
-      // Use actual products from the database that match this amount
-      const invoiceItems = [
-        {
-          product_code: 'EOLG1L',
-          description: 'Lemongrass Essential Oil',
-          size: '1L',
-          quantity: 3,
-          unit_price: 400.00,
-          line_total: 1200.00
-        },
-        {
-          product_code: 'REF123',
-          description: 'Refresh Foot Balm',
-          size: '250g',
-          quantity: 6,
-          unit_price: 79.00,
-          line_total: 474.00
-        }
-      ];
+      let totalAmount: number, taxAmount: number, subtotal: number, applicableVatRate: number;
+      if (storedVat > 0 || storedTotal > 0) {
+        // Use stored values
+        totalAmount = storedTotal;
+        taxAmount = storedVat;
+        subtotal = totalAmount - taxAmount;
+        applicableVatRate = totalAmount > 0 ? taxAmount / (totalAmount - taxAmount) : 0;
+      } else {
+        // Legacy path: recalculate
+        subtotal = storedTotal;
+        applicableVatRate = (isInternational || !vatEnabled) ? 0 : defaultVatRate;
+        taxAmount = subtotal * applicableVatRate;
+        totalAmount = subtotal + taxAmount;
+      }
+
+      // Fetch real line items from invoiceLineItems table
+      const storedItems = await db.select({
+        productCode: invoiceLineItems.productCode,
+        description: invoiceLineItems.description,
+        productSku: products.sku,
+        productSize: products.size,
+        productName: products.name,
+        quantity: invoiceLineItems.quantity,
+        unitPrice: invoiceLineItems.unitPrice,
+        lineTotal: invoiceLineItems.lineTotal,
+      }).from(invoiceLineItems)
+        .leftJoin(products, eq(products.id, invoiceLineItems.productId))
+        .where(eq(invoiceLineItems.invoiceId, parseInt(invoiceId as string)));
+
+      const invoiceItemsList = storedItems.map(item => ({
+        product_code: item.productCode || item.productSku || '',
+        description: item.description || item.productName || '',
+        size: item.productSize || '',
+        quantity: item.quantity,
+        unit_price: parseFloat(item.unitPrice),
+        line_total: parseFloat(item.lineTotal),
+      }));
 
       // Structure the invoice data for frontend print view (matching quotation format)
       const invoiceWithItems = {
         id: invoice.id,
         invoice_number: invoice.invoiceNumber,
-        invoice_date: invoice.invoiceDate,
+        invoice_date: invoice.invoiceDate || invoice.createdAt,
         reference: invoice.reference,
         reference_date: invoice.referenceDate,
         subtotal: subtotal,
         tax_amount: taxAmount,
-        vat_rate: applicableVatRate * 100, // Convert to percentage for display (5% for local, 0% for international)
+        vat_rate: Math.round(applicableVatRate * 100),
         total_amount: totalAmount,
         status: invoice.status,
+        remarks: invoice.notes || '',
         customer: {
           name: invoice.customerName,
           contact_name: invoice.customerContactPerson || '',
@@ -2495,9 +2822,9 @@ export async function registerRoutes(app: Express): Promise<Server> {
           phone: invoice.customerPhone || '',
           address: invoice.customerBillingAddress || invoice.customerShippingAddress || '',
           trn_number: invoice.customerVatNumber || '',
-          type: invoice.customerVatTreatment || 'Local' // Add customer type for reference
+          type: invoice.customerVatTreatment || 'Local'
         },
-        items: invoiceItems
+        items: invoiceItemsList
       };
 
       // Return structured data for frontend print view
