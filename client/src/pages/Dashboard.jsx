@@ -86,22 +86,18 @@ export default function Dashboard() {
       {/* Stats Overview */}
       <DashboardStats data={data} />
 
-      {/* Main Dashboard Grid */}
+      {/* Quick Actions + Low Stock */}
       <div className="grid grid-cols-1 xl:grid-cols-3 gap-8">
-        {/* Recent Activity */}
         <div className="xl:col-span-2">
-          <RecentActivity data={data} />
-        </div>
-
-        {/* Side Panel */}
-        <div className="space-y-6">
-          {/* Quick Actions */}
           <QuickActions />
-          
-          {/* Low Stock Alert */}
+        </div>
+        <div>
           <LowStockAlert products={data.products} />
         </div>
       </div>
+
+      {/* Recent Activity — full width below */}
+      <RecentActivity data={data} />
     </div>
   );
 }
