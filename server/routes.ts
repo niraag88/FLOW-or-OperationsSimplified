@@ -2693,14 +2693,6 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  // Legal hold check helper
-  const checkLegalHoldForDeletion = (legalHold: boolean) => {
-    if (legalHold) {
-      return { canDelete: false, error: 'Cannot delete: Record is under legal hold' };
-    }
-    return { canDelete: true };
-  };
-
   const writeAuditLog = async (auditData: InsertAuditLog) => {
     await db.insert(auditLog).values(auditData);
   };
@@ -2825,12 +2817,6 @@ export async function registerRoutes(app: Express): Promise<Server> {
       if (!invoice) {
         return res.status(404).json({ error: 'Invoice not found' });
       }
-      
-      // Check legal hold
-      const retentionCheck = checkLegalHoldForDeletion(invoice.legalHold);
-      if (!retentionCheck.canDelete) {
-        return res.status(403).json({ error: retentionCheck.error });
-      }
 
       // Fetch line items for this invoice
       const items = await db.select().from(invoiceLineItems).where(eq(invoiceLineItems.invoiceId, parseInt(id)));
@@ -2887,12 +2873,6 @@ export async function registerRoutes(app: Express): Promise<Server> {
       
       if (!deliveryOrder) {
         return res.status(404).json({ error: 'Delivery order not found' });
-      }
-      
-      // Check legal hold
-      const retentionCheck = checkLegalHoldForDeletion(deliveryOrder.legalHold);
-      if (!retentionCheck.canDelete) {
-        return res.status(403).json({ error: retentionCheck.error });
       }
 
       // Fetch line items for this delivery order
