@@ -32,7 +32,6 @@ import {
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
 import { Badge } from "@/components/ui/badge";
-import GlobalSearch from "../components/GlobalSearch";
 
 const navigationItems = [
   {
@@ -119,35 +118,7 @@ const getIconForEntityType = (type) => {
   }
 };
 
-const getMockNotifications = () => [
-  {
-    id: '1',
-    entity_type: 'Product',
-    action: 'create',
-    user_email: 'admin@opsuite.com',
-    timestamp: new Date(Date.now() - 5 * 60 * 1000).toISOString(), // 5 minutes ago
-    changes: { created_product: { product_code: 'ABC123' } }
-  },
-  {
-    id: '2',
-    entity_type: 'PurchaseOrder',
-    action: 'status_change',
-    user_email: 'manager@opsuite.com',
-    timestamp: new Date(Date.now() - 15 * 60 * 1000).toISOString(), // 15 minutes ago
-    changes: { 
-      status: { from: 'draft', to: 'submitted' },
-      created_po: { po_number: 'PO-001' }
-    }
-  },
-  {
-    id: '3',
-    entity_type: 'Invoice',
-    action: 'create',
-    user_email: 'admin@opsuite.com',
-    timestamp: new Date(Date.now() - 30 * 60 * 1000).toISOString(), // 30 minutes ago
-    changes: { created_document: { invoice_number: 'INV-001' } }
-  }
-];
+const getMockNotifications = () => [];
 
 const getNotificationDetails = (log) => {
     let title = 'New Activity';
@@ -343,10 +314,6 @@ export default function Layout({ children, currentPageName }) {
             </nav>
 
             <div className="flex items-center gap-2 sm:gap-4 flex-shrink-0">
-              <div className="hidden md:block">
-                <GlobalSearch />
-              </div>
-
               <DropdownMenu onOpenChange={(open) => { if(open) setNotificationCount(0); }}>
                 <DropdownMenuTrigger asChild>
                   <Button variant="ghost" size="sm" className="text-gray-300 hover:text-white hover:bg-slate-800 relative p-2">
@@ -417,10 +384,6 @@ export default function Layout({ children, currentPageName }) {
         {mobileMenuOpen && (
           <div className="lg:hidden border-t border-slate-800 bg-slate-900">
             <div className="px-3 sm:px-4 py-4 space-y-2 max-h-[70vh] overflow-y-auto">
-              <div className="mb-4 px-1">
-                <GlobalSearch />
-              </div>
-              
               {navigationItems.map((item) => {
                 if (item.type === "single") {
                   const isActive = location.pathname.startsWith(item.url);
