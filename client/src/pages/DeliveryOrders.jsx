@@ -77,11 +77,15 @@ export default function DeliveryOrders() {
 
   useEffect(() => {
     const params = new URLSearchParams();
-    params.set('page', String(currentPage));
-    params.set('pageSize', String(itemsPerPage));
+    const isAll = itemsPerPage === 9999;
+    if (!isAll) {
+      params.set('page', String(currentPage));
+      params.set('pageSize', String(itemsPerPage));
+    }
     if (debouncedSearch) params.set('search', debouncedSearch);
     if (selectedStatuses.length) params.set('status', selectedStatuses.join(','));
     if (selectedCustomers.length) params.set('customerId', selectedCustomers.join(','));
+    if (selectedTaxTreatments.length) params.set('taxTreatment', selectedTaxTreatments.join(','));
     const today = new Date();
     const toStr = (d) => d.toISOString().split('T')[0];
     if (dateRange && dateRange !== 'all') {
@@ -91,16 +95,21 @@ export default function DeliveryOrders() {
       else if (dateRange === 'quarter') { const q = Math.floor(today.getMonth() / 3); params.set('dateFrom', toStr(new Date(today.getFullYear(), q * 3, 1))); }
       else if (typeof dateRange === 'object' && dateRange.type === 'custom') { params.set('dateFrom', toStr(new Date(dateRange.startDate))); params.set('dateTo', toStr(new Date(dateRange.endDate))); }
     }
+    const closedYears = financialYears.filter(y => y.status === 'Closed');
+    if (closedYears.length > 0) {
+      params.set('excludeYears', closedYears.map(cy => `${cy.startDate},${cy.endDate}`).join(';'));
+    }
     setLoading(true);
     fetch(`/api/delivery-orders?${params}`, { credentials: 'include' })
       .then(r => r.json())
       .then(result => {
-        setDeliveryOrders(Array.isArray(result) ? result : (result.data || []));
-        setTotalCount(result.total || 0);
+        const data = Array.isArray(result) ? result : (result.data || []);
+        setDeliveryOrders(data);
+        setTotalCount(Array.isArray(result) ? data.length : (result.total || 0));
       })
       .catch(err => console.error('Error loading delivery orders:', err))
       .finally(() => setLoading(false));
-  }, [currentPage, itemsPerPage, debouncedSearch, selectedStatuses, selectedCustomers, dateRange, refreshTrigger]);
+  }, [currentPage, itemsPerPage, debouncedSearch, selectedStatuses, selectedCustomers, selectedTaxTreatments, dateRange, financialYears, refreshTrigger]);
 
   // Use preloaded customers for better performance
   const availableCustomers = React.useMemo(() => {
