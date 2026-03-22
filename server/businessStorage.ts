@@ -167,7 +167,7 @@ export class BusinessStorage {
   // Purchase Order operations
   async getPurchaseOrders(params?: {
     page?: number; pageSize?: number; search?: string;
-    status?: string; supplierId?: number; dateFrom?: string; dateTo?: string;
+    status?: string; supplierId?: string; dateFrom?: string; dateTo?: string;
   }): Promise<{ data: any[]; total: number }> {
     const { page, pageSize, search, status, supplierId, dateFrom, dateTo } = params || {};
 
@@ -180,7 +180,11 @@ export class BusinessStorage {
       if (statuses.length === 1) conditions.push(eq(purchaseOrders.status, statuses[0]));
       else if (statuses.length > 1) conditions.push(inArray(purchaseOrders.status, statuses));
     }
-    if (supplierId) conditions.push(eq(purchaseOrders.supplierId, supplierId));
+    if (supplierId) {
+      const ids = String(supplierId).split(',').filter(Boolean).map(Number).filter(n => !isNaN(n));
+      if (ids.length === 1) conditions.push(eq(purchaseOrders.supplierId, ids[0]));
+      else if (ids.length > 1) conditions.push(inArray(purchaseOrders.supplierId, ids));
+    }
     if (dateFrom) conditions.push(gte(purchaseOrders.orderDate, dateFrom));
     if (dateTo) conditions.push(lte(purchaseOrders.orderDate, dateTo));
     const whereCondition = conditions.length > 0 ? and(...conditions) : undefined;
@@ -208,7 +212,7 @@ export class BusinessStorage {
       .groupBy(goodsReceipts.poId)
       .as('receivedAgg');
 
-    let q = db.select({
+    const baseQ = db.select({
       id: purchaseOrders.id,
       poNumber: purchaseOrders.poNumber,
       supplierId: purchaseOrders.supplierId,
@@ -235,10 +239,9 @@ export class BusinessStorage {
       .where(whereCondition)
       .orderBy(desc(purchaseOrders.createdAt));
 
-    if (page && pageSize) {
-      q = q.limit(pageSize).offset((page - 1) * pageSize) as any;
-    }
-    const data = await q;
+    const data = (page && pageSize)
+      ? await baseQ.limit(pageSize).offset((page - 1) * pageSize)
+      : await baseQ;
     return { data, total: Number(count) };
   }
 
@@ -272,7 +275,7 @@ export class BusinessStorage {
   // Quotation operations
   async getQuotations(params?: {
     page?: number; pageSize?: number; search?: string;
-    status?: string; customerId?: number; dateFrom?: string; dateTo?: string;
+    status?: string; customerId?: string; dateFrom?: string; dateTo?: string;
   }): Promise<{ data: any[]; total: number }> {
     const { page, pageSize, search, status, customerId, dateFrom, dateTo } = params || {};
 
@@ -285,7 +288,11 @@ export class BusinessStorage {
       if (statuses.length === 1) conditions.push(eq(quotations.status, statuses[0]));
       else if (statuses.length > 1) conditions.push(inArray(quotations.status, statuses));
     }
-    if (customerId) conditions.push(eq(quotations.customerId, customerId));
+    if (customerId) {
+      const ids = String(customerId).split(',').filter(Boolean).map(Number).filter(n => !isNaN(n));
+      if (ids.length === 1) conditions.push(eq(quotations.customerId, ids[0]));
+      else if (ids.length > 1) conditions.push(inArray(quotations.customerId, ids));
+    }
     if (dateFrom) conditions.push(sql`${quotations.quoteDate}::date >= ${dateFrom}::date`);
     if (dateTo) conditions.push(sql`${quotations.quoteDate}::date <= ${dateTo}::date`);
     const whereCondition = conditions.length > 0 ? and(...conditions) : undefined;
