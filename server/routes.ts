@@ -917,9 +917,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
   app.delete('/api/brands/:id', requireRole('Admin'), async (req: AuthenticatedRequest, res) => {
     try {
       const brandId = parseInt(req.params.id);
-      const brandName = req.body?.name || `ID ${brandId}`;
-      await businessStorage.deleteBrand(brandId);
-      writeAuditLog({ actor: req.user!.id, actorName: req.user?.username || String(req.user!.id), targetId: String(brandId), targetType: 'brand', action: 'DELETE', details: `Brand '${brandName}' deleted` });
+      const deletedBrand = await businessStorage.deleteBrand(brandId);
+      writeAuditLog({ actor: req.user!.id, actorName: req.user?.username || String(req.user!.id), targetId: String(brandId), targetType: 'brand', action: 'DELETE', details: `Brand '${deletedBrand?.name || brandId}' deleted` });
       res.json({ success: true });
     } catch (error) {
       console.error('Error deleting brand:', error);
