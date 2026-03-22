@@ -5,4 +5,5 @@ server/public
 vite.config.ts.*
 *.tar.gz
 cookies.txt
-attached_assets/
+attached_assets/*.pdf
+attached_assets/*.PDF
