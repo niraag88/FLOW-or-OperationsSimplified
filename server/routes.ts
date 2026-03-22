@@ -591,10 +591,10 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   }));
   // Rate limiters
-  // Strict: 5 login attempts per 15 minutes per IP — blocks brute-force attacks
+  // Strict: 20 attempts per 15 minutes per IP in development, 5 in production
   const loginLimiter = rateLimit({
     windowMs: 15 * 60 * 1000,
-    max: 5,
+    max: process.env.NODE_ENV === 'production' ? 5 : 20,
     message: { error: 'Too many login attempts. Please try again in 15 minutes.' },
     standardHeaders: true,
     legacyHeaders: false,
