@@ -1521,6 +1521,30 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  // DELETE /api/invoices/:id/scan-key - Remove the uploaded file and clear the scan key
+  app.delete('/api/invoices/:id/scan-key', requireAuth(['Admin', 'Manager', 'Staff']), async (req: AuthenticatedRequest, res) => {
+    try {
+      const id = parseInt(req.params.id);
+      const [invoice] = await db.select().from(invoices).where(eq(invoices.id, id));
+      if (!invoice) {
+        return res.status(404).json({ error: 'Invoice not found' });
+      }
+      if (invoice.scanKey) {
+        try {
+          await objectStorageClient.delete(invoice.scanKey);
+        } catch (storageErr) {
+          console.warn('Could not delete object from storage (clearing key anyway):', storageErr);
+        }
+      }
+      await db.update(invoices).set({ scanKey: null }).where(eq(invoices.id, id));
+      const [updated] = await db.select().from(invoices).where(eq(invoices.id, id));
+      res.json(updated);
+    } catch (error) {
+      console.error('Error removing invoice scan key:', error);
+      res.status(500).json({ error: 'Failed to remove file' });
+    }
+  });
+
   // GET /api/delivery-orders
   app.get('/api/delivery-orders', requireAuth(), async (req: AuthenticatedRequest, res) => {
     try {
@@ -1778,6 +1802,30 @@ export async function registerRoutes(app: Express): Promise<Server> {
     } catch (error) {
       console.error('Error updating delivery order scan key:', error);
       res.status(500).json({ error: 'Failed to update scan key' });
+    }
+  });
+
+  // DELETE /api/delivery-orders/:id/scan-key - Remove the uploaded file and clear the scan key
+  app.delete('/api/delivery-orders/:id/scan-key', requireAuth(['Admin', 'Manager', 'Staff']), async (req: AuthenticatedRequest, res) => {
+    try {
+      const id = parseInt(req.params.id);
+      const [doRecord] = await db.select().from(deliveryOrders).where(eq(deliveryOrders.id, id));
+      if (!doRecord) {
+        return res.status(404).json({ error: 'Delivery order not found' });
+      }
+      if (doRecord.scanKey) {
+        try {
+          await objectStorageClient.delete(doRecord.scanKey);
+        } catch (storageErr) {
+          console.warn('Could not delete object from storage (clearing key anyway):', storageErr);
+        }
+      }
+      await db.update(deliveryOrders).set({ scanKey: null }).where(eq(deliveryOrders.id, id));
+      const [updated] = await db.select().from(deliveryOrders).where(eq(deliveryOrders.id, id));
+      res.json(updated);
+    } catch (error) {
+      console.error('Error removing delivery order scan key:', error);
+      res.status(500).json({ error: 'Failed to remove file' });
     }
   });
 

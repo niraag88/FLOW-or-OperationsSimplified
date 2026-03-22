@@ -8,7 +8,7 @@ import {
   DropdownMenuSeparator,
 } from "@/components/ui/dropdown-menu";
 import { Button } from "@/components/ui/button";
-import { MoreHorizontal, Edit2, Download, Trash2, Eye, Upload, Paperclip } from "lucide-react";
+import { MoreHorizontal, Edit2, Download, Trash2, Eye, Upload, Paperclip, X } from "lucide-react";
 import { useToast } from "@/components/ui/use-toast";
 import { exportInvoiceToXLSX } from "../utils/export";
 import { format } from 'date-fns';
@@ -28,6 +28,7 @@ export default function InvoiceActionsDropdown({ invoice, canEdit, onEdit, onRef
   const [showCreateInvoiceFromQuotationDialog, setShowCreateInvoiceFromQuotationDialog] = useState(false);
   const [showCreateFromExistingDialog, setShowCreateFromExistingDialog] = useState(false);
   const [showUploadDialog, setShowUploadDialog] = useState(false);
+  const [showRemoveFileDialog, setShowRemoveFileDialog] = useState(false);
 
   useEffect(() => {
     loadCurrentUser();
@@ -126,6 +127,24 @@ export default function InvoiceActionsDropdown({ invoice, canEdit, onEdit, onRef
     }
   };
 
+  const handleRemoveFile = async () => {
+    try {
+      const res = await fetch(`/api/invoices/${invoice.id}/scan-key`, {
+        method: 'DELETE',
+        credentials: 'include',
+      });
+      if (!res.ok) {
+        const data = await res.json().catch(() => ({}));
+        throw new Error(data.error || 'Failed to remove file');
+      }
+      toast({ title: 'File Removed', description: 'The attachment has been removed.' });
+      onRefresh();
+    } catch (error) {
+      console.error('Error removing file:', error);
+      toast({ title: 'Error', description: 'Could not remove the file. Please try again.', variant: 'destructive' });
+    }
+  };
+
   const hasScanKey = !!(invoice.scanKey || invoice.scan_key);
   const invoiceNumber = invoice.invoiceNumber || invoice.invoice_number || `inv-${invoice.id}`;
 
@@ -158,10 +177,19 @@ export default function InvoiceActionsDropdown({ invoice, canEdit, onEdit, onRef
             Upload
           </DropdownMenuItem>
           {hasScanKey && (
-            <DropdownMenuItem onClick={handleViewFile}>
-              <Paperclip className="w-4 h-4 mr-2" />
-              View File
-            </DropdownMenuItem>
+            <>
+              <DropdownMenuItem onClick={handleViewFile}>
+                <Paperclip className="w-4 h-4 mr-2" />
+                View File
+              </DropdownMenuItem>
+              <DropdownMenuItem
+                onClick={() => setShowRemoveFileDialog(true)}
+                className="text-orange-600 focus:text-orange-600"
+              >
+                <X className="w-4 h-4 mr-2" />
+                Remove File
+              </DropdownMenuItem>
+            </>
           )}
           <DropdownMenuSeparator />
           <DropdownMenuItem 
@@ -187,6 +215,15 @@ export default function InvoiceActionsDropdown({ invoice, canEdit, onEdit, onRef
         title="Confirm Deletion"
         description={`Do you wish to confirm deleting Invoice "${invoiceNumber}"? It will be moved to the recycle bin.`}
         confirmText="Yes, Delete"
+        confirmVariant="destructive"
+      />
+      <SimpleConfirmDialog
+        open={showRemoveFileDialog}
+        onClose={() => setShowRemoveFileDialog(false)}
+        onConfirm={handleRemoveFile}
+        title="Remove Attachment"
+        description={`Remove the uploaded file from Invoice "${invoiceNumber}"? The file will be permanently deleted.`}
+        confirmText="Yes, Remove"
         confirmVariant="destructive"
       />
       <CreateInvoiceFromQuotationDialog
