@@ -170,9 +170,10 @@ export default function DeliveryOrders() {
 
   const canEdit = true;
 
+  const closedYears = financialYears.filter(y => y.status === 'Closed');
+
   const filteredDOs = deliveryOrders.filter(doOrder => {
     // Always hide documents from closed financial years
-    const closedYears = financialYears.filter(y => y.status === 'Closed');
     if (closedYears.length > 0) {
       const d = new Date(doOrder.order_date);
       for (const cy of closedYears) {

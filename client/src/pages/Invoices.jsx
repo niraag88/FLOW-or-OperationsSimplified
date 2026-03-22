@@ -343,9 +343,10 @@ export default function Invoices() {
   const canEdit = true;
   const canOverride = true;
 
+  const closedYears = financialYears.filter(y => y.status === 'Closed');
+
   const filteredInvoices = invoices.filter(invoice => {
     // Always hide documents from closed financial years
-    const closedYears = financialYears.filter(y => y.status === 'Closed');
     if (closedYears.length > 0) {
       const d = new Date(invoice.invoiceDate || invoice.invoice_date || invoice.createdAt);
       for (const cy of closedYears) {

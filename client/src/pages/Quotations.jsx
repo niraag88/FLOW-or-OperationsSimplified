@@ -104,9 +104,10 @@ export default function Quotations() {
   const canOverride = true;
   const currentUser = { role: 'Admin', email: 'public@opsuite.com' }; // Mock user for optimization
 
+  const closedYears = financialYears.filter(y => y.status === 'Closed');
+
   const filteredQuotations = quotations.filter(quotation => {
     // Always hide documents from closed financial years
-    const closedYears = financialYears.filter(y => y.status === 'Closed');
     if (closedYears.length > 0) {
       const d = new Date(quotation.quoteDate);
       for (const cy of closedYears) {

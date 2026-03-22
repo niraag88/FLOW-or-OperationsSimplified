@@ -90,9 +90,10 @@ export default function PurchaseOrders() {
   const canEdit = true;
   const currentUser = { role: 'Admin', email: 'admin@opsuite.com' }; // Mock user
 
+  const closedYears = financialYears.filter(y => y.status === 'Closed');
+
   const filteredPOs = purchaseOrders.filter(po => {
     // Always hide documents from closed financial years
-    const closedYears = financialYears.filter(y => y.status === 'Closed');
     if (closedYears.length > 0) {
       const d = new Date(po.order_date);
       for (const cy of closedYears) {
