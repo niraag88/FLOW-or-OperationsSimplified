@@ -3,12 +3,12 @@
 This is a full-stack web application built with a React frontend and Express.js backend, designed as FLOW - a UAE business operations platform (AED currency, 5% VAT). The application features a modern UI built with shadcn/ui components and Tailwind CSS, with PostgreSQL database integration using Drizzle ORM.
 
 ## Current Database State (as of Task #45)
-- **Products**: 348 active products across all categories (Essential Oils, Carrier Oils, Bath Salts, Body Butters, Massage Blends, Diffuser Blends, Roll-ons, Balms & Salves, Hydrosols, Supplements, Electronics, Stationery)
+- **Products**: 500 active products across all categories (Essential Oils, Carrier Oils, Bath Salts, Body Butters, Massage Blends, Diffuser Blends, Roll-ons, Balms & Salves, Hydrosols, Supplements, Electronics, Stationery)
 - **Customers**: 135 customers (hotels, spas, retail chains, corporate, export clients across UAE and internationally)
 - **Suppliers**: 47 suppliers (UK, India, USA, France, Germany, Australia, UAE-based)
 - **Brands**: 26 brands (Absolute Aromas, Mystic Moments, Tisserand, Nikura + others)
 - **Purchase Orders**: 307 records; **Quotations**: 257; **Invoices**: 506; **Delivery Orders**: 202
-- **Admin credentials**: username=`admin`, password=`admin123` — NEVER change these
+- **Admin credentials**: Stored securely in ADMIN_PASSWORD env var — NEVER change the admin username or password
 
 ## Known Bug Fixes (Task #45)
 - Fixed: Product deletion failed because `POST /api/recycle-bin` endpoint was missing — added in `server/routes.ts`
