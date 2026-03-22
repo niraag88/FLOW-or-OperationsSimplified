@@ -1,10 +1,10 @@
 import { Search, Bell, LayoutDashboard, Building, Users, Settings, ChevronDown } from "lucide-react";
-import { Link, useLocation } from "wouter";
+import { Link, useLocation } from "react-router-dom";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 
 export function TopNavigation() {
-  const [location] = useLocation();
+  const { pathname: location } = useLocation();
 
   return (
     <header className="bg-slate-800 border-b border-slate-700">
@@ -24,7 +24,7 @@ export function TopNavigation() {
 
           {/* Main Navigation */}
           <nav className="flex space-x-8">
-            <Link href="/">
+            <Link to="/">
               <Button
                 variant={location === "/" ? "default" : "ghost"}
                 className={`flex items-center space-x-2 ${
