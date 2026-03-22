@@ -61,7 +61,15 @@ export default function PurchaseOrders() {
       .catch(() => {});
     fetch('/api/goods-receipts', { credentials: 'include' })
       .then(r => r.json())
-      .then(data => setGoodsReceipts(Array.isArray(data) ? data : []))
+      .then(data => {
+        const grns = Array.isArray(data) ? data : [];
+        setGoodsReceipts(grns.map(grn => ({
+          ...grn,
+          grn_number: grn.receiptNumber ?? grn.grn_number,
+          purchase_order_id: grn.poId ?? grn.purchase_order_id,
+          delivery_note_ref: grn.notes ?? grn.delivery_note_ref,
+        })));
+      })
       .catch(() => {});
   }, [activeTab, refreshTrigger]);
 
