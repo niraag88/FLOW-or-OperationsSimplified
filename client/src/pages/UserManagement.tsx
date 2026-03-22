@@ -13,6 +13,7 @@ import { Switch } from '@/components/ui/switch';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { UserPlus, Edit, Trash2, Shield, Users, CheckCircle, XCircle, AlertCircle, Key } from 'lucide-react';
 import { apiRequest } from '@/lib/queryClient';
+import { useToast } from '@/hooks/use-toast';
 
 interface User {
   id: string;
@@ -37,9 +38,21 @@ interface CreateUserData {
   active: boolean;
 }
 
+const getServerError = (error: Error, fallback: string): string => {
+  try {
+    const match = error.message.match(/^\d+: (.+)$/);
+    if (match) {
+      const parsed = JSON.parse(match[1]);
+      return parsed.error || fallback;
+    }
+  } catch {}
+  return fallback;
+};
+
 export default function UserManagement() {
   const { user, hasRole } = useAuth();
   const queryClient = useQueryClient();
+  const { toast } = useToast();
   const [isCreateDialogOpen, setIsCreateDialogOpen] = useState(false);
   const [editingUser, setEditingUser] = useState<User | null>(null);
   const [passwordChangeUser, setPasswordChangeUser] = useState<User | null>(null);
@@ -92,6 +105,14 @@ export default function UserManagement() {
         email: '',
         active: true
       });
+      toast({ title: 'User created', description: 'The new user account has been created.' });
+    },
+    onError: (error: Error) => {
+      toast({
+        title: 'Failed to create user',
+        description: getServerError(error, 'An unexpected error occurred.'),
+        variant: 'destructive',
+      });
     },
   });
 
@@ -104,6 +125,14 @@ export default function UserManagement() {
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['/api/users'] });
       setEditingUser(null);
+      toast({ title: 'User updated', description: 'User details have been saved.' });
+    },
+    onError: (error: Error) => {
+      toast({
+        title: 'Failed to update user',
+        description: getServerError(error, 'An unexpected error occurred.'),
+        variant: 'destructive',
+      });
     },
   });
 
@@ -114,6 +143,14 @@ export default function UserManagement() {
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['/api/users'] });
+      toast({ title: 'User deleted', description: 'The user account has been removed.' });
+    },
+    onError: (error: Error) => {
+      toast({
+        title: 'Failed to delete user',
+        description: getServerError(error, 'An unexpected error occurred.'),
+        variant: 'destructive',
+      });
     },
   });
 
@@ -127,6 +164,14 @@ export default function UserManagement() {
       queryClient.invalidateQueries({ queryKey: ['/api/users'] });
       setPasswordChangeUser(null);
       setNewPassword('');
+      toast({ title: 'Password changed', description: 'The password has been updated successfully.' });
+    },
+    onError: (error: Error) => {
+      toast({
+        title: 'Failed to change password',
+        description: getServerError(error, 'An unexpected error occurred.'),
+        variant: 'destructive',
+      });
     },
   });
 
