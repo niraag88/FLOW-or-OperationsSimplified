@@ -78,7 +78,7 @@ export default function QuotationList({ quotations, totalCount, loading, canEdit
         <CardHeader>
           <CardTitle className="flex items-center gap-2">
             <FileText className="w-5 h-5" />
-            Quotations ({totalCount || quotations.length})
+            Quotations ({quotations.length})
           </CardTitle>
         </CardHeader>
         <CardContent>

@@ -83,7 +83,7 @@ export default function InvoiceList({ invoices, totalCount, loading, canEdit, ca
         <CardHeader>
           <CardTitle className="flex items-center gap-2">
             <FileText className="w-5 h-5" />
-            Invoices ({totalCount ?? invoices.length})
+            Invoices ({invoices.length})
           </CardTitle>
         </CardHeader>
         <CardContent>

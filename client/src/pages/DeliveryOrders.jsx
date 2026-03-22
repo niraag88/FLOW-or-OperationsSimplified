@@ -89,7 +89,7 @@ export default function DeliveryOrders() {
       else if (dateRange === 'week') { const s = new Date(today); s.setDate(today.getDate() - today.getDay()); s.setHours(0,0,0,0); params.set('dateFrom', toStr(s)); }
       else if (dateRange === 'month') params.set('dateFrom', toStr(new Date(today.getFullYear(), today.getMonth(), 1)));
       else if (dateRange === 'quarter') { const q = Math.floor(today.getMonth() / 3); params.set('dateFrom', toStr(new Date(today.getFullYear(), q * 3, 1))); }
-      else if (typeof dateRange === 'object' && dateRange.type === 'custom') { params.set('dateFrom', dateRange.startDate); params.set('dateTo', dateRange.endDate); }
+      else if (typeof dateRange === 'object' && dateRange.type === 'custom') { params.set('dateFrom', toStr(new Date(dateRange.startDate))); params.set('dateTo', toStr(new Date(dateRange.endDate))); }
     }
     setLoading(true);
     fetch(`/api/delivery-orders?${params}`, { credentials: 'include' })
@@ -213,7 +213,7 @@ export default function DeliveryOrders() {
       else if (dateRange === 'week') { const s = new Date(today); s.setDate(today.getDate() - today.getDay()); s.setHours(0,0,0,0); params.set('dateFrom', toStr(s)); }
       else if (dateRange === 'month') params.set('dateFrom', toStr(new Date(today.getFullYear(), today.getMonth(), 1)));
       else if (dateRange === 'quarter') { const q = Math.floor(today.getMonth() / 3); params.set('dateFrom', toStr(new Date(today.getFullYear(), q * 3, 1))); }
-      else if (typeof dateRange === 'object' && dateRange.type === 'custom') { params.set('dateFrom', dateRange.startDate); params.set('dateTo', dateRange.endDate); }
+      else if (typeof dateRange === 'object' && dateRange.type === 'custom') { params.set('dateFrom', toStr(new Date(dateRange.startDate))); params.set('dateTo', toStr(new Date(dateRange.endDate))); }
     }
     const r = await fetch(`/api/delivery-orders?${params}`, { credentials: 'include' });
     const result = await r.json();
@@ -312,7 +312,7 @@ export default function DeliveryOrders() {
         <div className="flex items-center justify-between mt-6 pt-4 border-t">
           <div className="flex items-center gap-2">
             <span className="text-sm text-gray-700">
-              Showing {startIndex + 1} to {endIndex} of {totalCount} delivery orders
+              Showing {startIndex + 1} to {startIndex + visibleDOs.length} of {totalCount} delivery orders
             </span>
           </div>
           

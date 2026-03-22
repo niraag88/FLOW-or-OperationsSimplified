@@ -17,6 +17,7 @@ import ExportDropdown from "../components/common/ExportDropdown";
 
 export default function PurchaseOrders() {
   const [purchaseOrders, setPurchaseOrders] = useState([]);
+  const [allPOs, setAllPOs] = useState([]);
   const [goodsReceipts, setGoodsReceipts] = useState([]);
   const [products, setProducts] = useState([]); // Added products state
   const [loading, setLoading] = useState(true);
@@ -41,14 +42,16 @@ export default function PurchaseOrders() {
   useEffect(() => {
     const loadSupporting = async () => {
       try {
-        const [grnsData, productsData, booksData] = await Promise.all([
+        const [grnsData, productsData, booksData, allPOsResp] = await Promise.all([
           GoodsReceipt.list('-updated_date'),
           Product.list(),
           fetch('/api/books').then(r => r.json()).catch(() => []),
+          fetch('/api/purchase-orders', { credentials: 'include' }).then(r => r.json()).catch(() => []),
         ]);
         setGoodsReceipts(grnsData);
         setProducts(productsData);
         setFinancialYears(booksData);
+        setAllPOs(Array.isArray(allPOsResp) ? allPOsResp : (allPOsResp.data || []));
       } catch (error) {
         console.error("Error loading supporting data:", error);
       }
@@ -79,7 +82,7 @@ export default function PurchaseOrders() {
       else if (dr === 'week') { const s = new Date(today); s.setDate(today.getDate() - today.getDay()); s.setHours(0,0,0,0); params.set('dateFrom', toStr(s)); }
       else if (dr === 'month') params.set('dateFrom', toStr(new Date(today.getFullYear(), today.getMonth(), 1)));
       else if (dr === 'quarter') { const q = Math.floor(today.getMonth() / 3); params.set('dateFrom', toStr(new Date(today.getFullYear(), q * 3, 1))); }
-      else if (typeof dr === 'object' && dr.type === 'custom') { params.set('dateFrom', dr.startDate); params.set('dateTo', dr.endDate); }
+      else if (typeof dr === 'object' && dr.type === 'custom') { params.set('dateFrom', toStr(new Date(dr.startDate))); params.set('dateTo', toStr(new Date(dr.endDate))); }
     }
     setLoading(true);
     fetch(`/api/purchase-orders?${params}`, { credentials: 'include' })
@@ -145,7 +148,7 @@ export default function PurchaseOrders() {
       else if (dr === 'week') { const s = new Date(today); s.setDate(today.getDate() - today.getDay()); s.setHours(0,0,0,0); params.set('dateFrom', toStr(s)); }
       else if (dr === 'month') params.set('dateFrom', toStr(new Date(today.getFullYear(), today.getMonth(), 1)));
       else if (dr === 'quarter') { const q = Math.floor(today.getMonth() / 3); params.set('dateFrom', toStr(new Date(today.getFullYear(), q * 3, 1))); }
-      else if (typeof dr === 'object' && dr.type === 'custom') { params.set('dateFrom', dr.startDate); params.set('dateTo', dr.endDate); }
+      else if (typeof dr === 'object' && dr.type === 'custom') { params.set('dateFrom', toStr(new Date(dr.startDate))); params.set('dateTo', toStr(new Date(dr.endDate))); }
     }
     const r = await fetch(`/api/purchase-orders?${params}`, { credentials: 'include' });
     const result = await r.json();
@@ -162,8 +165,8 @@ export default function PurchaseOrders() {
   const [showClosedReceipts, setShowClosedReceipts] = useState(false);
   
   const getGoodsReceiptsExportData = () => {
-    const openPOs = purchaseOrders.filter(po => po.status === 'submitted');
-    const closedPOs = purchaseOrders.filter(po => po.status === 'closed');
+    const openPOs = allPOs.filter(po => po.status === 'submitted');
+    const closedPOs = allPOs.filter(po => po.status === 'closed');
     
     // Context-aware export based on expanded sections
     if (showOpenReceipts && !showClosedReceipts) {
@@ -282,7 +285,7 @@ export default function PurchaseOrders() {
             <div className="flex items-center justify-between mt-6 pt-4 border-t">
               <div className="flex items-center gap-2">
                 <span className="text-sm text-gray-700">
-                  Showing {startIndexPos + 1} to {endIndexPos} of {totalCount} purchase orders
+                  Showing {startIndexPos + 1} to {startIndexPos + visiblePOs.length} of {totalCount} purchase orders
                 </span>
               </div>
               
@@ -362,7 +365,7 @@ export default function PurchaseOrders() {
 
         <TabsContent value="goods-receipts" className="mt-6">
           <GoodsReceiptsTab 
-            purchaseOrders={purchaseOrders}
+            purchaseOrders={allPOs}
             products={products}
             goodsReceipts={filteredGRNs}
             loading={loading}
