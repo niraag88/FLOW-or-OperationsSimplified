@@ -1,0 +1,13 @@
+okay have a look at the purchase order and the status in it. If you look at the actions then we only have three status options:
+- Draft
+- Submitted
+- Closed
+Why does mock data have cancelled? It doesn't show the right information and then we don't know how to test the system out. Sent, those are not there. You need to stick to providing mock data within the rules of the program so there can only be submitted, they can only be draft, they can only be confirmed, sorry, draft submitted and closed so you need to stick within that.
+What we need to now do is:
+- You need to add some more mock data.
+- You need to process it.
+- You need to create actual purchase orders, by actual I mean test actual, then go into goods receipt except for some of the orders but then half accept some and close it.
+Where you've not received the complete inventory that you had asked for and requested for twelve items of a product, you only receive six but that's what it is. Now you need to close this sale. That's how you need to test the entire system out so I would suggest that you go through the entire system again:
+- Create new customers, brands, products, purchase orders, goods receipts, inventory.
+- Accept the goods.
+There should be more open and closed purchase orders showing up in goods receipt for us to see that the system works. Try the export functionality completely. Try the uploads, the downloads, and every single thing. Create new test users. Absolutely everything, you need to make full use of the entire system. You need to see. You need to even try and maximize and see how you can change the settings, increase the VAT, decrease the VAT. Does that show any difference if you change the VAT in the Settings tab? The exchange rate that is mentioned in financial settings in Settings, instead of 1 GBP, is 5. You can change it to 5.5 or 6 or 7 and see how it works. Change the document numbering prefixes and see if the system works. Go through every single part in detail, open books, close books. See if there's more storage being used, less. Delete files. Check that they are going to the recycle bin; then they are cleared from there or are they able to restore it? Look at everything, test everything out, look for bugs, look for issues, look for how this app can be foolproof.
