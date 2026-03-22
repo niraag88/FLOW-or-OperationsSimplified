@@ -41,6 +41,7 @@ function formatLogDate(dateString: string) {
 
 export default function AuditLogTable() {
   const [search, setSearch] = useState('');
+  const [userFilter, setUserFilter] = useState('all');
   const [actionFilter, setActionFilter] = useState('all');
   const [typeFilter, setTypeFilter] = useState('all');
   const [dateFrom, setDateFrom] = useState('');
@@ -53,9 +54,11 @@ export default function AuditLogTable() {
 
   const logs = data ?? [];
 
+  const users = Array.from(new Set(logs.map(l => l.actorName).filter(Boolean))).sort();
   const targetTypes = Array.from(new Set(logs.map(l => l.targetType))).sort();
 
   const filtered = logs.filter(log => {
+    if (userFilter !== 'all' && log.actorName !== userFilter) return false;
     if (actionFilter !== 'all' && log.action !== actionFilter) return false;
     if (typeFilter !== 'all' && log.targetType !== typeFilter) return false;
     if (search) {
@@ -93,9 +96,21 @@ export default function AuditLogTable() {
           />
         </div>
 
+        <Select value={userFilter} onValueChange={setUserFilter}>
+          <SelectTrigger className="w-[160px]">
+            <SelectValue placeholder="All users" />
+          </SelectTrigger>
+          <SelectContent>
+            <SelectItem value="all">All users</SelectItem>
+            {users.map(u => (
+              <SelectItem key={u} value={u}>{u}</SelectItem>
+            ))}
+          </SelectContent>
+        </Select>
+
         <Select value={actionFilter} onValueChange={setActionFilter}>
           <SelectTrigger className="w-[160px]">
-            <SelectValue placeholder="Action type" />
+            <SelectValue placeholder="All actions" />
           </SelectTrigger>
           <SelectContent>
             <SelectItem value="all">All actions</SelectItem>
@@ -107,7 +122,7 @@ export default function AuditLogTable() {
 
         <Select value={typeFilter} onValueChange={setTypeFilter}>
           <SelectTrigger className="w-[160px]">
-            <SelectValue placeholder="Target type" />
+            <SelectValue placeholder="All types" />
           </SelectTrigger>
           <SelectContent>
             <SelectItem value="all">All types</SelectItem>
@@ -149,27 +164,25 @@ export default function AuditLogTable() {
               <TableRow>
                 <TableHead className="w-[130px]">Time</TableHead>
                 <TableHead className="w-[110px]">User</TableHead>
-                <TableHead className="w-[110px]">Action</TableHead>
-                <TableHead className="w-[160px]">Document</TableHead>
+                <TableHead className="w-[120px]">Action</TableHead>
                 <TableHead>Details</TableHead>
               </TableRow>
             </TableHeader>
             <TableBody>
               {filtered.map(log => (
                 <TableRow key={log.id} className="hover:bg-gray-50 dark:hover:bg-gray-800">
-                  <TableCell className="text-xs text-gray-500 whitespace-nowrap">
+                  <TableCell className="text-xs text-gray-500 whitespace-nowrap align-top pt-3">
                     {formatLogDate(log.timestamp)}
                   </TableCell>
-                  <TableCell className="font-medium text-sm">{log.actorName || '—'}</TableCell>
-                  <TableCell>
+                  <TableCell className="font-medium text-sm align-top pt-3">{log.actorName || '—'}</TableCell>
+                  <TableCell className="align-top pt-2">
                     <Badge className={`${ACTION_COLORS[log.action] || 'bg-gray-100 text-gray-800'} border-0 text-xs`}>
                       {log.action}
                     </Badge>
                   </TableCell>
-                  <TableCell className="text-sm text-gray-600 dark:text-gray-400 whitespace-nowrap">
-                    {log.targetType} <span className="text-gray-400">#{log.targetId}</span>
+                  <TableCell className="text-sm text-gray-700 dark:text-gray-300 align-top pt-3 leading-snug">
+                    {log.details || '—'}
                   </TableCell>
-                  <TableCell className="text-sm max-w-xs truncate" title={log.details || undefined}>{log.details || '—'}</TableCell>
                 </TableRow>
               ))}
             </TableBody>
