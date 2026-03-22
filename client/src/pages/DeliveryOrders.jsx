@@ -183,18 +183,7 @@ export default function DeliveryOrders() {
 
   const canEdit = true;
 
-  const closedYears = financialYears.filter(y => y.status === 'Closed');
-  const visibleDOs = deliveryOrders.filter(doOrder => {
-    if (selectedTaxTreatments.length > 0 && !selectedTaxTreatments.includes(doOrder.tax_treatment)) return false;
-    if (closedYears.length > 0) {
-      const d = new Date(doOrder.order_date);
-      for (const cy of closedYears) {
-        const cyEnd = new Date(cy.endDate); cyEnd.setHours(23, 59, 59, 999);
-        if (d >= new Date(cy.startDate) && d <= cyEnd) return false;
-      }
-    }
-    return true;
-  });
+  const visibleDOs = deliveryOrders;
 
   const totalPages = Math.ceil(totalCount / itemsPerPage);
   const startIndex = (currentPage - 1) * itemsPerPage;

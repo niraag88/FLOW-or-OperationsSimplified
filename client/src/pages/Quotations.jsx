@@ -118,17 +118,7 @@ export default function Quotations() {
   const canOverride = true;
   const currentUser = { role: 'Admin', email: 'public@opsuite.com' }; // Mock user for optimization
 
-  const closedYears = financialYears.filter(y => y.status === 'Closed');
-  const visibleQuotations = closedYears.length > 0
-    ? quotations.filter(q => {
-        const d = new Date(q.quoteDate);
-        for (const cy of closedYears) {
-          const cyEnd = new Date(cy.endDate); cyEnd.setHours(23, 59, 59, 999);
-          if (d >= new Date(cy.startDate) && d <= cyEnd) return false;
-        }
-        return true;
-      })
-    : quotations;
+  const visibleQuotations = quotations;
 
   const totalPages = Math.ceil(totalCount / itemsPerPage);
   const startIndex = (currentPage - 1) * itemsPerPage;

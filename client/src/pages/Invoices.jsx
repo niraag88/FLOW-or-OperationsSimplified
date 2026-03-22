@@ -356,19 +356,7 @@ export default function Invoices() {
   const canEdit = true;
   const canOverride = true;
 
-  const closedYears = financialYears.filter(y => y.status === 'Closed');
-  const visibleInvoices = invoices.filter(invoice => {
-    const taxTreatment = invoice.taxTreatment || invoice.tax_treatment;
-    if (selectedTaxTreatments.length > 0 && !selectedTaxTreatments.includes(taxTreatment)) return false;
-    if (closedYears.length > 0) {
-      const d = new Date(invoice.invoiceDate || invoice.invoice_date || invoice.createdAt);
-      for (const cy of closedYears) {
-        const cyEnd = new Date(cy.endDate); cyEnd.setHours(23, 59, 59, 999);
-        if (d >= new Date(cy.startDate) && d <= cyEnd) return false;
-      }
-    }
-    return true;
-  });
+  const visibleInvoices = invoices;
 
   const totalPages = Math.ceil(totalCount / itemsPerPage);
   const startIndex = (currentPage - 1) * itemsPerPage;

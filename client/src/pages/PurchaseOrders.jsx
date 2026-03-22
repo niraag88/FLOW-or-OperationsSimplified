@@ -42,22 +42,29 @@ export default function PurchaseOrders() {
   useEffect(() => {
     const loadSupporting = async () => {
       try {
-        const [grnsData, productsData, booksData, allPOsResp] = await Promise.all([
+        const [grnsData, productsData, booksData] = await Promise.all([
           GoodsReceipt.list('-updated_date'),
           Product.list(),
           fetch('/api/books').then(r => r.json()).catch(() => []),
-          fetch('/api/purchase-orders', { credentials: 'include' }).then(r => r.json()).catch(() => []),
         ]);
         setGoodsReceipts(grnsData);
         setProducts(productsData);
         setFinancialYears(booksData);
-        setAllPOs(Array.isArray(allPOsResp) ? allPOsResp : (allPOsResp.data || []));
       } catch (error) {
         console.error("Error loading supporting data:", error);
       }
     };
     loadSupporting();
   }, []);
+
+  useEffect(() => {
+    if (activeTab !== 'goods-receipts') return;
+    if (allPOs.length > 0) return;
+    fetch('/api/purchase-orders', { credentials: 'include' })
+      .then(r => r.json())
+      .then(result => setAllPOs(Array.isArray(result) ? result : (result.data || [])))
+      .catch(() => {});
+  }, [activeTab]);
 
   useEffect(() => {
     const timer = setTimeout(() => {
@@ -117,18 +124,7 @@ export default function PurchaseOrders() {
   const canEdit = true;
   const currentUser = { role: 'Admin', email: 'admin@opsuite.com' }; // Mock user
 
-  const closedYears = financialYears.filter(y => y.status === 'Closed');
-
-  const visiblePOs = closedYears.length > 0
-    ? purchaseOrders.filter(po => {
-        const d = new Date(po.order_date);
-        for (const cy of closedYears) {
-          const cyEnd = new Date(cy.endDate); cyEnd.setHours(23, 59, 59, 999);
-          if (d >= new Date(cy.startDate) && d <= cyEnd) return false;
-        }
-        return true;
-      })
-    : purchaseOrders;
+  const visiblePOs = purchaseOrders;
 
   const totalPagesPos = Math.ceil(totalCount / itemsPerPage);
   const startIndexPos = (currentPage - 1) * itemsPerPage;
