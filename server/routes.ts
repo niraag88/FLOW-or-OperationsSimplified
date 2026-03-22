@@ -1108,9 +1108,10 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const [productToDelete] = await db.select({ name: products.name, sku: products.sku }).from(products).where(eq(products.id, productId));
       try {
         await businessStorage.deleteProduct(productId);
-      } catch (deleteErr: any) {
-        // If hard delete fails due to FK references, soft-delete instead (mark inactive)
-        if (deleteErr?.code === '23503') {
+      } catch (deleteErr) {
+        // If hard delete fails due to FK references (PostgreSQL error 23503), soft-delete instead
+        const pgCode = (deleteErr instanceof Object && 'code' in deleteErr) ? String((deleteErr as Record<string, unknown>).code) : '';
+        if (pgCode === '23503') {
           await db.update(products).set({ isActive: false }).where(eq(products.id, productId));
           writeAuditLog({ actor: req.user!.id, actorName: req.user?.username || String(req.user!.id), targetId: String(productId), targetType: 'product', action: 'DEACTIVATE', details: `Product '${productToDelete?.name || productId}' (SKU: ${productToDelete?.sku || '?'}) deactivated (has order history)` });
           return res.json({ success: true, message: 'Product deactivated (has order history)' });
