@@ -1113,8 +1113,17 @@ export async function registerRoutes(app: Express): Promise<Server> {
   // Purchase Order management routes
   app.get('/api/purchase-orders', requireAuth(['Admin', 'Manager']), async (req: AuthenticatedRequest, res) => {
     try {
-      const purchaseOrders = await businessStorage.getPurchaseOrders();
-      res.json(purchaseOrders);
+      const { page, pageSize, search, status, supplierId, dateFrom, dateTo } = req.query as Record<string, string>;
+      const result = await businessStorage.getPurchaseOrders({
+        page: page ? parseInt(page) : undefined,
+        pageSize: pageSize ? parseInt(pageSize) : undefined,
+        search: search || undefined,
+        status: status || undefined,
+        supplierId: supplierId ? parseInt(supplierId) : undefined,
+        dateFrom: dateFrom || undefined,
+        dateTo: dateTo || undefined,
+      });
+      res.json(result);
     } catch (error) {
       console.error('Error fetching purchase orders:', error);
       res.status(500).json({ error: 'Failed to fetch purchase orders' });
@@ -1283,8 +1292,17 @@ export async function registerRoutes(app: Express): Promise<Server> {
   // Quotation management routes
   app.get('/api/quotations', requireAuth(), async (req: AuthenticatedRequest, res) => {
     try {
-      const quotations = await businessStorage.getQuotations();
-      res.json(quotations);
+      const { page, pageSize, search, status, customerId, dateFrom, dateTo } = req.query as Record<string, string>;
+      const result = await businessStorage.getQuotations({
+        page: page ? parseInt(page) : undefined,
+        pageSize: pageSize ? parseInt(pageSize) : undefined,
+        search: search || undefined,
+        status: status || undefined,
+        customerId: customerId ? parseInt(customerId) : undefined,
+        dateFrom: dateFrom || undefined,
+        dateTo: dateTo || undefined,
+      });
+      res.json(result);
     } catch (error) {
       console.error('Error fetching quotations:', error);
       res.status(500).json({ error: 'Failed to fetch quotations' });
@@ -1294,9 +1312,17 @@ export async function registerRoutes(app: Express): Promise<Server> {
   // GET /api/invoices
   app.get('/api/invoices', requireAuth(), async (req: AuthenticatedRequest, res) => {
     try {
-      // Use basic invoices for backward compatibility until enhanced system is fully deployed
-      const invoices = await businessStorage.getInvoices();
-      res.json(invoices);
+      const { page, pageSize, search, status, customerId, dateFrom, dateTo } = req.query as Record<string, string>;
+      const result = await businessStorage.getInvoices({
+        page: page ? parseInt(page) : undefined,
+        pageSize: pageSize ? parseInt(pageSize) : undefined,
+        search: search || undefined,
+        status: status || undefined,
+        customerId: customerId ? parseInt(customerId) : undefined,
+        dateFrom: dateFrom || undefined,
+        dateTo: dateTo || undefined,
+      });
+      res.json(result);
     } catch (error) {
       console.error('Error fetching invoices:', error);
       res.status(500).json({ error: 'Failed to fetch invoices' });
@@ -1636,9 +1662,18 @@ export async function registerRoutes(app: Express): Promise<Server> {
   // GET /api/delivery-orders
   app.get('/api/delivery-orders', requireAuth(), async (req: AuthenticatedRequest, res) => {
     try {
-      const rows = await businessStorage.getDeliveryOrders();
+      const { page, pageSize, search, status, customerId, dateFrom, dateTo } = req.query as Record<string, string>;
+      const result = await businessStorage.getDeliveryOrders({
+        page: page ? parseInt(page) : undefined,
+        pageSize: pageSize ? parseInt(pageSize) : undefined,
+        search: search || undefined,
+        status: status || undefined,
+        customerId: customerId ? parseInt(customerId) : undefined,
+        dateFrom: dateFrom || undefined,
+        dateTo: dateTo || undefined,
+      });
       // Transform to snake_case field names the frontend expects
-      const result = rows.map((d: any) => ({
+      const mappedData = result.data.map((d: any) => ({
         ...d,
         do_number: d.orderNumber,
         customer_name: d.customerName,
@@ -1646,7 +1681,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
         tax_amount: d.taxAmount,
         total_amount: d.totalAmount,
       }));
-      res.json(result);
+      res.json({ data: mappedData, total: result.total });
     } catch (error) {
       console.error('Error fetching delivery orders:', error);
       res.status(500).json({ error: 'Failed to fetch delivery orders' });

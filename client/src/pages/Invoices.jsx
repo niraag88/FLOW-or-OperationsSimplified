@@ -62,7 +62,7 @@ export default function Invoices() {
       console.time('📡 API Calls - Parallel Loading');
       // Load all necessary data in parallel like the optimized quotations page
       const [invoicesData, customersData, productsData, brandsData, booksData] = await Promise.all([
-        Invoice.list('-updated_date'),
+        fetch('/api/invoices').then(r => r.json()).then(r => Array.isArray(r) ? r : (r.data || [])),
         Customer.list().catch(() => []),
         Product.list().catch(() => []),
         Brand.list().catch(() => []),

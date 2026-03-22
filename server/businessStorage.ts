@@ -1,5 +1,5 @@
 import { db } from "./db";
-import { eq, desc, like, and, gte, lte, sql } from "drizzle-orm";
+import { eq, desc, like, and, or, gte, lte, sql, inArray } from "drizzle-orm";
 import {
   brands, suppliers, customers, products, purchaseOrders, quotations,
   vatReturns, companySettings, purchaseOrderItems, quotationItems,
@@ -165,7 +165,32 @@ export class BusinessStorage {
   }
 
   // Purchase Order operations
-  async getPurchaseOrders() {
+  async getPurchaseOrders(params?: {
+    page?: number; pageSize?: number; search?: string;
+    status?: string; supplierId?: number; dateFrom?: string; dateTo?: string;
+  }): Promise<{ data: any[]; total: number }> {
+    const { page, pageSize, search, status, supplierId, dateFrom, dateTo } = params || {};
+
+    const conditions: any[] = [];
+    if (search) {
+      conditions.push(sql`(${purchaseOrders.poNumber} ILIKE ${`%${search}%`} OR coalesce(${purchaseOrders.notes}, '') ILIKE ${`%${search}%`})`);
+    }
+    if (status) {
+      const statuses = status.split(',').filter(Boolean);
+      if (statuses.length === 1) conditions.push(eq(purchaseOrders.status, statuses[0]));
+      else if (statuses.length > 1) conditions.push(inArray(purchaseOrders.status, statuses));
+    }
+    if (supplierId) conditions.push(eq(purchaseOrders.supplierId, supplierId));
+    if (dateFrom) conditions.push(gte(purchaseOrders.orderDate, dateFrom));
+    if (dateTo) conditions.push(lte(purchaseOrders.orderDate, dateTo));
+    const whereCondition = conditions.length > 0 ? and(...conditions) : undefined;
+
+    // Total count
+    const [{ count }] = await db
+      .select({ count: sql<number>`count(*)::integer` })
+      .from(purchaseOrders)
+      .where(whereCondition);
+
     // Create subqueries for aggregated data
     const itemsAgg = db.select({
       poId: purchaseOrderItems.poId,
@@ -183,7 +208,7 @@ export class BusinessStorage {
       .groupBy(goodsReceipts.poId)
       .as('receivedAgg');
 
-    return await db.select({
+    let q = db.select({
       id: purchaseOrders.id,
       poNumber: purchaseOrders.poNumber,
       supplierId: purchaseOrders.supplierId,
@@ -198,17 +223,23 @@ export class BusinessStorage {
       createdBy: purchaseOrders.createdBy,
       createdAt: purchaseOrders.createdAt,
       updatedAt: purchaseOrders.updatedAt,
-      supplierName: brands.name, // Since supplierId is actually brandId from the form
+      supplierName: brands.name,
       brandName: brands.name,
-      // Aggregated data for efficient loading
       lineItems: sql<number>`coalesce(${itemsAgg.lineItems}, 0)`.as('lineItems'),
       orderedQty: sql<number>`coalesce(${itemsAgg.orderedQty}, 0)`.as('orderedQty'),
       receivedQty: sql<number>`coalesce(${receivedAgg.receivedQty}, 0)`.as('receivedQty')
     }).from(purchaseOrders)
-      .leftJoin(brands, eq(purchaseOrders.supplierId, brands.id)) // Join directly to brands since supplierId is brandId
+      .leftJoin(brands, eq(purchaseOrders.supplierId, brands.id))
       .leftJoin(itemsAgg, eq(itemsAgg.poId, purchaseOrders.id))
       .leftJoin(receivedAgg, eq(receivedAgg.poId, purchaseOrders.id))
+      .where(whereCondition)
       .orderBy(desc(purchaseOrders.createdAt));
+
+    if (page && pageSize) {
+      q = q.limit(pageSize).offset((page - 1) * pageSize) as any;
+    }
+    const data = await q;
+    return { data, total: Number(count) };
   }
 
   async getPurchaseOrderById(id: number) {
@@ -239,8 +270,32 @@ export class BusinessStorage {
   }
 
   // Quotation operations
-  async getQuotations() {
-    return await db.select({
+  async getQuotations(params?: {
+    page?: number; pageSize?: number; search?: string;
+    status?: string; customerId?: number; dateFrom?: string; dateTo?: string;
+  }): Promise<{ data: any[]; total: number }> {
+    const { page, pageSize, search, status, customerId, dateFrom, dateTo } = params || {};
+
+    const conditions: any[] = [];
+    if (search) {
+      conditions.push(sql`(${quotations.quoteNumber} ILIKE ${`%${search}%`} OR coalesce(${quotations.notes}, '') ILIKE ${`%${search}%`})`);
+    }
+    if (status) {
+      const statuses = status.split(',').filter(Boolean);
+      if (statuses.length === 1) conditions.push(eq(quotations.status, statuses[0]));
+      else if (statuses.length > 1) conditions.push(inArray(quotations.status, statuses));
+    }
+    if (customerId) conditions.push(eq(quotations.customerId, customerId));
+    if (dateFrom) conditions.push(sql`${quotations.quoteDate}::date >= ${dateFrom}::date`);
+    if (dateTo) conditions.push(sql`${quotations.quoteDate}::date <= ${dateTo}::date`);
+    const whereCondition = conditions.length > 0 ? and(...conditions) : undefined;
+
+    const [{ count }] = await db
+      .select({ count: sql<number>`count(*)::integer` })
+      .from(quotations)
+      .where(whereCondition);
+
+    let q = db.select({
       id: quotations.id,
       quoteNumber: quotations.quoteNumber,
       customerId: quotations.customerId,
@@ -262,7 +317,14 @@ export class BusinessStorage {
       customerName: customers.name,
     }).from(quotations)
       .leftJoin(customers, eq(quotations.customerId, customers.id))
+      .where(whereCondition)
       .orderBy(desc(quotations.createdAt));
+
+    if (page && pageSize) {
+      q = q.limit(pageSize).offset((page - 1) * pageSize) as any;
+    }
+    const data = await q;
+    return { data, total: Number(count) };
   }
 
   async getQuotationById(id: number) {
@@ -753,8 +815,37 @@ export class BusinessStorage {
   }
 
   // Invoice operations
-  async getInvoices() {
-    return await db.select().from(invoices).orderBy(desc(invoices.createdAt));
+  async getInvoices(params?: {
+    page?: number; pageSize?: number; search?: string;
+    status?: string; customerId?: number; dateFrom?: string; dateTo?: string;
+  }): Promise<{ data: any[]; total: number }> {
+    const { page, pageSize, search, status, customerId, dateFrom, dateTo } = params || {};
+
+    const conditions: any[] = [];
+    if (search) {
+      conditions.push(sql`(${invoices.invoiceNumber} ILIKE ${`%${search}%`} OR ${invoices.customerName} ILIKE ${`%${search}%`} OR coalesce(${invoices.notes}, '') ILIKE ${`%${search}%`})`);
+    }
+    if (status) {
+      const statuses = status.split(',').filter(Boolean);
+      if (statuses.length === 1) conditions.push(eq(invoices.status, statuses[0]));
+      else if (statuses.length > 1) conditions.push(inArray(invoices.status, statuses));
+    }
+    if (customerId) conditions.push(eq(invoices.customerId, customerId));
+    if (dateFrom) conditions.push(gte(invoices.invoiceDate, dateFrom));
+    if (dateTo) conditions.push(lte(invoices.invoiceDate, dateTo));
+    const whereCondition = conditions.length > 0 ? and(...conditions) : undefined;
+
+    const [{ count }] = await db
+      .select({ count: sql<number>`count(*)::integer` })
+      .from(invoices)
+      .where(whereCondition);
+
+    let q = db.select().from(invoices).where(whereCondition).orderBy(desc(invoices.createdAt));
+    if (page && pageSize) {
+      q = q.limit(pageSize).offset((page - 1) * pageSize) as any;
+    }
+    const data = await q;
+    return { data, total: Number(count) };
   }
 
   async getInvoiceById(id: number) {
@@ -778,8 +869,37 @@ export class BusinessStorage {
   }
 
   // Delivery Order operations
-  async getDeliveryOrders() {
-    return await db.select().from(deliveryOrders).orderBy(desc(deliveryOrders.createdAt));
+  async getDeliveryOrders(params?: {
+    page?: number; pageSize?: number; search?: string;
+    status?: string; customerId?: number; dateFrom?: string; dateTo?: string;
+  }): Promise<{ data: any[]; total: number }> {
+    const { page, pageSize, search, status, customerId, dateFrom, dateTo } = params || {};
+
+    const conditions: any[] = [];
+    if (search) {
+      conditions.push(sql`(${deliveryOrders.orderNumber} ILIKE ${`%${search}%`} OR ${deliveryOrders.customerName} ILIKE ${`%${search}%`} OR coalesce(${deliveryOrders.notes}, '') ILIKE ${`%${search}%`})`);
+    }
+    if (status) {
+      const statuses = status.split(',').filter(Boolean);
+      if (statuses.length === 1) conditions.push(eq(deliveryOrders.status, statuses[0]));
+      else if (statuses.length > 1) conditions.push(inArray(deliveryOrders.status, statuses));
+    }
+    if (customerId) conditions.push(eq(deliveryOrders.customerId, customerId));
+    if (dateFrom) conditions.push(gte(deliveryOrders.orderDate, dateFrom));
+    if (dateTo) conditions.push(lte(deliveryOrders.orderDate, dateTo));
+    const whereCondition = conditions.length > 0 ? and(...conditions) : undefined;
+
+    const [{ count }] = await db
+      .select({ count: sql<number>`count(*)::integer` })
+      .from(deliveryOrders)
+      .where(whereCondition);
+
+    let q = db.select().from(deliveryOrders).where(whereCondition).orderBy(desc(deliveryOrders.createdAt));
+    if (page && pageSize) {
+      q = q.limit(pageSize).offset((page - 1) * pageSize) as any;
+    }
+    const data = await q;
+    return { data, total: Number(count) };
   }
 
   async getDeliveryOrderById(id: number) {

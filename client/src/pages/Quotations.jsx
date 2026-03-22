@@ -46,7 +46,7 @@ export default function Quotations() {
       console.time('📡 API Calls - Parallel Loading');
       // Load all necessary data in parallel like the optimized PO page
       const [quotationsData, customersData, productsData, brandsData, booksData] = await Promise.all([
-        Quotation.list('-updated_date'),
+        fetch('/api/quotations').then(r => r.json()).then(r => Array.isArray(r) ? r : (r.data || [])),
         Customer.list().catch(() => []),
         Product.list().catch(() => []),
         Brand.list().catch(() => []),

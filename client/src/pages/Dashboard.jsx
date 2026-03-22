@@ -50,7 +50,11 @@ export default function Dashboard() {
       ]);
 
       const [products, purchaseOrders, deliveryOrders, invoices, customers, suppliers] =
-        results.map(r => (r.status === 'fulfilled' ? r.value : []));
+        results.map(r => {
+          if (r.status !== 'fulfilled') return [];
+          const v = r.value;
+          return Array.isArray(v) ? v : (v?.data ?? []);
+        });
 
       setData({ products, purchaseOrders, deliveryOrders, invoices, customers, suppliers });
     } catch (error) {

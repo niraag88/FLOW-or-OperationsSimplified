@@ -57,7 +57,7 @@ export default function DeliveryOrders() {
       console.time('📡 API Calls - Parallel Loading');
       // Load all necessary data in parallel like the optimized quotations page
       const [dosData, customersData, productsData, brandsData, booksData] = await Promise.all([
-        DeliveryOrder.list('-updated_date'),
+        fetch('/api/delivery-orders').then(r => r.json()).then(r => Array.isArray(r) ? r : (r.data || [])),
         Customer.list().catch(() => []),
         Product.list().catch(() => []),
         Brand.list().catch(() => []),

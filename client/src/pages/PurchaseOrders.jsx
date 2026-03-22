@@ -44,7 +44,7 @@ export default function PurchaseOrders() {
     setLoading(true);
     try {
       const [posData, grnsData, productsData, booksData] = await Promise.all([
-        PurchaseOrder.list('-updated_date'),
+        fetch('/api/purchase-orders').then(r => r.json()).then(r => Array.isArray(r) ? r : (r.data || [])),
         GoodsReceipt.list('-updated_date'),
         Product.list(),
         fetch('/api/books').then(r => r.json()).catch(() => []),
