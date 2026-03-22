@@ -5,9 +5,7 @@ import { Input } from "@/components/ui/input";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Plus, Search } from "lucide-react";
-import { PurchaseOrder } from "@/api/entities";
-import { GoodsReceipt } from "@/api/entities";
-import { Product } from "@/api/entities"; // Added Product import
+import { PurchaseOrder, Product } from "@/api/entities";
 import POList from "../components/purchase-orders/POList";
 import POForm from "../components/purchase-orders/POForm";
 import GoodsReceiptsTab from "../components/purchase-orders/GoodsReceiptsTab"; // Changed import
@@ -42,12 +40,10 @@ export default function PurchaseOrders() {
   useEffect(() => {
     const loadSupporting = async () => {
       try {
-        const [grnsData, productsData, booksData] = await Promise.all([
-          GoodsReceipt.list('-updated_date'),
+        const [productsData, booksData] = await Promise.all([
           Product.list(),
           fetch('/api/books').then(r => r.json()).catch(() => []),
         ]);
-        setGoodsReceipts(grnsData);
         setProducts(productsData);
         setFinancialYears(booksData);
       } catch (error) {
@@ -59,12 +55,15 @@ export default function PurchaseOrders() {
 
   useEffect(() => {
     if (activeTab !== 'goods-receipts') return;
-    if (allPOs.length > 0) return;
     fetch('/api/purchase-orders', { credentials: 'include' })
       .then(r => r.json())
       .then(result => setAllPOs(Array.isArray(result) ? result : (result.data || [])))
       .catch(() => {});
-  }, [activeTab]);
+    fetch('/api/goods-receipts', { credentials: 'include' })
+      .then(r => r.json())
+      .then(data => setGoodsReceipts(Array.isArray(data) ? data : []))
+      .catch(() => {});
+  }, [activeTab, refreshTrigger]);
 
   useEffect(() => {
     const timer = setTimeout(() => {

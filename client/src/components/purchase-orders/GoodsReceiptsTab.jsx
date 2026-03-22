@@ -410,13 +410,13 @@ export default function GoodsReceiptsTab({
   };
 
   const getReceivedQuantityForItem = (poId, productId) => {
-    const relatedGRNs = goodsReceipts.filter(grn => grn.purchase_order_id === poId);
+    const relatedGRNs = goodsReceipts.filter(grn => (grn.poId ?? grn.purchase_order_id) === poId);
     let totalReceived = 0;
     
     relatedGRNs.forEach(grn => {
       grn.items?.forEach(item => {
-        if (item.product_id === productId) {
-          totalReceived += item.received_quantity || 0;
+        if ((item.productId ?? item.product_id) === productId) {
+          totalReceived += item.receivedQuantity ?? item.received_quantity ?? 0;
         }
       });
     });
