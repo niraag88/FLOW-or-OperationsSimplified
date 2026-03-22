@@ -12,7 +12,9 @@ class ApiEntity {
     if (!response.ok) {
       throw new Error(`Failed to fetch ${this.endpoint}`);
     }
-    return await response.json();
+    const result = await response.json();
+    // Auto-extract .data from paginated responses { data: [], total: N }
+    return Array.isArray(result) ? result : (result?.data ?? result);
   }
 
   async create(data) {
