@@ -1,5 +1,5 @@
 
-import React, { useState, useEffect, useRef } from "react";
+import React, { useState, useEffect } from "react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
@@ -13,7 +13,7 @@ import POForm from "../components/purchase-orders/POForm";
 import GoodsReceiptsTab from "../components/purchase-orders/GoodsReceiptsTab"; // Changed import
 import POFilters from "../components/purchase-orders/POFilters";
 import ExportDropdown from "../components/common/ExportDropdown";
-import YearSelector from "../components/common/YearSelector";
+
 
 export default function PurchaseOrders() {
   const [purchaseOrders, setPurchaseOrders] = useState([]);
@@ -31,8 +31,6 @@ export default function PurchaseOrders() {
   });
   const [refreshTrigger, setRefreshTrigger] = useState(0);
   const [financialYears, setFinancialYears] = useState([]);
-  const [selectedYearId, setSelectedYearId] = useState(null);
-  const yearInitializedRef = useRef(false);
 
   // Pagination state
   const [currentPage, setCurrentPage] = useState(1);
@@ -56,11 +54,6 @@ export default function PurchaseOrders() {
       setGoodsReceipts(grnsData);
       setProducts(productsData);
       setFinancialYears(booksData);
-      if (!yearInitializedRef.current) {
-        const openBook = booksData.find(b => b.status === 'Open');
-        setSelectedYearId(openBook ? openBook.id : null);
-        yearInitializedRef.current = true;
-      }
     } catch (error) {
       console.error("Error loading purchase orders data:", error);
     } finally {
@@ -101,17 +94,6 @@ export default function PurchaseOrders() {
         const cyEnd = new Date(cy.endDate);
         cyEnd.setHours(23, 59, 59, 999);
         if (d >= cyStart && d <= cyEnd) return false;
-      }
-    }
-    // Year selector filter
-    if (selectedYearId !== null) {
-      const selectedBook = financialYears.find(b => b.id === selectedYearId);
-      if (selectedBook) {
-        const startDate = new Date(selectedBook.startDate);
-        const endDate = new Date(selectedBook.endDate);
-        endDate.setHours(23, 59, 59, 999);
-        const d = new Date(po.order_date);
-        if (d < startDate || d > endDate) return false;
       }
     }
     const matchesSearch = po.po_number?.toLowerCase().includes(searchTerm.toLowerCase()) ||
@@ -250,12 +232,6 @@ export default function PurchaseOrders() {
           )}
         </div>
       </div>
-
-      <YearSelector
-        financialYears={financialYears}
-        selectedYearId={selectedYearId}
-        onYearChange={(id) => { setSelectedYearId(id); resetPagination(); }}
-      />
 
       {/* Search and Filters */}
       <div className="flex flex-col sm:flex-row gap-4">

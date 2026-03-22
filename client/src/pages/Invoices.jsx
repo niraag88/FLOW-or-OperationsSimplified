@@ -1,5 +1,5 @@
 
-import React, { useState, useEffect, useRef } from "react";
+import React, { useState, useEffect } from "react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
@@ -15,7 +15,7 @@ import InvoiceFilters from "../components/invoices/InvoiceFilters";
 import CreateFromExistingDialog from "../components/invoices/CreateFromExistingDialog";
 import { getDerivedInvoiceStatus } from "../components/invoices/invoiceUtils";
 import ExportDropdown from "../components/common/ExportDropdown";
-import YearSelector from "../components/common/YearSelector";
+
 import InvoiceTemplate from "../components/print/InvoiceTemplate";
 import { createRoot } from 'react-dom/client';
 import { useToast } from '@/hooks/use-toast';
@@ -37,8 +37,6 @@ export default function Invoices() {
   const [showCreateFromExistingDialog, setShowCreateFromExistingDialog] = useState(false);
   const [refreshTrigger, setRefreshTrigger] = useState(0);
   const [financialYears, setFinancialYears] = useState([]);
-  const [selectedYearId, setSelectedYearId] = useState(null);
-  const yearInitializedRef = useRef(false);
 
   // Pagination state
   const [currentPage, setCurrentPage] = useState(1);
@@ -78,11 +76,6 @@ export default function Invoices() {
       setProducts(productsData);
       setBrands(brandsData.filter(b => b.isActive !== false));
       setFinancialYears(booksData);
-      if (!yearInitializedRef.current) {
-        const openBook = booksData.find(b => b.status === 'Open');
-        setSelectedYearId(openBook ? openBook.id : null);
-        yearInitializedRef.current = true;
-      }
       console.timeEnd('⚡ State Updates');
       
       console.log('📊 Data loaded:', invoicesData.length, 'invoices,', customersData.length, 'customers,', productsData.length, 'products,', brandsData.length, 'brands');
@@ -356,17 +349,6 @@ export default function Invoices() {
         if (d >= cyStart && d <= cyEnd) return false;
       }
     }
-    // Year selector filter
-    if (selectedYearId !== null) {
-      const selectedBook = financialYears.find(b => b.id === selectedYearId);
-      if (selectedBook) {
-        const startDate = new Date(selectedBook.startDate);
-        const endDate = new Date(selectedBook.endDate);
-        endDate.setHours(23, 59, 59, 999);
-        const d = new Date(invoice.invoiceDate || invoice.invoice_date || invoice.createdAt);
-        if (d < startDate || d > endDate) return false;
-      }
-    }
     // Normalize field names (backend returns camelCase, frontend expects snake_case)
     const invoiceNumber = invoice.invoiceNumber || invoice.invoice_number;
     const customerName = invoice.customerName || invoice.customer_name;
@@ -485,12 +467,6 @@ export default function Invoices() {
         </div>
       </div>
 
-
-      <YearSelector
-        financialYears={financialYears}
-        selectedYearId={selectedYearId}
-        onYearChange={(id) => { setSelectedYearId(id); resetPagination(); }}
-      />
 
       {/* Search and Filters */}
       <div className="flex flex-col sm:flex-row gap-4">
