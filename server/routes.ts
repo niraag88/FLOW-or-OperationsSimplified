@@ -3041,14 +3041,15 @@ export async function registerRoutes(app: Express): Promise<Server> {
   // POST /api/recycle-bin — add an item to the recycle bin (soft delete)
   app.post('/api/recycle-bin', requireAuth(), async (req: AuthenticatedRequest, res) => {
     try {
-      const { document_type, document_id, document_number, document_data, deleted_by, deleted_date, reason, original_status, can_restore } = req.body;
+      const { document_type, document_id, document_number, document_data, reason, original_status, can_restore } = req.body;
+      // deleted_by and deleted_date are always set server-side from the authenticated session and current time
       const [item] = await db.insert(recycleBin).values({
         documentType: document_type,
         documentId: String(document_id),
         documentNumber: document_number || String(document_id),
         documentData: typeof document_data === 'string' ? document_data : JSON.stringify(document_data || {}),
-        deletedBy: deleted_by || req.user?.username || 'unknown',
-        deletedDate: deleted_date ? new Date(deleted_date) : new Date(),
+        deletedBy: req.user?.username || 'unknown',
+        deletedDate: new Date(),
         reason: reason || 'Deleted from UI',
         originalStatus: original_status || null,
         canRestore: can_restore !== undefined ? can_restore : true,
