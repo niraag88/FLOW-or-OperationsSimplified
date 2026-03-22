@@ -65,7 +65,9 @@ class ApiEntity {
       credentials: 'include'
     });
     if (!response.ok) throw new Error(`Failed to filter ${this.endpoint}`);
-    return await response.json();
+    const result = await response.json();
+    // Auto-extract .data from paginated responses { data: [], total: N }
+    return Array.isArray(result) ? result : (result?.data ?? result);
   }
 }
 
