@@ -745,7 +745,19 @@ export async function registerRoutes(app: Express): Promise<Server> {
   app.put('/api/users/:id', requireRole('Admin'), async (req: AuthenticatedRequest, res) => {
     try {
       const userId = req.params.id;
-      const { role, firstName, lastName, email, active } = req.body;
+      const { role, firstName, lastName, email, active, password } = req.body;
+
+      // Validate optional password if provided
+      if (password !== undefined && password !== '') {
+        if (typeof password !== 'string' || password.length < 6) {
+          return res.status(400).json({ error: 'Password must be at least 6 characters long' });
+        }
+      }
+
+      // Hash password if a new one was provided
+      const hashedPassword = (password && password.trim())
+        ? await hashPassword(password)
+        : undefined;
 
       const [updatedUser] = await db.update(users)
         .set({
@@ -753,7 +765,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
           ...(firstName !== undefined && { firstName }),
           ...(lastName !== undefined && { lastName }),
           ...(email !== undefined && { email }),
-          ...(active !== undefined && { active })
+          ...(active !== undefined && { active }),
+          ...(hashedPassword !== undefined && { password: hashedPassword })
         })
         .where(eq(users.id, userId))
         .returning({

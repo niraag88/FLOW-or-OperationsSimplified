@@ -11,7 +11,7 @@ import { Badge } from '@/components/ui/badge';
 import { Alert, AlertDescription } from '@/components/ui/alert';
 import { Switch } from '@/components/ui/switch';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
-import { UserPlus, Edit, Trash2, Shield, Users, CheckCircle, XCircle, AlertCircle, Key } from 'lucide-react';
+import { UserPlus, Edit, Trash2, Shield, Users, CheckCircle, XCircle, AlertCircle } from 'lucide-react';
 import { apiRequest } from '@/lib/queryClient';
 import { useToast } from '@/hooks/use-toast';
 
@@ -60,8 +60,7 @@ export default function UserManagement() {
   const { toast } = useToast();
   const [isCreateDialogOpen, setIsCreateDialogOpen] = useState(false);
   const [editingUser, setEditingUser] = useState<User | null>(null);
-  const [passwordChangeUser, setPasswordChangeUser] = useState<User | null>(null);
-  const [newPassword, setNewPassword] = useState('');
+  const [editPassword, setEditPassword] = useState('');
   const [createForm, setCreateForm] = useState<CreateUserData>({
     username: '',
     password: '',
@@ -123,13 +122,16 @@ export default function UserManagement() {
 
   // Update user mutation
   const updateUserMutation = useMutation({
-    mutationFn: async ({ id, ...userData }: { id: string } & Partial<User>) => {
-      const response = await apiRequest('PUT', `/api/users/${id}`, userData);
+    mutationFn: async ({ id, password, ...userData }: { id: string; password?: string } & Partial<User>) => {
+      const body: Record<string, unknown> = { ...userData };
+      if (password && password.trim()) body.password = password;
+      const response = await apiRequest('PUT', `/api/users/${id}`, body);
       return await response.json();
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['/api/users'] });
       setEditingUser(null);
+      setEditPassword('');
       toast({ title: 'User updated', description: 'User details have been saved.' });
     },
     onError: (error: Error) => {
@@ -159,27 +161,6 @@ export default function UserManagement() {
     },
   });
 
-  // Change password mutation
-  const changePasswordMutation = useMutation({
-    mutationFn: async ({ userId, password }: { userId: string; password: string }) => {
-      const response = await apiRequest('PUT', `/api/users/${userId}/password`, { password });
-      return await response.json();
-    },
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['/api/users'] });
-      setPasswordChangeUser(null);
-      setNewPassword('');
-      toast({ title: 'Password changed', description: 'The password has been updated successfully.' });
-    },
-    onError: (error: Error) => {
-      toast({
-        title: 'Failed to change password',
-        description: getServerError(error, 'An unexpected error occurred.'),
-        variant: 'destructive',
-      });
-    },
-  });
-
   const handleCreateUser = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!createForm.username.trim() || !createForm.password.trim()) {
@@ -188,21 +169,15 @@ export default function UserManagement() {
     await createUserMutation.mutateAsync(createForm);
   };
 
-  const handleUpdateUser = async (updates: Partial<User>) => {
+  const handleUpdateUser = async () => {
     if (!editingUser) return;
-    await updateUserMutation.mutateAsync({ id: editingUser.id, ...updates });
+    await updateUserMutation.mutateAsync({ ...editingUser, password: editPassword });
   };
 
   const handleDeleteUser = async (userId: string, username: string) => {
     if (confirm(`Are you sure you want to delete user "${username}"? This action cannot be undone.`)) {
       await deleteUserMutation.mutateAsync(userId);
     }
-  };
-
-  const handleChangePassword = async (e: React.FormEvent) => {
-    e.preventDefault();
-    if (!passwordChangeUser || !newPassword) return;
-    await changePasswordMutation.mutateAsync({ userId: passwordChangeUser.id, password: newPassword });
   };
 
   const getRoleBadgeColor = (role: string) => {
@@ -453,18 +428,10 @@ export default function UserManagement() {
                         <Button
                           variant="outline"
                           size="sm"
-                          onClick={() => setEditingUser(u)}
+                          onClick={() => { setEditingUser(u); setEditPassword(''); }}
                           data-testid={`button-edit-${u.username}`}
                         >
                           <Edit className="h-3 w-3" />
-                        </Button>
-                        <Button
-                          variant="outline"
-                          size="sm"
-                          onClick={() => setPasswordChangeUser(u)}
-                          data-testid={`button-change-password-${u.username}`}
-                        >
-                          <Key className="h-3 w-3" />
                         </Button>
                         {u.id !== user?.id && (
                           <Button
@@ -489,15 +456,25 @@ export default function UserManagement() {
 
       {/* Edit User Dialog */}
       {editingUser && (
-        <Dialog open={!!editingUser} onOpenChange={() => setEditingUser(null)}>
+        <Dialog open={!!editingUser} onOpenChange={() => { setEditingUser(null); setEditPassword(''); }}>
           <DialogContent className="sm:max-w-md">
             <DialogHeader>
-              <DialogTitle>Edit User: @{editingUser.username}</DialogTitle>
+              <DialogTitle>Edit User</DialogTitle>
               <DialogDescription>
                 Update user information and permissions
               </DialogDescription>
             </DialogHeader>
             <div className="space-y-4 py-4">
+              <div className="space-y-2">
+                <Label>Username</Label>
+                <Input
+                  value={editingUser.username}
+                  disabled
+                  className="bg-gray-50 text-gray-500 cursor-not-allowed"
+                  data-testid="input-edit-username"
+                />
+              </div>
+
               <div className="grid grid-cols-2 gap-4">
                 <div className="space-y-2">
                   <Label>First Name</Label>
@@ -518,7 +495,7 @@ export default function UserManagement() {
                   />
                 </div>
               </div>
-              
+
               <div className="space-y-2">
                 <Label>Email</Label>
                 <Input
@@ -529,12 +506,26 @@ export default function UserManagement() {
                   data-testid="input-edit-email"
                 />
               </div>
-              
+
+              <div className="space-y-2">
+                <Label>New Password</Label>
+                <Input
+                  type="text"
+                  value={editPassword}
+                  onChange={(e) => setEditPassword(e.target.value)}
+                  placeholder="Enter new password to change it"
+                  data-testid="input-edit-password"
+                />
+                <p className="text-xs text-gray-500">
+                  Leave blank to keep current password. Minimum 6 characters.
+                </p>
+              </div>
+
               <div className="space-y-2">
                 <Label>Role</Label>
                 <Select
                   value={editingUser.role}
-                  onValueChange={(value: 'Admin' | 'Manager' | 'Staff') => 
+                  onValueChange={(value: 'Admin' | 'Manager' | 'Staff') =>
                     setEditingUser({ ...editingUser, role: value })
                   }
                 >
@@ -548,7 +539,7 @@ export default function UserManagement() {
                   </SelectContent>
                 </Select>
               </div>
-              
+
               <div className="flex items-center space-x-2">
                 <Switch
                   checked={editingUser.active}
@@ -562,73 +553,19 @@ export default function UserManagement() {
               <Button
                 type="button"
                 variant="outline"
-                onClick={() => setEditingUser(null)}
+                onClick={() => { setEditingUser(null); setEditPassword(''); }}
                 disabled={updateUserMutation.isPending}
               >
                 Cancel
               </Button>
               <Button
-                onClick={() => handleUpdateUser(editingUser)}
-                disabled={updateUserMutation.isPending}
+                onClick={handleUpdateUser}
+                disabled={updateUserMutation.isPending || (editPassword.length > 0 && editPassword.length < 6)}
                 data-testid="button-confirm-update-user"
               >
                 {updateUserMutation.isPending ? 'Updating...' : 'Update User'}
               </Button>
             </DialogFooter>
-          </DialogContent>
-        </Dialog>
-      )}
-
-      {/* Change Password Dialog */}
-      {passwordChangeUser && (
-        <Dialog open={!!passwordChangeUser} onOpenChange={() => setPasswordChangeUser(null)}>
-          <DialogContent className="sm:max-w-md">
-            <form onSubmit={handleChangePassword}>
-              <DialogHeader>
-                <DialogTitle>Change Password: @{passwordChangeUser.username}</DialogTitle>
-                <DialogDescription>
-                  Set a new password for this user. The user will need to use this new password to login.
-                </DialogDescription>
-              </DialogHeader>
-              <div className="space-y-4 py-4">
-                <div className="space-y-2">
-                  <Label htmlFor="newPassword">New Password *</Label>
-                  <Input
-                    id="newPassword"
-                    type="password"
-                    value={newPassword}
-                    onChange={(e) => setNewPassword(e.target.value)}
-                    placeholder="Enter new password"
-                    required
-                    minLength={6}
-                    data-testid="input-new-password"
-                  />
-                  <p className="text-sm text-gray-500">
-                    Password must be at least 6 characters long
-                  </p>
-                </div>
-              </div>
-              <DialogFooter>
-                <Button
-                  type="button"
-                  variant="outline"
-                  onClick={() => {
-                    setPasswordChangeUser(null);
-                    setNewPassword('');
-                  }}
-                  disabled={changePasswordMutation.isPending}
-                >
-                  Cancel
-                </Button>
-                <Button
-                  type="submit"
-                  disabled={changePasswordMutation.isPending || !newPassword || newPassword.length < 6}
-                  data-testid="button-confirm-change-password"
-                >
-                  {changePasswordMutation.isPending ? 'Changing...' : 'Change Password'}
-                </Button>
-              </DialogFooter>
-            </form>
           </DialogContent>
         </Dialog>
       )}
