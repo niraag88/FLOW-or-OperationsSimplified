@@ -185,12 +185,12 @@ export class BusinessStorage {
       if (ids.length === 1) conditions.push(eq(purchaseOrders.supplierId, ids[0]));
       else if (ids.length > 1) conditions.push(inArray(purchaseOrders.supplierId, ids));
     }
-    if (dateFrom) conditions.push(gte(purchaseOrders.orderDate, dateFrom));
-    if (dateTo) conditions.push(lte(purchaseOrders.orderDate, dateTo));
+    if (dateFrom) conditions.push(sql`${purchaseOrders.orderDate}::date >= ${dateFrom}::date`);
+    if (dateTo) conditions.push(sql`${purchaseOrders.orderDate}::date <= ${dateTo}::date`);
     if (excludeYears) {
       for (const range of excludeYears.split(';').filter(Boolean)) {
         const [start, end] = range.split(',');
-        if (start && end) conditions.push(sql`NOT (${purchaseOrders.orderDate} >= ${start} AND ${purchaseOrders.orderDate} <= ${end})`);
+        if (start && end) conditions.push(sql`NOT (${purchaseOrders.orderDate}::date >= ${start}::date AND ${purchaseOrders.orderDate}::date <= ${end}::date)`);
       }
     }
     const whereCondition = conditions.length > 0 ? and(...conditions) : undefined;
@@ -854,13 +854,18 @@ export class BusinessStorage {
       if (ids.length === 1) conditions.push(eq(invoices.customerId, ids[0]));
       else if (ids.length > 1) conditions.push(inArray(invoices.customerId, ids));
     }
-    if (dateFrom) conditions.push(gte(invoices.invoiceDate, dateFrom));
-    if (dateTo) conditions.push(lte(invoices.invoiceDate, dateTo));
+    if (dateFrom) conditions.push(sql`${invoices.invoiceDate}::date >= ${dateFrom}::date`);
+    if (dateTo) conditions.push(sql`${invoices.invoiceDate}::date <= ${dateTo}::date`);
     if (excludeYears) {
       for (const range of excludeYears.split(';').filter(Boolean)) {
         const [start, end] = range.split(',');
-        if (start && end) conditions.push(sql`NOT (${invoices.invoiceDate} >= ${start} AND ${invoices.invoiceDate} <= ${end})`);
+        if (start && end) conditions.push(sql`NOT (${invoices.invoiceDate}::date >= ${start}::date AND ${invoices.invoiceDate}::date <= ${end}::date)`);
       }
+    }
+    if (params?.taxTreatment) {
+      const treatments = params.taxTreatment.split(',').filter(Boolean);
+      if (treatments.length === 1) conditions.push(eq(invoices.taxTreatment, treatments[0]));
+      else if (treatments.length > 1) conditions.push(inArray(invoices.taxTreatment, treatments));
     }
     const whereCondition = conditions.length > 0 ? and(...conditions) : undefined;
 
