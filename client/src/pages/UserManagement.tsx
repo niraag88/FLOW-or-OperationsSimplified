@@ -42,8 +42,13 @@ const getServerError = (error: Error, fallback: string): string => {
   try {
     const match = error.message.match(/^\d+: (.+)$/);
     if (match) {
-      const parsed = JSON.parse(match[1]);
-      return parsed.error || fallback;
+      const text = match[1].trim();
+      try {
+        const parsed = JSON.parse(text);
+        return parsed.error || parsed.message || text || fallback;
+      } catch {
+        return text || fallback;
+      }
     }
   } catch {}
   return fallback;
