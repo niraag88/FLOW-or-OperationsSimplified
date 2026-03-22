@@ -963,6 +963,21 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  app.delete('/api/suppliers/:id', requireRole('Admin'), async (req: AuthenticatedRequest, res) => {
+    try {
+      const supplierId = parseInt(req.params.id);
+      const deletedSupplier = await businessStorage.deleteSupplier(supplierId);
+      if (!deletedSupplier) {
+        return res.status(404).json({ error: 'Supplier not found' });
+      }
+      writeAuditLog({ actor: req.user!.id, actorName: req.user?.username || String(req.user!.id), targetId: String(supplierId), targetType: 'supplier', action: 'DELETE', details: `Supplier '${deletedSupplier.name}' deleted` });
+      res.json({ success: true });
+    } catch (error) {
+      console.error('Error deleting supplier:', error);
+      res.status(500).json({ error: 'Failed to delete supplier' });
+    }
+  });
+
   // Customer management routes
   app.get('/api/customers', requireAuth(), async (req: AuthenticatedRequest, res) => {
     try {
@@ -1586,7 +1601,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       }
       await db.update(invoices).set({ scanKey }).where(eq(invoices.id, id));
       const [updated] = await db.select().from(invoices).where(eq(invoices.id, id));
-      writeAuditLog({ actor: req.user!.id, actorName: req.user?.username || String(req.user!.id), targetId: String(id), targetType: 'invoice', action: 'UPLOAD', details: `File attached to Invoice #${updated.invoiceNumber}` });
+      writeAuditLog({ actor: req.user!.id, actorName: req.user?.username || String(req.user!.id), targetId: String(id), targetType: 'invoice', action: 'UPLOAD', details: `Scan attached to Invoice #${updated.invoiceNumber}` });
       res.json(updated);
     } catch (error) {
       console.error('Error updating invoice scan key:', error);
@@ -1611,7 +1626,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       }
       await db.update(invoices).set({ scanKey: null }).where(eq(invoices.id, id));
       const [updated] = await db.select().from(invoices).where(eq(invoices.id, id));
-      writeAuditLog({ actor: req.user!.id, actorName: req.user?.username || String(req.user!.id), targetId: String(id), targetType: 'invoice', action: 'REMOVE_FILE', details: `File removed from Invoice #${invoice.invoiceNumber}` });
+      writeAuditLog({ actor: req.user!.id, actorName: req.user?.username || String(req.user!.id), targetId: String(id), targetType: 'invoice', action: 'REMOVE_FILE', details: `Scan removed from Invoice #${invoice.invoiceNumber}` });
       res.json(updated);
     } catch (error) {
       console.error('Error removing invoice scan key:', error);
@@ -1874,7 +1889,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       }
       await db.update(deliveryOrders).set({ scanKey }).where(eq(deliveryOrders.id, id));
       const [updated] = await db.select().from(deliveryOrders).where(eq(deliveryOrders.id, id));
-      writeAuditLog({ actor: req.user!.id, actorName: req.user?.username || String(req.user!.id), targetId: String(id), targetType: 'delivery_order', action: 'UPLOAD', details: `File attached to DO #${updated.orderNumber}` });
+      writeAuditLog({ actor: req.user!.id, actorName: req.user?.username || String(req.user!.id), targetId: String(id), targetType: 'delivery_order', action: 'UPLOAD', details: `Scan attached to DO #${updated.orderNumber}` });
       res.json(updated);
     } catch (error) {
       console.error('Error updating delivery order scan key:', error);
@@ -1899,7 +1914,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       }
       await db.update(deliveryOrders).set({ scanKey: null }).where(eq(deliveryOrders.id, id));
       const [updated] = await db.select().from(deliveryOrders).where(eq(deliveryOrders.id, id));
-      writeAuditLog({ actor: req.user!.id, actorName: req.user?.username || String(req.user!.id), targetId: String(id), targetType: 'delivery_order', action: 'REMOVE_FILE', details: `File removed from DO #${doRecord.orderNumber}` });
+      writeAuditLog({ actor: req.user!.id, actorName: req.user?.username || String(req.user!.id), targetId: String(id), targetType: 'delivery_order', action: 'REMOVE_FILE', details: `Scan removed from DO #${doRecord.orderNumber}` });
       res.json(updated);
     } catch (error) {
       console.error('Error removing delivery order scan key:', error);

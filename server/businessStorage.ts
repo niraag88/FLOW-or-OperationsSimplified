@@ -65,6 +65,11 @@ export class BusinessStorage {
     return supplier;
   }
 
+  async deleteSupplier(id: number) {
+    const [deletedSupplier] = await db.delete(suppliers).where(eq(suppliers.id, id)).returning();
+    return deletedSupplier;
+  }
+
   // Customer operations
   async getCustomers() {
     return await db.select().from(customers).where(eq(customers.isActive, true)).orderBy(desc(customers.createdAt));
