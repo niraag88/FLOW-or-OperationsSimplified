@@ -733,7 +733,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
         createdBy: users.createdBy
       });
 
-      writeAuditLog({ actor: req.user!.id, actorName: req.user!.username, targetId: newUser.id, targetType: 'user', action: 'CREATE', details: `User @${newUser.username} (${newUser.role}) created` });
+      writeAuditLog({ actor: req.user!.id, actorName: req.user?.username || String(req.user!.id), targetId: newUser.id, targetType: 'user', action: 'CREATE', details: `User @${newUser.username} (${newUser.role}) created` });
       res.status(201).json({ user: newUser });
 
     } catch (error) {
@@ -797,7 +797,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
         return res.status(404).json({ error: 'User not found' });
       }
 
-      writeAuditLog({ actor: req.user!.id, actorName: req.user!.username, targetId: userId, targetType: 'user', action: 'UPDATE', details: `User @${updatedUser.username} updated` });
+      writeAuditLog({ actor: req.user!.id, actorName: req.user?.username || String(req.user!.id), targetId: userId, targetType: 'user', action: 'UPDATE', details: `User @${updatedUser.username} updated` });
       res.json({ user: updatedUser });
 
     } catch (error) {
@@ -824,7 +824,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
         return res.status(404).json({ error: 'User not found' });
       }
 
-      writeAuditLog({ actor: req.user!.id, actorName: req.user!.username, targetId: userId, targetType: 'user', action: 'DELETE', details: `User @${deletedUser.username} deleted` });
+      writeAuditLog({ actor: req.user!.id, actorName: req.user?.username || String(req.user!.id), targetId: userId, targetType: 'user', action: 'DELETE', details: `User @${deletedUser.username} deleted` });
       res.json({ success: true, deletedUser });
 
     } catch (error) {
@@ -867,7 +867,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
         return res.status(404).json({ error: 'User not found' });
       }
 
-      writeAuditLog({ actor: req.user!.id, actorName: req.user!.username, targetId: userId, targetType: 'user', action: 'UPDATE', details: `Password changed for user @${updatedUser.username}` });
+      writeAuditLog({ actor: req.user!.id, actorName: req.user?.username || String(req.user!.id), targetId: userId, targetType: 'user', action: 'UPDATE', details: `Password changed for user @${updatedUser.username}` });
       res.json({ success: true, message: 'Password updated successfully' });
 
     } catch (error) {
@@ -893,7 +893,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
     try {
       const validatedData = insertBrandSchema.parse(req.body);
       const brand = await businessStorage.createBrand(validatedData);
-      writeAuditLog({ actor: req.user!.id, actorName: req.user!.username, targetId: String(brand.id), targetType: 'brand', action: 'CREATE', details: `Brand '${brand.name}' created` });
+      writeAuditLog({ actor: req.user!.id, actorName: req.user?.username || String(req.user!.id), targetId: String(brand.id), targetType: 'brand', action: 'CREATE', details: `Brand '${brand.name}' created` });
       res.status(201).json(brand);
     } catch (error) {
       console.error('Error creating brand:', error);
@@ -906,7 +906,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const brandId = parseInt(req.params.id);
       const validatedData = insertBrandSchema.partial().parse(req.body);
       const brand = await businessStorage.updateBrand(brandId, validatedData);
-      writeAuditLog({ actor: req.user!.id, actorName: req.user!.username, targetId: String(brandId), targetType: 'brand', action: 'UPDATE', details: `Brand '${brand.name}' updated` });
+      writeAuditLog({ actor: req.user!.id, actorName: req.user?.username || String(req.user!.id), targetId: String(brandId), targetType: 'brand', action: 'UPDATE', details: `Brand '${brand.name}' updated` });
       res.json(brand);
     } catch (error) {
       console.error('Error updating brand:', error);
@@ -919,7 +919,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const brandId = parseInt(req.params.id);
       const brandName = req.body?.name || `ID ${brandId}`;
       await businessStorage.deleteBrand(brandId);
-      writeAuditLog({ actor: req.user!.id, actorName: req.user!.username, targetId: String(brandId), targetType: 'brand', action: 'DELETE', details: `Brand '${brandName}' deleted` });
+      writeAuditLog({ actor: req.user!.id, actorName: req.user?.username || String(req.user!.id), targetId: String(brandId), targetType: 'brand', action: 'DELETE', details: `Brand '${brandName}' deleted` });
       res.json({ success: true });
     } catch (error) {
       console.error('Error deleting brand:', error);
@@ -942,7 +942,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
     try {
       const validatedData = insertSupplierSchema.parse(req.body);
       const supplier = await businessStorage.createSupplier(validatedData);
-      writeAuditLog({ actor: req.user!.id, actorName: req.user!.username, targetId: String(supplier.id), targetType: 'supplier', action: 'CREATE', details: `Supplier '${supplier.name}' created` });
+      writeAuditLog({ actor: req.user!.id, actorName: req.user?.username || String(req.user!.id), targetId: String(supplier.id), targetType: 'supplier', action: 'CREATE', details: `Supplier '${supplier.name}' created` });
       res.status(201).json(supplier);
     } catch (error) {
       console.error('Error creating supplier:', error);
@@ -955,7 +955,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const supplierId = parseInt(req.params.id);
       const validatedData = insertSupplierSchema.partial().parse(req.body);
       const supplier = await businessStorage.updateSupplier(supplierId, validatedData);
-      writeAuditLog({ actor: req.user!.id, actorName: req.user!.username, targetId: String(supplierId), targetType: 'supplier', action: 'UPDATE', details: `Supplier '${supplier.name}' updated` });
+      writeAuditLog({ actor: req.user!.id, actorName: req.user?.username || String(req.user!.id), targetId: String(supplierId), targetType: 'supplier', action: 'UPDATE', details: `Supplier '${supplier.name}' updated` });
       res.json(supplier);
     } catch (error) {
       console.error('Error updating supplier:', error);
@@ -978,7 +978,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
     try {
       const validatedData = insertCustomerSchema.parse(req.body);
       const customer = await businessStorage.createCustomer(validatedData);
-      writeAuditLog({ actor: req.user!.id, actorName: req.user!.username, targetId: String(customer.id), targetType: 'customer', action: 'CREATE', details: `Customer '${customer.name}' created` });
+      writeAuditLog({ actor: req.user!.id, actorName: req.user?.username || String(req.user!.id), targetId: String(customer.id), targetType: 'customer', action: 'CREATE', details: `Customer '${customer.name}' created` });
       res.status(201).json(customer);
     } catch (error) {
       console.error('Error creating customer:', error);
@@ -991,7 +991,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const customerId = parseInt(req.params.id);
       const validatedData = insertCustomerSchema.partial().parse(req.body);
       const customer = await businessStorage.updateCustomer(customerId, validatedData);
-      writeAuditLog({ actor: req.user!.id, actorName: req.user!.username, targetId: String(customerId), targetType: 'customer', action: 'UPDATE', details: `Customer '${customer.name}' updated` });
+      writeAuditLog({ actor: req.user!.id, actorName: req.user?.username || String(req.user!.id), targetId: String(customerId), targetType: 'customer', action: 'UPDATE', details: `Customer '${customer.name}' updated` });
       res.json(customer);
     } catch (error) {
       console.error('Error updating customer:', error);
@@ -1062,7 +1062,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
     try {
       const validatedData = insertProductSchema.parse(req.body);
       const product = await businessStorage.createProduct(validatedData);
-      writeAuditLog({ actor: req.user!.id, actorName: req.user!.username, targetId: String(product.id), targetType: 'product', action: 'CREATE', details: `Product '${product.name}' (SKU: ${product.sku}) created` });
+      writeAuditLog({ actor: req.user!.id, actorName: req.user?.username || String(req.user!.id), targetId: String(product.id), targetType: 'product', action: 'CREATE', details: `Product '${product.name}' (SKU: ${product.sku}) created` });
       res.status(201).json(product);
     } catch (error) {
       console.error('Error creating product:', error);
@@ -1075,7 +1075,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const productId = parseInt(req.params.id);
       const validatedData = insertProductSchema.partial().parse(req.body);
       const product = await businessStorage.updateProduct(productId, validatedData);
-      writeAuditLog({ actor: req.user!.id, actorName: req.user!.username, targetId: String(productId), targetType: 'product', action: 'UPDATE', details: `Product '${product.name}' updated` });
+      writeAuditLog({ actor: req.user!.id, actorName: req.user?.username || String(req.user!.id), targetId: String(productId), targetType: 'product', action: 'UPDATE', details: `Product '${product.name}' updated` });
       res.json(product);
     } catch (error) {
       console.error('Error updating product:', error);
@@ -1088,7 +1088,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const productId = parseInt(req.params.id);
       const [productToDelete] = await db.select({ name: products.name, sku: products.sku }).from(products).where(eq(products.id, productId));
       await businessStorage.deleteProduct(productId);
-      writeAuditLog({ actor: req.user!.id, actorName: req.user!.username, targetId: String(productId), targetType: 'product', action: 'DELETE', details: `Product '${productToDelete?.name || productId}' (SKU: ${productToDelete?.sku || '?'}) deleted` });
+      writeAuditLog({ actor: req.user!.id, actorName: req.user?.username || String(req.user!.id), targetId: String(productId), targetType: 'product', action: 'DELETE', details: `Product '${productToDelete?.name || productId}' (SKU: ${productToDelete?.sku || '?'}) deleted` });
       res.json({ success: true, message: 'Product deleted successfully' });
     } catch (error) {
       console.error('Error deleting product:', error);
@@ -1153,7 +1153,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
         }
       }
       
-      writeAuditLog({ actor: req.user!.id, actorName: req.user!.username, targetId: String(purchaseOrder.id), targetType: 'purchase_order', action: 'CREATE', details: `PO #${purchaseOrder.poNumber} created` });
+      writeAuditLog({ actor: req.user!.id, actorName: req.user?.username || String(req.user!.id), targetId: String(purchaseOrder.id), targetType: 'purchase_order', action: 'CREATE', details: `PO #${purchaseOrder.poNumber} created` });
       res.status(201).json(purchaseOrder);
     } catch (error) {
       console.error('Error creating purchase order:', error);
@@ -1196,7 +1196,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
         }
       }
       
-      writeAuditLog({ actor: req.user!.id, actorName: req.user!.username, targetId: String(poId), targetType: 'purchase_order', action: 'UPDATE', details: `PO #${updatedPO.poNumber} updated (status: ${updatedPO.status})` });
+      writeAuditLog({ actor: req.user!.id, actorName: req.user?.username || String(req.user!.id), targetId: String(poId), targetType: 'purchase_order', action: 'UPDATE', details: `PO #${updatedPO.poNumber} updated (status: ${updatedPO.status})` });
       res.json(updatedPO);
     } catch (error) {
       console.error('Error updating purchase order:', error);
@@ -1231,7 +1231,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
         await tx.delete(purchaseOrders).where(eq(purchaseOrders.id, poId));
       });
 
-      writeAuditLog({ actor: req.user!.id, actorName: req.user!.username, targetId: String(poId), targetType: 'purchase_order', action: 'DELETE', details: `PO #${po.poNumber} deleted` });
+      writeAuditLog({ actor: req.user!.id, actorName: req.user?.username || String(req.user!.id), targetId: String(poId), targetType: 'purchase_order', action: 'DELETE', details: `PO #${po.poNumber} deleted` });
       res.json({ success: true });
     } catch (error) {
       console.error('Error deleting purchase order:', error);
@@ -1501,7 +1501,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
         }
       }
 
-      writeAuditLog({ actor: req.user!.id, actorName: req.user!.username, targetId: String(invoice.id), targetType: 'invoice', action: 'CREATE', details: `Invoice #${invoice.invoiceNumber} created for ${customerName}` });
+      writeAuditLog({ actor: req.user!.id, actorName: req.user?.username || String(req.user!.id), targetId: String(invoice.id), targetType: 'invoice', action: 'CREATE', details: `Invoice #${invoice.invoiceNumber} created for ${customerName}` });
       res.status(201).json({ ...invoice, items: body.items || [] });
     } catch (error) {
       console.error('Error creating invoice:', error);
@@ -1564,7 +1564,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       }
 
       const [updated] = await db.select().from(invoices).where(eq(invoices.id, id));
-      writeAuditLog({ actor: req.user!.id, actorName: req.user!.username, targetId: String(id), targetType: 'invoice', action: 'UPDATE', details: `Invoice #${updated.invoiceNumber} updated (status: ${updated.status})` });
+      writeAuditLog({ actor: req.user!.id, actorName: req.user?.username || String(req.user!.id), targetId: String(id), targetType: 'invoice', action: 'UPDATE', details: `Invoice #${updated.invoiceNumber} updated (status: ${updated.status})` });
       res.json({ ...updated, items: body.items || [] });
     } catch (error) {
       console.error('Error updating invoice:', error);
@@ -1586,6 +1586,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       }
       await db.update(invoices).set({ scanKey }).where(eq(invoices.id, id));
       const [updated] = await db.select().from(invoices).where(eq(invoices.id, id));
+      writeAuditLog({ actor: req.user!.id, actorName: req.user?.username || String(req.user!.id), targetId: String(id), targetType: 'invoice', action: 'UPLOAD', details: `File attached to Invoice #${updated.invoiceNumber}` });
       res.json(updated);
     } catch (error) {
       console.error('Error updating invoice scan key:', error);
@@ -1610,6 +1611,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       }
       await db.update(invoices).set({ scanKey: null }).where(eq(invoices.id, id));
       const [updated] = await db.select().from(invoices).where(eq(invoices.id, id));
+      writeAuditLog({ actor: req.user!.id, actorName: req.user?.username || String(req.user!.id), targetId: String(id), targetType: 'invoice', action: 'REMOVE_FILE', details: `File removed from Invoice #${invoice.invoiceNumber}` });
       res.json(updated);
     } catch (error) {
       console.error('Error removing invoice scan key:', error);
@@ -1788,7 +1790,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
         }
       }
 
-      writeAuditLog({ actor: req.user!.id, actorName: req.user!.username, targetId: String(doRecord.id), targetType: 'delivery_order', action: 'CREATE', details: `DO #${doRecord.orderNumber} created for ${customerName}` });
+      writeAuditLog({ actor: req.user!.id, actorName: req.user?.username || String(req.user!.id), targetId: String(doRecord.id), targetType: 'delivery_order', action: 'CREATE', details: `DO #${doRecord.orderNumber} created for ${customerName}` });
       res.status(201).json({ ...doRecord, do_number: doRecord.orderNumber, items: body.items || [] });
     } catch (error) {
       console.error('Error creating delivery order:', error);
@@ -1850,7 +1852,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       }
 
       const [updated] = await db.select().from(deliveryOrders).where(eq(deliveryOrders.id, id));
-      writeAuditLog({ actor: req.user!.id, actorName: req.user!.username, targetId: String(id), targetType: 'delivery_order', action: 'UPDATE', details: `DO #${updated.orderNumber} updated (status: ${updated.status})` });
+      writeAuditLog({ actor: req.user!.id, actorName: req.user?.username || String(req.user!.id), targetId: String(id), targetType: 'delivery_order', action: 'UPDATE', details: `DO #${updated.orderNumber} updated (status: ${updated.status})` });
       res.json({ ...updated, do_number: updated.orderNumber, items: body.items || [] });
     } catch (error) {
       console.error('Error updating delivery order:', error);
@@ -1872,6 +1874,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       }
       await db.update(deliveryOrders).set({ scanKey }).where(eq(deliveryOrders.id, id));
       const [updated] = await db.select().from(deliveryOrders).where(eq(deliveryOrders.id, id));
+      writeAuditLog({ actor: req.user!.id, actorName: req.user?.username || String(req.user!.id), targetId: String(id), targetType: 'delivery_order', action: 'UPLOAD', details: `File attached to DO #${updated.orderNumber}` });
       res.json(updated);
     } catch (error) {
       console.error('Error updating delivery order scan key:', error);
@@ -1896,6 +1899,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       }
       await db.update(deliveryOrders).set({ scanKey: null }).where(eq(deliveryOrders.id, id));
       const [updated] = await db.select().from(deliveryOrders).where(eq(deliveryOrders.id, id));
+      writeAuditLog({ actor: req.user!.id, actorName: req.user?.username || String(req.user!.id), targetId: String(id), targetType: 'delivery_order', action: 'REMOVE_FILE', details: `File removed from DO #${doRecord.orderNumber}` });
       res.json(updated);
     } catch (error) {
       console.error('Error removing delivery order scan key:', error);
@@ -1937,7 +1941,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
         }
       }
       
-      writeAuditLog({ actor: req.user!.id, actorName: req.user!.username, targetId: String(quotation.id), targetType: 'quotation', action: 'CREATE', details: `Quotation #${quotation.quoteNumber} created` });
+      const quoteCustomerName = req.body.customerName || `Customer ID ${req.body.customerId || 'unknown'}`;
+      writeAuditLog({ actor: req.user!.id, actorName: req.user?.username || String(req.user!.id), targetId: String(quotation.id), targetType: 'quotation', action: 'CREATE', details: `Quotation #${quotation.quoteNumber} created for ${quoteCustomerName}` });
       res.status(201).json(quotation);
     } catch (error) {
       console.error('Error creating quotation:', error);
@@ -2018,7 +2023,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       
       const validatedData = insertQuotationSchema.partial().parse(processedData);
       const updatedQuote = await businessStorage.updateQuotation(id, validatedData);
-      writeAuditLog({ actor: req.user!.id, actorName: req.user!.username, targetId: String(id), targetType: 'quotation', action: 'UPDATE', details: `Quotation #${updatedQuote.quoteNumber} updated (status: ${updatedQuote.status})` });
+      writeAuditLog({ actor: req.user!.id, actorName: req.user?.username || String(req.user!.id), targetId: String(id), targetType: 'quotation', action: 'UPDATE', details: `Quotation #${updatedQuote.quoteNumber} updated (status: ${updatedQuote.status})` });
       res.json(updatedQuote);
     } catch (error) {
       console.error('Error updating quotation:', error);
@@ -2055,7 +2060,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
         await tx.delete(quotations).where(eq(quotations.id, id));
       });
 
-      writeAuditLog({ actor: req.user!.id, actorName: req.user!.username, targetId: String(id), targetType: 'quotation', action: 'DELETE', details: `Quotation #${quoteHeader.quoteNumber} deleted (moved to recycle bin)` });
+      writeAuditLog({ actor: req.user!.id, actorName: req.user?.username || String(req.user!.id), targetId: String(id), targetType: 'quotation', action: 'DELETE', details: `Quotation #${quoteHeader.quoteNumber} deleted (moved to recycle bin)` });
       res.json({ success: true, message: 'Quotation deleted successfully' });
     } catch (error) {
       console.error('Error deleting quotation:', error);
@@ -2146,7 +2151,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       
       await db.insert(stockCountItems).values(stockCountItemsData);
       
-      writeAuditLog({ actor: req.user!.id, actorName: req.user!.username, targetId: String(stockCount.id), targetType: 'stock_count', action: 'CREATE', details: `Stock count created: ${totalProducts} products, ${totalQuantity} total qty` });
+      writeAuditLog({ actor: req.user!.id, actorName: req.user?.username || String(req.user!.id), targetId: String(stockCount.id), targetType: 'stock_count', action: 'CREATE', details: `Stock count created: ${totalProducts} products, ${totalQuantity} total qty` });
       res.status(201).json({ 
         id: stockCount.id,
         message: `Stock count created with ${totalProducts} products and ${totalQuantity} total quantity` 
@@ -2165,7 +2170,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       await db.delete(stockCountItems).where(eq(stockCountItems.stockCountId, stockCountId));
       // Then delete the stock count
       await db.delete(stockCounts).where(eq(stockCounts.id, stockCountId));
-      writeAuditLog({ actor: req.user!.id, actorName: req.user!.username, targetId: String(stockCountId), targetType: 'stock_count', action: 'DELETE', details: `Stock count #${stockCountId} deleted` });
+      writeAuditLog({ actor: req.user!.id, actorName: req.user?.username || String(req.user!.id), targetId: String(stockCountId), targetType: 'stock_count', action: 'DELETE', details: `Stock count #${stockCountId} deleted` });
       res.json({ success: true });
     } catch (error) {
       console.error('Error deleting stock count:', error);
@@ -2307,7 +2312,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
           .where(eq(purchaseOrders.id, poId));
       }
 
-      writeAuditLog({ actor: req.user!.id, actorName: req.user!.username, targetId: String(receipt.id), targetType: 'goods_receipt', action: 'CREATE', details: `Goods receipt ${receipt.receiptNumber} from PO #${po.poNumber}` });
+      writeAuditLog({ actor: req.user!.id, actorName: req.user?.username || String(req.user!.id), targetId: String(receipt.id), targetType: 'goods_receipt', action: 'CREATE', details: `Goods receipt ${receipt.receiptNumber} from PO #${po.poNumber}` });
       res.status(201).json({
         id: receipt.id,
         receiptNumber: receipt.receiptNumber,
@@ -2353,7 +2358,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
         .set({ status: 'confirmed' })
         .where(eq(invoices.id, invoiceId));
 
-      writeAuditLog({ actor: req.user!.id, actorName: req.user!.username, targetId: String(invoiceId), targetType: 'invoice', action: 'UPDATE', details: `Invoice #${invoiceId} processed: stock deducted for ${items.length} products` });
+      const [processedInvoice] = await db.select({ invoiceNumber: invoices.invoiceNumber }).from(invoices).where(eq(invoices.id, invoiceId));
+      writeAuditLog({ actor: req.user!.id, actorName: req.user?.username || String(req.user!.id), targetId: String(invoiceId), targetType: 'invoice', action: 'UPDATE', details: `Invoice #${processedInvoice?.invoiceNumber || invoiceId} processed: stock deducted for ${items.length} products` });
       res.json({
         message: `Stock deducted for ${items.length} products from invoice #${invoiceId}`
       });
@@ -2502,7 +2508,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
         ...req.body,
         updatedBy: req.user!.id
       });
-      writeAuditLog({ actor: req.user!.id, actorName: req.user!.username, targetId: 'company', targetType: 'company_settings', action: 'UPDATE', details: 'Company settings updated' });
+      writeAuditLog({ actor: req.user!.id, actorName: req.user?.username || String(req.user!.id), targetId: 'company', targetType: 'company_settings', action: 'UPDATE', details: 'Company settings updated' });
       res.json(settings);
     } catch (error) {
       console.error('Error updating company settings:', error);
@@ -2975,7 +2981,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const id = parseInt(req.params.id);
       const [rbItem] = await db.select({ documentType: recycleBin.documentType, documentNumber: recycleBin.documentNumber }).from(recycleBin).where(eq(recycleBin.id, id));
       await db.delete(recycleBin).where(eq(recycleBin.id, id));
-      writeAuditLog({ actor: req.user!.id, actorName: req.user!.username, targetId: String(id), targetType: 'recycle_bin', action: 'DELETE', details: `Permanently deleted ${rbItem?.documentType} #${rbItem?.documentNumber}` });
+      writeAuditLog({ actor: req.user!.id, actorName: req.user?.username || String(req.user!.id), targetId: String(id), targetType: 'recycle_bin', action: 'DELETE', details: `Permanently deleted ${rbItem?.documentType} #${rbItem?.documentNumber}` });
       res.json({ success: true, message: 'Permanently deleted from recycle bin' });
     } catch (error) {
       console.error('Error permanently deleting from recycle bin:', error);
@@ -3043,7 +3049,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
         await tx.delete(recycleBin).where(eq(recycleBin.id, id));
       });
 
-      writeAuditLog({ actor: req.user!.id, actorName: req.user!.username, targetId: String(id), targetType: 'recycle_bin', action: 'UPDATE', details: `Restored ${item.documentType} #${item.documentNumber} from recycle bin` });
+      writeAuditLog({ actor: req.user!.id, actorName: req.user?.username || String(req.user!.id), targetId: String(id), targetType: 'recycle_bin', action: 'UPDATE', details: `Restored ${item.documentType} #${item.documentNumber} from recycle bin` });
       res.json({ success: true, message: `${item.documentNumber} has been restored successfully` });
     } catch (error) {
       console.error('Error restoring document:', error);
