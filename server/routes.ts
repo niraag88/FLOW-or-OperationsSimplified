@@ -3041,15 +3041,15 @@ export async function registerRoutes(app: Express): Promise<Server> {
   // POST /api/recycle-bin — add an item to the recycle bin (soft delete)
   app.post('/api/recycle-bin', requireAuth(), async (req: AuthenticatedRequest, res) => {
     try {
-      const { document_type, document_id, document_number, document_data, reason, original_status, can_restore } = req.body;
+      const { document_type: rawDocType, document_id, document_number, document_data, reason, original_status, can_restore } = req.body;
       // Validate required fields
-      if (!document_type || !document_id) {
+      if (!rawDocType || !document_id) {
         return res.status(400).json({ error: 'document_type and document_id are required' });
       }
-      const validDocTypes = ['product', 'quotation', 'invoice', 'purchase_order', 'delivery_order', 'customer', 'supplier'];
-      if (!validDocTypes.includes(document_type)) {
-        return res.status(400).json({ error: `document_type must be one of: ${validDocTypes.join(', ')}` });
-      }
+      // Normalize document_type: accept any casing from clients (e.g. 'Product', 'PurchaseOrder', 'purchase_order')
+      const document_type = String(rawDocType)
+        .replace(/([a-z])([A-Z])/g, '$1_$2')
+        .toLowerCase();
       // deleted_by and deleted_date are always set server-side from the authenticated session and current time
       // to prevent audit log spoofing — any client-supplied values for these fields are ignored
       const [item] = await db.insert(recycleBin).values({
