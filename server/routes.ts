@@ -745,7 +745,17 @@ export async function registerRoutes(app: Express): Promise<Server> {
   app.put('/api/users/:id', requireRole('Admin'), async (req: AuthenticatedRequest, res) => {
     try {
       const userId = req.params.id;
-      const { role, firstName, lastName, email, active, password } = req.body;
+      const { username, role, firstName, lastName, email, active, password } = req.body;
+
+      // Validate optional username change — must be unique (excluding current user)
+      if (username !== undefined && username !== '') {
+        const [existing] = await db.select({ id: users.id })
+          .from(users)
+          .where(eq(users.username, username));
+        if (existing && existing.id !== userId) {
+          return res.status(400).json({ error: 'Username already taken' });
+        }
+      }
 
       // Validate optional password if provided (trim first for consistent behaviour)
       const trimmedPassword = typeof password === 'string' ? password.trim() : undefined;
@@ -760,6 +770,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
       const [updatedUser] = await db.update(users)
         .set({
+          ...(username !== undefined && username !== '' && { username }),
           ...(role !== undefined && { role }),
           ...(firstName !== undefined && { firstName }),
           ...(lastName !== undefined && { lastName }),

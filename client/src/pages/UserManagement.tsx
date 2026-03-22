@@ -469,8 +469,8 @@ export default function UserManagement() {
                 <Label>Username</Label>
                 <Input
                   value={editingUser.username}
-                  disabled
-                  className="bg-gray-50 text-gray-500 cursor-not-allowed"
+                  onChange={(e) => setEditingUser({ ...editingUser, username: e.target.value })}
+                  placeholder="Enter username"
                   data-testid="input-edit-username"
                 />
               </div>
