@@ -4,8 +4,11 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@
 import { Input } from '@/components/ui/input';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Badge } from '@/components/ui/badge';
-import { FileText, Search } from 'lucide-react';
+import { Alert, AlertDescription } from '@/components/ui/alert';
+import { FileText, Search, AlertCircle } from 'lucide-react';
 import { format, isValid, parseISO } from 'date-fns';
+
+const KNOWN_ACTIONS = ['CREATE', 'UPDATE', 'DELETE', 'UPLOAD', 'REMOVE_FILE'] as const;
 
 interface AuditLog {
   id: number;
@@ -43,7 +46,7 @@ export default function AuditLogTable() {
   const [dateFrom, setDateFrom] = useState('');
   const [dateTo, setDateTo] = useState('');
 
-  const { data, isLoading } = useQuery<AuditLog[]>({
+  const { data, isLoading, isError } = useQuery<AuditLog[]>({
     queryKey: ['/api/audit-logs'],
     refetchOnWindowFocus: false,
   });
@@ -51,7 +54,6 @@ export default function AuditLogTable() {
   const logs = data ?? [];
 
   const targetTypes = Array.from(new Set(logs.map(l => l.targetType))).sort();
-  const actionTypes = Array.from(new Set(logs.map(l => l.action))).sort();
 
   const filtered = logs.filter(log => {
     if (actionFilter !== 'all' && log.action !== actionFilter) return false;
@@ -97,7 +99,7 @@ export default function AuditLogTable() {
           </SelectTrigger>
           <SelectContent>
             <SelectItem value="all">All actions</SelectItem>
-            {actionTypes.map(a => (
+            {KNOWN_ACTIONS.map(a => (
               <SelectItem key={a} value={a}>{a}</SelectItem>
             ))}
           </SelectContent>
@@ -131,9 +133,16 @@ export default function AuditLogTable() {
         />
       </div>
 
+      {isError && (
+        <Alert variant="destructive">
+          <AlertCircle className="h-4 w-4" />
+          <AlertDescription>Failed to load audit logs. Please try again.</AlertDescription>
+        </Alert>
+      )}
+
       {isLoading ? (
         <div className="text-center py-12 text-gray-500">Loading audit logs...</div>
-      ) : (
+      ) : !isError && (
         <div className="w-full overflow-x-auto rounded-md border">
           <Table>
             <TableHeader>
