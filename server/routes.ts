@@ -1106,7 +1106,17 @@ export async function registerRoutes(app: Express): Promise<Server> {
     try {
       const productId = parseInt(req.params.id);
       const [productToDelete] = await db.select({ name: products.name, sku: products.sku }).from(products).where(eq(products.id, productId));
-      await businessStorage.deleteProduct(productId);
+      try {
+        await businessStorage.deleteProduct(productId);
+      } catch (deleteErr: any) {
+        // If hard delete fails due to FK references, soft-delete instead (mark inactive)
+        if (deleteErr?.code === '23503') {
+          await db.update(products).set({ isActive: false }).where(eq(products.id, productId));
+          writeAuditLog({ actor: req.user!.id, actorName: req.user?.username || String(req.user!.id), targetId: String(productId), targetType: 'product', action: 'DEACTIVATE', details: `Product '${productToDelete?.name || productId}' (SKU: ${productToDelete?.sku || '?'}) deactivated (has order history)` });
+          return res.json({ success: true, message: 'Product deactivated (has order history)' });
+        }
+        throw deleteErr;
+      }
       writeAuditLog({ actor: req.user!.id, actorName: req.user?.username || String(req.user!.id), targetId: String(productId), targetType: 'product', action: 'DELETE', details: `Product '${productToDelete?.name || productId}' (SKU: ${productToDelete?.sku || '?'}) deleted` });
       res.json({ success: true, message: 'Product deleted successfully' });
     } catch (error) {
@@ -3041,19 +3051,15 @@ export async function registerRoutes(app: Express): Promise<Server> {
   // POST /api/recycle-bin — add an item to the recycle bin (soft delete)
   app.post('/api/recycle-bin', requireAuth(), async (req: AuthenticatedRequest, res) => {
     try {
-      const { document_type: rawDocType, document_id, document_number, document_data, reason, original_status, can_restore } = req.body;
+      const { document_type, document_id, document_number, document_data, reason, original_status, can_restore } = req.body;
       // Validate required fields
-      if (!rawDocType || !document_id) {
+      if (!document_type || !document_id) {
         return res.status(400).json({ error: 'document_type and document_id are required' });
       }
-      // Normalize document_type: accept any casing from clients (e.g. 'Product', 'PurchaseOrder', 'purchase_order')
-      const document_type = String(rawDocType)
-        .replace(/([a-z])([A-Z])/g, '$1_$2')
-        .toLowerCase();
       // deleted_by and deleted_date are always set server-side from the authenticated session and current time
       // to prevent audit log spoofing — any client-supplied values for these fields are ignored
       const [item] = await db.insert(recycleBin).values({
-        documentType: document_type,
+        documentType: String(document_type),
         documentId: String(document_id),
         documentNumber: document_number || String(document_id),
         documentData: typeof document_data === 'string' ? document_data : JSON.stringify(document_data || {}),

@@ -22,8 +22,14 @@ Generated: 2026-03-22
 - **Root Cause**: `POST /api/recycle-bin` endpoint was absent from `server/routes.ts`. The frontend client called `RecycleBin.create()` which hit the route and received an HTML 404 page instead of JSON, causing a JSON parse error that surfaced as a silent failure.
 - **Fix**: Added `POST /api/recycle-bin` route with `requireAuth()`, proper input validation, and server-side audit fields.
 - **Security Note**: `deleted_by` and `deleted_date` are now derived server-side from `req.user.username` and `new Date()`. Client-supplied values for these fields are ignored to prevent audit log spoofing.
-- **Validation**: `!document_type || !document_id` returns 400; `document_type` is normalized from client casing (e.g. `'Product'`, `'PurchaseOrder'`) to snake_case (`'product'`, `'purchase_order'`) using regex normalization — no case mismatch errors.
+- **Validation**: `!document_type || !document_id` returns 400 on missing fields. `document_type` is stored exactly as received from client (PascalCase like `'Product'`, `'PurchaseOrder'`) to remain consistent with existing server-side inserts and Recycle Bin UI tab/icon mapping.
 - **E2E Verified**: Automated browser test confirmed product deletion succeeds: `POST /api/recycle-bin → 200`, `DELETE /api/products/:id → 200`, product row removed from UI, no error toasts.
+
+### BUG-003: Product deletion fails with 500 when product has order history (FK violation)
+- **Root Cause**: `DELETE /api/products/:id` called `db.delete(products)` unconditionally. When a product was referenced by `quotation_items`, PostgreSQL raised FK constraint error 23503, which the route caught as a generic 500 response.
+- **Fix**: Wrapped the hard delete in a try/catch; if `error.code === '23503'` (FK violation), the route soft-deletes the product instead (`UPDATE products SET is_active = false`). Both paths return HTTP 200 `{ success: true }`, so the frontend succeeds and the product disappears from the active list.
+- **Location**: `server/routes.ts` — `DELETE /api/products/:id`
+- **E2E Verified**: Automated browser test confirmed product referenced by quotation_items now deletes without error toast; DELETE /api/products/:id → 200.
 
 ### BUG-002: Product with incorrect category string
 - **Root Cause**: One product had `category = 'massage'` instead of the canonical `'Massage Blends'`.
