@@ -96,10 +96,12 @@ export const deliveryOrders = pgTable("delivery_orders", {
 export const auditLog = pgTable("audit_log", {
   id: serial("id").primaryKey(),
   actor: text("actor").notNull(), // User ID who performed the action
+  actorName: text("actor_name"), // Display name of the user (stored at write time)
   targetId: text("target_id").notNull(), // ID of the record affected
-  targetType: text("target_type").notNull(), // "invoice" or "delivery_order"
+  targetType: text("target_type").notNull(), // e.g. "invoice", "product", "user"
   objectKey: text("object_key"), // Storage key that was affected
-  action: text("action").notNull(), // "DELETE", "CREATE", "UPDATE"
+  action: text("action").notNull(), // "CREATE", "UPDATE", "DELETE", "UPLOAD", "REMOVE_FILE"
+  details: text("details"), // Human-readable description of the change
   timestamp: timestamp("timestamp").defaultNow().notNull(),
 }, (table) => ({
   auditLogEntityIdx: index("audit_log_entity_idx").on(table.targetType, table.targetId),
@@ -155,10 +157,12 @@ export type DeliveryOrder = typeof deliveryOrders.$inferSelect;
 // Schema exports for audit log
 export const insertAuditLogSchema = createInsertSchema(auditLog).pick({
   actor: true,
+  actorName: true,
   targetId: true,
   targetType: true,
   objectKey: true,
   action: true,
+  details: true,
 });
 
 export type InsertAuditLog = z.infer<typeof insertAuditLogSchema>;

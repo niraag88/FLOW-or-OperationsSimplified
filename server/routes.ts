@@ -733,6 +733,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
         createdBy: users.createdBy
       });
 
+      writeAuditLog({ actor: req.user!.id, actorName: req.user!.username, targetId: newUser.id, targetType: 'user', action: 'CREATE', details: `User @${newUser.username} (${newUser.role}) created` });
       res.status(201).json({ user: newUser });
 
     } catch (error) {
@@ -796,6 +797,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
         return res.status(404).json({ error: 'User not found' });
       }
 
+      writeAuditLog({ actor: req.user!.id, actorName: req.user!.username, targetId: userId, targetType: 'user', action: 'UPDATE', details: `User @${updatedUser.username} updated` });
       res.json({ user: updatedUser });
 
     } catch (error) {
@@ -822,6 +824,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
         return res.status(404).json({ error: 'User not found' });
       }
 
+      writeAuditLog({ actor: req.user!.id, actorName: req.user!.username, targetId: userId, targetType: 'user', action: 'DELETE', details: `User @${deletedUser.username} deleted` });
       res.json({ success: true, deletedUser });
 
     } catch (error) {
@@ -889,6 +892,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
     try {
       const validatedData = insertBrandSchema.parse(req.body);
       const brand = await businessStorage.createBrand(validatedData);
+      writeAuditLog({ actor: req.user!.id, actorName: req.user!.username, targetId: String(brand.id), targetType: 'brand', action: 'CREATE', details: `Brand '${brand.name}' created` });
       res.status(201).json(brand);
     } catch (error) {
       console.error('Error creating brand:', error);
@@ -901,6 +905,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const brandId = parseInt(req.params.id);
       const validatedData = insertBrandSchema.partial().parse(req.body);
       const brand = await businessStorage.updateBrand(brandId, validatedData);
+      writeAuditLog({ actor: req.user!.id, actorName: req.user!.username, targetId: String(brandId), targetType: 'brand', action: 'UPDATE', details: `Brand '${brand.name}' updated` });
       res.json(brand);
     } catch (error) {
       console.error('Error updating brand:', error);
@@ -911,7 +916,9 @@ export async function registerRoutes(app: Express): Promise<Server> {
   app.delete('/api/brands/:id', requireRole('Admin'), async (req: AuthenticatedRequest, res) => {
     try {
       const brandId = parseInt(req.params.id);
+      const brandName = req.body?.name || `ID ${brandId}`;
       await businessStorage.deleteBrand(brandId);
+      writeAuditLog({ actor: req.user!.id, actorName: req.user!.username, targetId: String(brandId), targetType: 'brand', action: 'DELETE', details: `Brand '${brandName}' deleted` });
       res.json({ success: true });
     } catch (error) {
       console.error('Error deleting brand:', error);
@@ -934,6 +941,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
     try {
       const validatedData = insertSupplierSchema.parse(req.body);
       const supplier = await businessStorage.createSupplier(validatedData);
+      writeAuditLog({ actor: req.user!.id, actorName: req.user!.username, targetId: String(supplier.id), targetType: 'supplier', action: 'CREATE', details: `Supplier '${supplier.name}' created` });
       res.status(201).json(supplier);
     } catch (error) {
       console.error('Error creating supplier:', error);
@@ -946,6 +954,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const supplierId = parseInt(req.params.id);
       const validatedData = insertSupplierSchema.partial().parse(req.body);
       const supplier = await businessStorage.updateSupplier(supplierId, validatedData);
+      writeAuditLog({ actor: req.user!.id, actorName: req.user!.username, targetId: String(supplierId), targetType: 'supplier', action: 'UPDATE', details: `Supplier '${supplier.name}' updated` });
       res.json(supplier);
     } catch (error) {
       console.error('Error updating supplier:', error);
@@ -968,6 +977,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
     try {
       const validatedData = insertCustomerSchema.parse(req.body);
       const customer = await businessStorage.createCustomer(validatedData);
+      writeAuditLog({ actor: req.user!.id, actorName: req.user!.username, targetId: String(customer.id), targetType: 'customer', action: 'CREATE', details: `Customer '${customer.name}' created` });
       res.status(201).json(customer);
     } catch (error) {
       console.error('Error creating customer:', error);
@@ -980,6 +990,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const customerId = parseInt(req.params.id);
       const validatedData = insertCustomerSchema.partial().parse(req.body);
       const customer = await businessStorage.updateCustomer(customerId, validatedData);
+      writeAuditLog({ actor: req.user!.id, actorName: req.user!.username, targetId: String(customerId), targetType: 'customer', action: 'UPDATE', details: `Customer '${customer.name}' updated` });
       res.json(customer);
     } catch (error) {
       console.error('Error updating customer:', error);
@@ -1050,6 +1061,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
     try {
       const validatedData = insertProductSchema.parse(req.body);
       const product = await businessStorage.createProduct(validatedData);
+      writeAuditLog({ actor: req.user!.id, actorName: req.user!.username, targetId: String(product.id), targetType: 'product', action: 'CREATE', details: `Product '${product.name}' (SKU: ${product.sku}) created` });
       res.status(201).json(product);
     } catch (error) {
       console.error('Error creating product:', error);
@@ -1062,6 +1074,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const productId = parseInt(req.params.id);
       const validatedData = insertProductSchema.partial().parse(req.body);
       const product = await businessStorage.updateProduct(productId, validatedData);
+      writeAuditLog({ actor: req.user!.id, actorName: req.user!.username, targetId: String(productId), targetType: 'product', action: 'UPDATE', details: `Product '${product.name}' updated` });
       res.json(product);
     } catch (error) {
       console.error('Error updating product:', error);
@@ -1072,7 +1085,9 @@ export async function registerRoutes(app: Express): Promise<Server> {
   app.delete('/api/products/:id', requireAuth(['Admin', 'Manager']), async (req: AuthenticatedRequest, res) => {
     try {
       const productId = parseInt(req.params.id);
+      const [productToDelete] = await db.select({ name: products.name, sku: products.sku }).from(products).where(eq(products.id, productId));
       await businessStorage.deleteProduct(productId);
+      writeAuditLog({ actor: req.user!.id, actorName: req.user!.username, targetId: String(productId), targetType: 'product', action: 'DELETE', details: `Product '${productToDelete?.name || productId}' (SKU: ${productToDelete?.sku || '?'}) deleted` });
       res.json({ success: true, message: 'Product deleted successfully' });
     } catch (error) {
       console.error('Error deleting product:', error);
@@ -1137,6 +1152,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
         }
       }
       
+      writeAuditLog({ actor: req.user!.id, actorName: req.user!.username, targetId: String(purchaseOrder.id), targetType: 'purchase_order', action: 'CREATE', details: `PO #${purchaseOrder.poNumber} created` });
       res.status(201).json(purchaseOrder);
     } catch (error) {
       console.error('Error creating purchase order:', error);
@@ -1179,6 +1195,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
         }
       }
       
+      writeAuditLog({ actor: req.user!.id, actorName: req.user!.username, targetId: String(poId), targetType: 'purchase_order', action: 'UPDATE', details: `PO #${updatedPO.poNumber} updated (status: ${updatedPO.status})` });
       res.json(updatedPO);
     } catch (error) {
       console.error('Error updating purchase order:', error);
@@ -1213,6 +1230,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
         await tx.delete(purchaseOrders).where(eq(purchaseOrders.id, poId));
       });
 
+      writeAuditLog({ actor: req.user!.id, actorName: req.user!.username, targetId: String(poId), targetType: 'purchase_order', action: 'DELETE', details: `PO #${po.poNumber} deleted` });
       res.json({ success: true });
     } catch (error) {
       console.error('Error deleting purchase order:', error);
@@ -1482,6 +1500,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
         }
       }
 
+      writeAuditLog({ actor: req.user!.id, actorName: req.user!.username, targetId: String(invoice.id), targetType: 'invoice', action: 'CREATE', details: `Invoice #${invoice.invoiceNumber} created for ${customerName}` });
       res.status(201).json({ ...invoice, items: body.items || [] });
     } catch (error) {
       console.error('Error creating invoice:', error);
@@ -1544,6 +1563,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       }
 
       const [updated] = await db.select().from(invoices).where(eq(invoices.id, id));
+      writeAuditLog({ actor: req.user!.id, actorName: req.user!.username, targetId: String(id), targetType: 'invoice', action: 'UPDATE', details: `Invoice #${updated.invoiceNumber} updated (status: ${updated.status})` });
       res.json({ ...updated, items: body.items || [] });
     } catch (error) {
       console.error('Error updating invoice:', error);
@@ -2896,9 +2916,22 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  const writeAuditLog = async (auditData: InsertAuditLog) => {
-    await db.insert(auditLog).values(auditData);
+  const writeAuditLog = (auditData: InsertAuditLog) => {
+    db.insert(auditLog).values(auditData).catch((err) => {
+      console.error('Audit log write failed:', err);
+    });
   };
+
+  // GET /api/audit-logs — return all audit log entries, newest first (Admin + Manager only)
+  app.get('/api/audit-logs', requireAuth(['Admin', 'Manager']), async (req: AuthenticatedRequest, res) => {
+    try {
+      const logs = await db.select().from(auditLog).orderBy(desc(auditLog.timestamp)).limit(500);
+      res.json(logs);
+    } catch (error) {
+      console.error('Error fetching audit logs:', error);
+      res.status(500).json({ error: 'Failed to fetch audit logs' });
+    }
+  });
 
   // ── Recycle Bin routes ──────────────────────────────────────────────────────
 
