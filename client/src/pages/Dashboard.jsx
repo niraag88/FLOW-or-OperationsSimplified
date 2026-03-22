@@ -40,7 +40,7 @@ export default function Dashboard() {
 
   const loadDashboardData = async () => {
     try {
-      const [products, purchaseOrders, deliveryOrders, invoices, customers, suppliers] = await Promise.all([
+      const results = await Promise.allSettled([
         Product.list('-updated_date'),
         PurchaseOrder.list('-updated_date'),
         DeliveryOrder.list('-updated_date'),
@@ -49,14 +49,10 @@ export default function Dashboard() {
         Supplier.list('-updated_date')
       ]);
 
-      setData({
-        products,
-        purchaseOrders,
-        deliveryOrders,
-        invoices,
-        customers,
-        suppliers
-      });
+      const [products, purchaseOrders, deliveryOrders, invoices, customers, suppliers] =
+        results.map(r => (r.status === 'fulfilled' ? r.value : []));
+
+      setData({ products, purchaseOrders, deliveryOrders, invoices, customers, suppliers });
     } catch (error) {
       console.error("Error loading dashboard data:", error);
     } finally {
