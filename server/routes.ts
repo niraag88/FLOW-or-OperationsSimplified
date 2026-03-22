@@ -2660,12 +2660,6 @@ export async function registerRoutes(app: Express): Promise<Server> {
         return res.status(401).json({ error: 'Invalid or expired download token' });
       }
 
-      // Download file from Replit Object Storage as bytes and stream to response
-      const downloadResult = await objectStorageClient.downloadAsBytes(tokenData.key);
-      if (!downloadResult.ok) {
-        return res.status(404).json({ error: 'Object not found' });
-      }
-
       // Derive Content-Type from file extension so browsers can preview inline
       const ext = tokenData.key.split('.').pop()?.toLowerCase() || '';
       const contentTypeMap: Record<string, string> = {
@@ -2684,8 +2678,16 @@ export async function registerRoutes(app: Express): Promise<Server> {
         'Content-Disposition': `inline; filename="${filename}"`,
       });
 
-      // Convert Uint8Array → Buffer so Express sends raw bytes without corruption
-      res.send(Buffer.from(downloadResult.value));
+      // Stream directly from object storage to the response — avoids the
+      // [Buffer] → Buffer.from() conversion bug in downloadAsBytes
+      const stream = objectStorageClient.downloadAsStream(tokenData.key);
+      stream.on('error', (err: Error) => {
+        console.error('Error streaming file from storage:', err);
+        if (!res.headersSent) {
+          res.status(500).json({ error: 'Failed to download file' });
+        }
+      });
+      stream.pipe(res);
     } catch (error) {
       console.error('Error downloading file:', error);
       res.status(500).json({ error: 'Failed to download file' });
