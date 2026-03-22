@@ -1,5 +1,6 @@
 import type { Express, Request, Response, NextFunction } from "express";
 import { createServer, type Server } from "http";
+import rateLimit from 'express-rate-limit';
 import { storage } from "./storage";
 import { businessStorage } from "./businessStorage";
 import { Client } from '@replit/object-storage';
@@ -584,6 +585,27 @@ export async function registerRoutes(app: Express): Promise<Server> {
       maxAge: parseInt(process.env.SESSION_MAX_AGE || '3600000'), // Default 1 hour (configurable)
     }
   }));
+  // Rate limiters
+  // Strict: 5 login attempts per 15 minutes per IP — blocks brute-force attacks
+  const loginLimiter = rateLimit({
+    windowMs: 15 * 60 * 1000,
+    max: 5,
+    message: { error: 'Too many login attempts. Please try again in 15 minutes.' },
+    standardHeaders: true,
+    legacyHeaders: false,
+  });
+
+  // General: 300 requests per minute per IP — prevents API flooding
+  const apiLimiter = rateLimit({
+    windowMs: 60 * 1000,
+    max: 300,
+    message: { error: 'Too many requests. Please slow down.' },
+    standardHeaders: true,
+    legacyHeaders: false,
+  });
+
+  app.use('/api', apiLimiter);
+
   // Health check
   app.get('/api/health', (req, res) => {
     res.json({ status: 'ok', timestamp: new Date().toISOString() });
@@ -592,7 +614,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   // Authentication endpoints
   
   // POST /api/auth/login
-  app.post('/api/auth/login', async (req: AuthenticatedRequest, res) => {
+  app.post('/api/auth/login', loginLimiter, async (req: AuthenticatedRequest, res) => {
     try {
       const { username, password } = req.body;
       
