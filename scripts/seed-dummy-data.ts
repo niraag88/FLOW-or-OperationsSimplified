@@ -399,8 +399,12 @@ async function main() {
     'id'
   )) as { id: string }[];
   const testUserIds = userResults.map((r) => r.id);
-  // Also include real admin for some records
-  const adminId = '40840279-c5db-4cf9-afaf-ada69985b3b2';
+  // Dynamically resolve an existing admin user — never hardcode UUIDs
+  const adminResult = await pool.query<{ id: string }>(
+    `SELECT id FROM users WHERE role = 'Admin' AND username NOT LIKE 'test_%' LIMIT 1`
+  );
+  if (adminResult.rows.length === 0) throw new Error('No non-test Admin user found in DB');
+  const adminId = adminResult.rows[0].id;
   const allCreatorIds = [adminId, ...testUserIds];
   console.log(`  → inserted ${testUserIds.length} users`);
 
@@ -482,9 +486,9 @@ async function main() {
   const testProductIds = productResults.map((r) => r.id);
   console.log(`  → inserted ${testProductIds.length} products`);
 
-  // Build quick price lookup
+  // Build quick price lookup (productRows[i][6] is unit_price)
   const productPrice: Record<number, number> = {};
-  productResults.forEach((p: any, i) => {
+  productResults.forEach((p, i) => {
     productPrice[p.id] = parseFloat(productRows[i][6] as string);
   });
 
@@ -522,8 +526,10 @@ async function main() {
 
   // PO items
   console.log('     Inserting PO line items...');
+  type ReceivedItem = { productId: number; qty: number; unitPrice: number; poId: number };
   const poItemRows: unknown[][] = [];
   const poTotals: Record<number, { total: number; vat: number }> = {};
+  const receivedPoItems: ReceivedItem[] = [];
   for (const po of poResults) {
     const itemCount = rand(2, 6);
     let total = 0;
@@ -533,8 +539,13 @@ async function main() {
       const unitPrice = productPrice[prodId] || randDec(20, 300);
       const lineTotal = parseFloat((qty * unitPrice).toFixed(2));
       const vatRate = 5;
+      // For received POs, set received_quantity = quantity (full receipt)
+      const receivedQty = po.status === 'received' ? qty : 0;
       total += lineTotal;
-      poItemRows.push([po.id, prodId, qty, unitPrice.toFixed(2), vatRate.toFixed(2), lineTotal.toFixed(2), 0, new Date()]);
+      poItemRows.push([po.id, prodId, qty, unitPrice.toFixed(2), vatRate.toFixed(2), lineTotal.toFixed(2), receivedQty, new Date()]);
+      if (po.status === 'received') {
+        receivedPoItems.push({ productId: prodId, qty, unitPrice, poId: po.id });
+      }
     }
     const vat = parseFloat((total * 0.05).toFixed(2));
     poTotals[po.id] = { total, vat };
@@ -544,7 +555,7 @@ async function main() {
     ['po_id', 'product_id', 'quantity', 'unit_price', 'vat_rate', 'line_total', 'received_quantity', 'created_at'],
     poItemRows
   );
-  console.log(`  → inserted ${poItemRows.length} PO line items`);
+  console.log(`  → inserted ${poItemRows.length} PO line items (${receivedPoItems.length} in received POs)`);
 
   // Update PO totals
   for (const [poId, t] of Object.entries(poTotals)) {
@@ -761,24 +772,22 @@ async function main() {
   }
 
   // ── 10. Stock Movements ────────────────────────────────────────────────────
-  console.log('\n[10/11] Inserting stock movements for received POs...');
-  const receivedPOs = poResults.filter((p) => p.status === 'received');
+  // One stock_movement per received PO item, using the exact product/quantity from each item.
+  console.log('\n[10/11] Inserting stock movements for received PO items...');
   const smRows: unknown[][] = [];
-  for (const po of receivedPOs) {
-    const prodId = pick(testProductIds);
-    const qty = rand(10, 100);
+  for (const item of receivedPoItems) {
     const prevStock = rand(0, 200);
-    const newStock = prevStock + qty;
+    const newStock = prevStock + item.qty;
     smRows.push([
-      prodId,
+      item.productId,
       'goods_receipt',
-      po.id,
+      item.poId,
       'goods_receipt',
-      qty,
+      item.qty,
       prevStock,
       newStock,
-      randDec(10, 200).toFixed(2),
-      `[TEST] Stock received from PO-TEST PO`,
+      item.unitPrice.toFixed(2),
+      `[TEST] Stock received per PO item`,
       adminId,
       pastDate(180),
     ]);
@@ -790,7 +799,7 @@ async function main() {
       smRows
     );
   }
-  console.log(`  → inserted ${smRows.length} stock movements`);
+  console.log(`  → inserted ${smRows.length} stock movements (one per received PO item)`);
 
   // ── 11. Audit Log ──────────────────────────────────────────────────────────
   console.log('\n[11/11] Inserting ~500 audit log entries...');
