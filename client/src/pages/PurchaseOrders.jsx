@@ -91,7 +91,18 @@ export default function PurchaseOrders() {
   const currentUser = { role: 'Admin', email: 'admin@opsuite.com' }; // Mock user
 
   const filteredPOs = purchaseOrders.filter(po => {
-    // Year filter
+    // Always hide documents from closed financial years
+    const closedYears = financialYears.filter(y => y.status === 'Closed');
+    if (closedYears.length > 0) {
+      const d = new Date(po.order_date);
+      for (const cy of closedYears) {
+        const cyStart = new Date(cy.startDate);
+        const cyEnd = new Date(cy.endDate);
+        cyEnd.setHours(23, 59, 59, 999);
+        if (d >= cyStart && d <= cyEnd) return false;
+      }
+    }
+    // Year selector filter
     if (selectedYearId !== null) {
       const selectedBook = financialYears.find(b => b.id === selectedYearId);
       if (selectedBook) {

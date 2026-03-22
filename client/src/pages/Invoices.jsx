@@ -344,7 +344,18 @@ export default function Invoices() {
   const canOverride = true;
 
   const filteredInvoices = invoices.filter(invoice => {
-    // Year filter
+    // Always hide documents from closed financial years
+    const closedYears = financialYears.filter(y => y.status === 'Closed');
+    if (closedYears.length > 0) {
+      const d = new Date(invoice.invoiceDate || invoice.invoice_date || invoice.createdAt);
+      for (const cy of closedYears) {
+        const cyStart = new Date(cy.startDate);
+        const cyEnd = new Date(cy.endDate);
+        cyEnd.setHours(23, 59, 59, 999);
+        if (d >= cyStart && d <= cyEnd) return false;
+      }
+    }
+    // Year selector filter
     if (selectedYearId !== null) {
       const selectedBook = financialYears.find(b => b.id === selectedYearId);
       if (selectedBook) {
