@@ -87,7 +87,7 @@ export default function AuditLogTable() {
           <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-gray-400" />
           <Input
             className="pl-9"
-            placeholder="Search by actor or details..."
+            placeholder="Search by user or details..."
             value={search}
             onChange={e => setSearch(e.target.value)}
           />
@@ -148,10 +148,9 @@ export default function AuditLogTable() {
             <TableHeader>
               <TableRow>
                 <TableHead className="w-[130px]">Time</TableHead>
-                <TableHead className="w-[110px]">Actor</TableHead>
+                <TableHead className="w-[110px]">User</TableHead>
                 <TableHead className="w-[110px]">Action</TableHead>
-                <TableHead className="w-[110px]">Type</TableHead>
-                <TableHead className="w-[110px]">Target</TableHead>
+                <TableHead className="w-[160px]">Document</TableHead>
                 <TableHead>Details</TableHead>
               </TableRow>
             </TableHeader>
@@ -161,15 +160,16 @@ export default function AuditLogTable() {
                   <TableCell className="text-xs text-gray-500 whitespace-nowrap">
                     {formatLogDate(log.timestamp)}
                   </TableCell>
-                  <TableCell className="font-medium text-sm">{log.actorName}</TableCell>
+                  <TableCell className="font-medium text-sm">{log.actorName || '—'}</TableCell>
                   <TableCell>
                     <Badge className={`${ACTION_COLORS[log.action] || 'bg-gray-100 text-gray-800'} border-0 text-xs`}>
                       {log.action}
                     </Badge>
                   </TableCell>
-                  <TableCell className="text-sm text-gray-600 dark:text-gray-400">{log.targetType}</TableCell>
-                  <TableCell className="text-xs text-gray-500 font-mono">{log.targetId}</TableCell>
-                  <TableCell className="text-sm max-w-xs truncate" title={log.details}>{log.details}</TableCell>
+                  <TableCell className="text-sm text-gray-600 dark:text-gray-400 whitespace-nowrap">
+                    {log.targetType} <span className="text-gray-400">#{log.targetId}</span>
+                  </TableCell>
+                  <TableCell className="text-sm max-w-xs truncate" title={log.details || undefined}>{log.details || '—'}</TableCell>
                 </TableRow>
               ))}
             </TableBody>
