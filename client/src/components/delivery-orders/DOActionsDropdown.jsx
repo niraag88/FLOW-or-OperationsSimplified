@@ -79,12 +79,16 @@ export default function DOActionsDropdown({ doOrder, canEdit, onEdit, onRefresh 
 
   const handleUploadSuccess = async (storageKey) => {
     try {
-      await fetch(`/api/delivery-orders/${doOrder.id}/scan-key`, {
+      const res = await fetch(`/api/delivery-orders/${doOrder.id}/scan-key`, {
         method: 'PATCH',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ scanKey: storageKey }),
         credentials: 'include',
       });
+      if (!res.ok) {
+        const data = await res.json().catch(() => ({}));
+        throw new Error(data.error || 'Failed to link file to delivery order');
+      }
       onRefresh();
     } catch (error) {
       console.error('Error saving scan key:', error);

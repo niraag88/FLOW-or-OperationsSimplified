@@ -85,12 +85,16 @@ export default function InvoiceActionsDropdown({ invoice, canEdit, onEdit, onRef
 
   const handleUploadSuccess = async (storageKey) => {
     try {
-      await fetch(`/api/invoices/${invoice.id}/scan-key`, {
+      const res = await fetch(`/api/invoices/${invoice.id}/scan-key`, {
         method: 'PATCH',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ scanKey: storageKey }),
         credentials: 'include',
       });
+      if (!res.ok) {
+        const data = await res.json().catch(() => ({}));
+        throw new Error(data.error || 'Failed to link file to invoice');
+      }
       onRefresh();
     } catch (error) {
       console.error('Error saving scan key:', error);

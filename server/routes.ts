@@ -429,6 +429,24 @@ const validatePdfMagicBytes = (fileBuffer: Buffer) => {
   return { valid: true };
 };
 
+const validateImageMagicBytes = (fileBuffer: Buffer, contentType: string) => {
+  if (!fileBuffer || fileBuffer.length < 4) {
+    return { valid: false, error: 'Invalid file format.' };
+  }
+  if (contentType === 'image/jpeg' || contentType === 'image/jpg') {
+    // JPEG starts with FF D8 FF
+    if (fileBuffer[0] !== 0xFF || fileBuffer[1] !== 0xD8 || fileBuffer[2] !== 0xFF) {
+      return { valid: false, error: 'Invalid file format. Only real JPEG images are allowed.' };
+    }
+  } else if (contentType === 'image/png') {
+    // PNG starts with 89 50 4E 47 (i.e. \x89PNG)
+    if (fileBuffer[0] !== 0x89 || fileBuffer[1] !== 0x50 || fileBuffer[2] !== 0x4E || fileBuffer[3] !== 0x47) {
+      return { valid: false, error: 'Invalid file format. Only real PNG images are allowed.' };
+    }
+  }
+  return { valid: true };
+};
+
 const validateUploadInput = (key: string, contentType: string, fileSize?: number) => {
   // Validate key path
   if (!key.startsWith('invoices/') && !key.startsWith('delivery/')) {
@@ -2521,11 +2539,16 @@ export async function registerRoutes(app: Express): Promise<Server> {
         return res.status(400).json({ error: 'File size mismatch' });
       }
 
-      // Validate PDF magic bytes only for PDF files
+      // Validate magic bytes to confirm actual file type
       if (contentType === 'application/pdf') {
         const pdfValidation = validatePdfMagicBytes(req.file.buffer);
         if (!pdfValidation.valid) {
           return res.status(400).json({ error: pdfValidation.error });
+        }
+      } else {
+        const imgValidation = validateImageMagicBytes(req.file.buffer, contentType);
+        if (!imgValidation.valid) {
+          return res.status(400).json({ error: imgValidation.error });
         }
       }
 
