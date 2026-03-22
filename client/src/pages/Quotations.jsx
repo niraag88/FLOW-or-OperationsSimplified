@@ -138,6 +138,8 @@ export default function Quotations() {
     if (debouncedSearch) params.set('search', debouncedSearch);
     if (selectedStatuses.length) params.set('status', selectedStatuses.join(','));
     if (selectedCustomers.length) params.set('customerId', selectedCustomers.join(','));
+    const closedYears = financialYears.filter(y => y.status === 'Closed');
+    if (closedYears.length > 0) params.set('excludeYears', closedYears.map(cy => `${cy.startDate},${cy.endDate}`).join(';'));
     const today = new Date();
     const toStr = (d) => d.toISOString().split('T')[0];
     if (dateRange && dateRange !== 'all') {

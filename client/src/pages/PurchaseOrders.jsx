@@ -144,6 +144,8 @@ export default function PurchaseOrders() {
     if (debouncedSearch) params.set('search', debouncedSearch);
     if (filters.status && filters.status !== 'all') params.set('status', filters.status);
     if (filters.supplier && filters.supplier !== 'all') params.set('supplierId', String(filters.supplier));
+    const closedYears = financialYears.filter(y => y.status === 'Closed');
+    if (closedYears.length > 0) params.set('excludeYears', closedYears.map(cy => `${cy.startDate},${cy.endDate}`).join(';'));
     const today = new Date();
     const toStr = (d) => d.toISOString().split('T')[0];
     if (filters.dateRange && filters.dateRange !== 'all') {
