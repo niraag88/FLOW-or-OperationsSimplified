@@ -907,7 +907,7 @@ export class BusinessStorage {
     status?: string; customerId?: string; dateFrom?: string; dateTo?: string;
     taxTreatment?: string; excludeYears?: string;
   }): Promise<any> {
-    const { page, pageSize, search, status, customerId, dateFrom, dateTo, excludeYears } = params || {};
+    const { page, pageSize, search, status, customerId, dateFrom, dateTo, excludeYears, taxTreatment } = params || {};
 
     const conditions: any[] = [];
     if (search) {
@@ -923,13 +923,18 @@ export class BusinessStorage {
       if (ids.length === 1) conditions.push(eq(deliveryOrders.customerId, ids[0]));
       else if (ids.length > 1) conditions.push(inArray(deliveryOrders.customerId, ids));
     }
-    if (dateFrom) conditions.push(gte(deliveryOrders.orderDate, dateFrom));
-    if (dateTo) conditions.push(lte(deliveryOrders.orderDate, dateTo));
+    if (dateFrom) conditions.push(sql`${deliveryOrders.orderDate}::date >= ${dateFrom}::date`);
+    if (dateTo) conditions.push(sql`${deliveryOrders.orderDate}::date <= ${dateTo}::date`);
     if (excludeYears) {
       for (const range of excludeYears.split(';').filter(Boolean)) {
         const [start, end] = range.split(',');
-        if (start && end) conditions.push(sql`NOT (${deliveryOrders.orderDate} >= ${start} AND ${deliveryOrders.orderDate} <= ${end})`);
+        if (start && end) conditions.push(sql`NOT (${deliveryOrders.orderDate}::date >= ${start}::date AND ${deliveryOrders.orderDate}::date <= ${end}::date)`);
       }
+    }
+    if (taxTreatment) {
+      const treatments = taxTreatment.split(',').filter(Boolean);
+      if (treatments.length === 1) conditions.push(eq(deliveryOrders.taxTreatment, treatments[0]));
+      else if (treatments.length > 1) conditions.push(inArray(deliveryOrders.taxTreatment, treatments));
     }
     const whereCondition = conditions.length > 0 ? and(...conditions) : undefined;
 
