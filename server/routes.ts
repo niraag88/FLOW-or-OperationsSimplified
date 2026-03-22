@@ -747,17 +747,16 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const userId = req.params.id;
       const { role, firstName, lastName, email, active, password } = req.body;
 
-      // Validate optional password if provided
-      if (password !== undefined && password !== '') {
-        if (typeof password !== 'string' || password.length < 6) {
+      // Validate optional password if provided (trim first for consistent behaviour)
+      const trimmedPassword = typeof password === 'string' ? password.trim() : undefined;
+      if (trimmedPassword) {
+        if (trimmedPassword.length < 6) {
           return res.status(400).json({ error: 'Password must be at least 6 characters long' });
         }
       }
 
-      // Hash password if a new one was provided
-      const hashedPassword = (password && password.trim())
-        ? await hashPassword(password)
-        : undefined;
+      // Hash the trimmed password if one was provided
+      const hashedPassword = trimmedPassword ? await hashPassword(trimmedPassword) : undefined;
 
       const [updatedUser] = await db.update(users)
         .set({
