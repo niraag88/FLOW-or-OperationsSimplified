@@ -1672,16 +1672,19 @@ export async function registerRoutes(app: Express): Promise<Server> {
         dateFrom: dateFrom || undefined,
         dateTo: dateTo || undefined,
       });
-      // Transform to snake_case field names the frontend expects
-      const mappedData = result.data.map((d: any) => ({
+      const mapDO = (d: any) => ({
         ...d,
-        do_number: d.orderNumber,
-        customer_name: d.customerName,
-        order_date: d.orderDate,
-        tax_amount: d.taxAmount,
-        total_amount: d.totalAmount,
-      }));
-      res.json({ data: mappedData, total: result.total });
+        do_number: d.do_number || d.orderNumber,
+        customer_name: d.customer_name || d.customerName,
+        order_date: d.order_date || d.orderDate,
+        tax_amount: d.tax_amount ?? d.taxAmount,
+        total_amount: d.total_amount ?? d.totalAmount,
+      });
+      if (Array.isArray(result)) {
+        res.json(result.map(mapDO));
+      } else {
+        res.json({ data: result.data.map(mapDO), total: result.total });
+      }
     } catch (error) {
       console.error('Error fetching delivery orders:', error);
       res.status(500).json({ error: 'Failed to fetch delivery orders' });

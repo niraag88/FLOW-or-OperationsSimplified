@@ -168,7 +168,7 @@ export class BusinessStorage {
   async getPurchaseOrders(params?: {
     page?: number; pageSize?: number; search?: string;
     status?: string; supplierId?: string; dateFrom?: string; dateTo?: string;
-  }): Promise<{ data: any[]; total: number }> {
+  }): Promise<any> {
     const { page, pageSize, search, status, supplierId, dateFrom, dateTo } = params || {};
 
     const conditions: any[] = [];
@@ -242,7 +242,7 @@ export class BusinessStorage {
     const data = (page && pageSize)
       ? await baseQ.limit(pageSize).offset((page - 1) * pageSize)
       : await baseQ;
-    return { data, total: Number(count) };
+    return (page && pageSize) ? { data, total: Number(count) } : data;
   }
 
   async getPurchaseOrderById(id: number) {
@@ -276,7 +276,7 @@ export class BusinessStorage {
   async getQuotations(params?: {
     page?: number; pageSize?: number; search?: string;
     status?: string; customerId?: string; dateFrom?: string; dateTo?: string;
-  }): Promise<{ data: any[]; total: number }> {
+  }): Promise<any> {
     const { page, pageSize, search, status, customerId, dateFrom, dateTo } = params || {};
 
     const conditions: any[] = [];
@@ -330,7 +330,7 @@ export class BusinessStorage {
     const data = (page && pageSize)
       ? await baseQ.limit(pageSize).offset((page - 1) * pageSize)
       : await baseQ;
-    return { data, total: Number(count) };
+    return (page && pageSize) ? { data, total: Number(count) } : data;
   }
 
   async getQuotationById(id: number) {
@@ -824,7 +824,7 @@ export class BusinessStorage {
   async getInvoices(params?: {
     page?: number; pageSize?: number; search?: string;
     status?: string; customerId?: string; dateFrom?: string; dateTo?: string;
-  }): Promise<{ data: any[]; total: number }> {
+  }): Promise<any> {
     const { page, pageSize, search, status, customerId, dateFrom, dateTo } = params || {};
 
     const conditions: any[] = [];
@@ -854,7 +854,7 @@ export class BusinessStorage {
     const data = (page && pageSize)
       ? await baseQ.limit(pageSize).offset((page - 1) * pageSize)
       : await baseQ;
-    return { data, total: Number(count) };
+    return (page && pageSize) ? { data, total: Number(count) } : data;
   }
 
   async getInvoiceById(id: number) {
@@ -881,7 +881,7 @@ export class BusinessStorage {
   async getDeliveryOrders(params?: {
     page?: number; pageSize?: number; search?: string;
     status?: string; customerId?: string; dateFrom?: string; dateTo?: string;
-  }): Promise<{ data: any[]; total: number }> {
+  }): Promise<any> {
     const { page, pageSize, search, status, customerId, dateFrom, dateTo } = params || {};
 
     const conditions: any[] = [];
@@ -911,7 +911,7 @@ export class BusinessStorage {
     const data = (page && pageSize)
       ? await baseQ.limit(pageSize).offset((page - 1) * pageSize)
       : await baseQ;
-    return { data, total: Number(count) };
+    return (page && pageSize) ? { data, total: Number(count) } : data;
   }
 
   async getDeliveryOrderById(id: number) {
