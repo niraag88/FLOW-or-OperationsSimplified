@@ -55,6 +55,11 @@
  *
  * ============================================================
  * Run:  npx tsx scripts/seed-dummy-data.ts
+ *
+ * NOTE: This script is NOT idempotent — it uses fixed usernames, SKUs, and
+ * document numbers that will fail on unique-constraint errors if run a second
+ * time without first running the cleanup SQL above. Always clean up test data
+ * before re-running.
  * ============================================================
  */
 
