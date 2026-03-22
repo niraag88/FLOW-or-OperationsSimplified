@@ -1119,7 +1119,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
         pageSize: pageSize ? parseInt(pageSize) : undefined,
         search: search || undefined,
         status: status || undefined,
-        supplierId: supplierId ? parseInt(supplierId) : undefined,
+        supplierId: supplierId || undefined,
         dateFrom: dateFrom || undefined,
         dateTo: dateTo || undefined,
       });
@@ -1298,7 +1298,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
         pageSize: pageSize ? parseInt(pageSize) : undefined,
         search: search || undefined,
         status: status || undefined,
-        customerId: customerId ? parseInt(customerId) : undefined,
+        customerId: customerId || undefined,
         dateFrom: dateFrom || undefined,
         dateTo: dateTo || undefined,
       });
@@ -1318,7 +1318,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
         pageSize: pageSize ? parseInt(pageSize) : undefined,
         search: search || undefined,
         status: status || undefined,
-        customerId: customerId ? parseInt(customerId) : undefined,
+        customerId: customerId || undefined,
         dateFrom: dateFrom || undefined,
         dateTo: dateTo || undefined,
       });
@@ -1668,7 +1668,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
         pageSize: pageSize ? parseInt(pageSize) : undefined,
         search: search || undefined,
         status: status || undefined,
-        customerId: customerId ? parseInt(customerId) : undefined,
+        customerId: customerId || undefined,
         dateFrom: dateFrom || undefined,
         dateTo: dateTo || undefined,
       });

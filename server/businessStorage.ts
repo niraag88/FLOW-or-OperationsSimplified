@@ -302,7 +302,7 @@ export class BusinessStorage {
       .from(quotations)
       .where(whereCondition);
 
-    let q = db.select({
+    const baseQ = db.select({
       id: quotations.id,
       quoteNumber: quotations.quoteNumber,
       customerId: quotations.customerId,
@@ -327,10 +327,9 @@ export class BusinessStorage {
       .where(whereCondition)
       .orderBy(desc(quotations.createdAt));
 
-    if (page && pageSize) {
-      q = q.limit(pageSize).offset((page - 1) * pageSize) as any;
-    }
-    const data = await q;
+    const data = (page && pageSize)
+      ? await baseQ.limit(pageSize).offset((page - 1) * pageSize)
+      : await baseQ;
     return { data, total: Number(count) };
   }
 
@@ -824,7 +823,7 @@ export class BusinessStorage {
   // Invoice operations
   async getInvoices(params?: {
     page?: number; pageSize?: number; search?: string;
-    status?: string; customerId?: number; dateFrom?: string; dateTo?: string;
+    status?: string; customerId?: string; dateFrom?: string; dateTo?: string;
   }): Promise<{ data: any[]; total: number }> {
     const { page, pageSize, search, status, customerId, dateFrom, dateTo } = params || {};
 
@@ -837,7 +836,11 @@ export class BusinessStorage {
       if (statuses.length === 1) conditions.push(eq(invoices.status, statuses[0]));
       else if (statuses.length > 1) conditions.push(inArray(invoices.status, statuses));
     }
-    if (customerId) conditions.push(eq(invoices.customerId, customerId));
+    if (customerId) {
+      const ids = String(customerId).split(',').filter(Boolean).map(Number).filter(n => !isNaN(n));
+      if (ids.length === 1) conditions.push(eq(invoices.customerId, ids[0]));
+      else if (ids.length > 1) conditions.push(inArray(invoices.customerId, ids));
+    }
     if (dateFrom) conditions.push(gte(invoices.invoiceDate, dateFrom));
     if (dateTo) conditions.push(lte(invoices.invoiceDate, dateTo));
     const whereCondition = conditions.length > 0 ? and(...conditions) : undefined;
@@ -847,11 +850,10 @@ export class BusinessStorage {
       .from(invoices)
       .where(whereCondition);
 
-    let q = db.select().from(invoices).where(whereCondition).orderBy(desc(invoices.createdAt));
-    if (page && pageSize) {
-      q = q.limit(pageSize).offset((page - 1) * pageSize) as any;
-    }
-    const data = await q;
+    const baseQ = db.select().from(invoices).where(whereCondition).orderBy(desc(invoices.createdAt));
+    const data = (page && pageSize)
+      ? await baseQ.limit(pageSize).offset((page - 1) * pageSize)
+      : await baseQ;
     return { data, total: Number(count) };
   }
 
@@ -878,7 +880,7 @@ export class BusinessStorage {
   // Delivery Order operations
   async getDeliveryOrders(params?: {
     page?: number; pageSize?: number; search?: string;
-    status?: string; customerId?: number; dateFrom?: string; dateTo?: string;
+    status?: string; customerId?: string; dateFrom?: string; dateTo?: string;
   }): Promise<{ data: any[]; total: number }> {
     const { page, pageSize, search, status, customerId, dateFrom, dateTo } = params || {};
 
@@ -891,7 +893,11 @@ export class BusinessStorage {
       if (statuses.length === 1) conditions.push(eq(deliveryOrders.status, statuses[0]));
       else if (statuses.length > 1) conditions.push(inArray(deliveryOrders.status, statuses));
     }
-    if (customerId) conditions.push(eq(deliveryOrders.customerId, customerId));
+    if (customerId) {
+      const ids = String(customerId).split(',').filter(Boolean).map(Number).filter(n => !isNaN(n));
+      if (ids.length === 1) conditions.push(eq(deliveryOrders.customerId, ids[0]));
+      else if (ids.length > 1) conditions.push(inArray(deliveryOrders.customerId, ids));
+    }
     if (dateFrom) conditions.push(gte(deliveryOrders.orderDate, dateFrom));
     if (dateTo) conditions.push(lte(deliveryOrders.orderDate, dateTo));
     const whereCondition = conditions.length > 0 ? and(...conditions) : undefined;
@@ -901,11 +907,10 @@ export class BusinessStorage {
       .from(deliveryOrders)
       .where(whereCondition);
 
-    let q = db.select().from(deliveryOrders).where(whereCondition).orderBy(desc(deliveryOrders.createdAt));
-    if (page && pageSize) {
-      q = q.limit(pageSize).offset((page - 1) * pageSize) as any;
-    }
-    const data = await q;
+    const baseQ = db.select().from(deliveryOrders).where(whereCondition).orderBy(desc(deliveryOrders.createdAt));
+    const data = (page && pageSize)
+      ? await baseQ.limit(pageSize).offset((page - 1) * pageSize)
+      : await baseQ;
     return { data, total: Number(count) };
   }
 

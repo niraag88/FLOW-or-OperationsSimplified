@@ -35,31 +35,62 @@ export default function PurchaseOrders() {
   // Pagination state
   const [currentPage, setCurrentPage] = useState(1);
   const [itemsPerPage, setItemsPerPage] = useState(50);
+  const [totalCount, setTotalCount] = useState(0);
+  const [debouncedSearch, setDebouncedSearch] = useState("");
 
   useEffect(() => {
-    loadData();
-  }, [refreshTrigger]);
+    const loadSupporting = async () => {
+      try {
+        const [grnsData, productsData, booksData] = await Promise.all([
+          GoodsReceipt.list('-updated_date'),
+          Product.list(),
+          fetch('/api/books').then(r => r.json()).catch(() => []),
+        ]);
+        setGoodsReceipts(grnsData);
+        setProducts(productsData);
+        setFinancialYears(booksData);
+      } catch (error) {
+        console.error("Error loading supporting data:", error);
+      }
+    };
+    loadSupporting();
+  }, []);
 
-  const loadData = async () => {
-    setLoading(true);
-    try {
-      const [posData, grnsData, productsData, booksData] = await Promise.all([
-        fetch('/api/purchase-orders').then(r => r.json()).then(r => Array.isArray(r) ? r : (r.data || [])),
-        GoodsReceipt.list('-updated_date'),
-        Product.list(),
-        fetch('/api/books').then(r => r.json()).catch(() => []),
-      ]);
+  useEffect(() => {
+    const timer = setTimeout(() => {
+      setDebouncedSearch(searchTerm);
+      setCurrentPage(1);
+    }, 300);
+    return () => clearTimeout(timer);
+  }, [searchTerm]);
 
-      setPurchaseOrders(posData);
-      setGoodsReceipts(grnsData);
-      setProducts(productsData);
-      setFinancialYears(booksData);
-    } catch (error) {
-      console.error("Error loading purchase orders data:", error);
-    } finally {
-      setLoading(false);
+  useEffect(() => {
+    const params = new URLSearchParams();
+    params.set('page', String(currentPage));
+    params.set('pageSize', String(itemsPerPage));
+    if (debouncedSearch) params.set('search', debouncedSearch);
+    if (filters.status && filters.status !== 'all') params.set('status', filters.status);
+    if (filters.supplier && filters.supplier !== 'all') params.set('supplierId', String(filters.supplier));
+    const today = new Date();
+    const toStr = (d) => d.toISOString().split('T')[0];
+    if (filters.dateRange && filters.dateRange !== 'all') {
+      const dr = filters.dateRange;
+      if (dr === 'today') { const d = toStr(today); params.set('dateFrom', d); params.set('dateTo', d); }
+      else if (dr === 'week') { const s = new Date(today); s.setDate(today.getDate() - today.getDay()); s.setHours(0,0,0,0); params.set('dateFrom', toStr(s)); }
+      else if (dr === 'month') params.set('dateFrom', toStr(new Date(today.getFullYear(), today.getMonth(), 1)));
+      else if (dr === 'quarter') { const q = Math.floor(today.getMonth() / 3); params.set('dateFrom', toStr(new Date(today.getFullYear(), q * 3, 1))); }
+      else if (typeof dr === 'object' && dr.type === 'custom') { params.set('dateFrom', dr.startDate); params.set('dateTo', dr.endDate); }
     }
-  };
+    setLoading(true);
+    fetch(`/api/purchase-orders?${params}`, { credentials: 'include' })
+      .then(r => r.json())
+      .then(result => {
+        setPurchaseOrders(Array.isArray(result) ? result : (result.data || []));
+        setTotalCount(result.total || 0);
+      })
+      .catch(err => console.error('Error loading purchase orders:', err))
+      .finally(() => setLoading(false));
+  }, [currentPage, itemsPerPage, debouncedSearch, filters, refreshTrigger]);
 
   const handleRefresh = () => {
     setRefreshTrigger(prev => prev + 1);
@@ -85,65 +116,40 @@ export default function PurchaseOrders() {
 
   const closedYears = financialYears.filter(y => y.status === 'Closed');
 
-  const filteredPOs = purchaseOrders.filter(po => {
-    // Always hide documents from closed financial years
-    if (closedYears.length > 0) {
-      const d = new Date(po.order_date);
-      for (const cy of closedYears) {
-        const cyStart = new Date(cy.startDate);
-        const cyEnd = new Date(cy.endDate);
-        cyEnd.setHours(23, 59, 59, 999);
-        if (d >= cyStart && d <= cyEnd) return false;
-      }
-    }
-    const matchesSearch = po.po_number?.toLowerCase().includes(searchTerm.toLowerCase()) ||
-                         po.notes?.toLowerCase().includes(searchTerm.toLowerCase());
-    
-    const matchesStatus = filters.status === "all" || po.status === filters.status;
-    const matchesSupplier = filters.supplier === "all" || po.supplier_id === filters.supplier;
-    
-    // Date range filtering
-    let matchesDateRange = true;
-    if (filters.dateRange !== "all") {
-      const poDate = new Date(po.order_date);
-      const today = new Date();
-      const startOfToday = new Date(today.getFullYear(), today.getMonth(), today.getDate());
-      
-      if (filters.dateRange === "today") {
-        const endOfToday = new Date(today.getFullYear(), today.getMonth(), today.getDate(), 23, 59, 59);
-        matchesDateRange = poDate >= startOfToday && poDate <= endOfToday;
-      } else if (filters.dateRange === "week") {
-        const startOfWeek = new Date(today);
-        startOfWeek.setDate(today.getDate() - today.getDay());
-        startOfWeek.setHours(0, 0, 0, 0);
-        matchesDateRange = poDate >= startOfWeek;
-      } else if (filters.dateRange === "month") {
-        const startOfMonth = new Date(today.getFullYear(), today.getMonth(), 1);
-        matchesDateRange = poDate >= startOfMonth;
-      } else if (filters.dateRange === "quarter") {
-        const quarter = Math.floor(today.getMonth() / 3);
-        const startOfQuarter = new Date(today.getFullYear(), quarter * 3, 1);
-        matchesDateRange = poDate >= startOfQuarter;
-      } else if (typeof filters.dateRange === "object" && filters.dateRange.type === "custom") {
-        const startDate = new Date(filters.dateRange.startDate);
-        const endDate = new Date(filters.dateRange.endDate);
-        endDate.setHours(23, 59, 59, 999); // Include the entire end date
-        matchesDateRange = poDate >= startDate && poDate <= endDate;
-      }
-    }
-    
-    return matchesSearch && matchesStatus && matchesSupplier && matchesDateRange;
-  });
+  const visiblePOs = closedYears.length > 0
+    ? purchaseOrders.filter(po => {
+        const d = new Date(po.order_date);
+        for (const cy of closedYears) {
+          const cyEnd = new Date(cy.endDate); cyEnd.setHours(23, 59, 59, 999);
+          if (d >= new Date(cy.startDate) && d <= cyEnd) return false;
+        }
+        return true;
+      })
+    : purchaseOrders;
 
-  // Calculate pagination for POs
-  const totalPagesPos = Math.ceil(filteredPOs.length / itemsPerPage);
+  const totalPagesPos = Math.ceil(totalCount / itemsPerPage);
   const startIndexPos = (currentPage - 1) * itemsPerPage;
-  const endIndexPos = startIndexPos + itemsPerPage;
-  const paginatedPOs = filteredPOs.slice(startIndexPos, endIndexPos);
+  const endIndexPos = Math.min(startIndexPos + itemsPerPage, totalCount);
+  const resetPagination = () => setCurrentPage(1);
 
-  // Reset pagination when filters/search change
-  const resetPagination = () => {
-    setCurrentPage(1);
+  const fetchAllForExport = async () => {
+    const params = new URLSearchParams();
+    if (debouncedSearch) params.set('search', debouncedSearch);
+    if (filters.status && filters.status !== 'all') params.set('status', filters.status);
+    if (filters.supplier && filters.supplier !== 'all') params.set('supplierId', String(filters.supplier));
+    const today = new Date();
+    const toStr = (d) => d.toISOString().split('T')[0];
+    if (filters.dateRange && filters.dateRange !== 'all') {
+      const dr = filters.dateRange;
+      if (dr === 'today') { const d = toStr(today); params.set('dateFrom', d); params.set('dateTo', d); }
+      else if (dr === 'week') { const s = new Date(today); s.setDate(today.getDate() - today.getDay()); s.setHours(0,0,0,0); params.set('dateFrom', toStr(s)); }
+      else if (dr === 'month') params.set('dateFrom', toStr(new Date(today.getFullYear(), today.getMonth(), 1)));
+      else if (dr === 'quarter') { const q = Math.floor(today.getMonth() / 3); params.set('dateFrom', toStr(new Date(today.getFullYear(), q * 3, 1))); }
+      else if (typeof dr === 'object' && dr.type === 'custom') { params.set('dateFrom', dr.startDate); params.set('dateTo', dr.endDate); }
+    }
+    const r = await fetch(`/api/purchase-orders?${params}`, { credentials: 'include' });
+    const result = await r.json();
+    return Array.isArray(result) ? result : (result.data || []);
   };
 
   const filteredGRNs = goodsReceipts.filter(grn =>
@@ -205,7 +211,8 @@ export default function PurchaseOrders() {
         
         <div className="flex items-center gap-3">
           <ExportDropdown 
-            data={activeTab === 'purchase-orders' ? filteredPOs : getGoodsReceiptsExportData()}
+            data={activeTab === 'purchase-orders' ? visiblePOs : getGoodsReceiptsExportData()}
+            fetchAllData={activeTab === 'purchase-orders' ? fetchAllForExport : null}
             type={activeTab === 'purchase-orders' ? 'Purchase Orders' : 'Goods Receipts'}
             filename={activeTab === 'purchase-orders' ? 'purchase-orders' : 'goods-receipts'}
             columns={activeTab === 'purchase-orders' ? {
@@ -240,10 +247,7 @@ export default function PurchaseOrders() {
           <Input
             placeholder="Search PO numbers, notes..."
             value={searchTerm}
-            onChange={(e) => {
-              setSearchTerm(e.target.value);
-              resetPagination();
-            }}
+            onChange={(e) => setSearchTerm(e.target.value)}
             className="pl-10"
           />
         </div>
@@ -264,8 +268,8 @@ export default function PurchaseOrders() {
 
         <TabsContent value="purchase-orders" className="mt-6">
           <POList 
-            purchaseOrders={paginatedPOs}
-            totalCount={filteredPOs.length}
+            purchaseOrders={visiblePOs}
+            totalCount={totalCount}
             loading={loading}
             canEdit={canEdit}
             currentUser={currentUser}
@@ -274,11 +278,11 @@ export default function PurchaseOrders() {
           />
 
           {/* Pagination Controls for POs */}
-          {!loading && activeTab === "purchase-orders" && filteredPOs.length > 0 && (
+          {!loading && activeTab === "purchase-orders" && totalCount > 0 && (
             <div className="flex items-center justify-between mt-6 pt-4 border-t">
               <div className="flex items-center gap-2">
                 <span className="text-sm text-gray-700">
-                  Showing {startIndexPos + 1} to {Math.min(endIndexPos, filteredPOs.length)} of {filteredPOs.length} purchase orders
+                  Showing {startIndexPos + 1} to {endIndexPos} of {totalCount} purchase orders
                 </span>
               </div>
               
@@ -297,7 +301,7 @@ export default function PurchaseOrders() {
                       <SelectItem value="20">20</SelectItem>
                       <SelectItem value="50">50</SelectItem>
                       <SelectItem value="100">100</SelectItem>
-                      <SelectItem value={filteredPOs.length.toString()}>All</SelectItem>
+                      <SelectItem value="9999">All</SelectItem>
                     </SelectContent>
                   </Select>
                 </div>

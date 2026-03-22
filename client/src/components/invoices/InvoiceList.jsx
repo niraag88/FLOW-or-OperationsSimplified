@@ -8,7 +8,7 @@ import { Skeleton } from "@/components/ui/skeleton";
 import { format, isValid, parseISO } from "date-fns";
 import InvoiceActionsDropdown from "./InvoiceActionsDropdown";
 
-export default function InvoiceList({ invoices, loading, canEdit, canOverride, currentUser, onEdit, onRefresh }) {
+export default function InvoiceList({ invoices, totalCount, loading, canEdit, canOverride, currentUser, onEdit, onRefresh }) {
 
   const getCustomerName = (invoice) => {
     return invoice.customer_name || invoice.customerName || 'Unknown Customer';
@@ -83,7 +83,7 @@ export default function InvoiceList({ invoices, loading, canEdit, canOverride, c
         <CardHeader>
           <CardTitle className="flex items-center gap-2">
             <FileText className="w-5 h-5" />
-            Invoices ({invoices.length})
+            Invoices ({totalCount ?? invoices.length})
           </CardTitle>
         </CardHeader>
         <CardContent>

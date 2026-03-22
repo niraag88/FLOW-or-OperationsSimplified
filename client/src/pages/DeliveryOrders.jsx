@@ -38,49 +38,69 @@ export default function DeliveryOrders() {
 
   // Pagination state
   const [currentPage, setCurrentPage] = useState(1);
-  const [itemsPerPage, setItemsPerPage] = useState(50); // New state
-
-  useEffect(() => {
-    loadData();
-    loadCurrentUser();
-  }, [refreshTrigger]);
+  const [itemsPerPage, setItemsPerPage] = useState(50);
+  const [totalCount, setTotalCount] = useState(0);
+  const [debouncedSearch, setDebouncedSearch] = useState("");
 
   const loadCurrentUser = async () => {
-    // Always use mock user for public access
     setCurrentUser({ role: 'Admin', email: 'public@opsuite.com' });
   };
 
-  const loadData = async () => {
-    console.time('🚀 Delivery Orders Page - Total Load Time');
-    setLoading(true);
-    try {
-      console.time('📡 API Calls - Parallel Loading');
-      // Load all necessary data in parallel like the optimized quotations page
-      const [dosData, customersData, productsData, brandsData, booksData] = await Promise.all([
-        fetch('/api/delivery-orders').then(r => r.json()).then(r => Array.isArray(r) ? r : (r.data || [])),
-        Customer.list().catch(() => []),
-        Product.list().catch(() => []),
-        Brand.list().catch(() => []),
-        fetch('/api/books').then(r => r.json()).catch(() => []),
-      ]);
-      console.timeEnd('📡 API Calls - Parallel Loading');
+  useEffect(() => {
+    loadCurrentUser();
+    const loadSupporting = async () => {
+      try {
+        const [customersData, productsData, brandsData, booksData] = await Promise.all([
+          Customer.list().catch(() => []),
+          Product.list().catch(() => []),
+          Brand.list().catch(() => []),
+          fetch('/api/books').then(r => r.json()).catch(() => []),
+        ]);
+        setCustomers(customersData.filter(c => c.is_active !== false));
+        setProducts(productsData);
+        setBrands(brandsData.filter(b => b.isActive !== false));
+        setFinancialYears(booksData);
+      } catch (error) {
+        console.error("Error loading supporting data:", error);
+      }
+    };
+    loadSupporting();
+  }, []);
 
-      console.time('⚡ State Updates');
-      setDeliveryOrders(dosData);
-      setCustomers(customersData.filter(c => c.is_active !== false));
-      setProducts(productsData);
-      setBrands(brandsData.filter(b => b.isActive !== false));
-      setFinancialYears(booksData);
-      console.timeEnd('⚡ State Updates');
-      
-      console.log('📊 Data loaded:', dosData.length, 'delivery orders,', customersData.length, 'customers,', productsData.length, 'products,', brandsData.length, 'brands');
-    } catch (error) {
-      console.error("Error loading delivery orders data:", error);
-    } finally {
-      setLoading(false);
-      console.timeEnd('🚀 Delivery Orders Page - Total Load Time');
+  useEffect(() => {
+    const timer = setTimeout(() => {
+      setDebouncedSearch(searchTerm);
+      setCurrentPage(1);
+    }, 300);
+    return () => clearTimeout(timer);
+  }, [searchTerm]);
+
+  useEffect(() => {
+    const params = new URLSearchParams();
+    params.set('page', String(currentPage));
+    params.set('pageSize', String(itemsPerPage));
+    if (debouncedSearch) params.set('search', debouncedSearch);
+    if (selectedStatuses.length) params.set('status', selectedStatuses.join(','));
+    if (selectedCustomers.length) params.set('customerId', selectedCustomers.join(','));
+    const today = new Date();
+    const toStr = (d) => d.toISOString().split('T')[0];
+    if (dateRange && dateRange !== 'all') {
+      if (dateRange === 'today') { const d = toStr(today); params.set('dateFrom', d); params.set('dateTo', d); }
+      else if (dateRange === 'week') { const s = new Date(today); s.setDate(today.getDate() - today.getDay()); s.setHours(0,0,0,0); params.set('dateFrom', toStr(s)); }
+      else if (dateRange === 'month') params.set('dateFrom', toStr(new Date(today.getFullYear(), today.getMonth(), 1)));
+      else if (dateRange === 'quarter') { const q = Math.floor(today.getMonth() / 3); params.set('dateFrom', toStr(new Date(today.getFullYear(), q * 3, 1))); }
+      else if (typeof dateRange === 'object' && dateRange.type === 'custom') { params.set('dateFrom', dateRange.startDate); params.set('dateTo', dateRange.endDate); }
     }
-  };
+    setLoading(true);
+    fetch(`/api/delivery-orders?${params}`, { credentials: 'include' })
+      .then(r => r.json())
+      .then(result => {
+        setDeliveryOrders(Array.isArray(result) ? result : (result.data || []));
+        setTotalCount(result.total || 0);
+      })
+      .catch(err => console.error('Error loading delivery orders:', err))
+      .finally(() => setLoading(false));
+  }, [currentPage, itemsPerPage, debouncedSearch, selectedStatuses, selectedCustomers, dateRange, refreshTrigger]);
 
   // Use preloaded customers for better performance
   const availableCustomers = React.useMemo(() => {
@@ -164,67 +184,40 @@ export default function DeliveryOrders() {
   const canEdit = true;
 
   const closedYears = financialYears.filter(y => y.status === 'Closed');
-
-  const filteredDOs = deliveryOrders.filter(doOrder => {
-    // Always hide documents from closed financial years
+  const visibleDOs = deliveryOrders.filter(doOrder => {
+    if (selectedTaxTreatments.length > 0 && !selectedTaxTreatments.includes(doOrder.tax_treatment)) return false;
     if (closedYears.length > 0) {
       const d = new Date(doOrder.order_date);
       for (const cy of closedYears) {
-        const cyStart = new Date(cy.startDate);
-        const cyEnd = new Date(cy.endDate);
-        cyEnd.setHours(23, 59, 59, 999);
-        if (d >= cyStart && d <= cyEnd) return false;
+        const cyEnd = new Date(cy.endDate); cyEnd.setHours(23, 59, 59, 999);
+        if (d >= new Date(cy.startDate) && d <= cyEnd) return false;
       }
     }
-    const matchesSearch = doOrder.do_number?.toLowerCase().includes(searchTerm.toLowerCase()) ||
-                         doOrder.remarks?.toLowerCase().includes(searchTerm.toLowerCase());
-    
-    const matchesStatus = selectedStatuses.length === 0 || selectedStatuses.includes(doOrder.status);
-    const matchesCustomer = selectedCustomers.length === 0 || selectedCustomers.includes(doOrder.customer_id);
-    const matchesTaxTreatment = selectedTaxTreatments.length === 0 || selectedTaxTreatments.includes(doOrder.tax_treatment);
-    
-    // Date range filtering
-    let matchesDateRange = true;
-    if (dateRange !== "all") {
-      const doDate = new Date(doOrder.order_date);
-      const today = new Date();
-      const startOfToday = new Date(today.getFullYear(), today.getMonth(), today.getDate());
-      
-      if (dateRange === "today") {
-        const endOfToday = new Date(today.getFullYear(), today.getMonth(), today.getDate(), 23, 59, 59);
-        matchesDateRange = doDate >= startOfToday && doDate <= endOfToday;
-      } else if (dateRange === "week") {
-        const startOfWeek = new Date(today);
-        startOfWeek.setDate(today.getDate() - today.getDay());
-        startOfWeek.setHours(0, 0, 0, 0);
-        matchesDateRange = doDate >= startOfWeek;
-      } else if (dateRange === "month") {
-        const startOfMonth = new Date(today.getFullYear(), today.getMonth(), 1);
-        matchesDateRange = doDate >= startOfMonth;
-      } else if (dateRange === "quarter") {
-        const quarter = Math.floor(today.getMonth() / 3);
-        const startOfQuarter = new Date(today.getFullYear(), quarter * 3, 1);
-        matchesDateRange = doDate >= startOfQuarter;
-      } else if (typeof dateRange === "object" && dateRange.type === "custom") {
-        const startDate = new Date(dateRange.startDate);
-        const endDate = new Date(dateRange.endDate);
-        endDate.setHours(23, 59, 59, 999); // Include the entire end date
-        matchesDateRange = doDate >= startDate && doDate <= endDate;
-      }
-    }
-    
-    return matchesSearch && matchesStatus && matchesCustomer && matchesTaxTreatment && matchesDateRange;
+    return true;
   });
 
-  // Calculate pagination
-  const totalPages = Math.ceil(filteredDOs.length / itemsPerPage);
+  const totalPages = Math.ceil(totalCount / itemsPerPage);
   const startIndex = (currentPage - 1) * itemsPerPage;
-  const endIndex = startIndex + itemsPerPage;
-  const paginatedDOs = filteredDOs.slice(startIndex, endIndex);
+  const endIndex = Math.min(startIndex + itemsPerPage, totalCount);
+  const resetPagination = () => setCurrentPage(1);
 
-  // Reset pagination when filters/search change
-  const resetPagination = () => {
-    setCurrentPage(1);
+  const fetchAllForExport = async () => {
+    const params = new URLSearchParams();
+    if (debouncedSearch) params.set('search', debouncedSearch);
+    if (selectedStatuses.length) params.set('status', selectedStatuses.join(','));
+    if (selectedCustomers.length) params.set('customerId', selectedCustomers.join(','));
+    const today = new Date();
+    const toStr = (d) => d.toISOString().split('T')[0];
+    if (dateRange && dateRange !== 'all') {
+      if (dateRange === 'today') { const d = toStr(today); params.set('dateFrom', d); params.set('dateTo', d); }
+      else if (dateRange === 'week') { const s = new Date(today); s.setDate(today.getDate() - today.getDay()); s.setHours(0,0,0,0); params.set('dateFrom', toStr(s)); }
+      else if (dateRange === 'month') params.set('dateFrom', toStr(new Date(today.getFullYear(), today.getMonth(), 1)));
+      else if (dateRange === 'quarter') { const q = Math.floor(today.getMonth() / 3); params.set('dateFrom', toStr(new Date(today.getFullYear(), q * 3, 1))); }
+      else if (typeof dateRange === 'object' && dateRange.type === 'custom') { params.set('dateFrom', dateRange.startDate); params.set('dateTo', dateRange.endDate); }
+    }
+    const r = await fetch(`/api/delivery-orders?${params}`, { credentials: 'include' });
+    const result = await r.json();
+    return Array.isArray(result) ? result : (result.data || []);
   };
 
 
@@ -239,7 +232,8 @@ export default function DeliveryOrders() {
         
         <div className="flex items-center gap-3">
           <ExportDropdown 
-            data={filteredDOs}
+            data={visibleDOs}
+            fetchAllData={fetchAllForExport}
             type="Delivery Orders"
             filename="delivery-orders"
             columns={{
@@ -283,10 +277,7 @@ export default function DeliveryOrders() {
           <Input
             placeholder="Search DO numbers, remarks..."
             value={searchTerm}
-            onChange={(e) => {
-              setSearchTerm(e.target.value);
-              resetPagination();
-            }}
+            onChange={(e) => setSearchTerm(e.target.value)}
             className="pl-10"
           />
         </div>
@@ -307,8 +298,8 @@ export default function DeliveryOrders() {
 
       {/* Delivery Orders List */}
       <DOList 
-        deliveryOrders={paginatedDOs}
-        totalCount={filteredDOs.length}
+        deliveryOrders={visibleDOs}
+        totalCount={totalCount}
         loading={loading}
         canEdit={canEdit}
         currentUser={currentUser}
@@ -317,11 +308,11 @@ export default function DeliveryOrders() {
       />
 
       {/* Pagination Controls */}
-      {!loading && filteredDOs.length > 0 && (
+      {!loading && totalCount > 0 && (
         <div className="flex items-center justify-between mt-6 pt-4 border-t">
           <div className="flex items-center gap-2">
             <span className="text-sm text-gray-700">
-              Showing {startIndex + 1} to {Math.min(endIndex, filteredDOs.length)} of {filteredDOs.length} delivery orders
+              Showing {startIndex + 1} to {endIndex} of {totalCount} delivery orders
             </span>
           </div>
           
@@ -340,7 +331,7 @@ export default function DeliveryOrders() {
                   <SelectItem value="20">20</SelectItem>
                   <SelectItem value="50">50</SelectItem>
                   <SelectItem value="100">100</SelectItem>
-                  <SelectItem value={filteredDOs.length.toString()}>All</SelectItem>
+                  <SelectItem value="9999">All</SelectItem>
                 </SelectContent>
               </Select>
             </div>

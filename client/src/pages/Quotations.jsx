@@ -34,42 +34,63 @@ export default function Quotations() {
   // Pagination state
   const [currentPage, setCurrentPage] = useState(1);
   const [itemsPerPage, setItemsPerPage] = useState(50);
+  const [totalCount, setTotalCount] = useState(0);
+  const [debouncedSearch, setDebouncedSearch] = useState("");
 
   useEffect(() => {
-    loadData();
-  }, [refreshTrigger]);
+    const loadSupporting = async () => {
+      try {
+        const [customersData, productsData, brandsData, booksData] = await Promise.all([
+          Customer.list().catch(() => []),
+          Product.list().catch(() => []),
+          Brand.list().catch(() => []),
+          fetch('/api/books').then(r => r.json()).catch(() => []),
+        ]);
+        setCustomers(customersData.filter(c => c.is_active !== false));
+        setProducts(productsData);
+        setBrands(brandsData.filter(b => b.isActive !== false));
+        setFinancialYears(booksData);
+      } catch (error) {
+        console.error("Error loading supporting data:", error);
+      }
+    };
+    loadSupporting();
+  }, []);
 
-  const loadData = async () => {
-    console.time('🚀 Quotations Page - Total Load Time');
-    setLoading(true);
-    try {
-      console.time('📡 API Calls - Parallel Loading');
-      // Load all necessary data in parallel like the optimized PO page
-      const [quotationsData, customersData, productsData, brandsData, booksData] = await Promise.all([
-        fetch('/api/quotations').then(r => r.json()).then(r => Array.isArray(r) ? r : (r.data || [])),
-        Customer.list().catch(() => []),
-        Product.list().catch(() => []),
-        Brand.list().catch(() => []),
-        fetch('/api/books').then(r => r.json()).catch(() => []),
-      ]);
-      console.timeEnd('📡 API Calls - Parallel Loading');
+  useEffect(() => {
+    const timer = setTimeout(() => {
+      setDebouncedSearch(searchTerm);
+      setCurrentPage(1);
+    }, 300);
+    return () => clearTimeout(timer);
+  }, [searchTerm]);
 
-      console.time('⚡ State Updates');
-      setQuotations(quotationsData);
-      setCustomers(customersData.filter(c => c.is_active !== false));
-      setProducts(productsData);
-      setBrands(brandsData.filter(b => b.isActive !== false));
-      setFinancialYears(booksData);
-      console.timeEnd('⚡ State Updates');
-
-      console.log(`📊 Data loaded: ${quotationsData.length} quotations, ${customersData.length} customers, ${productsData.length} products, ${brandsData.length} brands`);
-    } catch (error) {
-      console.error("Error loading quotations data:", error);
-    } finally {
-      setLoading(false);
-      console.timeEnd('🚀 Quotations Page - Total Load Time');
+  useEffect(() => {
+    const params = new URLSearchParams();
+    params.set('page', String(currentPage));
+    params.set('pageSize', String(itemsPerPage));
+    if (debouncedSearch) params.set('search', debouncedSearch);
+    if (selectedStatuses.length) params.set('status', selectedStatuses.join(','));
+    if (selectedCustomers.length) params.set('customerId', selectedCustomers.join(','));
+    const today = new Date();
+    const toStr = (d) => d.toISOString().split('T')[0];
+    if (dateRange && dateRange !== 'all') {
+      if (dateRange === 'today') { const d = toStr(today); params.set('dateFrom', d); params.set('dateTo', d); }
+      else if (dateRange === 'week') { const s = new Date(today); s.setDate(today.getDate() - today.getDay()); s.setHours(0,0,0,0); params.set('dateFrom', toStr(s)); }
+      else if (dateRange === 'month') params.set('dateFrom', toStr(new Date(today.getFullYear(), today.getMonth(), 1)));
+      else if (dateRange === 'quarter') { const q = Math.floor(today.getMonth() / 3); params.set('dateFrom', toStr(new Date(today.getFullYear(), q * 3, 1))); }
+      else if (typeof dateRange === 'object' && dateRange.type === 'custom') { params.set('dateFrom', dateRange.startDate); params.set('dateTo', dateRange.endDate); }
     }
-  };
+    setLoading(true);
+    fetch(`/api/quotations?${params}`, { credentials: 'include' })
+      .then(r => r.json())
+      .then(result => {
+        setQuotations(Array.isArray(result) ? result : (result.data || []));
+        setTotalCount(result.total || 0);
+      })
+      .catch(err => console.error('Error loading quotations:', err))
+      .finally(() => setLoading(false));
+  }, [currentPage, itemsPerPage, debouncedSearch, selectedStatuses, selectedCustomers, dateRange, refreshTrigger]);
 
   // Use preloaded customers data instead of extracting from quotations
   const availableCustomers = customers;
@@ -98,66 +119,39 @@ export default function Quotations() {
   const currentUser = { role: 'Admin', email: 'public@opsuite.com' }; // Mock user for optimization
 
   const closedYears = financialYears.filter(y => y.status === 'Closed');
+  const visibleQuotations = closedYears.length > 0
+    ? quotations.filter(q => {
+        const d = new Date(q.quoteDate);
+        for (const cy of closedYears) {
+          const cyEnd = new Date(cy.endDate); cyEnd.setHours(23, 59, 59, 999);
+          if (d >= new Date(cy.startDate) && d <= cyEnd) return false;
+        }
+        return true;
+      })
+    : quotations;
 
-  const filteredQuotations = quotations.filter(quotation => {
-    // Always hide documents from closed financial years
-    if (closedYears.length > 0) {
-      const d = new Date(quotation.quoteDate);
-      for (const cy of closedYears) {
-        const cyStart = new Date(cy.startDate);
-        const cyEnd = new Date(cy.endDate);
-        cyEnd.setHours(23, 59, 59, 999);
-        if (d >= cyStart && d <= cyEnd) return false;
-      }
-    }
-    const matchesSearch = quotation.quoteNumber?.toLowerCase().includes(searchTerm.toLowerCase()) ||
-                         quotation.notes?.toLowerCase().includes(searchTerm.toLowerCase());
-    
-    const matchesStatus = selectedStatuses.length === 0 || selectedStatuses.includes(quotation.status);
-    const matchesCustomer = selectedCustomers.length === 0 || selectedCustomers.includes(quotation.customerId);
-    
-    // Date range filtering
-    let matchesDateRange = true;
-    if (dateRange !== "all") {
-      const quotationDate = new Date(quotation.quoteDate);
-      const today = new Date();
-      const startOfToday = new Date(today.getFullYear(), today.getMonth(), today.getDate());
-      
-      if (dateRange === "today") {
-        const endOfToday = new Date(today.getFullYear(), today.getMonth(), today.getDate(), 23, 59, 59);
-        matchesDateRange = quotationDate >= startOfToday && quotationDate <= endOfToday;
-      } else if (dateRange === "week") {
-        const startOfWeek = new Date(today);
-        startOfWeek.setDate(today.getDate() - today.getDay());
-        startOfWeek.setHours(0, 0, 0, 0);
-        matchesDateRange = quotationDate >= startOfWeek;
-      } else if (dateRange === "month") {
-        const startOfMonth = new Date(today.getFullYear(), today.getMonth(), 1);
-        matchesDateRange = quotationDate >= startOfMonth;
-      } else if (dateRange === "quarter") {
-        const quarter = Math.floor(today.getMonth() / 3);
-        const startOfQuarter = new Date(today.getFullYear(), quarter * 3, 1);
-        matchesDateRange = quotationDate >= startOfQuarter;
-      } else if (typeof dateRange === "object" && dateRange.type === "custom") {
-        const startDate = new Date(dateRange.startDate);
-        const endDate = new Date(dateRange.endDate);
-        endDate.setHours(23, 59, 59, 999); // Include the entire end date
-        matchesDateRange = quotationDate >= startDate && quotationDate <= endDate;
-      }
-    }
-    
-    return matchesSearch && matchesStatus && matchesCustomer && matchesDateRange;
-  });
-
-  // Calculate pagination
-  const totalPages = Math.ceil(filteredQuotations.length / itemsPerPage);
+  const totalPages = Math.ceil(totalCount / itemsPerPage);
   const startIndex = (currentPage - 1) * itemsPerPage;
-  const endIndex = startIndex + itemsPerPage;
-  const paginatedQuotations = filteredQuotations.slice(startIndex, endIndex);
+  const endIndex = Math.min(startIndex + itemsPerPage, totalCount);
+  const resetPagination = () => setCurrentPage(1);
 
-  // Reset pagination when filters/search change
-  const resetPagination = () => {
-    setCurrentPage(1);
+  const fetchAllForExport = async () => {
+    const params = new URLSearchParams();
+    if (debouncedSearch) params.set('search', debouncedSearch);
+    if (selectedStatuses.length) params.set('status', selectedStatuses.join(','));
+    if (selectedCustomers.length) params.set('customerId', selectedCustomers.join(','));
+    const today = new Date();
+    const toStr = (d) => d.toISOString().split('T')[0];
+    if (dateRange && dateRange !== 'all') {
+      if (dateRange === 'today') { const d = toStr(today); params.set('dateFrom', d); params.set('dateTo', d); }
+      else if (dateRange === 'week') { const s = new Date(today); s.setDate(today.getDate() - today.getDay()); s.setHours(0,0,0,0); params.set('dateFrom', toStr(s)); }
+      else if (dateRange === 'month') params.set('dateFrom', toStr(new Date(today.getFullYear(), today.getMonth(), 1)));
+      else if (dateRange === 'quarter') { const q = Math.floor(today.getMonth() / 3); params.set('dateFrom', toStr(new Date(today.getFullYear(), q * 3, 1))); }
+      else if (typeof dateRange === 'object' && dateRange.type === 'custom') { params.set('dateFrom', dateRange.startDate); params.set('dateTo', dateRange.endDate); }
+    }
+    const r = await fetch(`/api/quotations?${params}`, { credentials: 'include' });
+    const result = await r.json();
+    return Array.isArray(result) ? result : (result.data || []);
   };
 
 
@@ -171,7 +165,8 @@ export default function Quotations() {
         
         <div className="flex items-center gap-3">
           <ExportDropdown 
-            data={filteredQuotations}
+            data={visibleQuotations}
+            fetchAllData={fetchAllForExport}
             type="Quotations"
             filename="quotations"
             columns={{
@@ -205,10 +200,7 @@ export default function Quotations() {
           <Input
             placeholder="Search quotation numbers, remarks..."
             value={searchTerm}
-            onChange={(e) => {
-              setSearchTerm(e.target.value);
-              resetPagination();
-            }}
+            onChange={(e) => setSearchTerm(e.target.value)}
             className="pl-10"
           />
         </div>
@@ -226,8 +218,8 @@ export default function Quotations() {
       </div>
 
       <QuotationList 
-        quotations={paginatedQuotations}
-        totalCount={filteredQuotations.length}
+        quotations={visibleQuotations}
+        totalCount={totalCount}
         loading={loading}
         canEdit={canEdit}
         canOverride={canOverride}
@@ -237,11 +229,11 @@ export default function Quotations() {
       />
 
       {/* Pagination Controls */}
-      {!loading && filteredQuotations.length > 0 && (
+      {!loading && totalCount > 0 && (
         <div className="flex items-center justify-between mt-6 pt-4 border-t">
           <div className="flex items-center gap-2">
             <span className="text-sm text-gray-700">
-              Showing {startIndex + 1} to {Math.min(endIndex, filteredQuotations.length)} of {filteredQuotations.length} quotations
+              Showing {startIndex + 1} to {endIndex} of {totalCount} quotations
             </span>
           </div>
           
@@ -260,7 +252,7 @@ export default function Quotations() {
                   <SelectItem value="20">20</SelectItem>
                   <SelectItem value="50">50</SelectItem>
                   <SelectItem value="100">100</SelectItem>
-                  <SelectItem value={filteredQuotations.length.toString()}>All</SelectItem>
+                  <SelectItem value="9999">All</SelectItem>
                 </SelectContent>
               </Select>
             </div>

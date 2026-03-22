@@ -8,7 +8,7 @@ import { Skeleton } from "@/components/ui/skeleton";
 import { format, isValid, parseISO } from "date-fns";
 import DOActionsDropdown from "./DOActionsDropdown";
 
-export default function DOList({ deliveryOrders, loading, canEdit, currentUser, onEdit, onRefresh }) {
+export default function DOList({ deliveryOrders, totalCount, loading, canEdit, currentUser, onEdit, onRefresh }) {
   const getCustomerName = (doOrder) => {
     return doOrder.customer_name || doOrder.customerName || 'Unknown Customer';
   };
@@ -72,7 +72,7 @@ export default function DOList({ deliveryOrders, loading, canEdit, currentUser, 
       <CardHeader>
         <CardTitle className="flex items-center gap-2">
           <Truck className="w-5 h-5" />
-          Delivery Orders ({deliveryOrders.length})
+          Delivery Orders ({totalCount ?? deliveryOrders.length})
         </CardTitle>
       </CardHeader>
       <CardContent>

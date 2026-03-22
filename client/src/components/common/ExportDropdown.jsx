@@ -20,14 +20,16 @@ export default function ExportDropdown({
   columns = {},
   isLoading = false,
   showExternalDocument = false,
-  onExternalDocumentClick = null
+  onExternalDocumentClick = null,
+  fetchAllData = null
 }) {
   const [isExporting, setIsExporting] = useState(false);
 
-  const getExportData = () => {
-    if (!data || data.length === 0) return [];
+  const getExportData = (sourceData) => {
+    const src = sourceData || data;
+    if (!src || src.length === 0) return [];
     
-    return data.map(item => {
+    return src.map(item => {
       const exportItem = {};
       Object.keys(columns).forEach(key => {
         const columnConfig = columns[key];
@@ -49,17 +51,19 @@ export default function ExportDropdown({
   };
 
   const handleExport = async (format = 'xlsx') => {
-    console.log('Export clicked:', { data, type, filename, format, columns });
-    
-    if (!data || data.length === 0) {
-      console.warn('No data to export');
-      alert('No data available to export');
-      return;
-    }
-    
     setIsExporting(true);
     try {
-      const exportData = getExportData();
+      let exportSource = data;
+      if (fetchAllData) {
+        exportSource = await fetchAllData();
+      }
+      
+      if (!exportSource || exportSource.length === 0) {
+        alert('No data available to export');
+        return;
+      }
+      
+      const exportData = getExportData(exportSource);
       console.log('Export data prepared:', exportData);
       const timestamp = new Date().toISOString().split('T')[0];
       const exportFilename = `${filename}-${timestamp}`;

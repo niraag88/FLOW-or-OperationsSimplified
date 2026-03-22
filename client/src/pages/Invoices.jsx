@@ -41,51 +41,71 @@ export default function Invoices() {
   // Pagination state
   const [currentPage, setCurrentPage] = useState(1);
   const [itemsPerPage, setItemsPerPage] = useState(50);
+  const [totalCount, setTotalCount] = useState(0);
+  const [debouncedSearch, setDebouncedSearch] = useState("");
   
   // Toast hook for error handling
   const { toast } = useToast();
 
-  useEffect(() => {
-    loadData();
-    loadCurrentUser();
-  }, [refreshTrigger]);
-
   const loadCurrentUser = async () => {
-    // Always use mock user for public access
     setCurrentUser({ role: 'Admin', email: 'public@opsuite.com' });
   };
 
-  const loadData = async () => {
-    console.time('🚀 Invoices Page - Total Load Time');
-    setLoading(true);
-    try {
-      console.time('📡 API Calls - Parallel Loading');
-      // Load all necessary data in parallel like the optimized quotations page
-      const [invoicesData, customersData, productsData, brandsData, booksData] = await Promise.all([
-        fetch('/api/invoices').then(r => r.json()).then(r => Array.isArray(r) ? r : (r.data || [])),
-        Customer.list().catch(() => []),
-        Product.list().catch(() => []),
-        Brand.list().catch(() => []),
-        fetch('/api/books').then(r => r.json()).catch(() => []),
-      ]);
-      console.timeEnd('📡 API Calls - Parallel Loading');
+  useEffect(() => {
+    loadCurrentUser();
+    const loadSupporting = async () => {
+      try {
+        const [customersData, productsData, brandsData, booksData] = await Promise.all([
+          Customer.list().catch(() => []),
+          Product.list().catch(() => []),
+          Brand.list().catch(() => []),
+          fetch('/api/books').then(r => r.json()).catch(() => []),
+        ]);
+        setCustomers(customersData.filter(c => c.is_active !== false));
+        setProducts(productsData);
+        setBrands(brandsData.filter(b => b.isActive !== false));
+        setFinancialYears(booksData);
+      } catch (error) {
+        console.error("Error loading supporting data:", error);
+      }
+    };
+    loadSupporting();
+  }, []);
 
-      console.time('⚡ State Updates');
-      setInvoices(invoicesData);
-      setCustomers(customersData.filter(c => c.is_active !== false));
-      setProducts(productsData);
-      setBrands(brandsData.filter(b => b.isActive !== false));
-      setFinancialYears(booksData);
-      console.timeEnd('⚡ State Updates');
-      
-      console.log('📊 Data loaded:', invoicesData.length, 'invoices,', customersData.length, 'customers,', productsData.length, 'products,', brandsData.length, 'brands');
-    } catch (error) {
-      console.error("Error loading invoices data:", error);
-    } finally {
-      setLoading(false);
-      console.timeEnd('🚀 Invoices Page - Total Load Time');
+  useEffect(() => {
+    const timer = setTimeout(() => {
+      setDebouncedSearch(searchTerm);
+      setCurrentPage(1);
+    }, 300);
+    return () => clearTimeout(timer);
+  }, [searchTerm]);
+
+  useEffect(() => {
+    const params = new URLSearchParams();
+    params.set('page', String(currentPage));
+    params.set('pageSize', String(itemsPerPage));
+    if (debouncedSearch) params.set('search', debouncedSearch);
+    if (selectedStatuses.length) params.set('status', selectedStatuses.join(','));
+    if (selectedCustomers.length) params.set('customerId', selectedCustomers.join(','));
+    const today = new Date();
+    const toStr = (d) => d.toISOString().split('T')[0];
+    if (dateRange && dateRange !== 'all') {
+      if (dateRange === 'today') { const d = toStr(today); params.set('dateFrom', d); params.set('dateTo', d); }
+      else if (dateRange === 'week') { const s = new Date(today); s.setDate(today.getDate() - today.getDay()); s.setHours(0,0,0,0); params.set('dateFrom', toStr(s)); }
+      else if (dateRange === 'month') params.set('dateFrom', toStr(new Date(today.getFullYear(), today.getMonth(), 1)));
+      else if (dateRange === 'quarter') { const q = Math.floor(today.getMonth() / 3); params.set('dateFrom', toStr(new Date(today.getFullYear(), q * 3, 1))); }
+      else if (typeof dateRange === 'object' && dateRange.type === 'custom') { params.set('dateFrom', dateRange.startDate); params.set('dateTo', dateRange.endDate); }
     }
-  };
+    setLoading(true);
+    fetch(`/api/invoices?${params}`, { credentials: 'include' })
+      .then(r => r.json())
+      .then(result => {
+        setInvoices(Array.isArray(result) ? result : (result.data || []));
+        setTotalCount(result.total || 0);
+      })
+      .catch(err => console.error('Error loading invoices:', err))
+      .finally(() => setLoading(false));
+  }, [currentPage, itemsPerPage, debouncedSearch, selectedStatuses, selectedCustomers, dateRange, refreshTrigger]);
 
   // Use preloaded customers for better performance
   const availableCustomers = React.useMemo(() => {
@@ -337,87 +357,42 @@ export default function Invoices() {
   const canOverride = true;
 
   const closedYears = financialYears.filter(y => y.status === 'Closed');
-
-  const filteredInvoices = invoices.filter(invoice => {
-    // Always hide documents from closed financial years
+  const visibleInvoices = invoices.filter(invoice => {
+    const taxTreatment = invoice.taxTreatment || invoice.tax_treatment;
+    if (selectedTaxTreatments.length > 0 && !selectedTaxTreatments.includes(taxTreatment)) return false;
     if (closedYears.length > 0) {
       const d = new Date(invoice.invoiceDate || invoice.invoice_date || invoice.createdAt);
       for (const cy of closedYears) {
-        const cyStart = new Date(cy.startDate);
-        const cyEnd = new Date(cy.endDate);
-        cyEnd.setHours(23, 59, 59, 999);
-        if (d >= cyStart && d <= cyEnd) return false;
+        const cyEnd = new Date(cy.endDate); cyEnd.setHours(23, 59, 59, 999);
+        if (d >= new Date(cy.startDate) && d <= cyEnd) return false;
       }
     }
-    // Normalize field names (backend returns camelCase, frontend expects snake_case)
-    const invoiceNumber = invoice.invoiceNumber || invoice.invoice_number;
-    const customerName = invoice.customerName || invoice.customer_name;
-    const notes = invoice.notes || invoice.remarks;
-    const status = invoice.status;
-    const customerId = invoice.customerId || invoice.customer_id;
-    const taxTreatment = invoice.taxTreatment || invoice.tax_treatment;
-    
-    const matchesSearch = searchTerm === '' || 
-                         invoiceNumber?.toLowerCase().includes(searchTerm.toLowerCase()) ||
-                         customerName?.toLowerCase().includes(searchTerm.toLowerCase()) ||
-                         notes?.toLowerCase().includes(searchTerm.toLowerCase());
-    
-    const matchesStatus = selectedStatuses.length === 0 || selectedStatuses.includes(status);
-    const matchesCustomer = selectedCustomers.length === 0 || selectedCustomers.includes(String(customerId));
-    const matchesTaxTreatment = selectedTaxTreatments.length === 0 || selectedTaxTreatments.includes(taxTreatment);
-    
-    // Date range filtering
-    let matchesDateRange = true;
-    if (dateRange !== "all") {
-      const invoiceDate = new Date(invoice.invoiceDate || invoice.invoice_date || invoice.createdAt);
-      const today = new Date();
-      const startOfToday = new Date(today.getFullYear(), today.getMonth(), today.getDate());
-      
-      if (dateRange === "today") {
-        const endOfToday = new Date(today.getFullYear(), today.getMonth(), today.getDate(), 23, 59, 59);
-        matchesDateRange = invoiceDate >= startOfToday && invoiceDate <= endOfToday;
-      } else if (dateRange === "week") {
-        const startOfWeek = new Date(today);
-        startOfWeek.setDate(today.getDate() - today.getDay());
-        startOfWeek.setHours(0, 0, 0, 0);
-        matchesDateRange = invoiceDate >= startOfWeek;
-      } else if (dateRange === "month") {
-        const startOfMonth = new Date(today.getFullYear(), today.getMonth(), 1);
-        matchesDateRange = invoiceDate >= startOfMonth;
-      } else if (dateRange === "quarter") {
-        const quarter = Math.floor(today.getMonth() / 3);
-        const startOfQuarter = new Date(today.getFullYear(), quarter * 3, 1);
-        matchesDateRange = invoiceDate >= startOfQuarter;
-      } else if (typeof dateRange === "object" && dateRange.type === "custom") {
-        const startDate = new Date(dateRange.startDate);
-        const endDate = new Date(dateRange.endDate);
-        endDate.setHours(23, 59, 59, 999); // Include the entire end date
-        matchesDateRange = invoiceDate >= startDate && invoiceDate <= endDate;
-      }
-    }
-    
-    return matchesSearch && matchesStatus && matchesCustomer && matchesTaxTreatment && matchesDateRange;
+    return true;
   });
 
-  // Calculate pagination
-  const totalPages = Math.ceil(filteredInvoices.length / itemsPerPage);
+  const totalPages = Math.ceil(totalCount / itemsPerPage);
   const startIndex = (currentPage - 1) * itemsPerPage;
-  const endIndex = startIndex + itemsPerPage;
-  const paginatedInvoices = filteredInvoices.slice(startIndex, endIndex);
+  const endIndex = Math.min(startIndex + itemsPerPage, totalCount);
+  const resetPagination = () => setCurrentPage(1);
 
-  // Reset pagination when filters/search change
-  const resetPagination = () => {
-    setCurrentPage(1);
+  const fetchAllForExport = async () => {
+    const params = new URLSearchParams();
+    if (debouncedSearch) params.set('search', debouncedSearch);
+    if (selectedStatuses.length) params.set('status', selectedStatuses.join(','));
+    if (selectedCustomers.length) params.set('customerId', selectedCustomers.join(','));
+    const today = new Date();
+    const toStr = (d) => d.toISOString().split('T')[0];
+    if (dateRange && dateRange !== 'all') {
+      if (dateRange === 'today') { const d = toStr(today); params.set('dateFrom', d); params.set('dateTo', d); }
+      else if (dateRange === 'week') { const s = new Date(today); s.setDate(today.getDate() - today.getDay()); s.setHours(0,0,0,0); params.set('dateFrom', toStr(s)); }
+      else if (dateRange === 'month') params.set('dateFrom', toStr(new Date(today.getFullYear(), today.getMonth(), 1)));
+      else if (dateRange === 'quarter') { const q = Math.floor(today.getMonth() / 3); params.set('dateFrom', toStr(new Date(today.getFullYear(), q * 3, 1))); }
+      else if (typeof dateRange === 'object' && dateRange.type === 'custom') { params.set('dateFrom', dateRange.startDate); params.set('dateTo', dateRange.endDate); }
+    }
+    const r = await fetch(`/api/invoices?${params}`, { credentials: 'include' });
+    const result = await r.json();
+    return Array.isArray(result) ? result : (result.data || []);
   };
-
-
-  // Calculate totals - since all invoices are in AED, simpler calculation
-  const totals = filteredInvoices.reduce((acc, invoice) => {
-    acc.total += invoice.total_amount || 0;
-    acc.paid += invoice.paid_amount || 0;
-    acc.outstanding += (invoice.total_amount || 0) - (invoice.paid_amount || 0);
-    return acc;
-  }, { total: 0, paid: 0, outstanding: 0 });
 
   return (
     <div className="space-y-6">
@@ -430,7 +405,8 @@ export default function Invoices() {
         
         <div className="flex items-center gap-3">
           <ExportDropdown 
-            data={filteredInvoices}
+            data={visibleInvoices}
+            fetchAllData={fetchAllForExport}
             type="Invoices"
             filename="invoices"
             columns={{
@@ -475,10 +451,7 @@ export default function Invoices() {
           <Input
             placeholder="Search invoice numbers, notes..."
             value={searchTerm}
-            onChange={(e) => {
-              setSearchTerm(e.target.value);
-              resetPagination();
-            }}
+            onChange={(e) => setSearchTerm(e.target.value)}
             className="pl-10"
           />
         </div>
@@ -499,8 +472,8 @@ export default function Invoices() {
 
       {/* Invoices List */}
       <InvoiceList 
-        invoices={paginatedInvoices}
-        totalCount={filteredInvoices.length}
+        invoices={visibleInvoices}
+        totalCount={totalCount}
         loading={loading}
         canEdit={canEdit}
         canOverride={canOverride}
@@ -510,11 +483,11 @@ export default function Invoices() {
       />
 
       {/* Pagination Controls */}
-      {!loading && filteredInvoices.length > 0 && (
+      {!loading && totalCount > 0 && (
         <div className="flex items-center justify-between mt-6 pt-4 border-t">
           <div className="flex items-center gap-2">
             <span className="text-sm text-gray-700">
-              Showing {startIndex + 1} to {Math.min(endIndex, filteredInvoices.length)} of {filteredInvoices.length} invoices
+              Showing {startIndex + 1} to {endIndex} of {totalCount} invoices
             </span>
           </div>
           
@@ -533,7 +506,7 @@ export default function Invoices() {
                   <SelectItem value="20">20</SelectItem>
                   <SelectItem value="50">50</SelectItem>
                   <SelectItem value="100">100</SelectItem>
-                  <SelectItem value={filteredInvoices.length.toString()}>All</SelectItem>
+                  <SelectItem value="9999">All</SelectItem>
                 </SelectContent>
               </Select>
             </div>
