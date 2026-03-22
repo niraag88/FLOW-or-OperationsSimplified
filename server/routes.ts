@@ -564,10 +564,16 @@ const requireRole = (role: "Admin" | "Manager" | "Staff") => {
 };
 
 export async function registerRoutes(app: Express): Promise<Server> {
+  // Require SESSION_SECRET — refuse to start with a hardcoded fallback
+  const sessionSecret = process.env.SESSION_SECRET;
+  if (!sessionSecret) {
+    throw new Error('SESSION_SECRET environment variable is required but not set');
+  }
+
   // Session middleware setup with hardened security
   app.use(session({
     store: sessionStore,
-    secret: process.env.SESSION_SECRET || 'fallback-secret-change-in-production',
+    secret: sessionSecret,
     resave: false,
     saveUninitialized: false,
     rolling: true,
