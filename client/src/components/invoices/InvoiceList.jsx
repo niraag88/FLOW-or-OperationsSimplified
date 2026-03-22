@@ -1,10 +1,9 @@
 
-import React, { useState } from "react";
+import React from "react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Badge } from "@/components/ui/badge";
-import { Button } from "@/components/ui/button";
-import { FileText } from "lucide-react";
+import { FileText, Paperclip } from "lucide-react";
 import { Skeleton } from "@/components/ui/skeleton";
 import { format, isValid, parseISO } from "date-fns";
 import InvoiceActionsDropdown from "./InvoiceActionsDropdown";
@@ -107,7 +106,14 @@ export default function InvoiceList({ invoices, loading, canEdit, canOverride, c
                 {invoices.map((invoice) => {
                   return (
                     <TableRow key={invoice.id} className="hover:bg-gray-50">
-                      <TableCell className="font-medium">{invoice.invoiceNumber || invoice.invoice_number || '-'}</TableCell>
+                      <TableCell className="font-medium">
+                        <span className="flex items-center gap-1">
+                          {invoice.invoiceNumber || invoice.invoice_number || '-'}
+                          {(invoice.scanKey || invoice.scan_key) && (
+                            <Paperclip className="w-3 h-3 text-blue-500 shrink-0" title="Attachment" />
+                          )}
+                        </span>
+                      </TableCell>
                       <TableCell>{getCustomerName(invoice)}</TableCell>
                       <TableCell>{formatDate(invoice.invoiceDate || invoice.invoice_date || invoice.createdAt)}</TableCell>
                       <TableCell>{invoice.reference || '-'}</TableCell>

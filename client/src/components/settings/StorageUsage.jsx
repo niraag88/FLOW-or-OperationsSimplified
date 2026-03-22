@@ -288,45 +288,41 @@ export default function StorageUsageComponent() {
       <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
         <Card>
           <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-sm font-medium">Database Storage</CardTitle>
+            <CardTitle className="text-sm font-medium">App Data</CardTitle>
             <Database className="h-4 w-4 text-muted-foreground" />
           </CardHeader>
           <CardContent>
             <div className="text-2xl font-bold">{formatBytes(currentUsage?.database_size_gb || 0)}</div>
             <p className="text-xs text-muted-foreground">
-              {((currentUsage?.database_size_gb || 0) / storageSettings.storage_soft_quota_gb * 100).toFixed(1)}% of quota
+              PostgreSQL database records
             </p>
           </CardContent>
         </Card>
 
         <Card>
           <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-sm font-medium">App Storage</CardTitle>
+            <CardTitle className="text-sm font-medium">Object Storage</CardTitle>
             <Folder className="h-4 w-4 text-muted-foreground" />
           </CardHeader>
           <CardContent>
             <div className="text-2xl font-bold">{formatBytes(currentUsage?.app_storage_gb || 0)}</div>
             <p className="text-xs text-muted-foreground">
-              Pay-per-use ($0.03/GiB/month)
+              Uploaded files &amp; documents
             </p>
           </CardContent>
         </Card>
 
         <Card>
           <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-sm font-medium">Key-Value Store</CardTitle>
-            <div className={`p-1 rounded ${getStatusColor(currentUsage?.keyvalue_storage_mb > 40 ? 'warning' : 'normal')}`}>
-              {getStatusIcon(currentUsage?.keyvalue_storage_mb > 40 ? 'warning' : 'normal')}
-            </div>
+            <CardTitle className="text-sm font-medium">Total</CardTitle>
+            <HardDrive className="h-4 w-4 text-muted-foreground" />
           </CardHeader>
           <CardContent>
-            <div className="text-2xl font-bold">{currentUsage?.keyvalue_storage_mb || 0} MB</div>
-            <Progress 
-              value={(currentUsage?.keyvalue_storage_mb || 0) / 50 * 100} 
-              className="mt-2" 
-            />
-            <p className="text-xs text-muted-foreground mt-1">
-              {((currentUsage?.keyvalue_storage_mb || 0) / 50 * 100).toFixed(1)}% of 50 MB limit
+            <div className="text-2xl font-bold">
+              {formatBytes((currentUsage?.database_size_gb || 0) + (currentUsage?.app_storage_gb || 0))}
+            </div>
+            <p className="text-xs text-muted-foreground">
+              All storage combined
             </p>
           </CardContent>
         </Card>

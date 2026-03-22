@@ -1,9 +1,9 @@
 
-import React, { useState } from "react";
+import React from "react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Badge } from "@/components/ui/badge";
-import { Truck } from "lucide-react";
+import { Truck, Paperclip } from "lucide-react";
 import { Skeleton } from "@/components/ui/skeleton";
 import { format, isValid, parseISO } from "date-fns";
 import DOActionsDropdown from "./DOActionsDropdown";
@@ -94,7 +94,14 @@ export default function DOList({ deliveryOrders, loading, canEdit, currentUser, 
             <TableBody>
               {deliveryOrders.map((doOrder) => (
                 <TableRow key={doOrder.id} className="hover:bg-gray-50">
-                  <TableCell className="font-medium">{doOrder.do_number}</TableCell>
+                  <TableCell className="font-medium">
+                    <span className="flex items-center gap-1">
+                      {doOrder.do_number}
+                      {(doOrder.scanKey || doOrder.scan_key) && (
+                        <Paperclip className="w-3 h-3 text-blue-500 shrink-0" title="Attachment" />
+                      )}
+                    </span>
+                  </TableCell>
                   <TableCell>{getCustomerName(doOrder)}</TableCell>
                   <TableCell>{formatDate(doOrder.order_date)}</TableCell>
                   <TableCell>{doOrder.reference || '-'}</TableCell>

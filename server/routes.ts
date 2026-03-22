@@ -1486,6 +1486,23 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  // PATCH /api/invoices/:id/scan-key - Store an uploaded file's storage key
+  app.patch('/api/invoices/:id/scan-key', requireAuth(['Admin', 'Manager', 'Staff']), async (req: AuthenticatedRequest, res) => {
+    try {
+      const id = parseInt(req.params.id);
+      const { scanKey } = req.body;
+      if (!scanKey || typeof scanKey !== 'string') {
+        return res.status(400).json({ error: 'scanKey is required' });
+      }
+      await db.update(invoices).set({ scanKey }).where(eq(invoices.id, id));
+      const [updated] = await db.select().from(invoices).where(eq(invoices.id, id));
+      res.json(updated);
+    } catch (error) {
+      console.error('Error updating invoice scan key:', error);
+      res.status(500).json({ error: 'Failed to update scan key' });
+    }
+  });
+
   // GET /api/delivery-orders
   app.get('/api/delivery-orders', requireAuth(), async (req: AuthenticatedRequest, res) => {
     try {
@@ -1726,6 +1743,23 @@ export async function registerRoutes(app: Express): Promise<Server> {
       } else {
         res.status(500).json({ error: 'Failed to update delivery order' });
       }
+    }
+  });
+
+  // PATCH /api/delivery-orders/:id/scan-key - Store an uploaded file's storage key
+  app.patch('/api/delivery-orders/:id/scan-key', requireAuth(['Admin', 'Manager', 'Staff']), async (req: AuthenticatedRequest, res) => {
+    try {
+      const id = parseInt(req.params.id);
+      const { scanKey } = req.body;
+      if (!scanKey || typeof scanKey !== 'string') {
+        return res.status(400).json({ error: 'scanKey is required' });
+      }
+      await db.update(deliveryOrders).set({ scanKey }).where(eq(deliveryOrders.id, id));
+      const [updated] = await db.select().from(deliveryOrders).where(eq(deliveryOrders.id, id));
+      res.json(updated);
+    } catch (error) {
+      console.error('Error updating delivery order scan key:', error);
+      res.status(500).json({ error: 'Failed to update scan key' });
     }
   });
 
@@ -2467,8 +2501,9 @@ export async function registerRoutes(app: Express): Promise<Server> {
       }
 
       // Validate content type
-      if (contentType !== 'application/pdf') {
-        return res.status(400).json({ error: 'Only PDF files are allowed' });
+      const allowedTypes = ['application/pdf', 'image/jpeg', 'image/jpg', 'image/png'];
+      if (!allowedTypes.includes(contentType)) {
+        return res.status(400).json({ error: 'Only PDF, JPG, and PNG files are allowed' });
       }
 
       // Validate file size (25MB max)
@@ -2476,8 +2511,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
         return res.status(400).json({ error: 'File size exceeds 25MB limit' });
       }
 
-      // Validate storage key format
-      if (!storageKey.match(/^(invoices|delivery)\/\d{4}\/[^\/]+\.pdf$/)) {
+      // Validate storage key format (allow pdf, jpg, jpeg, png extensions)
+      if (!storageKey.match(/^(invoices|delivery)\/\d{4}\/[^\/]+\.(pdf|jpg|jpeg|png)$/)) {
         return res.status(400).json({ error: 'Invalid storage key format' });
       }
 
@@ -2486,10 +2521,12 @@ export async function registerRoutes(app: Express): Promise<Server> {
         return res.status(400).json({ error: 'File size mismatch' });
       }
 
-      // Validate PDF magic bytes
-      const pdfValidation = validatePdfMagicBytes(req.file.buffer);
-      if (!pdfValidation.valid) {
-        return res.status(400).json({ error: pdfValidation.error });
+      // Validate PDF magic bytes only for PDF files
+      if (contentType === 'application/pdf') {
+        const pdfValidation = validatePdfMagicBytes(req.file.buffer);
+        if (!pdfValidation.valid) {
+          return res.status(400).json({ error: pdfValidation.error });
+        }
       }
 
       // Upload to Replit Object Storage

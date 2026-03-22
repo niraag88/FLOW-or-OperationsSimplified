@@ -5,23 +5,24 @@ import {
   DropdownMenuContent,
   DropdownMenuItem,
   DropdownMenuTrigger,
-  DropdownMenuSeparator, // Added for separator
+  DropdownMenuSeparator,
 } from "@/components/ui/dropdown-menu";
 import { Button } from "@/components/ui/button";
-import { MoreHorizontal, Edit2, Download, Trash2, Eye } from "lucide-react"; // Added Trash2
+import { MoreHorizontal, Edit2, Download, Trash2, Eye, Upload, Paperclip } from "lucide-react";
 import { useToast } from "@/components/ui/use-toast";
 import { exportDeliveryOrderToXLSX } from "../utils/export";
 import { format, isValid, parseISO } from 'date-fns';
-import SimpleConfirmDialog from "../common/SimpleConfirmDialog"; // Changed import from ConfirmDeleteDialog
-import { DeliveryOrder } from "@/api/entities"; // New import
-import { User } from "@/api/entities"; // New import
+import SimpleConfirmDialog from "../common/SimpleConfirmDialog";
+import { DeliveryOrder } from "@/api/entities";
+import { User } from "@/api/entities";
+import UploadFileDialog from "../common/UploadFileDialog";
 
 export default function DOActionsDropdown({ doOrder, canEdit, onEdit, onRefresh }) {
   const { toast } = useToast();
-  const [showDeleteDialog, setShowDeleteDialog] = useState(false); // New state
-  const [currentUser, setCurrentUser] = useState(null); // New state
+  const [showDeleteDialog, setShowDeleteDialog] = useState(false);
+  const [currentUser, setCurrentUser] = useState(null);
+  const [showUploadDialog, setShowUploadDialog] = useState(false);
 
-  // New useEffect hook to load current user
   useEffect(() => {
     loadCurrentUser();
   }, []);
@@ -31,21 +32,8 @@ export default function DOActionsDropdown({ doOrder, canEdit, onEdit, onRefresh 
       const user = await User.me();
       setCurrentUser(user);
     } catch (error) {
-      // Fallback or error handling if user cannot be loaded
-      // This is a placeholder for development/testing if User.me() fails
       console.error("Failed to load current user:", error);
       setCurrentUser({ role: 'Admin', email: 'admin@example.com' });
-    }
-  };
-
-  const formatDate = (dateString) => {
-    if (!dateString) return '';
-    try {
-      const date = typeof dateString === 'string' ? parseISO(dateString) : new Date(dateString);
-      return isValid(date) ? format(date, 'dd/MM/yyyy') : '';
-    } catch (error) {
-      console.error("Error formatting date:", error);
-      return '';
     }
   };
 
@@ -73,14 +61,12 @@ export default function DOActionsDropdown({ doOrder, canEdit, onEdit, onRefresh 
   const handleDelete = async () => {
     try {
       await DeliveryOrder.delete(doOrder.id);
-
       toast({
         title: 'Delivery Order Deleted',
         description: `${doOrder.do_number} has been moved to the recycle bin.`
       });
-
       setShowDeleteDialog(false);
-      onRefresh(); // Refresh parent component to update the list
+      onRefresh();
     } catch (error) {
       console.error('Error deleting delivery order:', error);
       toast({
@@ -91,8 +77,50 @@ export default function DOActionsDropdown({ doOrder, canEdit, onEdit, onRefresh 
     }
   };
 
+  const handleUploadSuccess = async (storageKey) => {
+    try {
+      await fetch(`/api/delivery-orders/${doOrder.id}/scan-key`, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ scanKey: storageKey }),
+        credentials: 'include',
+      });
+      onRefresh();
+    } catch (error) {
+      console.error('Error saving scan key:', error);
+      toast({
+        title: 'Warning',
+        description: 'File uploaded but failed to link it to the delivery order.',
+        variant: 'destructive'
+      });
+    }
+  };
+
+  const handleViewFile = async () => {
+    const scanKey = doOrder.scanKey || doOrder.scan_key;
+    if (!scanKey) return;
+    try {
+      const res = await fetch(`/api/storage/signed-get?key=${encodeURIComponent(scanKey)}`, {
+        credentials: 'include',
+      });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error || 'Failed to get download link');
+      window.open(data.url, '_blank');
+    } catch (error) {
+      console.error('Error viewing file:', error);
+      toast({
+        title: 'Error',
+        description: 'Could not retrieve the file. Please try again.',
+        variant: 'destructive'
+      });
+    }
+  };
+
+  const hasScanKey = !!(doOrder.scanKey || doOrder.scan_key);
+  const doNumber = doOrder.do_number || doOrder.orderNumber || `do-${doOrder.id}`;
+
   return (
-    <> {/* React Fragment to wrap multiple elements */}
+    <>
       <DropdownMenu>
         <DropdownMenuTrigger asChild>
           <Button variant="ghost" size="sm">
@@ -114,10 +142,21 @@ export default function DOActionsDropdown({ doOrder, canEdit, onEdit, onRefresh 
             <Download className="w-4 h-4 mr-2" />
             Export to XLSX
           </DropdownMenuItem>
-          <DropdownMenuSeparator /> {/* Separator for delete option */}
+          <DropdownMenuSeparator />
+          <DropdownMenuItem onClick={() => setShowUploadDialog(true)}>
+            <Upload className="w-4 h-4 mr-2" />
+            Upload
+          </DropdownMenuItem>
+          {hasScanKey && (
+            <DropdownMenuItem onClick={handleViewFile}>
+              <Paperclip className="w-4 h-4 mr-2" />
+              View File
+            </DropdownMenuItem>
+          )}
+          <DropdownMenuSeparator />
           <DropdownMenuItem 
             onClick={() => setShowDeleteDialog(true)}
-            className="text-red-600 focus:text-red-600" // Styling for delete
+            className="text-red-600 focus:text-red-600"
           >
             <Trash2 className="w-4 h-4 mr-2" />
             Delete
@@ -125,15 +164,22 @@ export default function DOActionsDropdown({ doOrder, canEdit, onEdit, onRefresh 
         </DropdownMenuContent>
       </DropdownMenu>
 
-      {/* Changed to SimpleConfirmDialog component */}
       <SimpleConfirmDialog
         open={showDeleteDialog}
         onClose={() => setShowDeleteDialog(false)}
         onConfirm={handleDelete}
         title="Confirm Deletion"
-        description={`Do you wish to confirm deleting Delivery Order "${doOrder.do_number}"? It will be moved to the recycle bin.`}
+        description={`Do you wish to confirm deleting Delivery Order "${doNumber}"? It will be moved to the recycle bin.`}
         confirmText="Yes, Delete"
         confirmVariant="destructive"
+      />
+      <UploadFileDialog
+        open={showUploadDialog}
+        onClose={() => setShowUploadDialog(false)}
+        onSuccess={handleUploadSuccess}
+        recordType="delivery"
+        recordId={doOrder.id}
+        documentNumber={doNumber}
       />
     </>
   );
