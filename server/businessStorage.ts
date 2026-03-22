@@ -167,9 +167,9 @@ export class BusinessStorage {
   // Purchase Order operations
   async getPurchaseOrders(params?: {
     page?: number; pageSize?: number; search?: string;
-    status?: string; supplierId?: string; dateFrom?: string; dateTo?: string;
+    status?: string; supplierId?: string; dateFrom?: string; dateTo?: string; excludeYears?: string;
   }): Promise<any> {
-    const { page, pageSize, search, status, supplierId, dateFrom, dateTo } = params || {};
+    const { page, pageSize, search, status, supplierId, dateFrom, dateTo, excludeYears } = params || {};
 
     const conditions: any[] = [];
     if (search) {
@@ -187,6 +187,12 @@ export class BusinessStorage {
     }
     if (dateFrom) conditions.push(gte(purchaseOrders.orderDate, dateFrom));
     if (dateTo) conditions.push(lte(purchaseOrders.orderDate, dateTo));
+    if (excludeYears) {
+      for (const range of excludeYears.split(';').filter(Boolean)) {
+        const [start, end] = range.split(',');
+        if (start && end) conditions.push(sql`NOT (${purchaseOrders.orderDate} >= ${start} AND ${purchaseOrders.orderDate} <= ${end})`);
+      }
+    }
     const whereCondition = conditions.length > 0 ? and(...conditions) : undefined;
 
     // Total count
@@ -275,9 +281,9 @@ export class BusinessStorage {
   // Quotation operations
   async getQuotations(params?: {
     page?: number; pageSize?: number; search?: string;
-    status?: string; customerId?: string; dateFrom?: string; dateTo?: string;
+    status?: string; customerId?: string; dateFrom?: string; dateTo?: string; excludeYears?: string;
   }): Promise<any> {
-    const { page, pageSize, search, status, customerId, dateFrom, dateTo } = params || {};
+    const { page, pageSize, search, status, customerId, dateFrom, dateTo, excludeYears } = params || {};
 
     const conditions: any[] = [];
     if (search) {
@@ -295,6 +301,12 @@ export class BusinessStorage {
     }
     if (dateFrom) conditions.push(sql`${quotations.quoteDate}::date >= ${dateFrom}::date`);
     if (dateTo) conditions.push(sql`${quotations.quoteDate}::date <= ${dateTo}::date`);
+    if (excludeYears) {
+      for (const range of excludeYears.split(';').filter(Boolean)) {
+        const [start, end] = range.split(',');
+        if (start && end) conditions.push(sql`NOT (${quotations.quoteDate} >= ${start} AND ${quotations.quoteDate} <= ${end})`);
+      }
+    }
     const whereCondition = conditions.length > 0 ? and(...conditions) : undefined;
 
     const [{ count }] = await db
@@ -824,8 +836,9 @@ export class BusinessStorage {
   async getInvoices(params?: {
     page?: number; pageSize?: number; search?: string;
     status?: string; customerId?: string; dateFrom?: string; dateTo?: string;
+    taxTreatment?: string; excludeYears?: string;
   }): Promise<any> {
-    const { page, pageSize, search, status, customerId, dateFrom, dateTo } = params || {};
+    const { page, pageSize, search, status, customerId, dateFrom, dateTo, excludeYears } = params || {};
 
     const conditions: any[] = [];
     if (search) {
@@ -843,6 +856,12 @@ export class BusinessStorage {
     }
     if (dateFrom) conditions.push(gte(invoices.invoiceDate, dateFrom));
     if (dateTo) conditions.push(lte(invoices.invoiceDate, dateTo));
+    if (excludeYears) {
+      for (const range of excludeYears.split(';').filter(Boolean)) {
+        const [start, end] = range.split(',');
+        if (start && end) conditions.push(sql`NOT (${invoices.invoiceDate} >= ${start} AND ${invoices.invoiceDate} <= ${end})`);
+      }
+    }
     const whereCondition = conditions.length > 0 ? and(...conditions) : undefined;
 
     const [{ count }] = await db
@@ -881,8 +900,9 @@ export class BusinessStorage {
   async getDeliveryOrders(params?: {
     page?: number; pageSize?: number; search?: string;
     status?: string; customerId?: string; dateFrom?: string; dateTo?: string;
+    taxTreatment?: string; excludeYears?: string;
   }): Promise<any> {
-    const { page, pageSize, search, status, customerId, dateFrom, dateTo } = params || {};
+    const { page, pageSize, search, status, customerId, dateFrom, dateTo, excludeYears } = params || {};
 
     const conditions: any[] = [];
     if (search) {
@@ -900,6 +920,12 @@ export class BusinessStorage {
     }
     if (dateFrom) conditions.push(gte(deliveryOrders.orderDate, dateFrom));
     if (dateTo) conditions.push(lte(deliveryOrders.orderDate, dateTo));
+    if (excludeYears) {
+      for (const range of excludeYears.split(';').filter(Boolean)) {
+        const [start, end] = range.split(',');
+        if (start && end) conditions.push(sql`NOT (${deliveryOrders.orderDate} >= ${start} AND ${deliveryOrders.orderDate} <= ${end})`);
+      }
+    }
     const whereCondition = conditions.length > 0 ? and(...conditions) : undefined;
 
     const [{ count }] = await db

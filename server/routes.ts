@@ -1113,7 +1113,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   // Purchase Order management routes
   app.get('/api/purchase-orders', requireAuth(['Admin', 'Manager']), async (req: AuthenticatedRequest, res) => {
     try {
-      const { page, pageSize, search, status, supplierId, dateFrom, dateTo } = req.query as Record<string, string>;
+      const { page, pageSize, search, status, supplierId, dateFrom, dateTo, excludeYears } = req.query as Record<string, string>;
       const result = await businessStorage.getPurchaseOrders({
         page: page ? parseInt(page) : undefined,
         pageSize: pageSize ? parseInt(pageSize) : undefined,
@@ -1122,6 +1122,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
         supplierId: supplierId || undefined,
         dateFrom: dateFrom || undefined,
         dateTo: dateTo || undefined,
+        excludeYears: excludeYears || undefined,
       });
       res.json(result);
     } catch (error) {
@@ -1292,7 +1293,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   // Quotation management routes
   app.get('/api/quotations', requireAuth(), async (req: AuthenticatedRequest, res) => {
     try {
-      const { page, pageSize, search, status, customerId, dateFrom, dateTo } = req.query as Record<string, string>;
+      const { page, pageSize, search, status, customerId, dateFrom, dateTo, excludeYears } = req.query as Record<string, string>;
       const result = await businessStorage.getQuotations({
         page: page ? parseInt(page) : undefined,
         pageSize: pageSize ? parseInt(pageSize) : undefined,
@@ -1301,6 +1302,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
         customerId: customerId || undefined,
         dateFrom: dateFrom || undefined,
         dateTo: dateTo || undefined,
+        excludeYears: excludeYears || undefined,
       });
       res.json(result);
     } catch (error) {
@@ -1312,7 +1314,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   // GET /api/invoices
   app.get('/api/invoices', requireAuth(), async (req: AuthenticatedRequest, res) => {
     try {
-      const { page, pageSize, search, status, customerId, dateFrom, dateTo } = req.query as Record<string, string>;
+      const { page, pageSize, search, status, customerId, dateFrom, dateTo, taxTreatment, excludeYears } = req.query as Record<string, string>;
       const result = await businessStorage.getInvoices({
         page: page ? parseInt(page) : undefined,
         pageSize: pageSize ? parseInt(pageSize) : undefined,
@@ -1321,6 +1323,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
         customerId: customerId || undefined,
         dateFrom: dateFrom || undefined,
         dateTo: dateTo || undefined,
+        taxTreatment: taxTreatment || undefined,
+        excludeYears: excludeYears || undefined,
       });
       res.json(result);
     } catch (error) {
@@ -1662,7 +1666,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   // GET /api/delivery-orders
   app.get('/api/delivery-orders', requireAuth(), async (req: AuthenticatedRequest, res) => {
     try {
-      const { page, pageSize, search, status, customerId, dateFrom, dateTo } = req.query as Record<string, string>;
+      const { page, pageSize, search, status, customerId, dateFrom, dateTo, taxTreatment, excludeYears } = req.query as Record<string, string>;
       const result = await businessStorage.getDeliveryOrders({
         page: page ? parseInt(page) : undefined,
         pageSize: pageSize ? parseInt(pageSize) : undefined,
@@ -1671,6 +1675,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
         customerId: customerId || undefined,
         dateFrom: dateFrom || undefined,
         dateTo: dateTo || undefined,
+        taxTreatment: taxTreatment || undefined,
+        excludeYears: excludeYears || undefined,
       });
       const mapDO = (d: any) => ({
         ...d,
