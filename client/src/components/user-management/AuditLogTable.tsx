@@ -9,13 +9,13 @@ import { format, isValid, parseISO } from 'date-fns';
 
 interface AuditLog {
   id: number;
-  actor: number;
+  actor: string;
   actorName: string;
   targetId: string;
   targetType: string;
   action: string;
   details: string;
-  createdAt: string;
+  timestamp: string;
 }
 
 const ACTION_COLORS: Record<string, string> = {
@@ -43,12 +43,12 @@ export default function AuditLogTable() {
   const [dateFrom, setDateFrom] = useState('');
   const [dateTo, setDateTo] = useState('');
 
-  const { data, isLoading } = useQuery<{ logs: AuditLog[] }>({
+  const { data, isLoading } = useQuery<AuditLog[]>({
     queryKey: ['/api/audit-logs'],
     refetchOnWindowFocus: false,
   });
 
-  const logs = data?.logs || [];
+  const logs = data ?? [];
 
   const targetTypes = Array.from(new Set(logs.map(l => l.targetType))).sort();
   const actionTypes = Array.from(new Set(logs.map(l => l.action))).sort();
@@ -64,13 +64,13 @@ export default function AuditLogTable() {
       ) return false;
     }
     if (dateFrom) {
-      const logDate = new Date(log.createdAt);
+      const logDate = new Date(log.timestamp);
       const from = new Date(dateFrom);
       from.setHours(0, 0, 0, 0);
       if (logDate < from) return false;
     }
     if (dateTo) {
-      const logDate = new Date(log.createdAt);
+      const logDate = new Date(log.timestamp);
       const to = new Date(dateTo);
       to.setHours(23, 59, 59, 999);
       if (logDate > to) return false;
@@ -142,7 +142,7 @@ export default function AuditLogTable() {
                 <TableHead className="w-[110px]">Actor</TableHead>
                 <TableHead className="w-[110px]">Action</TableHead>
                 <TableHead className="w-[110px]">Type</TableHead>
-                <TableHead className="w-[110px]">Target ID</TableHead>
+                <TableHead className="w-[110px]">Target</TableHead>
                 <TableHead>Details</TableHead>
               </TableRow>
             </TableHeader>
@@ -150,7 +150,7 @@ export default function AuditLogTable() {
               {filtered.map(log => (
                 <TableRow key={log.id} className="hover:bg-gray-50 dark:hover:bg-gray-800">
                   <TableCell className="text-xs text-gray-500 whitespace-nowrap">
-                    {formatLogDate(log.createdAt)}
+                    {formatLogDate(log.timestamp)}
                   </TableCell>
                   <TableCell className="font-medium text-sm">{log.actorName}</TableCell>
                   <TableCell>
