@@ -2618,14 +2618,26 @@ export async function registerRoutes(app: Express): Promise<Server> {
         return res.status(404).json({ error: 'Object not found' });
       }
 
-      // Set appropriate headers
+      // Derive Content-Type from file extension so browsers can preview inline
+      const ext = tokenData.key.split('.').pop()?.toLowerCase() || '';
+      const contentTypeMap: Record<string, string> = {
+        pdf: 'application/pdf',
+        jpg: 'image/jpeg',
+        jpeg: 'image/jpeg',
+        png: 'image/png',
+      };
+      const fileContentType = contentTypeMap[ext] || 'application/octet-stream';
+
+      // Use only the basename for the download filename (not the full key path)
+      const filename = tokenData.key.split('/').pop() || 'download';
+
       res.set({
-        'Content-Disposition': `attachment; filename="${tokenData.key}"`,
-        'Content-Type': 'application/octet-stream'
+        'Content-Type': fileContentType,
+        'Content-Disposition': `inline; filename="${filename}"`,
       });
 
-      // Send the file data
-      res.send(downloadResult.value);
+      // Convert Uint8Array → Buffer so Express sends raw bytes without corruption
+      res.send(Buffer.from(downloadResult.value));
     } catch (error) {
       console.error('Error downloading file:', error);
       res.status(500).json({ error: 'Failed to download file' });
