@@ -1,5 +1,6 @@
 
 import React, { useState, useEffect } from "react";
+import { useAuth } from "@/hooks/useAuth";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
@@ -29,7 +30,6 @@ export default function Invoices() {
   const [searchTerm, setSearchTerm] = useState("");
   const [showInvoiceForm, setShowInvoiceForm] = useState(false);
   const [editingInvoice, setEditingInvoice] = useState(null);
-  const [currentUser, setCurrentUser] = useState(null);
   const [selectedStatuses, setSelectedStatuses] = useState([]);
   const [selectedCustomers, setSelectedCustomers] = useState([]);
   const [selectedTaxTreatments, setSelectedTaxTreatments] = useState([]);
@@ -46,13 +46,9 @@ export default function Invoices() {
   
   // Toast hook for error handling
   const { toast } = useToast();
-
-  const loadCurrentUser = async () => {
-    setCurrentUser({ role: 'Admin', email: 'public@opsuite.com' });
-  };
+  const { user: currentUser } = useAuth();
 
   useEffect(() => {
-    loadCurrentUser();
     const loadSupporting = async () => {
       try {
         const [customersData, productsData, brandsData, booksData] = await Promise.all([

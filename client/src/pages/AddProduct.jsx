@@ -1,5 +1,6 @@
 
 import React, { useState, useEffect, useCallback } from "react";
+import { useAuth } from "@/hooks/useAuth";
 import { useNavigate } from "react-router-dom";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -29,16 +30,13 @@ export default function AddProduct() {
   const [formData, setFormData] = useState(initialFormData);
   const [errors, setErrors] = useState({});
   const [loading, setLoading] = useState(false);
-  const [currentUser, setCurrentUser] = useState(null);
   const [brands, setBrands] = useState([]); // Added state for brands
   const [fxRate, setFxRate] = useState(4.85); // State for exchange rate
   const navigate = useNavigate();
   const { toast } = useToast();
+  const { user: currentUser } = useAuth();
 
   useEffect(() => {
-    // Always use mock user for public access, removing all authentication logic
-    setCurrentUser({ role: 'Admin', email: 'public@opsuite.com' });
-    
     const loadInitialData = async () => {
       try {
         const [brandsData, settingsList] = await Promise.all([

@@ -1,4 +1,5 @@
 import React, { useState, useEffect, useCallback } from "react";
+import { useAuth } from "@/hooks/useAuth";
 import { useNavigate, useParams } from "react-router-dom";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -30,17 +31,14 @@ export default function EditProduct() {
   const [errors, setErrors] = useState({});
   const [loading, setLoading] = useState(false);
   const [loadingProduct, setLoadingProduct] = useState(true);
-  const [currentUser, setCurrentUser] = useState(null);
   const [brands, setBrands] = useState([]);
   const [fxRate, setFxRate] = useState(4.85);
   const [originalProduct, setOriginalProduct] = useState(null);
   const navigate = useNavigate();
   const { toast } = useToast();
+  const { user: currentUser } = useAuth();
 
   useEffect(() => {
-    // Always use mock user for public access
-    setCurrentUser({ role: 'Admin', email: 'public@opsuite.com' });
-    
     const loadInitialData = async () => {
       try {
         const [brandsData, settingsList, productData] = await Promise.all([

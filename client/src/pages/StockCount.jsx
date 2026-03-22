@@ -1,4 +1,5 @@
 import React, { useState, useEffect } from "react";
+import { useAuth } from "@/hooks/useAuth";
 import { useNavigate } from "react-router-dom";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -18,13 +19,11 @@ export default function StockCount() {
   const [searchTerm, setSearchTerm] = useState("");
   const [loading, setLoading] = useState(false);
   const [loadingProducts, setLoadingProducts] = useState(true);
-  const [currentUser, setCurrentUser] = useState(null);
   const navigate = useNavigate();
   const { toast } = useToast();
+  const { user: currentUser } = useAuth();
 
   useEffect(() => {
-    setCurrentUser({ role: 'Admin', email: 'public@opsuite.com' });
-    
     const loadProducts = async () => {
       try {
         const productsData = await Product.list();

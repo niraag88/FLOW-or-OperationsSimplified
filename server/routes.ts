@@ -565,6 +565,11 @@ const requireRole = (role: "Admin" | "Manager" | "Staff") => {
 };
 
 export async function registerRoutes(app: Express): Promise<Server> {
+  // Trust the first proxy (Replit's reverse proxy sets X-Forwarded-For).
+  // Without this, express-rate-limit throws ERR_ERL_UNEXPECTED_X_FORWARDED_FOR
+  // and cannot correctly identify client IPs.
+  app.set('trust proxy', 1);
+
   // Require SESSION_SECRET — refuse to start with a hardcoded fallback
   const sessionSecret = process.env.SESSION_SECRET;
   if (!sessionSecret) {

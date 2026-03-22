@@ -1,5 +1,6 @@
 
 import React, { useState, useEffect } from "react";
+import { useAuth } from "@/hooks/useAuth";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
@@ -27,7 +28,6 @@ export default function DeliveryOrders() {
   const [searchTerm, setSearchTerm] = useState("");
   const [showDOForm, setShowDOForm] = useState(false);
   const [editingDO, setEditingDO] = useState(null);
-  const [currentUser, setCurrentUser] = useState(null);
   const [selectedStatuses, setSelectedStatuses] = useState([]);
   const [selectedCustomers, setSelectedCustomers] = useState([]);
   const [selectedTaxTreatments, setSelectedTaxTreatments] = useState([]);
@@ -42,12 +42,9 @@ export default function DeliveryOrders() {
   const [totalCount, setTotalCount] = useState(0);
   const [debouncedSearch, setDebouncedSearch] = useState("");
 
-  const loadCurrentUser = async () => {
-    setCurrentUser({ role: 'Admin', email: 'public@opsuite.com' });
-  };
+  const { user: currentUser } = useAuth();
 
   useEffect(() => {
-    loadCurrentUser();
     const loadSupporting = async () => {
       try {
         const [customersData, productsData, brandsData, booksData] = await Promise.all([

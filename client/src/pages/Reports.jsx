@@ -1,4 +1,5 @@
 import React, { useState, useEffect } from "react";
+import { useAuth } from "@/hooks/useAuth";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Skeleton } from "@/components/ui/skeleton";
@@ -38,21 +39,11 @@ export default function Reports() {
     companySettings: null,
   });
   const [loading, setLoading] = useState(true);
-  const [currentUser, setCurrentUser] = useState(null);
+  const { user: currentUser } = useAuth();
 
   useEffect(() => {
     loadAllData();
-    loadCurrentUser();
   }, []);
-
-  const loadCurrentUser = async () => {
-    try {
-      // Always use mock user for public access
-      setCurrentUser({ role: 'Admin', email: 'public@opsuite.com' });
-    } catch (error) {
-      console.error("Error loading current user:", error);
-    }
-  };
 
   const loadAllData = async () => {
     setLoading(true);
@@ -82,7 +73,7 @@ export default function Reports() {
     }
   };
   
-  const canEdit = currentUser && (currentUser.role === 'Admin' || currentUser.role === 'Ops');
+  const canEdit = currentUser && (currentUser.role === 'Admin' || currentUser.role === 'Manager');
 
   if (loading) {
     return (

@@ -1,5 +1,6 @@
 
 import React, { useState, useEffect } from "react";
+import { useAuth } from "@/hooks/useAuth";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
@@ -124,7 +125,7 @@ export default function Quotations() {
 
   const canEdit = true;
   const canOverride = true;
-  const currentUser = { role: 'Admin', email: 'public@opsuite.com' }; // Mock user for optimization
+  const { user: currentUser } = useAuth();
 
   const visibleQuotations = quotations;
 

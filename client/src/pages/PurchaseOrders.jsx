@@ -1,5 +1,6 @@
 
 import React, { useState, useEffect } from "react";
+import { useAuth } from "@/hooks/useAuth";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
@@ -53,12 +54,7 @@ export default function PurchaseOrders() {
     loadSupporting();
   }, []);
 
-  useEffect(() => {
-    if (activeTab !== 'goods-receipts') return;
-    fetch('/api/purchase-orders', { credentials: 'include' })
-      .then(r => r.json())
-      .then(result => setAllPOs(Array.isArray(result) ? result : (result.data || [])))
-      .catch(() => {});
+  const fetchGoodsReceipts = () => {
     fetch('/api/goods-receipts', { credentials: 'include' })
       .then(r => r.json())
       .then(data => {
@@ -71,7 +67,29 @@ export default function PurchaseOrders() {
         })));
       })
       .catch(() => {});
-  }, [activeTab, refreshTrigger]);
+  };
+
+  // On first goods-receipts tab open: fetch both allPOs (lazy, once) and GRNs
+  useEffect(() => {
+    if (activeTab !== 'goods-receipts') return;
+    if (allPOs.length === 0) {
+      fetch('/api/purchase-orders', { credentials: 'include' })
+        .then(r => r.json())
+        .then(result => setAllPOs(Array.isArray(result) ? result : (result.data || [])))
+        .catch(() => {});
+    }
+    fetchGoodsReceipts();
+  }, [activeTab]);
+
+  // On refresh: re-fetch allPOs and GRNs if currently on goods-receipts tab
+  useEffect(() => {
+    if (refreshTrigger === 0 || activeTab !== 'goods-receipts') return;
+    fetch('/api/purchase-orders', { credentials: 'include' })
+      .then(r => r.json())
+      .then(result => setAllPOs(Array.isArray(result) ? result : (result.data || [])))
+      .catch(() => {});
+    fetchGoodsReceipts();
+  }, [refreshTrigger]);
 
   useEffect(() => {
     const timer = setTimeout(() => {
@@ -137,7 +155,7 @@ export default function PurchaseOrders() {
   };
 
   const canEdit = true;
-  const currentUser = { role: 'Admin', email: 'admin@opsuite.com' }; // Mock user
+  const { user: currentUser } = useAuth();
 
   const visiblePOs = purchaseOrders;
 
@@ -380,7 +398,7 @@ export default function PurchaseOrders() {
           <GoodsReceiptsTab 
             purchaseOrders={allPOs}
             products={products}
-            goodsReceipts={filteredGRNs}
+            goodsReceipts={goodsReceipts}
             loading={loading}
             canEdit={canEdit}
             currentUser={currentUser}
