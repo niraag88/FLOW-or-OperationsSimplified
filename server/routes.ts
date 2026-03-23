@@ -2757,10 +2757,14 @@ export async function registerRoutes(app: Express): Promise<Server> {
       // Clean up token
       signedTokens.delete(token);
 
-      // Track uploaded file size for accurate total-size reporting (only on confirmed success)
-      await db.insert(storageObjects)
-        .values({ key: tokenData.key, sizeBytes: fileData.length })
-        .onConflictDoUpdate({ target: storageObjects.key, set: { sizeBytes: fileData.length, uploadedAt: new Date() } });
+      // Track uploaded file size for accurate total-size reporting (non-fatal — upload already succeeded)
+      try {
+        await db.insert(storageObjects)
+          .values({ key: tokenData.key, sizeBytes: fileData.length })
+          .onConflictDoUpdate({ target: storageObjects.key, set: { sizeBytes: fileData.length, uploadedAt: new Date() } });
+      } catch (trackErr) {
+        console.warn('Could not record storage size for', tokenData.key, '— size reporting may be inaccurate:', trackErr);
+      }
 
       res.json({ success: true, key: tokenData.key });
     } catch (error) {
@@ -2826,10 +2830,14 @@ export async function registerRoutes(app: Express): Promise<Server> {
         throw new Error(`Upload failed: ${result.error}`);
       }
 
-      // Track uploaded file size for accurate total-size reporting
-      await db.insert(storageObjects)
-        .values({ key: storageKey, sizeBytes: req.file.size })
-        .onConflictDoUpdate({ target: storageObjects.key, set: { sizeBytes: req.file.size, uploadedAt: new Date() } });
+      // Track uploaded file size for accurate total-size reporting (non-fatal — upload already succeeded)
+      try {
+        await db.insert(storageObjects)
+          .values({ key: storageKey, sizeBytes: req.file.size })
+          .onConflictDoUpdate({ target: storageObjects.key, set: { sizeBytes: req.file.size, uploadedAt: new Date() } });
+      } catch (trackErr) {
+        console.warn('Could not record storage size for', storageKey, '— size reporting may be inaccurate:', trackErr);
+      }
 
       res.json({ success: true, key: storageKey });
     } catch (error) {
