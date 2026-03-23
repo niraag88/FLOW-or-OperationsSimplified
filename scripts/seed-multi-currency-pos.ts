@@ -4,6 +4,9 @@
  * Creates ~30 USD and ~30 INR test purchase orders assigned to US/Indian suppliers.
  * PO numbers are prefixed PO-TEST-USD- and PO-TEST-INR- for easy cleanup.
  *
+ * USD PO totals are constrained to USD 200–5,000 per PO.
+ * INR PO totals are constrained to INR 5,000–200,000 per PO.
+ *
  * ============================================================
  * CLEANUP SQL
  * ============================================================
@@ -36,6 +39,49 @@ const pastDate = (maxDaysAgo: number): Date => {
   return d;
 };
 const isoDate = (d: Date) => d.toISOString().slice(0, 10);
+
+/**
+ * Distribute a target total across 1–4 line items.
+ * Returns an array of { qty, unitPrice, lineTotal } objects that sum to exactly targetTotal.
+ */
+function distributeTotal(
+  targetTotal: number,
+  products: { id: number }[],
+  lineCount: number
+): { productId: number; qty: number; unitPrice: number; lineTotal: number }[] {
+  const lines: { productId: number; qty: number; unitPrice: number; lineTotal: number }[] = [];
+
+  for (let i = 0; i < lineCount; i++) {
+    const isLast = i === lineCount - 1;
+    const remaining = parseFloat(
+      (targetTotal - lines.reduce((s, l) => s + l.lineTotal, 0)).toFixed(2)
+    );
+
+    let lineTotal: number;
+    if (isLast) {
+      lineTotal = remaining;
+    } else {
+      // Assign between 10% and 60% of remaining to this line
+      const share = randDec(0.1, 0.6, 4);
+      lineTotal = parseFloat((remaining * share).toFixed(2));
+    }
+
+    // Choose a sensible quantity and derive unit price
+    const qty = rand(2, 50);
+    const unitPrice = parseFloat((lineTotal / qty).toFixed(2));
+    // Recalculate to avoid rounding drift
+    const actualLineTotal = parseFloat((qty * unitPrice).toFixed(2));
+
+    lines.push({
+      productId: pick(products).id,
+      qty,
+      unitPrice,
+      lineTotal: actualLineTotal,
+    });
+  }
+
+  return lines;
+}
 
 const PO_STATUSES = ['draft', 'submitted', 'closed'];
 
@@ -86,7 +132,7 @@ async function main() {
 
   // Get real products (non-test) for line items
   const productResult = await pool.query(
-    `SELECT id, unit_price FROM products
+    `SELECT id FROM products
      WHERE is_active = true AND name NOT LIKE '[TEST]%'
      ORDER BY id LIMIT 30`
   );
@@ -98,7 +144,7 @@ async function main() {
   }
 
   // ─── Create USD POs ──────────────────────────────────────────────────────────
-  console.log('\nCreating 30 USD purchase orders...');
+  console.log('\nCreating 30 USD purchase orders (totals USD 200–5,000)...');
   let usdCreated = 0;
 
   for (let i = 1; i <= 30; i++) {
@@ -107,23 +153,13 @@ async function main() {
     const orderDate = pastDate(365);
     const status = pick(PO_STATUSES);
 
-    // 1-4 line items per PO
+    // Generate a target total within the required range
+    const targetTotal = randDec(200, 5000, 2);
     const lineCount = rand(1, 4);
-    const selectedProducts = products.slice(0, lineCount);
+    const lineItems = distributeTotal(targetTotal, products, lineCount);
 
-    let totalAmount = 0;
-    const lineItems: { productId: number; qty: number; unitPrice: number; lineTotal: number }[] = [];
-
-    for (const product of selectedProducts) {
-      const qty = rand(5, 100);
-      // Convert AED unit_price to USD equivalent, then add slight variation
-      const unitPriceUsd = randDec(20, 500);
-      const lineTotal = parseFloat((qty * unitPriceUsd).toFixed(2));
-      totalAmount += lineTotal;
-      lineItems.push({ productId: product.id, qty, unitPrice: unitPriceUsd, lineTotal });
-    }
-
-    totalAmount = parseFloat(totalAmount.toFixed(2));
+    // Recalculate totalAmount from actual line totals to avoid rounding drift
+    const totalAmount = parseFloat(lineItems.reduce((s, l) => s + l.lineTotal, 0).toFixed(2));
     const grandTotal = parseFloat((totalAmount * fxUsdToAed).toFixed(2));
 
     const poResult = await pool.query(
@@ -149,7 +185,6 @@ async function main() {
     );
     const poId = poResult.rows[0].id;
 
-    // Insert line items
     for (const item of lineItems) {
       await pool.query(
         `INSERT INTO purchase_order_items
@@ -160,13 +195,13 @@ async function main() {
     }
 
     usdCreated++;
-    if (i % 10 === 0) console.log(`  → ${usdCreated} USD POs created`);
+    if (i % 10 === 0) console.log(`  → ${usdCreated} USD POs created (last total: USD ${totalAmount.toFixed(2)} → AED ${grandTotal.toFixed(2)})`);
   }
 
   console.log(`  ✓ ${usdCreated} USD POs created`);
 
   // ─── Create INR POs ──────────────────────────────────────────────────────────
-  console.log('\nCreating 30 INR purchase orders...');
+  console.log('\nCreating 30 INR purchase orders (totals INR 5,000–200,000)...');
   let inrCreated = 0;
 
   for (let i = 1; i <= 30; i++) {
@@ -175,21 +210,12 @@ async function main() {
     const orderDate = pastDate(365);
     const status = pick(PO_STATUSES);
 
+    // Generate a target total within the required range
+    const targetTotal = randDec(5000, 200000, 2);
     const lineCount = rand(1, 4);
-    const selectedProducts = products.slice(0, lineCount);
+    const lineItems = distributeTotal(targetTotal, products, lineCount);
 
-    let totalAmount = 0;
-    const lineItems: { productId: number; qty: number; unitPrice: number; lineTotal: number }[] = [];
-
-    for (const product of selectedProducts) {
-      const qty = rand(10, 200);
-      const unitPriceInr = randDec(500, 8000);
-      const lineTotal = parseFloat((qty * unitPriceInr).toFixed(2));
-      totalAmount += lineTotal;
-      lineItems.push({ productId: product.id, qty, unitPrice: unitPriceInr, lineTotal });
-    }
-
-    totalAmount = parseFloat(totalAmount.toFixed(2));
+    const totalAmount = parseFloat(lineItems.reduce((s, l) => s + l.lineTotal, 0).toFixed(2));
     const grandTotal = parseFloat((totalAmount * fxInrToAed).toFixed(2));
 
     const poResult = await pool.query(
@@ -225,12 +251,25 @@ async function main() {
     }
 
     inrCreated++;
-    if (i % 10 === 0) console.log(`  → ${inrCreated} INR POs created`);
+    if (i % 10 === 0) console.log(`  → ${inrCreated} INR POs created (last total: INR ${totalAmount.toFixed(2)} → AED ${grandTotal.toFixed(2)})`);
   }
 
   console.log(`  ✓ ${inrCreated} INR POs created`);
 
   console.log(`\nDone! Created ${usdCreated} USD POs and ${inrCreated} INR POs.`);
+
+  // Verification summary
+  const verifyResult = await pool.query(`
+    SELECT currency, count(*) as cnt, min(total_amount) as min_total, max(total_amount) as max_total
+    FROM purchase_orders
+    WHERE po_number LIKE 'PO-TEST-USD-%' OR po_number LIKE 'PO-TEST-INR-%'
+    GROUP BY currency ORDER BY currency
+  `);
+  console.log('\nVerification:');
+  verifyResult.rows.forEach(r => {
+    console.log(`  ${r.currency}: ${r.cnt} POs, range: ${parseFloat(r.min_total).toFixed(2)} – ${parseFloat(r.max_total).toFixed(2)}`);
+  });
+
   await pool.end();
 }
 
