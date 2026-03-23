@@ -3281,6 +3281,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       if (invoice.objectKey) {
         try {
           await objectStorageClient.delete(invoice.objectKey);
+          await db.delete(storageObjects).where(eq(storageObjects.key, invoice.objectKey));
         } catch (error) {
           console.warn(`Failed to delete object ${invoice.objectKey}:`, error);
         }
@@ -3331,6 +3332,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       if (deliveryOrder.objectKey) {
         try {
           await objectStorageClient.delete(deliveryOrder.objectKey);
+          await db.delete(storageObjects).where(eq(storageObjects.key, deliveryOrder.objectKey));
         } catch (error) {
           console.warn(`Failed to delete object ${deliveryOrder.objectKey}:`, error);
         }
