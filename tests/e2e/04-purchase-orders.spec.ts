@@ -12,10 +12,8 @@ test.describe('Purchase Orders', () => {
 
     const suppsRaw = await apiGet('/api/suppliers', cookie);
     const suppList: any[] = Array.isArray(suppsRaw) ? suppsRaw : (Array.isArray(suppsRaw.suppliers) ? suppsRaw.suppliers : []);
-    // purchase_orders.supplier_id FK references brands table (known schema bug BUG-005)
-    // use a supplier whose ID also exists in brands (IDs 2-26 overlap both tables)
-    const validSupp = suppList.find((s: any) => s.id >= 2 && s.id <= 26);
-    supplierId = validSupp?.id ?? 2;
+    // BUG-005 fixed: supplier_id now correctly references suppliers table
+    supplierId = suppList[0]?.id ?? 2;
 
     const prodsRaw = await apiGet('/api/products', cookie);
     const prodList: any[] = Array.isArray(prodsRaw) ? prodsRaw : [];

@@ -54,31 +54,47 @@ test.describe('UI Flows — page loads, dialogs, navigation', () => {
     expect(text).toMatch(/report|revenue|sales|summary/i);
   });
 
-  test('purchase orders page loads with controls visible', async ({ page }) => {
+  // ── Page-level performance checks at full data scale ──────────────────────
+  // PO list: 307+ records, Invoice list: 511+ records, Inventory: 545+ products
+  // Threshold: interactive content visible within 8 seconds of navigation start
+
+  test('purchase orders page loads within 8s at full scale (307+ records)', async ({ page }) => {
     await login(page);
+    const start = Date.now();
     await page.goto(`${BASE_URL}/PurchaseOrders`);
     await page.waitForLoadState('domcontentloaded', { timeout: 15000 });
-    await page.waitForTimeout(3000);
+    await page.waitForTimeout(2000);
+    const elapsed = Date.now() - start;
     const text = await page.locator('body').innerText();
     expect(text).toMatch(/purchase order|new purchase order/i);
+    // Performance assertion: page must be interactive within 8 seconds
+    expect(elapsed).toBeLessThan(8000);
   });
 
-  test('invoices page loads with controls visible', async ({ page }) => {
+  test('invoices page loads within 8s at full scale (511+ records)', async ({ page }) => {
     await login(page);
+    const start = Date.now();
     await page.goto(`${BASE_URL}/Invoices`);
     await page.waitForLoadState('domcontentloaded', { timeout: 15000 });
-    await page.waitForTimeout(3000);
+    await page.waitForTimeout(2000);
+    const elapsed = Date.now() - start;
     const text = await page.locator('body').innerText();
     expect(text).toMatch(/invoice|new invoice/i);
+    // Performance assertion: page must be interactive within 8 seconds
+    expect(elapsed).toBeLessThan(8000);
   });
 
-  test('inventory page loads with product listing controls', async ({ page }) => {
+  test('inventory page loads within 8s at full scale (545+ products)', async ({ page }) => {
     await login(page);
+    const start = Date.now();
     await page.goto(`${BASE_URL}/Inventory`);
     await page.waitForLoadState('domcontentloaded', { timeout: 15000 });
-    await page.waitForTimeout(3000);
+    await page.waitForTimeout(2000);
+    const elapsed = Date.now() - start;
     const text = await page.locator('body').innerText();
     expect(text).toMatch(/product|inventory|add product/i);
+    // Performance assertion: page must be interactive within 8 seconds
+    expect(elapsed).toBeLessThan(8000);
   });
 
   test('dashboard page total navigation + load time under 12 seconds', async ({ page }) => {

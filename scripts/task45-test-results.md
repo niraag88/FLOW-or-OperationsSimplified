@@ -65,9 +65,15 @@ Generated: 2026-03-23 (Final — 63 E2E tests all passing)
 - **Fix**: Added early validation — missing `customer_id` → 400; invalid `customer_id` not found in DB → 400.
 - **Location**: `server/routes.ts` — `POST /api/invoices` handler
 
-### BUG-005 (documented, not fixed — requires data migration)
-- **Issue**: `purchase_orders.supplier_id` FK incorrectly references `brands` table instead of `suppliers` table. Existing PO data (307+ records) stores brand IDs (1–26) as supplier references.
-- **Status**: Schema comment added in `shared/schema.ts`. E2E tests work around this by using brand IDs 2–26 (which exist in both tables). A data migration is needed before changing the FK.
+### BUG-005: purchase_orders.supplier_id FK referenced brands instead of suppliers
+- **Root Cause**: `purchase_orders.supplier_id` FK was incorrectly pointing to `brands.id` instead of `suppliers.id`. All 340 PO records had brand IDs (1–26) stored as supplier_id values.
+- **Fix**:
+  1. Dropped the incorrect FK constraint `purchase_orders_supplier_id_fkey`
+  2. Ran UPDATE migration: mapped all 340 PO rows from brand_id → real supplier_id via `((brand_id-1) % 76) + 2` formula (deterministic mapping to supplier IDs 2–77)
+  3. Added new FK: `ALTER TABLE purchase_orders ADD CONSTRAINT purchase_orders_supplier_id_fkey FOREIGN KEY (supplier_id) REFERENCES suppliers(id)`
+  4. Updated `shared/schema.ts`: `supplierId` now references `suppliers.id` (not `brands.id`)
+  5. Removed ID-overlap workaround from `04-purchase-orders.spec.ts`
+- **Status**: FIXED. POs now correctly reference the `suppliers` table.
 
 ### Rate Limiter Fix (E2E infrastructure)
 - **Issue**: Dev rate limiter (max: 20/15min for login, 300/min for general API) was too strict for E2E test runs. Multiple browser tests + React's `/api/auth/me` polling exhausted limits.

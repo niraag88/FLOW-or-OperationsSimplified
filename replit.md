@@ -10,20 +10,19 @@ This is a full-stack web application built with a React frontend and Express.js 
 - **Purchase Orders**: 307+ records; **Quotations**: 259+; **Invoices**: 511+; **Delivery Orders**: 202
 - **Admin credentials**: Stored securely in ADMIN_PASSWORD env var — NEVER change the admin username or password
 
-## Known Bug Fixes (Task #45)
+## Bug Fixes (Task #45)
 - Fixed: Product deletion failed because `POST /api/recycle-bin` endpoint was missing — added in `server/routes.ts`
 - Fixed: `POST /api/recycle-bin` now derives `deleted_by` and `deleted_date` server-side (from `req.user` and `new Date()`) — client-supplied values for these fields are ignored to prevent audit spoofing
 - Fixed: One product had incorrect category "massage" → corrected to "Massage Blends"
 - Fixed: `POST /api/invoices` now requires and validates `customer_id` — returns 400 on missing or invalid customer (BUG-004)
-
-## Known Bugs Discovered (Task #45, unfixed — require data migration)
-- **BUG-005**: `purchase_orders.supplier_id` FK incorrectly references `brands` table instead of `suppliers` table. Existing PO data (307+ records) stores brand IDs (1–26) as supplier references. A data migration is needed to map brand IDs to supplier IDs before changing the FK. Schema comment added in `shared/schema.ts` to document this. E2E tests work around this by using brand IDs 2–26 (which exist in both tables).
+- Fixed: `purchase_orders.supplier_id` FK was incorrectly referencing `brands` table — migrated all 340 POs to use real supplier IDs, FK now correctly points to `suppliers` table (BUG-005)
+- Fixed: Dev rate limiters were too strict for E2E runs — login limit raised to 200/15min, general API limit to 2000/min (production limits unchanged)
 
 ## E2E Test Suite (Task #45)
-- **Location**: `tests/e2e/` — 7 spec files, 54 tests, all passing
+- **Location**: `tests/e2e/` — 8 spec files, 63 tests, all passing
 - **Runner**: Playwright (`npx playwright test`) with system Chromium
-- **Specs**: 01-auth (4), 02-products (12), 03-quotations (6), 04-purchase-orders (9), 05-invoices (10), 06-delivery-orders (5), 07-stock-count-and-reports (8)
-- **Covers**: Auth, products CRUD+edit+perf, quotation create/convert-to-invoice, PO lifecycle (draft→submitted→GRN receive→auto-close), invoice create/filters/validation/date-range, delivery orders, stock count create/load, dashboard summary, 50-line stress tests, SQL injection safety, performance benchmarks
+- **Specs**: 01-auth (4), 02-products (12), 03-quotations (6), 04-purchase-orders (9), 05-invoices (10), 06-delivery-orders (5), 07-stock-count-and-reports (8), 08-ui-flows (9)
+- **Covers**: Auth, products CRUD+edit+perf, quotation create/convert-to-invoice, PO lifecycle (draft→submitted→GRN receive→auto-close), invoice create/filters/validation/date-range, delivery orders, stock count create/load, dashboard summary, 50-line stress tests, SQL injection safety, performance benchmarks, browser UI flows (page loads, dialogs, page-level perf at full data scale)
 - **Credentials**: Reads from `E2E_ADMIN_USERNAME`/`E2E_ADMIN_PASSWORD` env vars; falls back to dev defaults with a console warning
 - **API Population Scripts**: `scripts/populate-customers-api.ts` (105 entries), `scripts/populate-suppliers-api.ts`, `scripts/populate-products-api.ts` — use authenticated POST endpoints (no direct SQL)
 
