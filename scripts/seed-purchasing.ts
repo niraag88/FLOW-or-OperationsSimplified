@@ -18,9 +18,9 @@ const { Pool } = pkg;
 
 const pool = new Pool({ connectionString: process.env.DATABASE_URL });
 
-const BASE_URL = 'http://localhost:5000';
-const USERNAME = 'admin';
-const PASSWORD = 'admin123';
+const BASE_URL = process.env.APP_URL ?? 'http://localhost:5000';
+const USERNAME = process.env.ADMIN_USERNAME ?? 'admin';
+const PASSWORD = process.env.ADMIN_PASSWORD ?? 'admin123';
 
 // Seed batch tag — lets us distinguish seed POs from others
 const SEED_TAG = '[SEED-55]';
@@ -251,14 +251,25 @@ async function seedPurchaseOrders(cookie: string): Promise<number[]> {
     const ids = await pool.query(`SELECT id FROM purchase_orders WHERE notes LIKE $1 AND status IN ('submitted','closed')`, [`${SEED_TAG}%`]);
     return ids.rows.map(r => r.id);
   }
-  // Partial batch detected — clear it to start clean and avoid distribition skew
+  // Partial batch detected — clear it to start clean and avoid distribution skew
   if (existing > 0) {
     console.log(`  → Partial batch found (${existing} POs) — clearing before fresh seed`);
+    // Reverse stock increases from partial GRNs before deleting them
+    await pool.query(`
+      UPDATE products p
+      SET stock_quantity = GREATEST(0, stock_quantity - COALESCE((
+        SELECT SUM(gri.received_quantity)
+        FROM goods_receipt_items gri
+        JOIN goods_receipts gr ON gri.receipt_id = gr.id
+        JOIN purchase_orders po ON gr.po_id = po.id
+        WHERE gri.product_id = p.id AND po.notes LIKE $1
+      ), 0))`, [`${SEED_TAG}%`]);
+    await pool.query(`DELETE FROM stock_movements WHERE reference_type = 'goods_receipt' AND reference_id IN (SELECT gr.id FROM goods_receipts gr JOIN purchase_orders po ON gr.po_id = po.id WHERE po.notes LIKE $1)`, [`${SEED_TAG}%`]);
     await pool.query(`DELETE FROM goods_receipt_items WHERE receipt_id IN (SELECT gr.id FROM goods_receipts gr JOIN purchase_orders po ON gr.po_id = po.id WHERE po.notes LIKE $1)`, [`${SEED_TAG}%`]);
     await pool.query(`DELETE FROM goods_receipts WHERE po_id IN (SELECT id FROM purchase_orders WHERE notes LIKE $1)`, [`${SEED_TAG}%`]);
     await pool.query(`DELETE FROM purchase_order_items WHERE po_id IN (SELECT id FROM purchase_orders WHERE notes LIKE $1)`, [`${SEED_TAG}%`]);
     await pool.query(`DELETE FROM purchase_orders WHERE notes LIKE $1`, [`${SEED_TAG}%`]);
-    console.log('  → Partial batch cleared');
+    console.log('  → Partial batch cleared (stock quantities reversed)');
   }
 
   // FX rates
@@ -481,7 +492,7 @@ async function verify(cookie: string) {
     pool.query('SELECT currency, status, COUNT(*) as cnt FROM purchase_orders WHERE notes LIKE $1 GROUP BY currency, status ORDER BY currency, status', [`${SEED_TAG}%`]),
     pool.query(`SELECT COUNT(*) as total, COUNT(CASE WHEN currency='GBP' THEN 1 END) as gbp, COUNT(CASE WHEN currency='USD' THEN 1 END) as usd, COUNT(CASE WHEN currency='INR' THEN 1 END) as inr FROM purchase_orders WHERE notes LIKE $1`, [`${SEED_TAG}%`]),
     pool.query(`SELECT COUNT(*) FROM goods_receipts gr JOIN purchase_orders po ON gr.po_id = po.id WHERE po.notes LIKE $1`, [`${SEED_TAG}%`]),
-    pool.query(`SELECT COUNT(*) FROM stock_movements sm JOIN goods_receipts gr ON sm.reference_id = gr.id WHERE sm.reference_type = 'goods_receipt'`),
+    pool.query(`SELECT COUNT(*) FROM stock_movements sm JOIN goods_receipts gr ON sm.reference_id = gr.id JOIN purchase_orders po ON gr.po_id = po.id WHERE sm.reference_type = 'goods_receipt' AND po.notes LIKE $1`, [`${SEED_TAG}%`]),
     pool.query('SELECT company_name, po_number_prefix, do_number_prefix FROM company_settings LIMIT 1'),
   ]);
 
@@ -531,7 +542,7 @@ async function verify(cookie: string) {
   const grnOk = grnCount >= 90;
   console.log(`  GRNs (seed): ${grnCount} ${grnOk ? '✓' : '✗ (need >= 90)'}`);
   if (!grnOk) pass = false;
-  console.log(`  Stock movements (from GRNs): ${smRes.rows[0].count}`);
+  console.log(`  Stock movements (seed GRNs): ${smRes.rows[0].count}`);
   console.log(`  Company: ${csRes.rows[0].company_name}`);
 
   // Check company name
