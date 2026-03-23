@@ -1,5 +1,5 @@
 import { test, expect } from '@playwright/test';
-import { apiLogin, apiGet, apiPost } from './helpers';
+import { apiLogin, apiGet, apiPost, toProductList, toInvoiceList, productStock, ApiProduct } from './helpers';
 
 test.describe('Stock Count & Reports', () => {
   let cookie: string;
@@ -16,27 +16,29 @@ test.describe('Stock Count & Reports', () => {
 
   test('create a stock count (save) from current product list', async () => {
     const prodsRaw = await apiGet('/api/products', cookie);
-    const prods: any[] = Array.isArray(prodsRaw) ? prodsRaw : [];
+    const prods = toProductList(prodsRaw);
     expect(prods.length).toBeGreaterThan(0);
 
-    const items = prods.slice(0, 5).map((p: any) => ({
+    const items = prods.slice(0, 5).map((p: ApiProduct) => ({
       product_id: p.id,
       product_code: p.sku ?? '',
       product_name: p.name,
-      brand_name: p.brandName ?? '',
-      size: p.size ?? '',
-      quantity: Math.max(1, p.stockQuantity ?? 1),
+      brand_name: '',
+      size: '',
+      quantity: Math.max(1, productStock(p)),
     }));
 
     const { status, data } = await apiPost('/api/stock-counts', { items }, cookie);
     expect(status).toBe(201);
-    expect(data.id).toBeTruthy();
-    stockCountId = data.id;
+    stockCountId = (data as { id: number }).id;
+    expect(stockCountId).toBeTruthy();
   });
 
   test('load stock count by ID — all 5 items present', async () => {
     expect(stockCountId).toBeTruthy();
-    const data = await apiGet(`/api/stock-counts/${stockCountId}`, cookie);
+    const data = await apiGet(`/api/stock-counts/${stockCountId}`, cookie) as {
+      id: number; items?: unknown[]; totalProducts?: number; totalQuantity?: number;
+    };
     expect(data.id).toBe(stockCountId);
     expect((data.items ?? []).length).toBe(5);
     expect(data.totalProducts).toBe(5);
@@ -49,7 +51,9 @@ test.describe('Stock Count & Reports', () => {
   });
 
   test('dashboard summary shows non-zero product/customer/supplier counts', async () => {
-    const data = await apiGet('/api/dashboard', cookie);
+    const data = await apiGet('/api/dashboard', cookie) as {
+      summary?: { totalProducts?: number; totalCustomers?: number; totalSuppliers?: number; totalPurchaseOrders?: number };
+    };
     const summary = data.summary ?? {};
     expect(summary.totalProducts).toBeGreaterThanOrEqual(500);
     expect(summary.totalCustomers).toBeGreaterThanOrEqual(150);
@@ -58,7 +62,10 @@ test.describe('Stock Count & Reports', () => {
   });
 
   test('dashboard stats endpoint is reachable with valid shape', async () => {
-    const data = await apiGet('/api/dashboard/stats', cookie);
+    const data = await apiGet('/api/dashboard/stats', cookie) as {
+      products?: number; customers?: number; suppliers?: number;
+      purchaseOrders?: number; quotations?: number;
+    };
     expect(typeof data.products).toBe('number');
     expect(typeof data.customers).toBe('number');
     expect(typeof data.suppliers).toBe('number');
@@ -67,8 +74,10 @@ test.describe('Stock Count & Reports', () => {
   });
 
   test('invoices list is non-empty and has amount field', async () => {
-    const data = await apiGet('/api/invoices?pageSize=20', cookie);
-    const invs: any[] = Array.isArray(data) ? data : (data.invoices ?? []);
+    const raw = await apiGet('/api/invoices?pageSize=20', cookie);
+    const invs = toInvoiceList(raw) as Array<{
+      invoiceNumber?: string; invoice_number?: string; amount?: unknown;
+    }>;
     expect(invs.length).toBeGreaterThan(0);
     for (const inv of invs) {
       expect(inv.invoiceNumber ?? inv.invoice_number).toBeTruthy();
@@ -77,8 +86,8 @@ test.describe('Stock Count & Reports', () => {
   });
 
   test('products list loads without error (reports sanity)', async () => {
-    const data = await apiGet('/api/products?pageSize=5', cookie);
-    const prods: any[] = Array.isArray(data) ? data : [];
+    const raw = await apiGet('/api/products?pageSize=5', cookie);
+    const prods = toProductList(raw);
     expect(prods.length).toBeGreaterThan(0);
     for (const p of prods) {
       expect(p.id).toBeTruthy();

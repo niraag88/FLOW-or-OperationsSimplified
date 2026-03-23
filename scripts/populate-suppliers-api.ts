@@ -33,9 +33,11 @@ async function post(path: string, body: object, cookie: string) {
 
 async function getExistingNames(cookie: string): Promise<Set<string>> {
   const r = await fetch(`${BASE_URL}/api/suppliers`, { headers: { Cookie: cookie } });
-  const data = await r.json();
-  const list: any[] = Array.isArray(data) ? data : (Array.isArray(data.suppliers) ? data.suppliers : []);
-  return new Set(list.map((s: any) => s.name));
+  const data = await r.json() as unknown;
+  const list: Array<{ name: string }> = Array.isArray(data)
+    ? (data as Array<{ name: string }>)
+    : ((data as { suppliers?: Array<{ name: string }> }).suppliers ?? []);
+  return new Set(list.map((s) => s.name));
 }
 
 const SUPPLIERS: Array<{

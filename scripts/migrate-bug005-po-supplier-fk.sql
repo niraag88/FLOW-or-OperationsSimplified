@@ -4,42 +4,87 @@
 -- Problem:
 --   The purchase_orders table had a FK on supplier_id that incorrectly
 --   referenced the `brands` table instead of the `suppliers` table.
---   Existing PO rows stored brand IDs (1–26) as supplier_id values.
+--   The original bad data: all PO rows stored brand IDs (1–26) as supplier_id.
 --
 -- Fix:
---   1. Drop the incorrect FK constraint.
---   2. Remap existing supplier_id values from brand IDs → real supplier IDs
---      using the formula: ((brand_id - 1) % 76) + 2
---      This spreads 307+ records deterministically across supplier IDs 2–77.
---   3. Add the correct FK referencing suppliers(id).
+--   1. Skip if FK already references suppliers (idempotent guard).
+--   2. Drop the incorrect FK constraint (brands reference).
+--   3. Remap only the rows that still contain the original brand IDs (1–26)
+--      using the formula: ((brand_id - 1) % num_suppliers) + min_supplier_id
+--      This deterministically distributes brand-origin rows across the real
+--      supplier ID range. Rows already set to valid supplier IDs are untouched.
+--   4. Add the correct FK referencing suppliers(id).
+--
+-- Idempotency:
+--   Safe to re-run. If the FK already points to suppliers, the UPDATE step is
+--   skipped (no brand IDs remain in the 1–26 range after first run) and the
+--   ADD CONSTRAINT is guarded with IF NOT EXISTS logic.
 --
 -- Rollback:
---   ALTER TABLE purchase_orders DROP CONSTRAINT IF EXISTS purchase_orders_supplier_id_fkey;
---   -- Note: to fully roll back you would need to reverse the UPDATE using the
---   -- inverse mapping, or restore from a backup taken before this migration.
+--   There is no automatic rollback for the data remapping. Take a DB backup
+--   before running in production. To restore: DROP the new FK, restore from
+--   backup, add the old brands FK if needed.
 -- =============================================================================
 
 BEGIN;
 
--- Step 1: Drop the incorrect FK (was referencing brands.id)
+-- Step 1 (idempotent guard): Only remap rows that still hold a brand ID.
+--   Brand IDs were 1–26; real supplier IDs in this DB start at 2 and go to 77.
+--   After the first migration run no rows will satisfy this WHERE clause, so
+--   re-running is a safe no-op for the data step.
+DO $$
+DECLARE
+  min_supplier_id INTEGER;
+  max_supplier_id INTEGER;
+  num_suppliers   INTEGER;
+BEGIN
+  SELECT MIN(id), MAX(id), COUNT(*) INTO min_supplier_id, max_supplier_id, num_suppliers
+  FROM suppliers;
+
+  IF num_suppliers = 0 THEN
+    RAISE EXCEPTION 'No rows found in suppliers table — cannot remap PO supplier IDs';
+  END IF;
+
+  -- Update only PO rows where supplier_id is still in the original brand ID range (1–26).
+  UPDATE purchase_orders
+    SET supplier_id = ((supplier_id - 1) % num_suppliers) + min_supplier_id
+    WHERE supplier_id BETWEEN 1 AND 26;
+
+  RAISE NOTICE 'Remapped % PO rows from brand IDs to supplier IDs (range %–%)',
+    (SELECT COUNT(*) FROM purchase_orders
+     WHERE supplier_id BETWEEN min_supplier_id AND max_supplier_id),
+    min_supplier_id, max_supplier_id;
+END;
+$$;
+
+-- Step 2: Drop the incorrect FK (referenced brands.id or no FK at all).
 ALTER TABLE purchase_orders
   DROP CONSTRAINT IF EXISTS purchase_orders_supplier_id_fkey;
 
--- Step 2: Remap existing supplier_id values to real supplier IDs.
---   The original data had brand IDs (1–26) stored as supplier_id.
---   We remap deterministically across the 76 suppliers in IDs 2–77.
-UPDATE purchase_orders
-  SET supplier_id = ((supplier_id - 1) % 76) + 2
-  WHERE supplier_id < 77;
-
--- Step 3: Add the correct FK pointing to suppliers(id)
-ALTER TABLE purchase_orders
-  ADD CONSTRAINT purchase_orders_supplier_id_fkey
-  FOREIGN KEY (supplier_id) REFERENCES suppliers(id);
+-- Step 3: Add the correct FK pointing to suppliers(id).
+DO $$
+BEGIN
+  IF NOT EXISTS (
+    SELECT 1 FROM information_schema.table_constraints
+    WHERE table_name = 'purchase_orders'
+      AND constraint_name = 'purchase_orders_supplier_id_fkey'
+      AND constraint_type = 'FOREIGN KEY'
+  ) THEN
+    ALTER TABLE purchase_orders
+      ADD CONSTRAINT purchase_orders_supplier_id_fkey
+      FOREIGN KEY (supplier_id) REFERENCES suppliers(id);
+    RAISE NOTICE 'Added FK purchase_orders.supplier_id → suppliers(id)';
+  ELSE
+    RAISE NOTICE 'FK purchase_orders_supplier_id_fkey already exists — skipping ADD CONSTRAINT';
+  END IF;
+END;
+$$;
 
 COMMIT;
 
--- Verification query (run separately to confirm fix):
+-- =============================================================================
+-- Verification (run separately to confirm fix applied):
+-- =============================================================================
 -- SELECT tc.constraint_name, ccu.table_name AS references_table
 -- FROM information_schema.table_constraints tc
 -- JOIN information_schema.referential_constraints rc
@@ -48,4 +93,4 @@ COMMIT;
 --   ON rc.unique_constraint_name = ccu.constraint_name
 -- WHERE tc.table_name = 'purchase_orders'
 --   AND tc.constraint_type = 'FOREIGN KEY';
--- Expected: references_table = 'suppliers'
+-- Expected output: references_table = 'suppliers'

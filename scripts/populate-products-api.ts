@@ -37,8 +37,8 @@ async function getBrands(cookie: string): Promise<Record<string, number>> {
 
 async function getExistingSkus(cookie: string): Promise<Set<string>> {
   const r = await fetch(`${BASE_URL}/api/products`, { headers: { Cookie: cookie } });
-  const prods = await r.json();
-  return new Set((prods as any[]).map((p: any) => p.sku));
+  const prods = await r.json() as Array<{ sku: string }>;
+  return new Set(prods.map((p) => p.sku));
 }
 
 async function createProduct(product: object, cookie: string) {

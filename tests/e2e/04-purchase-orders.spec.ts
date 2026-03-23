@@ -1,5 +1,9 @@
 import { test, expect } from '@playwright/test';
-import { login, apiLogin, apiGet, apiPost, apiPut, BASE_URL } from './helpers';
+import {
+  login, apiLogin, apiGet, apiPost, apiPut, BASE_URL,
+  toProductList, toSupplierList, toCustomerList, toPurchaseOrderList,
+  productPrice, ApiProduct, ApiPurchaseOrder,
+} from './helpers';
 
 test.describe('Purchase Orders', () => {
   let cookie: string;
@@ -11,18 +15,18 @@ test.describe('Purchase Orders', () => {
     cookie = await apiLogin();
 
     const suppsRaw = await apiGet('/api/suppliers', cookie);
-    const suppList: any[] = Array.isArray(suppsRaw) ? suppsRaw : (Array.isArray(suppsRaw.suppliers) ? suppsRaw.suppliers : []);
+    const suppList = toSupplierList(suppsRaw);
     // BUG-005 fixed: supplier_id now correctly references suppliers table
     supplierId = suppList[0]?.id ?? 2;
 
     const prodsRaw = await apiGet('/api/products', cookie);
-    const prodList: any[] = Array.isArray(prodsRaw) ? prodsRaw : [];
+    const prodList = toProductList(prodsRaw);
     productId = prodList[0]?.id ?? 1;
   });
 
   test('purchase orders list loads with 307+ records', async () => {
     const raw = await apiGet('/api/purchase-orders', cookie);
-    const pos: any[] = Array.isArray(raw) ? raw : (raw.purchaseOrders ?? raw.data ?? []);
+    const pos = toPurchaseOrderList(raw);
     expect(pos.length).toBeGreaterThanOrEqual(300);
   });
 
@@ -30,22 +34,22 @@ test.describe('Purchase Orders', () => {
     const start = Date.now();
     const raw = await apiGet('/api/purchase-orders', cookie);
     const elapsed = Date.now() - start;
-    const pos: any[] = Array.isArray(raw) ? raw : (raw.purchaseOrders ?? raw.data ?? []);
+    const pos = toPurchaseOrderList(raw);
     expect(pos.length).toBeGreaterThan(0);
     expect(elapsed).toBeLessThan(150);
   });
 
   test('create purchase order with line items via API', async () => {
     const prodsRaw = await apiGet('/api/products', cookie);
-    const prods: any[] = Array.isArray(prodsRaw) ? prodsRaw : [];
-    const items = prods.slice(0, 4).map((p: any, i: number) => ({
+    const prods = toProductList(prodsRaw);
+    const items = prods.slice(0, 4).map((p: ApiProduct, i: number) => ({
       productId: p.id,
       description: p.name,
       quantity: (i + 1) * 5,
-      unitPrice: parseFloat(p.unitPrice),
-      lineTotal: (i + 1) * 5 * parseFloat(p.unitPrice),
+      unitPrice: productPrice(p),
+      lineTotal: (i + 1) * 5 * productPrice(p),
     }));
-    const subtotal = items.reduce((s: number, i: any) => s + i.lineTotal, 0);
+    const subtotal = items.reduce((s, it) => s + it.lineTotal, 0);
 
     const { status, data } = await apiPost('/api/purchase-orders', {
       supplierId,
@@ -60,19 +64,20 @@ test.describe('Purchase Orders', () => {
     }, cookie);
 
     expect(status).toBe(201);
-    expect(data.id ?? data.poNumber).toBeTruthy();
+    const created = data as ApiPurchaseOrder & { poNumber?: string };
+    expect(created.id ?? created.poNumber).toBeTruthy();
   });
 
   test('PO full lifecycle: draft → submitted → GRN receive → auto-close', async () => {
     const prodsRaw = await apiGet('/api/products', cookie);
-    const prods: any[] = Array.isArray(prodsRaw) ? prodsRaw : [];
+    const prods = toProductList(prodsRaw);
 
-    const createItems = prods.slice(0, 2).map((p: any, i: number) => ({
+    const createItems = prods.slice(0, 2).map((p: ApiProduct, i: number) => ({
       productId: p.id,
       description: p.name,
       quantity: (i + 1) * 3,
-      unitPrice: parseFloat(p.unitPrice),
-      lineTotal: (i + 1) * 3 * parseFloat(p.unitPrice),
+      unitPrice: productPrice(p),
+      lineTotal: (i + 1) * 3 * productPrice(p),
     }));
 
     const { status: createStatus, data: po } = await apiPost('/api/purchase-orders', {
@@ -81,25 +86,28 @@ test.describe('Purchase Orders', () => {
       expectedDelivery: '2026-04-30',
       status: 'draft',
       notes: 'E2E GRN lifecycle test PO',
-      totalAmount: createItems.reduce((s: number, i: any) => s + i.lineTotal, 0).toFixed(2),
+      totalAmount: createItems.reduce((s, it) => s + it.lineTotal, 0).toFixed(2),
       vatAmount: '0',
-      grandTotal: createItems.reduce((s: number, i: any) => s + i.lineTotal, 0).toFixed(2),
+      grandTotal: createItems.reduce((s, it) => s + it.lineTotal, 0).toFixed(2),
       items: createItems,
     }, cookie);
     expect(createStatus).toBe(201);
-    lifecyclePoId = po.id;
+    lifecyclePoId = (po as ApiPurchaseOrder).id;
 
-    const { status: submitStatus, data: submitted } = await apiPut(`/api/purchase-orders/${lifecyclePoId}`, {
-      status: 'submitted',
-    }, cookie);
+    const { status: submitStatus, data: submitted } = await apiPut(
+      `/api/purchase-orders/${lifecyclePoId}`, { status: 'submitted' }, cookie,
+    );
     expect(submitStatus).toBe(200);
-    expect(submitted.status).toBe('submitted');
+    expect((submitted as ApiPurchaseOrder).status).toBe('submitted');
 
     const poItems = await apiGet(`/api/purchase-orders/${lifecyclePoId}/items`, cookie);
     expect(Array.isArray(poItems)).toBe(true);
-    expect(poItems.length).toBeGreaterThan(0);
+    const itemsArr = poItems as Array<{
+      id: number; productId: number; quantity: number; unitPrice: string;
+    }>;
+    expect(itemsArr.length).toBeGreaterThan(0);
 
-    const grnItems = poItems.map((item: any) => ({
+    const grnItems = itemsArr.map((item) => ({
       poItemId: item.id,
       productId: item.productId,
       orderedQuantity: item.quantity,
@@ -112,7 +120,7 @@ test.describe('Purchase Orders', () => {
       headers: { 'Content-Type': 'application/json', Cookie: cookie },
       body: JSON.stringify({ poId: lifecyclePoId, items: grnItems, forceClose: true }),
     });
-    const grn = await grnResp.json();
+    const grn = await grnResp.json() as { id: number; receiptNumber: string; poStatus: string };
     expect(grnResp.status).toBe(201);
     expect(grn.id).toBeTruthy();
     expect(grn.receiptNumber).toMatch(/GR\d+/);
@@ -122,27 +130,27 @@ test.describe('Purchase Orders', () => {
   test('GRN-closed PO shows closed status in list', async () => {
     expect(lifecyclePoId).toBeTruthy();
     const raw = await apiGet('/api/purchase-orders', cookie);
-    const pos: any[] = Array.isArray(raw) ? raw : (raw.purchaseOrders ?? raw.data ?? []);
-    const found = pos.find((p: any) => p.id === lifecyclePoId);
+    const pos = toPurchaseOrderList(raw);
+    const found = pos.find((p) => p.id === lifecyclePoId);
     expect(found).toBeTruthy();
-    expect(found.status).toBe('closed');
+    expect(found!.status).toBe('closed');
   });
 
   test('goods receipts list is reachable and returns array', async () => {
     const data = await apiGet('/api/goods-receipts', cookie);
     expect(Array.isArray(data)).toBe(true);
-    expect(data.length).toBeGreaterThanOrEqual(1);
+    expect((data as unknown[]).length).toBeGreaterThanOrEqual(1);
   });
 
   test('77+ suppliers available', async () => {
     const raw = await apiGet('/api/suppliers', cookie);
-    const supps: any[] = Array.isArray(raw) ? raw : (raw.suppliers ?? []);
+    const supps = toSupplierList(raw);
     expect(supps.length).toBeGreaterThanOrEqual(50);
   });
 
   test('150+ customers available', async () => {
     const raw = await apiGet('/api/customers', cookie);
-    const custs: any[] = Array.isArray(raw) ? raw : (raw.customers ?? []);
+    const custs = toCustomerList(raw);
     expect(custs.length).toBeGreaterThanOrEqual(148);
   });
 

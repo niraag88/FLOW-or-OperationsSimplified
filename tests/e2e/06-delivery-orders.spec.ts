@@ -1,5 +1,8 @@
 import { test, expect } from '@playwright/test';
-import { apiLogin, apiGet, apiPost } from './helpers';
+import {
+  apiLogin, apiGet, apiPost,
+  toCustomerList, toProductList, toDeliveryOrderList, productPrice, ApiProduct, ApiDeliveryOrder,
+} from './helpers';
 
 test.describe('Delivery Orders', () => {
   let cookie: string;
@@ -9,14 +12,13 @@ test.describe('Delivery Orders', () => {
   test.beforeAll(async () => {
     cookie = await apiLogin();
     const custsRaw = await apiGet('/api/customers', cookie);
-    const custs: any[] = Array.isArray(custsRaw) ? custsRaw : (Array.isArray(custsRaw.customers) ? custsRaw.customers : []);
+    const custs = toCustomerList(custsRaw);
     customerId = custs[0]?.id ?? 3;
   });
 
   test('delivery orders list loads with 200+ records', async () => {
-    const data = await apiGet('/api/delivery-orders', cookie);
-    const dos = data.deliveryOrders ?? data.data ?? data;
-    expect(Array.isArray(dos)).toBe(true);
+    const raw = await apiGet('/api/delivery-orders', cookie);
+    const dos = toDeliveryOrderList(raw);
     expect(dos.length).toBeGreaterThanOrEqual(200);
   });
 
@@ -28,17 +30,17 @@ test.describe('Delivery Orders', () => {
 
   test('create delivery order with customer and line items via API', async () => {
     const prodsRaw = await apiGet('/api/products', cookie);
-    const prods: any[] = Array.isArray(prodsRaw) ? prodsRaw : [];
+    const prods = toProductList(prodsRaw);
 
-    const items = prods.slice(0, 3).map((p: any, i: number) => ({
+    const items = prods.slice(0, 3).map((p: ApiProduct, i: number) => ({
       product_id: p.id,
       product_code: p.sku,
       description: p.name,
       quantity: (i + 1) * 2,
-      unit_price: parseFloat(p.unitPrice),
-      line_total: (i + 1) * 2 * parseFloat(p.unitPrice),
+      unit_price: productPrice(p),
+      line_total: (i + 1) * 2 * productPrice(p),
     }));
-    const subtotal = items.reduce((s: number, it: any) => s + it.line_total, 0);
+    const subtotal = items.reduce((s, it) => s + it.line_total, 0);
     const vat = subtotal * 0.05;
 
     const { status, data } = await apiPost('/api/delivery-orders', {
@@ -53,21 +55,24 @@ test.describe('Delivery Orders', () => {
     }, cookie);
 
     expect(status).toBe(201);
-    expect(data.id).toBeTruthy();
-    expect(data.orderNumber).toMatch(/DO-/);
-    testDoId = data.id;
+    const created = data as ApiDeliveryOrder & { orderNumber?: string };
+    expect(created.id).toBeTruthy();
+    expect(created.orderNumber).toMatch(/DO-/);
+    testDoId = created.id;
   });
 
   test('created delivery order appears in list', async () => {
     expect(testDoId).toBeTruthy();
-    const data = await apiGet(`/api/delivery-orders/${testDoId}`, cookie);
+    const data = await apiGet(`/api/delivery-orders/${testDoId}`, cookie) as {
+      id: number; items?: unknown[];
+    };
     expect(data.id).toBe(testDoId);
     expect((data.items ?? []).length).toBe(3);
   });
 
   test('delivery orders list API returns 202+ records', async () => {
-    const data = await apiGet('/api/delivery-orders', cookie);
-    const dos: any[] = Array.isArray(data) ? data : (data.deliveryOrders ?? []);
+    const raw = await apiGet('/api/delivery-orders', cookie);
+    const dos = toDeliveryOrderList(raw);
     expect(dos.length).toBeGreaterThanOrEqual(200);
   });
 });

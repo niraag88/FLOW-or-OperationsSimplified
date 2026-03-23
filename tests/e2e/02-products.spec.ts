@@ -1,5 +1,8 @@
 import { test, expect } from '@playwright/test';
-import { apiLogin, apiGet, apiPost, apiPut, apiDelete } from './helpers';
+import {
+  apiLogin, apiGet, apiPost, apiPut, apiDelete,
+  toProductList,
+} from './helpers';
 
 test.describe('Products CRUD', () => {
   let cookie: string;
@@ -10,15 +13,16 @@ test.describe('Products CRUD', () => {
     cookie = await apiLogin();
   });
 
-  test('products list loads with 498+ items', async () => {
-    const prods = await apiGet('/api/products', cookie);
-    expect(Array.isArray(prods)).toBe(true);
+  test('products list loads with 490+ items', async () => {
+    const raw = await apiGet('/api/products', cookie);
+    const prods = toProductList(raw);
     expect(prods.length).toBeGreaterThanOrEqual(490);
   });
 
   test('all 12 product categories are represented', async () => {
-    const prods = await apiGet('/api/products', cookie);
-    const categories = new Set(prods.map((p: any) => p.category));
+    const raw = await apiGet('/api/products', cookie);
+    const prods = toProductList(raw);
+    const categories = new Set(prods.map((p) => p.category));
     const expected = [
       'Essential Oils', 'Carrier Oils', 'Bath Salts', 'Body Butters',
       'Massage Blends', 'Diffuser Blends', 'Roll-ons', 'Balms & Salves',
@@ -43,15 +47,17 @@ test.describe('Products CRUD', () => {
       brandId: 1,
     }, cookie);
     expect(status).toBe(201);
-    expect(data.id).toBeTruthy();
-    testProductId = data.id;
+    const created = data as { id: number };
+    expect(created.id).toBeTruthy();
+    testProductId = created.id;
   });
 
   test('created product appears in list', async () => {
-    const prods = await apiGet('/api/products', cookie);
-    const found = prods.find((p: any) => p.sku === testSku);
+    const raw = await apiGet('/api/products', cookie);
+    const prods = toProductList(raw);
+    const found = prods.find((p) => p.sku === testSku);
     expect(found).toBeTruthy();
-    expect(found.name).toBe('E2E Test Product');
+    expect(found!.name).toBe('E2E Test Product');
   });
 
   test('update product name and price via API', async () => {
@@ -61,15 +67,17 @@ test.describe('Products CRUD', () => {
       unitPrice: '65.00',
     }, cookie);
     expect(status).toBe(200);
-    expect(data.name).toBe('E2E Test Product UPDATED');
-    expect(parseFloat(data.unitPrice)).toBeCloseTo(65.0, 1);
+    const updated = data as { name: string; unitPrice: string };
+    expect(updated.name).toBe('E2E Test Product UPDATED');
+    expect(parseFloat(updated.unitPrice)).toBeCloseTo(65.0, 1);
   });
 
   test('updated product reflects new values in list', async () => {
-    const prods = await apiGet('/api/products', cookie);
-    const found = prods.find((p: any) => p.id === testProductId);
+    const raw = await apiGet('/api/products', cookie);
+    const prods = toProductList(raw);
+    const found = prods.find((p) => p.id === testProductId);
     expect(found).toBeTruthy();
-    expect(found.name).toBe('E2E Test Product UPDATED');
+    expect(found!.name).toBe('E2E Test Product UPDATED');
   });
 
   test('delete unreferenced product (hard delete)', async () => {
@@ -77,8 +85,9 @@ test.describe('Products CRUD', () => {
     const status = await apiDelete(`/api/products/${testProductId}`, cookie);
     expect(status).toBe(200);
 
-    const prods = await apiGet('/api/products', cookie);
-    const found = prods.find((p: any) => p.id === testProductId);
+    const raw = await apiGet('/api/products', cookie);
+    const prods = toProductList(raw);
+    const found = prods.find((p) => p.id === testProductId);
     expect(found).toBeUndefined();
   });
 
@@ -88,7 +97,8 @@ test.describe('Products CRUD', () => {
       items: [],
     }, cookie);
     expect(status).toBe(400);
-    expect(data.error).toBeTruthy();
+    const body = data as { error?: string };
+    expect(body.error).toBeTruthy();
   });
 
   test('invalid customer_id rejected on invoice create', async () => {
@@ -97,7 +107,8 @@ test.describe('Products CRUD', () => {
       invoice_date: '2026-03-23',
     }, cookie);
     expect(status).toBe(400);
-    expect(data.error).toContain('not found');
+    const body = data as { error?: string };
+    expect(body.error).toContain('not found');
   });
 
   test('product search is injection-safe', async () => {
@@ -112,15 +123,16 @@ test.describe('Products CRUD', () => {
 
   test('products list API responds under 150ms at full scale', async () => {
     const start = Date.now();
-    const prods = await apiGet('/api/products', cookie);
+    const raw = await apiGet('/api/products', cookie);
     const elapsed = Date.now() - start;
-    expect(Array.isArray(prods)).toBe(true);
+    const prods = toProductList(raw);
+    expect(prods.length).toBeGreaterThan(0);
     expect(elapsed).toBeLessThan(150);
   });
 
-  test('products list has 545+ records (count badge sanity)', async () => {
-    const data = await apiGet('/api/products', cookie);
-    const prods: any[] = Array.isArray(data) ? data : [];
+  test('products list has 540+ records and valid shape', async () => {
+    const raw = await apiGet('/api/products', cookie);
+    const prods = toProductList(raw);
     expect(prods.length).toBeGreaterThanOrEqual(540);
     for (const p of prods.slice(0, 10)) {
       expect(p.name).toBeTruthy();

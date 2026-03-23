@@ -36,9 +36,11 @@ async function post(path: string, body: object, cookie: string) {
 
 async function getExistingNames(cookie: string): Promise<Set<string>> {
   const r = await fetch(`${BASE_URL}/api/customers`, { headers: { Cookie: cookie } });
-  const data = await r.json();
-  const list = data.customers ?? data;
-  return new Set(list.map((c: any) => c.name));
+  const data = await r.json() as unknown;
+  const list: Array<{ name: string }> = Array.isArray(data)
+    ? (data as Array<{ name: string }>)
+    : ((data as { customers?: Array<{ name: string }> }).customers ?? []);
+  return new Set(list.map((c) => c.name));
 }
 
 const CUSTOMERS: Array<{
