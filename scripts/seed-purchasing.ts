@@ -257,25 +257,36 @@ async function seedPurchaseOrders(cookie: string): Promise<number[]> {
     const ids = await pool.query(`SELECT id FROM purchase_orders WHERE notes LIKE $1 AND status IN ('submitted','closed')`, [`${SEED_TAG}%`]);
     return ids.rows.map(r => r.id);
   }
-  // Partial batch detected — clear it to start clean and avoid distribution skew
+  // Partial batch detected — clear it inside a transaction to start clean and avoid distribution skew
   if (existing > 0) {
     console.log(`  → Partial batch found (${existing} POs) — clearing before fresh seed`);
-    // Reverse stock increases from partial GRNs before deleting them
-    await pool.query(`
-      UPDATE products p
-      SET stock_quantity = GREATEST(0, stock_quantity - COALESCE((
-        SELECT SUM(gri.received_quantity)
-        FROM goods_receipt_items gri
-        JOIN goods_receipts gr ON gri.receipt_id = gr.id
-        JOIN purchase_orders po ON gr.po_id = po.id
-        WHERE gri.product_id = p.id AND po.notes LIKE $1
-      ), 0))`, [`${SEED_TAG}%`]);
-    await pool.query(`DELETE FROM stock_movements WHERE reference_type = 'goods_receipt' AND reference_id IN (SELECT gr.id FROM goods_receipts gr JOIN purchase_orders po ON gr.po_id = po.id WHERE po.notes LIKE $1)`, [`${SEED_TAG}%`]);
-    await pool.query(`DELETE FROM goods_receipt_items WHERE receipt_id IN (SELECT gr.id FROM goods_receipts gr JOIN purchase_orders po ON gr.po_id = po.id WHERE po.notes LIKE $1)`, [`${SEED_TAG}%`]);
-    await pool.query(`DELETE FROM goods_receipts WHERE po_id IN (SELECT id FROM purchase_orders WHERE notes LIKE $1)`, [`${SEED_TAG}%`]);
-    await pool.query(`DELETE FROM purchase_order_items WHERE po_id IN (SELECT id FROM purchase_orders WHERE notes LIKE $1)`, [`${SEED_TAG}%`]);
-    await pool.query(`DELETE FROM purchase_orders WHERE notes LIKE $1`, [`${SEED_TAG}%`]);
-    console.log('  → Partial batch cleared (stock quantities reversed)');
+    const client = await pool.connect();
+    try {
+      await client.query('BEGIN');
+      // Reverse stock increases from partial GRNs before deleting them
+      await client.query(`
+        UPDATE products p
+        SET stock_quantity = GREATEST(0, stock_quantity - COALESCE((
+          SELECT SUM(gri.received_quantity)
+          FROM goods_receipt_items gri
+          JOIN goods_receipts gr ON gri.receipt_id = gr.id
+          JOIN purchase_orders po ON gr.po_id = po.id
+          WHERE gri.product_id = p.id AND po.notes LIKE $1
+        ), 0))`, [`${SEED_TAG}%`]);
+      await client.query(`DELETE FROM stock_movements WHERE reference_type = 'goods_receipt' AND reference_id IN (SELECT gr.id FROM goods_receipts gr JOIN purchase_orders po ON gr.po_id = po.id WHERE po.notes LIKE $1)`, [`${SEED_TAG}%`]);
+      await client.query(`DELETE FROM goods_receipt_items WHERE receipt_id IN (SELECT gr.id FROM goods_receipts gr JOIN purchase_orders po ON gr.po_id = po.id WHERE po.notes LIKE $1)`, [`${SEED_TAG}%`]);
+      await client.query(`DELETE FROM goods_receipts WHERE po_id IN (SELECT id FROM purchase_orders WHERE notes LIKE $1)`, [`${SEED_TAG}%`]);
+      await client.query(`DELETE FROM purchase_order_items WHERE po_id IN (SELECT id FROM purchase_orders WHERE notes LIKE $1)`, [`${SEED_TAG}%`]);
+      await client.query(`DELETE FROM purchase_orders WHERE notes LIKE $1`, [`${SEED_TAG}%`]);
+      await client.query('COMMIT');
+      console.log('  → Partial batch cleared atomically (stock quantities reversed)');
+    } catch (err) {
+      await client.query('ROLLBACK');
+      console.error('  ✗ Partial cleanup rolled back due to error:', err);
+      throw err;
+    } finally {
+      client.release();
+    }
   }
 
   // FX rates
