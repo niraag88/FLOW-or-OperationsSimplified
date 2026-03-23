@@ -274,21 +274,33 @@ async function seedPurchaseOrders(cookie: string): Promise<number[]> {
   type Currency = 'GBP' | 'USD' | 'INR';
   type Status = 'draft' | 'submitted' | 'closed';
 
+  // Target: 120 GBP / 90 USD / 90 INR  ×  50 Draft / 100 Submitted / 150 Closed
+  // GBP (20D, 40S, 60C = 120): 2025→(5D,10S,15C=30), 2026→(10D,20S,30C=60), 2027→(5D,10S,15C=30)
+  // USD (15D, 30S, 45C = 90):  2025→(3D,7S,10C=20),  2026→(8D,15S,22C=45),  2027→(4D,8S,13C=25)
+  // INR same as USD
   const PLAN: Array<[Currency, number, Status, number]> = [
-    // [currency, year, status, count]
-    // GBP: 10D+10S+10C for 2025, 15D+15S+30C for 2026, 10D+10S+10C for 2027
-    ['GBP', 2025, 'draft', 10], ['GBP', 2025, 'submitted', 10], ['GBP', 2025, 'closed', 10],
-    ['GBP', 2026, 'draft', 15], ['GBP', 2026, 'submitted', 15], ['GBP', 2026, 'closed', 30],
-    ['GBP', 2027, 'draft', 10], ['GBP', 2027, 'submitted', 10], ['GBP', 2027, 'closed', 10],
-    // USD: 5D+5S+10C for 2025, 10D+15S+20C for 2026, 5D+10S+10C for 2027
-    ['USD', 2025, 'draft', 5], ['USD', 2025, 'submitted', 5], ['USD', 2025, 'closed', 10],
-    ['USD', 2026, 'draft', 10], ['USD', 2026, 'submitted', 15], ['USD', 2026, 'closed', 20],
-    ['USD', 2027, 'draft', 5], ['USD', 2027, 'submitted', 10], ['USD', 2027, 'closed', 10],
-    // INR: same as USD
-    ['INR', 2025, 'draft', 5], ['INR', 2025, 'submitted', 5], ['INR', 2025, 'closed', 10],
-    ['INR', 2026, 'draft', 10], ['INR', 2026, 'submitted', 15], ['INR', 2026, 'closed', 20],
-    ['INR', 2027, 'draft', 5], ['INR', 2027, 'submitted', 10], ['INR', 2027, 'closed', 10],
+    ['GBP', 2025, 'draft', 5],  ['GBP', 2025, 'submitted', 10], ['GBP', 2025, 'closed', 15],
+    ['GBP', 2026, 'draft', 10], ['GBP', 2026, 'submitted', 20], ['GBP', 2026, 'closed', 30],
+    ['GBP', 2027, 'draft', 5],  ['GBP', 2027, 'submitted', 10], ['GBP', 2027, 'closed', 15],
+    ['USD', 2025, 'draft', 3],  ['USD', 2025, 'submitted', 7],  ['USD', 2025, 'closed', 10],
+    ['USD', 2026, 'draft', 8],  ['USD', 2026, 'submitted', 15], ['USD', 2026, 'closed', 22],
+    ['USD', 2027, 'draft', 4],  ['USD', 2027, 'submitted', 8],  ['USD', 2027, 'closed', 13],
+    ['INR', 2025, 'draft', 3],  ['INR', 2025, 'submitted', 7],  ['INR', 2025, 'closed', 10],
+    ['INR', 2026, 'draft', 8],  ['INR', 2026, 'submitted', 15], ['INR', 2026, 'closed', 22],
+    ['INR', 2027, 'draft', 4],  ['INR', 2027, 'submitted', 8],  ['INR', 2027, 'closed', 13],
   ];
+  // Verify plan totals: GBP=120, USD=90, INR=90; Draft=50, Submitted=100, Closed=150
+  const planCheck = PLAN.reduce((acc, [cur,, st, n]) => {
+    acc[cur] = (acc[cur] || 0) + n;
+    acc[st] = (acc[st] || 0) + n;
+    return acc;
+  }, {} as Record<string, number>);
+  if (planCheck.GBP !== 120 || planCheck.USD !== 90 || planCheck.INR !== 90 ||
+      planCheck.draft !== 50 || planCheck.submitted !== 100 || planCheck.closed !== 150) {
+    console.error('  ✗ PLAN totals wrong:', planCheck);
+    process.exit(1);
+  }
+  console.log('  PLAN: GBP=120, USD=90, INR=90 | Draft=50, Submitted=100, Closed=150');
 
   // Build specs array
   const specs: PoSpec[] = [];
@@ -360,6 +372,18 @@ async function seedPurchaseOrders(cookie: string): Promise<number[]> {
   console.log(`  ✓ Created: ${created}, Failed: ${failed}`);
   console.log(`  Currency: GBP=${counters.GBP}, USD=${counters.USD}, INR=${counters.INR}`);
   console.log(`  Status: Draft=${statusCts.draft}, Submitted=${statusCts.submitted}, Closed=${statusCts.closed}`);
+
+  // Strict post-creation check — verify exact distribution before GRNs alter statuses
+  let distOk = true;
+  if (counters.GBP !== 120) { distOk = false; console.error(`  ✗ GBP: got ${counters.GBP}, need 120`); }
+  if (counters.USD !== 90)  { distOk = false; console.error(`  ✗ USD: got ${counters.USD}, need 90`); }
+  if (counters.INR !== 90)  { distOk = false; console.error(`  ✗ INR: got ${counters.INR}, need 90`); }
+  if (statusCts.draft !== 50)      { distOk = false; console.error(`  ✗ Draft: got ${statusCts.draft}, need 50`); }
+  if (statusCts.submitted !== 100) { distOk = false; console.error(`  ✗ Submitted: got ${statusCts.submitted}, need 100`); }
+  if (statusCts.closed !== 150)    { distOk = false; console.error(`  ✗ Closed: got ${statusCts.closed}, need 150`); }
+  if (!distOk) { console.error('  ✗ Distribution check failed — exiting'); process.exit(1); }
+  console.log('  ✓ Distribution correct: GBP=120, USD=90, INR=90 | Draft=50, Submitted=100, Closed=150');
+
   return createdIds;
 }
 
@@ -375,27 +399,28 @@ async function seedGoodsReceipts(cookie: string, poIds: number[]) {
      WHERE po.notes LIKE $1`, [`${SEED_TAG}%`]
   );
   const existingGrns = parseInt(seedGrnCount.rows[0].count);
-  if (existingGrns >= 80) {
+  if (existingGrns >= 90) {
     console.log(`  → Already have ${existingGrns} GRNs for seed POs — skipping`);
     return;
   }
 
-  // Get submitted+closed POs from the seeded batch
+  // Get up to 100 submitted+closed POs from the seeded batch (ordered deterministically)
   let eligible: number[];
   if (poIds.length > 0) {
     const placeholders = poIds.map((_, i) => `$${i + 1}`).join(',');
     const res = await pool.query(
-      `SELECT id FROM purchase_orders WHERE id IN (${placeholders}) AND status IN ('submitted','closed') ORDER BY random() LIMIT 100`,
+      `SELECT id FROM purchase_orders WHERE id IN (${placeholders}) AND status IN ('submitted','closed') ORDER BY id LIMIT 100`,
       poIds
     );
     eligible = res.rows.map(r => r.id);
   } else {
     const res = await pool.query(
-      `SELECT id FROM purchase_orders WHERE notes LIKE '${SEED_TAG}%' AND status IN ('submitted','closed') ORDER BY random() LIMIT 100`
+      `SELECT id FROM purchase_orders WHERE notes LIKE $1 AND status IN ('submitted','closed') ORDER BY id LIMIT 100`,
+      [`${SEED_TAG}%`]
     );
     eligible = res.rows.map(r => r.id);
   }
-  console.log(`  Eligible POs: ${eligible.length}`);
+  console.log(`  Eligible POs: ${eligible.length} (targeting 100 GRNs)`);
 
   let created = 0, failed = 0;
 
@@ -462,19 +487,35 @@ async function verify(cookie: string) {
     console.log(`    ${yr}: ${r.status} ${ok ? '✓' : '✗'}`);
   });
 
+  // ── Currency totals (exact)
   const seeds = poSeedRes.rows[0];
-  console.log(`  Seed POs: total=${seeds.total} GBP=${seeds.gbp} USD=${seeds.usd} INR=${seeds.inr}`);
-  if (parseInt(seeds.total) < 300) { pass = false; console.log('  ✗ Need >= 300 seed POs'); }
-  if (parseInt(seeds.gbp) < 110) { pass = false; console.log('  ✗ Need >= 110 GBP POs'); }
-  if (parseInt(seeds.usd) < 80) { pass = false; console.log('  ✗ Need >= 80 USD POs'); }
-  if (parseInt(seeds.inr) < 80) { pass = false; console.log('  ✗ Need >= 80 INR POs'); }
+  const totGBP = parseInt(seeds.gbp), totUSD = parseInt(seeds.usd), totINR = parseInt(seeds.inr);
+  const totAll = parseInt(seeds.total);
+  console.log(`  Seed POs: total=${totAll} GBP=${totGBP} USD=${totUSD} INR=${totINR}`);
+  if (totAll !== 300)  { pass = false; console.log('  ✗ Need exactly 300 seed POs'); }
+  if (totGBP !== 120) { pass = false; console.log(`  ✗ GBP: got ${totGBP}, need 120`); }
+  if (totUSD !== 90)  { pass = false; console.log(`  ✗ USD: got ${totUSD}, need 90`); }
+  if (totINR !== 90)  { pass = false; console.log(`  ✗ INR: got ${totINR}, need 90`); }
 
+  // ── Status distribution (note: some submitted POs may become closed after GRNs)
+  const statusMap: Record<string, number> = {};
+  poAllRes.rows.forEach(r => { statusMap[r.status] = (statusMap[r.status] || 0) + parseInt(r.cnt); });
   console.log('  By currency/status:');
   poAllRes.rows.forEach(r => console.log(`    ${r.currency} ${r.status}: ${r.cnt}`));
+  const draftCt = statusMap['draft'] ?? 0;
+  // Draft POs should not change (only submitted/closed are affected by GRNs)
+  if (draftCt !== 50) { pass = false; console.log(`  ✗ Draft: got ${draftCt}, need 50`); }
+  else console.log(`  ✓ Draft: ${draftCt} (exact)`);
+  // Submitted+Closed combined = 250 (100+150 originally; GRNs can move submitted → closed)
+  const nonDraft = (statusMap['submitted'] ?? 0) + (statusMap['closed'] ?? 0);
+  if (nonDraft !== 250) { pass = false; console.log(`  ✗ Submitted+Closed: got ${nonDraft}, need 250`); }
+  else console.log(`  ✓ Submitted+Closed: ${nonDraft} (exact)`);
 
+  // ── GRN target ~100 (at least 90 required)
   const grnCount = parseInt(grnRes.rows[0].count);
-  console.log(`  GRNs (seed): ${grnCount} ${grnCount >= 80 ? '✓' : '✗ (need >= 80)'}`)
-  if (grnCount < 80) pass = false;
+  const grnOk = grnCount >= 90;
+  console.log(`  GRNs (seed): ${grnCount} ${grnOk ? '✓' : '✗ (need >= 90)'}`);
+  if (!grnOk) pass = false;
   console.log(`  Stock movements (from GRNs): ${smRes.rows[0].count}`);
   console.log(`  Company: ${csRes.rows[0].company_name}`);
 
