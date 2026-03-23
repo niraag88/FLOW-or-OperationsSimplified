@@ -6,7 +6,7 @@ import { ShoppingCart, BarChart2 } from "lucide-react";
 import ExportDropdown from "../common/ExportDropdown";
 import { format } from 'date-fns';
 import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer } from 'recharts';
-import { getRateToAed, formatCurrency } from "@/utils/currency";
+import { getRateToAed } from "@/utils/currency";
 
 const fmt = (value) => new Intl.NumberFormat('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 }).format(value);
 
@@ -22,7 +22,7 @@ export default function PurchasesReport({ purchaseOrders, suppliers, companySett
     const storedRate = parseFloat(po.fxRateToAed || po.fx_rate_to_aed);
     if (!isNaN(storedRate) && storedRate > 0) return storedRate;
     const currency = po.currency || 'GBP';
-    return companySettings ? getRateToAed(currency, companySettings) : 4.85;
+    return getRateToAed(currency, companySettings);
   };
 
   const purchasesByMonth = useMemo(() => {

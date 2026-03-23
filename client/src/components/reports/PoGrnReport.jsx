@@ -43,7 +43,7 @@ export default function PoGrnReport({ purchaseOrders, goodsReceipts, suppliers =
     const storedRate = parseFloat(po.fxRateToAed || po.fx_rate_to_aed);
     if (!isNaN(storedRate) && storedRate > 0) return storedRate;
     const currency = po.currency || 'GBP';
-    return companySettings ? getRateToAed(currency, companySettings) : 4.85;
+    return getRateToAed(currency, companySettings);
   };
 
   const calculateAEDAmount = (po) => {
