@@ -1,8 +1,9 @@
 const SUPPORTED_CURRENCIES = ['AED', 'GBP', 'USD', 'INR'];
 
 export function getRateToAed(currency, settings) {
-  if (!currency || currency === 'AED') return 1.0;
+  if (!currency) return 1.0;
   const c = String(currency).toUpperCase();
+  if (c === 'AED') return 1.0;
   if (c === 'GBP') return parseFloat(settings?.fxGbpToAed ?? 4.85);
   if (c === 'USD') return parseFloat(settings?.fxUsdToAed ?? 3.6725);
   if (c === 'INR') return parseFloat(settings?.fxInrToAed ?? 0.044);
