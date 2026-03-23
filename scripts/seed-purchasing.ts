@@ -44,8 +44,10 @@ async function login(): Promise<string> {
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify({ username: USERNAME, password: PASSWORD }),
   });
-  const cookie = r.headers.get('set-cookie') ?? '';
-  if (!cookie) throw new Error('Login failed — no cookie returned');
+  const rawCookie = r.headers.get('set-cookie') ?? '';
+  if (!rawCookie) throw new Error('Login failed — no cookie returned');
+  // Extract only the name=value portion (strip attributes like Path, HttpOnly, etc.)
+  const cookie = rawCookie.split(';')[0];
   console.log('✓ Authenticated as admin');
   return cookie;
 }
@@ -95,13 +97,17 @@ async function seedFinancialYears(cookie: string) {
     }
   }
 
-  // Close 2025
+  // Close 2025 — explicitly demonstrate open→close cycle on every run
   const fy2025 = yearMap.get(2025);
-  if (fy2025 && fy2025.status !== 'Closed') {
-    const { status } = await apiPut(`/api/books/${fy2025.id}`, { status: 'Closed' }, cookie);
-    console.log(status === 200 ? '  ✓ Closed 2025' : '  ✗ Failed to close 2025');
-  } else {
-    console.log('  → 2025 already Closed');
+  if (fy2025) {
+    // Ensure 2025 is Open first (so the close is a visible state transition)
+    if (fy2025.status !== 'Open') {
+      const { status: openStatus } = await apiPut(`/api/books/${fy2025.id}`, { status: 'Open' }, cookie);
+      console.log(openStatus === 200 ? '  ✓ Reopened 2025 (for cycle demonstration)' : '  ✗ Failed to reopen 2025');
+    }
+    // Now close it
+    const { status: closeStatus } = await apiPut(`/api/books/${fy2025.id}`, { status: 'Closed' }, cookie);
+    console.log(closeStatus === 200 ? '  ✓ Closed 2025 (open→close demonstrated)' : '  ✗ Failed to close 2025');
   }
 
   // Ensure 2026 and 2027 are Open
@@ -238,12 +244,21 @@ async function seedPurchaseOrders(cookie: string): Promise<number[]> {
   console.log('\n── Purchase orders (300 via API) ──────────────────────────');
 
   // Idempotency: skip if >= 300 seeded POs
-  const existingRow = await pool.query(`SELECT COUNT(*) FROM purchase_orders WHERE notes LIKE '${SEED_TAG}%'`);
+  const existingRow = await pool.query(`SELECT COUNT(*) FROM purchase_orders WHERE notes LIKE $1`, [`${SEED_TAG}%`]);
   const existing = parseInt(existingRow.rows[0].count);
   if (existing >= 300) {
     console.log(`  → Already have ${existing} seeded POs — skipping`);
-    const ids = await pool.query(`SELECT id FROM purchase_orders WHERE notes LIKE '${SEED_TAG}%' AND status IN ('submitted','closed')`);
+    const ids = await pool.query(`SELECT id FROM purchase_orders WHERE notes LIKE $1 AND status IN ('submitted','closed')`, [`${SEED_TAG}%`]);
     return ids.rows.map(r => r.id);
+  }
+  // Partial batch detected — clear it to start clean and avoid distribition skew
+  if (existing > 0) {
+    console.log(`  → Partial batch found (${existing} POs) — clearing before fresh seed`);
+    await pool.query(`DELETE FROM goods_receipt_items WHERE receipt_id IN (SELECT gr.id FROM goods_receipts gr JOIN purchase_orders po ON gr.po_id = po.id WHERE po.notes LIKE $1)`, [`${SEED_TAG}%`]);
+    await pool.query(`DELETE FROM goods_receipts WHERE po_id IN (SELECT id FROM purchase_orders WHERE notes LIKE $1)`, [`${SEED_TAG}%`]);
+    await pool.query(`DELETE FROM purchase_order_items WHERE po_id IN (SELECT id FROM purchase_orders WHERE notes LIKE $1)`, [`${SEED_TAG}%`]);
+    await pool.query(`DELETE FROM purchase_orders WHERE notes LIKE $1`, [`${SEED_TAG}%`]);
+    console.log('  → Partial batch cleared');
   }
 
   // FX rates
