@@ -38,7 +38,7 @@ const SEED_TAG  = '[SEED-56]';
 const QUOTE_TARGET   = 300;
 const INVOICE_TARGET = 400;
 const DO_TARGET      = 300;
-const CONVERT_TARGET = 80;
+const CONVERT_TARGET = 100;  // 100 converted + 300 direct = 400 total
 const DIRECT_TARGET  = 300;
 
 // ─── Types ────────────────────────────────────────────────────────────────────
@@ -665,7 +665,7 @@ async function verify(cookie: string): Promise<void> {
     const s = inv.status ?? 'unknown';
     invByStatus[s] = (invByStatus[s] ?? 0) + 1;
   });
-  console.log(`  Invoice status distribution (direct 320):`, JSON.stringify(invByStatus));
+  console.log(`  Invoice status distribution (direct ${DIRECT_TARGET}):`, JSON.stringify(invByStatus));
   // Direct invoices: no drafts; all should be sent/paid/overdue
   const directHasDraft = (invByStatus['draft'] ?? 0) > 0;
   if (directHasDraft) { console.error('  ✗ Direct invoices must not contain drafts'); pass = false; }
