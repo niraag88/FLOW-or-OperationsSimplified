@@ -493,8 +493,24 @@ export default function POForm({ open, onClose, editingPO, currentUser, onSucces
                           </Select>
                         </TableCell>
                         <TableCell>{item.productSku}</TableCell>
-                        <TableCell>{item.productName}</TableCell>
-                        <TableCell>{item.size}</TableCell>
+                        <TableCell>
+                          <Input
+                            value={item.productName}
+                            onChange={(e) => updateItem(index, 'productName', e.target.value)}
+                            disabled={!canEdit}
+                            className="min-w-[140px]"
+                            placeholder="Description"
+                          />
+                        </TableCell>
+                        <TableCell>
+                          <Input
+                            value={item.size || ''}
+                            onChange={(e) => updateItem(index, 'size', e.target.value)}
+                            disabled={!canEdit}
+                            className="w-24"
+                            placeholder="Size"
+                          />
+                        </TableCell>
                         <TableCell>
                           <Input
                             type="number"

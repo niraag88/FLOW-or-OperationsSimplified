@@ -14,17 +14,26 @@ import ExportDropdown from "../common/ExportDropdown";
 import { getRateToAed } from "@/utils/currency";
 
 export default function PoGrnReport({ purchaseOrders, goodsReceipts, suppliers = [], companySettings, canExport }) {
-  const [selectedStatuses, setSelectedStatuses] = useState([]);
-  const [selectedSuppliers, setSelectedSuppliers] = useState([]);
-  const [dateRange, setDateRange] = useState("all");
-  const [dateRangeOpen, setDateRangeOpen] = useState(false);
-  const [customRange, setCustomRange] = useState({ from: null, to: null });
-  const [pendingRange, setPendingRange] = useState({ from: null, to: null });
+  // PO section filter state
+  const [poSelectedStatuses, setPoSelectedStatuses] = useState([]);
+  const [poSelectedSuppliers, setPoSelectedSuppliers] = useState([]);
+  const [poDateRange, setPoDateRange] = useState("all");
+  const [poDateRangeOpen, setPoDateRangeOpen] = useState(false);
+  const [poCustomRange, setPoCustomRange] = useState({ from: null, to: null });
+  const [poPendingRange, setPoPendingRange] = useState({ from: null, to: null });
   const [currentPage, setCurrentPage] = useState(1);
   const [itemsPerPage, setItemsPerPage] = useState(20);
+
+  // GRN section filter state
+  const [grnSelectedSuppliers, setGrnSelectedSuppliers] = useState([]);
+  const [grnDateRange, setGrnDateRange] = useState("all");
+  const [grnDateRangeOpen, setGrnDateRangeOpen] = useState(false);
+  const [grnCustomRange, setGrnCustomRange] = useState({ from: null, to: null });
+  const [grnPendingRange, setGrnPendingRange] = useState({ from: null, to: null });
   const [grnCurrentPage, setGrnCurrentPage] = useState(1);
   const [grnItemsPerPage, setGrnItemsPerPage] = useState(20);
 
+  // Shared utilities
   const getSupplierName = (supplierId) => {
     const supplier = suppliers.find(s => s.id === supplierId || s.id === Number(supplierId));
     return supplier?.name || 'Unknown Supplier';
@@ -56,55 +65,17 @@ export default function PoGrnReport({ purchaseOrders, goodsReceipts, suppliers =
   const formatDate = (dateString) => {
     if (!dateString) return '-';
     try {
-      const date = typeof dateString === 'string' ? new Date(dateString) : new Date(dateString);
+      const date = new Date(dateString);
       return date && !isNaN(date) ? format(date, 'dd/MM/yy') : '-';
-    } catch (error) {
+    } catch {
       return '-';
     }
   };
 
-  const clearFilters = () => {
-    setSelectedStatuses([]);
-    setSelectedSuppliers([]);
-    setDateRange("all");
-    setCustomRange({ from: null, to: null });
-    setPendingRange({ from: null, to: null });
-    resetPagination();
-  };
-
-  const hasActiveFilters = selectedStatuses.length > 0 || selectedSuppliers.length > 0 || dateRange !== "all";
-
-  const uniqueStatuses = [...new Set(purchaseOrders.map(po => po.status).filter(Boolean))].sort();
-
   const sortedSuppliers = [...suppliers].sort((a, b) => (a.name || '').localeCompare(b.name || ''));
 
-  const handleDateRangeChange = (value) => {
-    if (value !== 'custom') {
-      setCustomRange({ from: null, to: null });
-    }
-    setDateRange(value);
-    resetPagination();
-  };
-
-  const handleCustomDateRange = () => {
-    if (pendingRange.from && pendingRange.to) {
-      setCustomRange(pendingRange);
-      setDateRange({ type: 'custom', startDate: pendingRange.from, endDate: pendingRange.to });
-      setDateRangeOpen(false);
-    }
-  };
-
-  const formatCustomDateRange = () => {
-    if (customRange.from && customRange.to) {
-      return `${format(customRange.from, 'MMM dd')} - ${format(customRange.to, 'MMM dd')}`;
-    }
-    if (customRange.from) {
-      return `${format(customRange.from, 'MMM dd')} - ...`;
-    }
-    return 'Pick date range';
-  };
-
-  const applyDateFilter = (po) => {
+  // Generic date filter — accepts the dateRange value as a parameter
+  const applyDateFilter = (po, dateRange) => {
     if (dateRange === "all") return true;
     const dateValue = po.orderDate || po.order_date;
     if (!dateValue) return false;
@@ -134,46 +105,104 @@ export default function PoGrnReport({ purchaseOrders, goodsReceipts, suppliers =
     return true;
   };
 
+  // PO filter helpers
+  const clearPoFilters = () => {
+    setPoSelectedStatuses([]);
+    setPoSelectedSuppliers([]);
+    setPoDateRange("all");
+    setPoCustomRange({ from: null, to: null });
+    setPoPendingRange({ from: null, to: null });
+    setCurrentPage(1);
+  };
+  const hasPoFilters = poSelectedStatuses.length > 0 || poSelectedSuppliers.length > 0 || poDateRange !== "all";
+
+  const handlePoDateRangeChange = (value) => {
+    if (value !== 'custom') setPoCustomRange({ from: null, to: null });
+    setPoDateRange(value);
+    setCurrentPage(1);
+  };
+  const applyPoCustomRange = () => {
+    if (poPendingRange.from && poPendingRange.to) {
+      setPoCustomRange(poPendingRange);
+      setPoDateRange({ type: 'custom', startDate: poPendingRange.from, endDate: poPendingRange.to });
+      setPoDateRangeOpen(false);
+    }
+  };
+  const formatPoDateRange = () => {
+    if (poCustomRange.from && poCustomRange.to)
+      return `${format(poCustomRange.from, 'MMM dd')} - ${format(poCustomRange.to, 'MMM dd')}`;
+    if (poCustomRange.from) return `${format(poCustomRange.from, 'MMM dd')} - ...`;
+    return 'Pick date range';
+  };
+
+  // GRN filter helpers
+  const clearGrnFilters = () => {
+    setGrnSelectedSuppliers([]);
+    setGrnDateRange("all");
+    setGrnCustomRange({ from: null, to: null });
+    setGrnPendingRange({ from: null, to: null });
+    setGrnCurrentPage(1);
+  };
+  const hasGrnFilters = grnSelectedSuppliers.length > 0 || grnDateRange !== "all";
+
+  const handleGrnDateRangeChange = (value) => {
+    if (value !== 'custom') setGrnCustomRange({ from: null, to: null });
+    setGrnDateRange(value);
+    setGrnCurrentPage(1);
+  };
+  const applyGrnCustomRange = () => {
+    if (grnPendingRange.from && grnPendingRange.to) {
+      setGrnCustomRange(grnPendingRange);
+      setGrnDateRange({ type: 'custom', startDate: grnPendingRange.from, endDate: grnPendingRange.to });
+      setGrnDateRangeOpen(false);
+    }
+  };
+  const formatGrnDateRange = () => {
+    if (grnCustomRange.from && grnCustomRange.to)
+      return `${format(grnCustomRange.from, 'MMM dd')} - ${format(grnCustomRange.to, 'MMM dd')}`;
+    if (grnCustomRange.from) return `${format(grnCustomRange.from, 'MMM dd')} - ...`;
+    return 'Pick date range';
+  };
+
+  const uniqueStatuses = [...new Set(purchaseOrders.map(po => po.status).filter(Boolean))].sort();
+
+  // Filtered data — independent per section
   const filteredPOs = useMemo(() => {
     return purchaseOrders.filter(po => {
-      const matchesStatus = selectedStatuses.length === 0 || selectedStatuses.includes(po.status);
+      const matchesStatus = poSelectedStatuses.length === 0 || poSelectedStatuses.includes(po.status);
       const suppId = po.supplierId || po.supplier_id;
-      const matchesSupplier = selectedSuppliers.length === 0 || selectedSuppliers.includes(suppId);
-      return matchesStatus && matchesSupplier && applyDateFilter(po);
+      const matchesSupplier = poSelectedSuppliers.length === 0 || poSelectedSuppliers.includes(suppId);
+      return matchesStatus && matchesSupplier && applyDateFilter(po, poDateRange);
     });
-  }, [purchaseOrders, selectedStatuses, selectedSuppliers, dateRange]);
+  }, [purchaseOrders, poSelectedStatuses, poSelectedSuppliers, poDateRange]);
 
   const filteredGRNs = useMemo(() => {
     const grnPOs = purchaseOrders.filter(po => po.status === 'submitted' || po.status === 'closed');
     return grnPOs.filter(po => {
       const suppId = po.supplierId || po.supplier_id;
-      const matchesSupplier = selectedSuppliers.length === 0 || selectedSuppliers.includes(suppId);
-      return matchesSupplier && applyDateFilter(po);
+      const matchesSupplier = grnSelectedSuppliers.length === 0 || grnSelectedSuppliers.includes(suppId);
+      return matchesSupplier && applyDateFilter(po, grnDateRange);
     });
-  }, [purchaseOrders, selectedSuppliers, dateRange]);
+  }, [purchaseOrders, grnSelectedSuppliers, grnDateRange]);
 
   const totals = useMemo(() => {
     return filteredPOs.reduce((acc, po) => {
-      const aedAmount = calculateAEDAmount(po);
-      acc.totalAED += aedAmount;
+      acc.totalAED += calculateAEDAmount(po);
       return acc;
-    }, { totalAED: 0, pos: filteredPOs.length, grns: filteredGRNs.length });
-  }, [filteredPOs, filteredGRNs]);
+    }, { totalAED: 0 });
+  }, [filteredPOs]);
 
+  // PO pagination
   const startIndex = (currentPage - 1) * itemsPerPage;
   const endIndex = startIndex + itemsPerPage;
   const paginatedPOs = filteredPOs.slice(startIndex, endIndex);
   const totalPages = Math.ceil(filteredPOs.length / itemsPerPage);
 
+  // GRN pagination
   const grnStartIndex = (grnCurrentPage - 1) * grnItemsPerPage;
   const grnEndIndex = grnStartIndex + grnItemsPerPage;
   const paginatedGRNs = filteredGRNs.slice(grnStartIndex, grnEndIndex);
   const grnTotalPages = Math.ceil(filteredGRNs.length / grnItemsPerPage);
-
-  const resetPagination = () => {
-    setCurrentPage(1);
-    setGrnCurrentPage(1);
-  };
 
   const exportData = [
     ...filteredPOs.map(po => {
@@ -206,8 +235,93 @@ export default function PoGrnReport({ purchaseOrders, goodsReceipts, suppliers =
     })
   ];
 
+  // Reusable supplier filter popover content
+  const SupplierFilterPopover = ({ selected, setSelected, onReset, idPrefix }) => (
+    <Popover>
+      <PopoverTrigger asChild>
+        <Button variant="outline" className="justify-between w-48">
+          {selected.length === 0 ? "All Suppliers" : `${selected.length} selected`}
+          <ChevronDown className="ml-2 h-4 w-4" />
+        </Button>
+      </PopoverTrigger>
+      <PopoverContent className="w-60 p-4">
+        <div className="space-y-3">
+          <h4 className="font-medium leading-none">Select Suppliers</h4>
+          <div className="space-y-2 max-h-60 overflow-y-auto">
+            {sortedSuppliers.map(supplier => (
+              <div key={supplier.id} className="flex items-center space-x-2">
+                <Checkbox
+                  id={`${idPrefix}-supplier-${supplier.id}`}
+                  checked={selected.includes(supplier.id)}
+                  onCheckedChange={(checked) => {
+                    setSelected(prev => checked ? [...prev, supplier.id] : prev.filter(id => id !== supplier.id));
+                    onReset();
+                  }}
+                />
+                <label htmlFor={`${idPrefix}-supplier-${supplier.id}`} className="text-sm leading-none cursor-pointer">
+                  {supplier.name}
+                </label>
+              </div>
+            ))}
+          </div>
+        </div>
+      </PopoverContent>
+    </Popover>
+  );
+
+  // Reusable date range filter
+  const DateRangeFilter = ({ dateRange, onDateRangeChange, dateRangeOpen, setDateRangeOpen, customRange, pendingRange, setPendingRange, applyCustomRange, formatRange }) => (
+    <>
+      <Select value={typeof dateRange === 'object' ? 'custom' : dateRange} onValueChange={onDateRangeChange}>
+        <SelectTrigger className="w-32">
+          <SelectValue placeholder="Date" />
+        </SelectTrigger>
+        <SelectContent>
+          <SelectItem value="all">All Time</SelectItem>
+          <SelectItem value="today">Today</SelectItem>
+          <SelectItem value="week">This Week</SelectItem>
+          <SelectItem value="month">This Month</SelectItem>
+          <SelectItem value="quarter">This Quarter</SelectItem>
+          <SelectItem value="custom">Custom Range</SelectItem>
+        </SelectContent>
+      </Select>
+      {(dateRange === 'custom' || typeof dateRange === 'object') && (
+        <Popover open={dateRangeOpen} onOpenChange={(open) => {
+          if (open) setPendingRange(customRange);
+          setDateRangeOpen(open);
+        }}>
+          <PopoverTrigger asChild>
+            <Button variant="outline" className={cn("w-48 justify-start text-left font-normal", !customRange.from && "text-muted-foreground")}>
+              <CalendarIcon className="mr-2 h-4 w-4" />
+              {formatRange()}
+            </Button>
+          </PopoverTrigger>
+          <PopoverContent className="w-auto p-0" align="start">
+            <div className="p-3 border-b">
+              <p className="text-sm font-medium">Select date range</p>
+              <p className="text-xs text-muted-foreground">Click start date, then end date</p>
+            </div>
+            <Calendar
+              mode="range"
+              selected={pendingRange}
+              onSelect={(range) => setPendingRange(range || { from: null, to: null })}
+              numberOfMonths={2}
+              disabled={(date) => date > new Date()}
+              initialFocus
+            />
+            <div className="flex justify-end gap-2 p-3 border-t">
+              <Button variant="outline" size="sm" onClick={() => setDateRangeOpen(false)}>Cancel</Button>
+              <Button size="sm" onClick={applyCustomRange} disabled={!pendingRange.from || !pendingRange.to}>Apply</Button>
+            </div>
+          </PopoverContent>
+        </Popover>
+      )}
+    </>
+  );
+
   return (
     <div className="space-y-6">
+      {/* Summary header card */}
       <Card>
         <CardHeader className="flex flex-row items-center justify-between">
           <div>
@@ -215,10 +329,10 @@ export default function PoGrnReport({ purchaseOrders, goodsReceipts, suppliers =
             <p className="text-sm text-gray-500">Compare PO creation with actual goods receipts.</p>
           </div>
           {canExport && (
-            <ExportDropdown 
+            <ExportDropdown
               data={exportData}
               type="PO vs GRN Report"
-              filename={`PO_GRN_Report_${dateRange === 'all' ? 'All_Time' : 'Filtered'}`}
+              filename={`PO_GRN_Report`}
               columns={{
                 type: 'Type',
                 document_number: 'Document Number',
@@ -232,165 +346,17 @@ export default function PoGrnReport({ purchaseOrders, goodsReceipts, suppliers =
             />
           )}
         </CardHeader>
-        <CardContent className="space-y-4">
-          {/* Filters */}
-          <div className="flex items-center gap-3 flex-wrap">
-            <Filter className="w-4 h-4 text-gray-500" />
-            
-            {/* Status Filter */}
-            <Popover>
-              <PopoverTrigger asChild>
-                <Button variant="outline" className="justify-between w-36">
-                  {selectedStatuses.length === 0 ? "All Status" : `${selectedStatuses.length} selected`}
-                  <ChevronDown className="ml-2 h-4 w-4" />
-                </Button>
-              </PopoverTrigger>
-              <PopoverContent className="w-60 p-4">
-                <div className="space-y-3">
-                  <h4 className="font-medium leading-none">Select Status</h4>
-                  <div className="space-y-2 max-h-60 overflow-y-auto">
-                    {uniqueStatuses.map(status => (
-                      <div key={status} className="flex items-center space-x-2">
-                        <Checkbox
-                          id={`status-${status}`}
-                          checked={selectedStatuses.includes(status)}
-                          onCheckedChange={(checked) => {
-                            if (checked) setSelectedStatuses(prev => [...prev, status]);
-                            else setSelectedStatuses(prev => prev.filter(s => s !== status));
-                            resetPagination();
-                          }}
-                        />
-                        <label htmlFor={`status-${status}`} className="text-sm leading-none cursor-pointer capitalize">
-                          {status}
-                        </label>
-                      </div>
-                    ))}
-                  </div>
-                </div>
-              </PopoverContent>
-            </Popover>
-
-            {/* Supplier Filter */}
-            <Popover>
-              <PopoverTrigger asChild>
-                <Button variant="outline" className="justify-between w-48">
-                  {selectedSuppliers.length === 0 ? "All Suppliers" : `${selectedSuppliers.length} selected`}
-                  <ChevronDown className="ml-2 h-4 w-4" />
-                </Button>
-              </PopoverTrigger>
-              <PopoverContent className="w-60 p-4">
-                <div className="space-y-3">
-                  <h4 className="font-medium leading-none">Select Suppliers</h4>
-                  <div className="space-y-2 max-h-60 overflow-y-auto">
-                    {sortedSuppliers.map(supplier => (
-                      <div key={supplier.id} className="flex items-center space-x-2">
-                        <Checkbox
-                          id={`supplier-${supplier.id}`}
-                          checked={selectedSuppliers.includes(supplier.id)}
-                          onCheckedChange={(checked) => {
-                            if (checked) setSelectedSuppliers(prev => [...prev, supplier.id]);
-                            else setSelectedSuppliers(prev => prev.filter(id => id !== supplier.id));
-                            resetPagination();
-                          }}
-                        />
-                        <label htmlFor={`supplier-${supplier.id}`} className="text-sm leading-none cursor-pointer">
-                          {supplier.name}
-                        </label>
-                      </div>
-                    ))}
-                  </div>
-                </div>
-              </PopoverContent>
-            </Popover>
-
-            <Select value={typeof dateRange === 'object' ? 'custom' : dateRange} onValueChange={handleDateRangeChange}>
-              <SelectTrigger className="w-32">
-                <SelectValue placeholder="Date" />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="all">All Time</SelectItem>
-                <SelectItem value="today">Today</SelectItem>
-                <SelectItem value="week">This Week</SelectItem>
-                <SelectItem value="month">This Month</SelectItem>
-                <SelectItem value="quarter">This Quarter</SelectItem>
-                <SelectItem value="custom">Custom Range</SelectItem>
-              </SelectContent>
-            </Select>
-
-            {(dateRange === 'custom' || typeof dateRange === 'object') && (
-              <Popover open={dateRangeOpen} onOpenChange={(open) => {
-                if (open) setPendingRange(customRange);
-                setDateRangeOpen(open);
-              }}>
-                <PopoverTrigger asChild>
-                  <Button
-                    variant="outline"
-                    className={cn("w-48 justify-start text-left font-normal", !customRange.from && "text-muted-foreground")}
-                  >
-                    <CalendarIcon className="mr-2 h-4 w-4" />
-                    {formatCustomDateRange()}
-                  </Button>
-                </PopoverTrigger>
-                <PopoverContent className="w-auto p-0" align="start">
-                  <div className="p-3 border-b">
-                    <p className="text-sm font-medium">Select date range</p>
-                    <p className="text-xs text-muted-foreground">Click start date, then end date</p>
-                  </div>
-                  <Calendar
-                    mode="range"
-                    selected={pendingRange}
-                    onSelect={(range) => setPendingRange(range || { from: null, to: null })}
-                    numberOfMonths={2}
-                    disabled={(date) => date > new Date()}
-                    initialFocus
-                  />
-                  <div className="flex justify-end gap-2 p-3 border-t">
-                    <Button variant="outline" size="sm" onClick={() => setDateRangeOpen(false)}>Cancel</Button>
-                    <Button size="sm" onClick={handleCustomDateRange} disabled={!pendingRange.from || !pendingRange.to}>Apply</Button>
-                  </div>
-                </PopoverContent>
-              </Popover>
-            )}
-
-            {hasActiveFilters && (
-              <Button variant="ghost" size="sm" onClick={clearFilters}>
-                <X className="w-4 h-4" />
-              </Button>
-            )}
-          </div>
-
-          {/* Active filter badges */}
-          {(selectedStatuses.length > 0 || selectedSuppliers.length > 0) && (
-            <div className="flex flex-wrap gap-2">
-              {selectedStatuses.map(status => (
-                <Badge key={status} variant="secondary" className="gap-1">
-                  Status: {status}
-                  <X className="h-3 w-3 cursor-pointer" onClick={() => { setSelectedStatuses(prev => prev.filter(s => s !== status)); resetPagination(); }} />
-                </Badge>
-              ))}
-              {selectedSuppliers.map(supplierId => {
-                const supplier = suppliers.find(s => s.id === supplierId);
-                return (
-                  <Badge key={supplierId} variant="secondary" className="gap-1">
-                    Supplier: {supplier?.name}
-                    <X className="h-3 w-3 cursor-pointer" onClick={() => { setSelectedSuppliers(prev => prev.filter(id => id !== supplierId)); resetPagination(); }} />
-                  </Badge>
-                );
-              })}
-            </div>
-          )}
-
-          {/* Summary Cards */}
+        <CardContent>
           <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
             <Card className="p-4">
               <div className="text-center">
-                <p className="text-2xl font-bold text-blue-600">{totals.pos}</p>
+                <p className="text-2xl font-bold text-blue-600">{filteredPOs.length}</p>
                 <p className="text-sm text-gray-600">Purchase Orders</p>
               </div>
             </Card>
             <Card className="p-4">
               <div className="text-center">
-                <p className="text-2xl font-bold text-green-600">{totals.grns}</p>
+                <p className="text-2xl font-bold text-green-600">{filteredGRNs.length}</p>
                 <p className="text-sm text-gray-600">Goods Receipts</p>
               </div>
             </Card>
@@ -409,7 +375,87 @@ export default function PoGrnReport({ purchaseOrders, goodsReceipts, suppliers =
         <CardHeader>
           <CardTitle>Purchase Orders ({filteredPOs.length})</CardTitle>
         </CardHeader>
-        <CardContent>
+        <CardContent className="space-y-4">
+          {/* PO Filters */}
+          <div className="flex items-center gap-3 flex-wrap">
+            <Filter className="w-4 h-4 text-gray-500" />
+            {/* Status */}
+            <Popover>
+              <PopoverTrigger asChild>
+                <Button variant="outline" className="justify-between w-36">
+                  {poSelectedStatuses.length === 0 ? "All Status" : `${poSelectedStatuses.length} selected`}
+                  <ChevronDown className="ml-2 h-4 w-4" />
+                </Button>
+              </PopoverTrigger>
+              <PopoverContent className="w-60 p-4">
+                <div className="space-y-3">
+                  <h4 className="font-medium leading-none">Select Status</h4>
+                  <div className="space-y-2 max-h-60 overflow-y-auto">
+                    {uniqueStatuses.map(status => (
+                      <div key={status} className="flex items-center space-x-2">
+                        <Checkbox
+                          id={`po-status-${status}`}
+                          checked={poSelectedStatuses.includes(status)}
+                          onCheckedChange={(checked) => {
+                            setPoSelectedStatuses(prev => checked ? [...prev, status] : prev.filter(s => s !== status));
+                            setCurrentPage(1);
+                          }}
+                        />
+                        <label htmlFor={`po-status-${status}`} className="text-sm leading-none cursor-pointer capitalize">
+                          {status}
+                        </label>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              </PopoverContent>
+            </Popover>
+            {/* Supplier */}
+            <SupplierFilterPopover
+              selected={poSelectedSuppliers}
+              setSelected={setPoSelectedSuppliers}
+              onReset={() => setCurrentPage(1)}
+              idPrefix="po"
+            />
+            {/* Date */}
+            <DateRangeFilter
+              dateRange={poDateRange}
+              onDateRangeChange={handlePoDateRangeChange}
+              dateRangeOpen={poDateRangeOpen}
+              setDateRangeOpen={setPoDateRangeOpen}
+              customRange={poCustomRange}
+              pendingRange={poPendingRange}
+              setPendingRange={setPoPendingRange}
+              applyCustomRange={applyPoCustomRange}
+              formatRange={formatPoDateRange}
+            />
+            {hasPoFilters && (
+              <Button variant="ghost" size="sm" onClick={clearPoFilters}>
+                <X className="w-4 h-4" />
+              </Button>
+            )}
+          </div>
+          {/* Active PO filter badges */}
+          {(poSelectedStatuses.length > 0 || poSelectedSuppliers.length > 0) && (
+            <div className="flex flex-wrap gap-2">
+              {poSelectedStatuses.map(status => (
+                <Badge key={status} variant="secondary" className="gap-1">
+                  Status: {status}
+                  <X className="h-3 w-3 cursor-pointer" onClick={() => { setPoSelectedStatuses(prev => prev.filter(s => s !== status)); setCurrentPage(1); }} />
+                </Badge>
+              ))}
+              {poSelectedSuppliers.map(supplierId => {
+                const supplier = suppliers.find(s => s.id === supplierId);
+                return (
+                  <Badge key={supplierId} variant="secondary" className="gap-1">
+                    Supplier: {supplier?.name}
+                    <X className="h-3 w-3 cursor-pointer" onClick={() => { setPoSelectedSuppliers(prev => prev.filter(id => id !== supplierId)); setCurrentPage(1); }} />
+                  </Badge>
+                );
+              })}
+            </div>
+          )}
+          {/* PO Table */}
           <div className="overflow-x-auto">
             <Table>
               <TableHeader>
@@ -456,7 +502,6 @@ export default function PoGrnReport({ purchaseOrders, goodsReceipts, suppliers =
               <p>No purchase orders found for the selected filters</p>
             </div>
           )}
-
           {filteredPOs.length > 0 && (
             <div className="flex items-center justify-between mt-6 pt-4 border-t">
               <span className="text-sm text-gray-700">
@@ -493,7 +538,50 @@ export default function PoGrnReport({ purchaseOrders, goodsReceipts, suppliers =
         <CardHeader>
           <CardTitle>Goods Receipts ({filteredGRNs.length})</CardTitle>
         </CardHeader>
-        <CardContent>
+        <CardContent className="space-y-4">
+          {/* GRN Filters */}
+          <div className="flex items-center gap-3 flex-wrap">
+            <Filter className="w-4 h-4 text-gray-500" />
+            {/* Supplier */}
+            <SupplierFilterPopover
+              selected={grnSelectedSuppliers}
+              setSelected={setGrnSelectedSuppliers}
+              onReset={() => setGrnCurrentPage(1)}
+              idPrefix="grn"
+            />
+            {/* Date */}
+            <DateRangeFilter
+              dateRange={grnDateRange}
+              onDateRangeChange={handleGrnDateRangeChange}
+              dateRangeOpen={grnDateRangeOpen}
+              setDateRangeOpen={setGrnDateRangeOpen}
+              customRange={grnCustomRange}
+              pendingRange={grnPendingRange}
+              setPendingRange={setGrnPendingRange}
+              applyCustomRange={applyGrnCustomRange}
+              formatRange={formatGrnDateRange}
+            />
+            {hasGrnFilters && (
+              <Button variant="ghost" size="sm" onClick={clearGrnFilters}>
+                <X className="w-4 h-4" />
+              </Button>
+            )}
+          </div>
+          {/* Active GRN supplier badges */}
+          {grnSelectedSuppliers.length > 0 && (
+            <div className="flex flex-wrap gap-2">
+              {grnSelectedSuppliers.map(supplierId => {
+                const supplier = suppliers.find(s => s.id === supplierId);
+                return (
+                  <Badge key={supplierId} variant="secondary" className="gap-1">
+                    Supplier: {supplier?.name}
+                    <X className="h-3 w-3 cursor-pointer" onClick={() => { setGrnSelectedSuppliers(prev => prev.filter(id => id !== supplierId)); setGrnCurrentPage(1); }} />
+                  </Badge>
+                );
+              })}
+            </div>
+          )}
+          {/* GRN Table */}
           <div className="overflow-x-auto">
             <Table>
               <TableHeader>
@@ -517,8 +605,7 @@ export default function PoGrnReport({ purchaseOrders, goodsReceipts, suppliers =
                       <TableCell>
                         <Badge variant="outline" className={
                           po.status === 'closed' ? 'border-green-300 text-green-800 bg-green-50' :
-                          po.status === 'submitted' ? 'border-blue-300 text-blue-800 bg-blue-50' :
-                          'border-gray-300 text-gray-800 bg-gray-50'
+                          'border-blue-300 text-blue-800 bg-blue-50'
                         }>
                           {po.status === 'submitted' ? 'SUBMITTED' : po.status?.toUpperCase()}
                         </Badge>
