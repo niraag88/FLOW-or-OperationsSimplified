@@ -91,6 +91,7 @@ const BRANDS = [
   'Majestic Pure', 'Viva Naturals', 'Base Formula', 'Naissance', 'Amphora Aromatics',
   'Essentially Oils', 'Aromantic', 'Australian Botanical Products',
   'Mountain Rose Herbs', 'Gya Labs', 'Sala Essentials', 'Certified Natural',
+  'Freshskin Beauty',
 ];
 
 async function seedBrands(cookie: string): Promise<Record<string, number>> {
@@ -217,19 +218,44 @@ async function seedSuppliers(cookie: string) {
   console.log('\n── Creating suppliers ─────────────────────────────────────');
   const r = await fetch(`${BASE_URL}/api/suppliers`, { headers: { Cookie: cookie } });
   const existingList = await r.json() as unknown;
-  const list: Array<{ name: string }> = Array.isArray(existingList)
-    ? existingList as Array<{ name: string }>
-    : ((existingList as { suppliers?: Array<{ name: string }> }).suppliers ?? []);
-  const existing = new Set(list.map((s) => s.name));
+  const list: Array<{ id: number; name: string; paymentTerms?: string }> = Array.isArray(existingList)
+    ? existingList as Array<{ id: number; name: string; paymentTerms?: string }>
+    : ((existingList as { suppliers?: Array<{ id: number; name: string; paymentTerms?: string }> }).suppliers ?? []);
+  const existingMap = new Map(list.map((s) => [s.name, s]));
 
-  let created = 0, skipped = 0;
+  let created = 0, updated = 0;
   for (const sup of SUPPLIERS) {
-    if (existing.has(sup.name)) { skipped++; continue; }
-    const { status } = await apiPost('/api/suppliers', sup, cookie);
-    if (status === 201) { created++; process.stdout.write(`  ✓ ${sup.name}\n`); }
-    else console.error(`  ✗ Failed: ${sup.name}`);
+    const fullAddress = sup.country ? `${sup.address}, ${sup.country}` : sup.address;
+    const payload = {
+      name: sup.name,
+      email: sup.email,
+      phone: sup.phone,
+      address: fullAddress,
+      paymentTerms: sup.payment_terms,
+    };
+    const existing = existingMap.get(sup.name);
+    if (existing) {
+      if (existing.paymentTerms !== sup.payment_terms) {
+        const { status } = await apiFetch('PUT', `/api/suppliers/${existing.id}`, payload, cookie);
+        if (status === 200) { updated++; }
+        else console.error(`  ✗ Update failed: ${sup.name}`);
+      }
+    } else {
+      const { status } = await apiPost('/api/suppliers', payload, cookie);
+      if (status === 201) { created++; process.stdout.write(`  ✓ ${sup.name}\n`); }
+      else console.error(`  ✗ Failed: ${sup.name}`);
+    }
   }
-  console.log(`  Suppliers: created ${created}, skipped ${skipped}, total defined ${SUPPLIERS.length}`);
+  console.log(`  Suppliers: created ${created}, updated ${updated}, total defined ${SUPPLIERS.length}`);
+}
+
+async function apiFetch(method: string, path: string, body: object, cookie: string) {
+  const r = await fetch(`${BASE_URL}${path}`, {
+    method,
+    headers: { 'Content-Type': 'application/json', Cookie: cookie },
+    body: JSON.stringify(body),
+  });
+  return { status: r.status, data: await r.json() };
 }
 
 // ─── 4. PRODUCTS ───────────────────────────────────────────────────────────
