@@ -779,8 +779,8 @@ export class BusinessStorage {
         this.getStockCounts(),
         this.getPurchaseOrders(),
         db.select().from(goodsReceipts).orderBy(desc(goodsReceipts.createdAt)), // Basic GRN data
-        // Note: Invoices would go here when implemented
-        Promise.resolve([]), // Placeholder for invoices
+        // Invoices are fetched directly by the Reports page (/api/invoices) for completeness
+        Promise.resolve([]),
         this.getCustomers(),
         this.getSuppliers(),
         this.getCompanySettings()

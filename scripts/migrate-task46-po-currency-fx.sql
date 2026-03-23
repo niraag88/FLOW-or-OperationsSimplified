@@ -6,7 +6,7 @@ ALTER TABLE purchase_orders
   ADD COLUMN IF NOT EXISTS currency TEXT NOT NULL DEFAULT 'GBP';
 
 ALTER TABLE purchase_orders
-  ADD COLUMN IF NOT EXISTS fx_rate_to_aed DECIMAL(10,4) NOT NULL DEFAULT 4.8500;
+  ADD COLUMN IF NOT EXISTS fx_rate_to_aed DECIMAL(8,4) NOT NULL DEFAULT 4.8500;
 
 -- Verify the migration
 SELECT
