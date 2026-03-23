@@ -10,7 +10,7 @@
  *
  * Idempotent:
  *  - POs: skips if count >= 300; clears partial batch (1–299) with stock reversion
- *  - GRNs: creates up to 100; skips if count already >= 100 for seed POs
+ *  - GRNs: creates up to 100; skips if count already >= 100 for seed POs; verified >= 100
  *
  * Prefix format note: document number prefix stored without trailing dash (e.g. "PO")
  *  because generatePoNumber() in businessStorage adds a "-" separator automatically,
@@ -559,10 +559,10 @@ async function verify(cookie: string) {
   if (nonDraft !== 250) { pass = false; console.log(`  ✗ Submitted+Closed: got ${nonDraft}, need 250`); }
   else console.log(`  ✓ Submitted+Closed: ${nonDraft} (exact)`);
 
-  // ── GRN target 100 (at least 90 as a safe margin for reruns on sparse PO pools)
+  // ── GRN target: 100 (verify at least 100 exist for seed POs)
   const grnCount = parseInt(grnRes.rows[0].count);
-  const grnOk = grnCount >= 90;
-  console.log(`  GRNs (seed): ${grnCount} ${grnOk ? '✓' : '✗ (need >= 90, target 100)'}`);
+  const grnOk = grnCount >= 100;
+  console.log(`  GRNs (seed): ${grnCount} ${grnOk ? '✓' : '✗ (need >= 100)'}`);
   if (!grnOk) pass = false;
   console.log(`  Stock movements (seed GRNs): ${smRes.rows[0].count}`);
   console.log(`  Company: ${csRes.rows[0].company_name}`);
@@ -579,6 +579,10 @@ async function verify(cookie: string) {
   if (fyMap.get(2025) !== 'Closed') { pass = false; console.log('  ✗ 2025 not Closed'); }
   if (fyMap.get(2026) !== 'Open') { pass = false; console.log('  ✗ 2026 not Open'); }
   if (fyMap.get(2027) !== 'Open') { pass = false; console.log('  ✗ 2027 not Open'); }
+
+  // Prefix convention: stored as "PO"/"DO" (no trailing dash); server's generatePoNumber()
+  //  adds "-" separator producing "PO-001". Prefix "PO-AE" produces "PO-AE-001" (clean format).
+  console.log(`  Prefix (company settings): "${csRes.rows[0].po_number_prefix}" → generates "PO-NNN" format`);
 
   if (pass) console.log('\n  ✓ All verification checks passed');
   else { console.error('\n  ✗ Verification FAILED'); process.exit(1); }
