@@ -197,6 +197,22 @@ export default function POForm({ open, onClose, editingPO, currentUser, onSucces
         newItems[index].size = product.size || '';
         newItems[index].unitPrice = parseFloat(product.costPrice) || 0;
         newItems[index].lineTotal = newItems[index].quantity * (parseFloat(product.costPrice) || 0);
+
+        // Auto-set PO currency from product's costPriceCurrency when first item is selected on a new PO
+        const productCurrency = product.costPriceCurrency || 'GBP';
+        const isFirstItem = index === 0 && !editingPO && newItems.filter(i => i.productId).length <= 1;
+        if (isFirstItem) {
+          const rate = companySettings ? getRateToAed(productCurrency, companySettings) : 4.85;
+          setFormData(prev => ({
+            ...prev,
+            currency: productCurrency,
+            fxRateToAed: rate.toFixed(4),
+            items: newItems
+          }));
+          const total = newItems.reduce((sum, item) => sum + (item.lineTotal || 0), 0);
+          setFormData(prev => ({ ...prev, totalAmount: total.toFixed(2) }));
+          return;
+        }
       }
     }
     

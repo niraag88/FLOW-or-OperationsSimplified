@@ -2,6 +2,12 @@
 
 This is a full-stack web application built with a React frontend and Express.js backend, designed as FLOW - a UAE business operations platform (AED currency, 5% VAT). The application features a modern UI built with shadcn/ui components and Tailwind CSS, with PostgreSQL database integration using Drizzle ORM.
 
+## Schema Changes (Task #49)
+- **products** table: Added `cost_price_currency` (text, default 'GBP') column via direct SQL. Schema updated in `shared/schema.ts` with `costPriceCurrency` field. `insertProductSchema` includes `costPriceCurrency`. `getProducts()` and `getProductById()` in `server/businessStorage.ts` include this field.
+- **AddProduct.jsx** and **EditProduct.jsx**: Currency selector for purchase price now supports AED/GBP/USD/INR (all `SUPPORTED_CURRENCIES`). `costPriceCurrency` is saved to DB and loaded back when editing. Profitability check only runs when both prices share the same currency.
+- **ProductsTab.jsx**: Cost price column now displays `formatCurrency(costPrice, costPriceCurrency)` instead of hardcoded `£`.
+- **POForm.jsx**: When first product is selected on a new PO, the PO currency automatically defaults to that product's `costPriceCurrency`.
+
 ## Schema Changes (Task #46)
 - **purchase_orders** table: Added `currency` (text, default 'GBP') and `fxRateToAed` (decimal 10,4, default 4.8500) columns via direct SQL (`ALTER TABLE purchase_orders ADD COLUMN IF NOT EXISTS ...`). All 307+ existing POs default to GBP/4.85. Schema updated in `shared/schema.ts`. `getPurchaseOrders()` in `server/businessStorage.ts` now includes these fields in its explicit SELECT and joins `suppliers` table (not `brands`) for `supplierName`.
 

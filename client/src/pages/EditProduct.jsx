@@ -13,6 +13,7 @@ import { logAuditAction } from "../components/utils/auditLogger";
 import { createPageUrl } from "@/utils";
 import { Save, X, AlertTriangle } from "lucide-react";
 import { Alert, AlertDescription } from "@/components/ui/alert";
+import { SUPPORTED_CURRENCIES } from "@/utils/currency";
 
 const initialFormData = {
   brand_id: "",
@@ -61,7 +62,7 @@ export default function EditProduct() {
             product_name: productData.name || "",
             size: productData.description || "",
             purchase_price: productData.costPrice || "",
-            purchase_price_currency: "GBP",
+            purchase_price_currency: productData.costPriceCurrency || "GBP",
             sale_price: productData.unitPrice || "",
             sale_price_currency: "AED",
           });
@@ -115,8 +116,8 @@ export default function EditProduct() {
       newErrors.purchase_price = "Purchase price must be positive";
     }
 
-    // Business logic: Sale price should be higher than purchase price for profitability
-    if (formData.purchase_price && formData.sale_price) {
+    // Business logic: Sale price should be higher than purchase price for profitability (only when same currency)
+    if (formData.purchase_price && formData.sale_price && formData.purchase_price_currency === formData.sale_price_currency) {
       const purchasePrice = parseFloat(formData.purchase_price);
       const salePrice = parseFloat(formData.sale_price);
       if (salePrice <= purchasePrice) {
@@ -153,6 +154,7 @@ export default function EditProduct() {
         name: formData.product_name.trim(),
         description: formData.size.trim() || null,
         costPrice: formData.purchase_price || "0",
+        costPriceCurrency: formData.purchase_price_currency || "GBP",
         unitPrice: formData.sale_price || "0",
       };
 
@@ -329,8 +331,9 @@ export default function EditProduct() {
                     <SelectValue />
                   </SelectTrigger>
                   <SelectContent>
-                    <SelectItem value="AED">AED</SelectItem>
-                    <SelectItem value="GBP">GBP</SelectItem>
+                    {SUPPORTED_CURRENCIES.map(c => (
+                      <SelectItem key={c} value={c}>{c}</SelectItem>
+                    ))}
                   </SelectContent>
                 </Select>
               </div>

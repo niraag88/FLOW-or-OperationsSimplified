@@ -14,6 +14,7 @@ import { logAuditAction } from "../components/utils/auditLogger";
 import { createPageUrl } from "@/utils";
 import { Save, Plus, X, AlertTriangle } from "lucide-react";
 import { Alert, AlertDescription } from "@/components/ui/alert";
+import { SUPPORTED_CURRENCIES } from "@/utils/currency";
 
 const initialFormData = {
   brand_id: "",
@@ -80,8 +81,8 @@ export default function AddProduct() {
       newErrors.purchase_price = "Purchase price must be positive";
     }
 
-    // Business logic: Sale price should be higher than purchase price for profitability
-    if (formData.purchase_price && formData.sale_price) {
+    // Business logic: Sale price should be higher than purchase price for profitability (only when same currency)
+    if (formData.purchase_price && formData.sale_price && formData.purchase_price_currency === formData.sale_price_currency) {
       const purchasePrice = parseFloat(formData.purchase_price);
       const salePrice = parseFloat(formData.sale_price);
       if (salePrice <= purchasePrice) {
@@ -116,6 +117,7 @@ export default function AddProduct() {
         name: formData.product_name.trim(),
         description: formData.size.trim() || null,
         costPrice: formData.purchase_price || "0",
+        costPriceCurrency: formData.purchase_price_currency || "GBP",
         unitPrice: formData.sale_price || "0",
         stockQuantity: 0, // Default initial stock
         minStockLevel: 10 // Default reorder level
@@ -279,8 +281,9 @@ export default function AddProduct() {
                     <SelectValue />
                   </SelectTrigger>
                   <SelectContent>
-                    <SelectItem value="AED">AED</SelectItem>
-                    <SelectItem value="GBP">GBP</SelectItem>
+                    {SUPPORTED_CURRENCIES.map(c => (
+                      <SelectItem key={c} value={c}>{c}</SelectItem>
+                    ))}
                   </SelectContent>
                 </Select>
               </div>

@@ -232,6 +232,7 @@ export const products = pgTable("products", {
   size: text("size"), // Product size (e.g., 100ml, 5L, 1kg, 250g)
   unitPrice: decimal("unit_price", { precision: 10, scale: 2 }).notNull(),
   costPrice: decimal("cost_price", { precision: 10, scale: 2 }),
+  costPriceCurrency: text("cost_price_currency").default("GBP"),
   vatRate: decimal("vat_rate", { precision: 5, scale: 2 }).default("0.00"),
   unit: text("unit").default("pcs"), // pcs, kg, liters, etc.
   stockQuantity: integer("stock_quantity").default(0),
@@ -540,6 +541,7 @@ export const insertProductSchema = createInsertSchema(products).pick({
   category: true,
   unitPrice: true,
   costPrice: true,
+  costPriceCurrency: true,
   vatRate: true,
   unit: true,
   stockQuantity: true,

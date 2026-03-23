@@ -11,6 +11,7 @@ import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigge
 import { Package, Trash2, MoreHorizontal, Edit, Search, Filter, ChevronDown, X } from "lucide-react";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Product, RecycleBin, AuditLog, User } from "@/api/entities";
+import { formatCurrency } from "@/utils/currency";
 import { logAuditAction } from "../utils/auditLogger";
 import SimpleConfirmDialog from "../common/SimpleConfirmDialog";
 
@@ -322,7 +323,7 @@ export default function ProductsTab({
                           <div>{product.name}</div>
                         </TableCell>
                         <TableCell>{product.description || '-'}</TableCell>
-                        <TableCell>£{product.costPrice}</TableCell>
+                        <TableCell>{formatCurrency(product.costPrice, product.costPriceCurrency || 'GBP')}</TableCell>
                         <TableCell>AED {product.unitPrice}</TableCell>
                         {actualCanDelete && (
                           <TableCell>
