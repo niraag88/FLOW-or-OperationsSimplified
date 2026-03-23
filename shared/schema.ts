@@ -60,6 +60,7 @@ export const invoices = pgTable("invoices", {
   notes: text("notes"),
   currency: text("currency").default("AED"),
   taxTreatment: text("tax_treatment").default("standard"),
+  paymentMethod: text("payment_method"),
   objectKey: text("object_key"),
   scanKey: text("scan_key"),
   createdAt: timestamp("created_at").defaultNow().notNull(),
@@ -125,6 +126,7 @@ export const insertInvoiceSchema = createInsertSchema(invoices).pick({
   vatAmount: z.string().optional(),
   notes: z.string().optional(),
   currency: z.string().optional(),
+  paymentMethod: z.string().optional(),
 });
 
 export type InsertInvoice = z.infer<typeof insertInvoiceSchema>;

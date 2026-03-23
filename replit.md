@@ -42,7 +42,7 @@ This is a full-stack web application built with a React frontend and Express.js 
 - **Specs**: 01-auth (4), 02-products (12), 03-quotations (6), 04-purchase-orders (9), 05-invoices (10), 06-delivery-orders (5), 07-stock-count-and-reports (8), 08-ui-flows (10)
 - **Covers**: Auth, products CRUD+edit+perf, quotation create/convert-to-invoice, PO lifecycle (draft→submitted→GRN receive→auto-close), invoice create/filters/validation/date-range, delivery orders, DO-from-invoice end-to-end, stock count create/load, dashboard summary, 50-line stress tests, SQL injection safety, performance benchmarks, browser UI flows (page loads, dialogs, page-level perf at full data scale)
 - **Credentials**: Reads from `E2E_ADMIN_USERNAME`/`E2E_ADMIN_PASSWORD` env vars; falls back to dev defaults with a console warning
-- **API Population Scripts**: `scripts/populate-customers-api.ts` (105 entries), `scripts/populate-suppliers-api.ts`, `scripts/populate-products-api.ts` — use authenticated POST endpoints (no direct SQL)
+- **API Population Scripts**: `scripts/populate-customers-api.ts` (191 entries), `scripts/populate-sales-api.ts` — use authenticated POST endpoints (no direct SQL)
 
 # User Preferences
 

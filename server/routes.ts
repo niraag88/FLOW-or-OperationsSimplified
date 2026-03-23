@@ -1549,6 +1549,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
         referenceDate: body.reference_date || undefined,
         notes: body.remarks || body.notes || undefined,
         currency: body.currency || 'AED',
+        paymentMethod: body.payment_method || undefined,
         objectKey: undefined,
         scanKey: undefined,
       };

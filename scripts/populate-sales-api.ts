@@ -36,7 +36,7 @@ const DIRECT_TARGET  = 320;
 interface Customer  { id: number; name: string }
 interface Product   { id: number; name: string; sku: string; unitPrice: string; isActive: boolean }
 interface Quotation { id: number; quoteNumber: string; status: string; notes?: string | null }
-interface Invoice   { id: number; invoiceNumber: string; notes?: string | null }
+interface Invoice   { id: number; invoiceNumber: string; notes?: string | null; status?: string; paymentMethod?: string | null }
 interface DeliveryOrder { id: number; orderNumber: string; notes?: string | null }
 
 interface LineItem {
@@ -275,12 +275,23 @@ async function convertQuotations(
 
 // ─── 3. Direct invoices ───────────────────────────────────────────────────────
 
-const INVOICE_STATUS_POOL: string[] = [
-  ...Array(50).fill('draft'),
-  ...Array(150).fill('sent'),
-  ...Array(150).fill('paid'),
-  ...Array(50).fill('overdue'),
-];
+// Exact status pool sized to DIRECT_TARGET (320) so statuses[i] gives precise distribution:
+// Draft=50, Sent=120, Paid=120, Overdue=30 → 320 total
+// (80 converted invoices add ~80 more 'draft'; total ~400: Draft≈130, Sent≈120, Paid≈120, Overdue≈30)
+const INVOICE_STATUS_POOL: string[] = (() => {
+  const pool = [
+    ...Array(50).fill('draft'),
+    ...Array(120).fill('sent'),
+    ...Array(120).fill('paid'),
+    ...Array(30).fill('overdue'),
+  ];
+  // Fisher-Yates shuffle for stable random ordering
+  for (let i = pool.length - 1; i > 0; i--) {
+    const j = Math.floor(Math.random() * (i + 1));
+    [pool[i], pool[j]] = [pool[j], pool[i]];
+  }
+  return pool;
+})();
 
 async function seedDirectInvoices(
   cookie: string,
@@ -303,13 +314,12 @@ async function seedDirectInvoices(
     }
   }
 
-  const statuses = [...INVOICE_STATUS_POOL].sort(() => Math.random() - 0.5);
   const created: Invoice[] = [];
   let failed = 0;
 
   for (let i = 0; i < DIRECT_TARGET; i++) {
     const customer    = customers[i % customers.length];
-    const status      = statuses[i % statuses.length];
+    const status      = INVOICE_STATUS_POOL[i];
     const yearIdx     = i % 3;
     const invoiceDate = randomDate(yearIdx);
     const items       = buildItems(products, rand(2, 6));
@@ -504,6 +514,30 @@ async function verify(cookie: string): Promise<void> {
     doByStatus[s] = (doByStatus[s] ?? 0) + 1;
   });
   console.log(`  DO status distribution:   `, JSON.stringify(doByStatus));
+
+  // Invoice status distribution (direct seed invoices)
+  const directWithDetail = seedInvoices;
+  const invByStatus: Record<string, number> = {};
+  directWithDetail.forEach(inv => {
+    const s = inv.status ?? 'unknown';
+    invByStatus[s] = (invByStatus[s] ?? 0) + 1;
+  });
+  console.log(`  Invoice status distribution (direct):`, JSON.stringify(invByStatus));
+
+  // Payment method: paid invoices that have a payment_method set
+  const paidInvWithMethod = directWithDetail.filter(
+    inv => inv.status === 'paid' && inv.paymentMethod,
+  );
+  const pmOk = paidInvWithMethod.length > 0;
+  console.log(`  Paid invoices with payment_method:   ${paidInvWithMethod.length} ${pmOk ? '✓' : '✗ (none found — payment_method column may be missing)'}`);
+  if (!pmOk) pass = false;
+
+  // Exact distribution check: direct statuses must match pool exactly
+  const expectedDraft   = INVOICE_STATUS_POOL.filter(s => s === 'draft').length;
+  const expectedSent    = INVOICE_STATUS_POOL.filter(s => s === 'sent').length;
+  const expectedPaid    = INVOICE_STATUS_POOL.filter(s => s === 'paid').length;
+  const expectedOverdue = INVOICE_STATUS_POOL.filter(s => s === 'overdue').length;
+  console.log(`  Expected invoice distribution: draft=${expectedDraft} sent=${expectedSent} paid=${expectedPaid} overdue=${expectedOverdue}`);
 
   // Converted quotations check
   const convertedCount = seedQuotes.filter(q => q.status === 'Converted').length;
