@@ -276,6 +276,25 @@ const CUSTOMERS: Array<{
   { name: 'Cobone Online Deals UAE', email: 'partners@cobone.com', phone: '+971 4 391 6008', billing_address: 'Media City, Dubai, UAE', shipping_address: 'Dubai, UAE' },
   { name: 'Wigme.com Health', email: 'purchasing@wigme.com', phone: '+971 4 295 5511', billing_address: 'Business Bay, Dubai, UAE', shipping_address: 'Dubai, UAE' },
   { name: 'Shopitag UAE Health', email: 'vendor@shopitag.com', phone: '+971 4 450 1100', billing_address: 'DIFC, Dubai, UAE', shipping_address: 'Dubai South, UAE' },
+
+  // ── UAE Spas & Wellness (extra to reach 190+) ─────────────────────────────
+  { name: 'Nirvana Spa Jumeirah', email: 'orders@nirvanaspa.ae', phone: '+971 4 349 7700', billing_address: 'Jumeirah 2, Dubai, UAE', shipping_address: 'Jumeirah 2, Dubai, UAE' },
+  { name: 'Oasis Wellbeing Centre', email: 'purchasing@oasiswellbeing.ae', phone: '+971 4 261 5500', billing_address: 'Deira, Dubai, UAE', shipping_address: 'Deira, Dubai, UAE' },
+  { name: 'The Retreat Spa Abu Dhabi', email: 'orders@retreatspa.ae', phone: '+971 2 445 0000', billing_address: 'Al Khalidiyah, Abu Dhabi, UAE', shipping_address: 'Abu Dhabi, UAE' },
+
+  // ── UAE Corporate & Hospitality (extra) ───────────────────────────────────
+  { name: 'Meraas Destination Dubai', email: 'wellness@meraas.ae', phone: '+971 4 556 6000', billing_address: 'Jumeirah, Dubai, UAE', shipping_address: 'Dubai, UAE' },
+  { name: 'Al Habtoor Group Wellness', email: 'wellness@habtoor.com', phone: '+971 4 407 7911', billing_address: 'Sheikh Zayed Road, Dubai, UAE', shipping_address: 'Dubai, UAE' },
+  { name: 'Dubai Culture Arts Authority', email: 'procurement@dubaiculture.gov.ae', phone: '+971 4 205 5550', billing_address: 'Al Shindagha, Dubai, UAE', shipping_address: 'Dubai, UAE' },
+
+  // ── Oman (extra) ───────────────────────────────────────────────────────────
+  { name: 'Seeb Wellness Oman', email: 'orders@seebwellness.om', phone: '+968 2454 1122', billing_address: 'Al Seeb, Muscat, Oman', shipping_address: 'Muscat, Oman' },
+
+  // ── International (extra) ─────────────────────────────────────────────────
+  { name: 'Lotus Naturals Hong Kong', email: 'orders@lotusnaturals.hk', phone: '+852 2234 5678', billing_address: 'Sheung Wan, Hong Kong', shipping_address: 'Hong Kong Port' },
+  { name: 'Aravali Herbals India', email: 'export@aravaliherbals.in', phone: '+91 11 4000 5678', billing_address: 'Connaught Place, New Delhi, India', shipping_address: 'NMPT, New Delhi, India' },
+  { name: 'Serenova Wellness Bahrain', email: 'orders@seronovawellness.bh', phone: '+973 1755 8800', billing_address: 'Seef District, Manama, Bahrain', shipping_address: 'Manama, Bahrain' },
+  { name: 'Radiant Natural Health KSA', email: 'orders@radiantnaturalksa.com', phone: '+966 11 234 4455', billing_address: 'Al Malaz, Riyadh, KSA', shipping_address: 'Riyadh, KSA' },
 ];
 
 async function main() {

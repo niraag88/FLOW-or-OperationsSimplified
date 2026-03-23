@@ -13,7 +13,7 @@ This is a full-stack web application built with a React frontend and Express.js 
 
 ## Current Database State (as of Task #56)
 - **Products**: 600 active products across all 12 categories (Essential Oils, Carrier Oils, Bath Salts, Body Butters, Massage Blends, Diffuser Blends, Roll-ons, Balms & Salves, Hydrosols, Supplements, Electronics, Stationery)
-- **Customers**: 180 customers (hotels, spas, retail chains, corporate, export clients across UAE, Oman, Kuwait, KSA, Jordan, Qatar, Egypt and internationally); script in `scripts/populate-customers-api.ts`
+- **Customers**: 191 customers (hotels, spas, retail chains, corporate, export clients across UAE, Oman, Kuwait, KSA, Jordan, Qatar, Egypt and internationally); script in `scripts/populate-customers-api.ts`
 - **Suppliers**: 80 suppliers (UK, India, USA, France, Germany, Australia, Italy, UAE-based)
 - **Brands**: 31 brands
 - **Users**: 15 users (1 Admin, 5 Managers, 9 Staff); password = Pass@1234

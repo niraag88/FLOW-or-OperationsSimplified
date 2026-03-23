@@ -1,6 +1,8 @@
 /**
  * populate-sales-api.ts
  * Comprehensive sales seeding script — all data created via authenticated REST API.
+ * No direct database access; idempotency is managed through API list/delete endpoints.
+ *
  * Creates:
  *   - 300+ Quotations  (Draft=50, Sent=100, Accepted=100, Expired=50)
  *   - ~80 Invoices from accepted quotations (convert flow)
@@ -8,7 +10,7 @@
  *   - 300+ Delivery Orders  (~150 linked to invoices, ~150 standalone)
  *
  * Idempotency tag: [SEED-56] in notes/remarks
- * Skips if counts already meet targets; clears partial batches.
+ * Skips entire section if target met; clears partial batches via DELETE API.
  *
  * Usage:
  *   npx tsx scripts/populate-sales-api.ts
@@ -17,47 +19,64 @@
  *   APP_URL, ADMIN_USERNAME, ADMIN_PASSWORD
  */
 
-import pkg from 'pg';
-const { Pool } = pkg;
-
 const BASE_URL = process.env.APP_URL ?? 'http://localhost:5000';
 const USERNAME  = process.env.ADMIN_USERNAME ?? 'admin';
 const PASSWORD  = process.env.ADMIN_PASSWORD ?? 'admin123';
 const SEED_TAG  = '[SEED-56]';
 
-const pool = new Pool({ connectionString: process.env.DATABASE_URL });
-
 // ─── Targets ──────────────────────────────────────────────────────────────────
-const QUOTE_TARGET     = 300;
-const INVOICE_TARGET   = 400;
-const DO_TARGET        = 300;
+const QUOTE_TARGET   = 300;
+const INVOICE_TARGET = 400;
+const DO_TARGET      = 300;
+const CONVERT_TARGET = 80;
+const DIRECT_TARGET  = 320;
 
-// ─── Helpers ──────────────────────────────────────────────────────────────────
+// ─── Types ────────────────────────────────────────────────────────────────────
 
-async function apiPost(path: string, body: object, cookie: string) {
-  const r = await fetch(`${BASE_URL}${path}`, {
-    method: 'POST',
+interface Customer  { id: number; name: string }
+interface Product   { id: number; name: string; sku: string; unitPrice: string; isActive: boolean }
+interface Quotation { id: number; quoteNumber: string; status: string; notes?: string | null }
+interface Invoice   { id: number; invoiceNumber: string; notes?: string | null }
+interface DeliveryOrder { id: number; orderNumber: string; notes?: string | null }
+
+interface LineItem {
+  product_id: number;
+  product_code: string;
+  description: string;
+  quantity: number;
+  unit_price: number;
+  vat_rate: number;
+  discount: number;
+  line_total: number;
+}
+
+// ─── HTTP Helpers ─────────────────────────────────────────────────────────────
+
+async function apiFetch(
+  path: string,
+  method: 'GET' | 'POST' | 'PUT' | 'DELETE',
+  cookie: string,
+  body?: object,
+): Promise<{ status: number; data: unknown }> {
+  const opts: RequestInit = {
+    method,
     headers: { 'Content-Type': 'application/json', Cookie: cookie },
-    body: JSON.stringify(body),
-  });
+  };
+  if (body !== undefined) opts.body = JSON.stringify(body);
+  const r = await fetch(`${BASE_URL}${path}`, opts);
   const data = await r.json().catch(() => ({}));
   return { status: r.status, data };
 }
 
-async function apiPut(path: string, body: object, cookie: string) {
-  const r = await fetch(`${BASE_URL}${path}`, {
-    method: 'PUT',
-    headers: { 'Content-Type': 'application/json', Cookie: cookie },
-    body: JSON.stringify(body),
-  });
-  const data = await r.json().catch(() => ({}));
-  return { status: r.status, data };
+async function apiGet(path: string, cookie: string): Promise<{ status: number; data: unknown }> {
+  return apiFetch(path, 'GET', cookie);
 }
-
-async function apiGet(path: string, cookie: string) {
-  const r = await fetch(`${BASE_URL}${path}`, { headers: { Cookie: cookie } });
-  const data = await r.json().catch(() => ({}));
-  return { status: r.status, data };
+async function apiPost(path: string, body: object, cookie: string): Promise<{ status: number; data: unknown }> {
+  return apiFetch(path, 'POST', cookie, body);
+}
+async function apiDelete(path: string, cookie: string): Promise<{ status: number }> {
+  const { status } = await apiFetch(path, 'DELETE', cookie);
+  return { status };
 }
 
 async function login(): Promise<string> {
@@ -72,9 +91,10 @@ async function login(): Promise<string> {
   return cookie;
 }
 
+// ─── Data Helpers ─────────────────────────────────────────────────────────────
+
 function pick<T>(arr: T[]): T { return arr[Math.floor(Math.random() * arr.length)]; }
 function rand(min: number, max: number): number { return Math.floor(Math.random() * (max - min + 1)) + min; }
-
 function isoDate(date: Date): string { return date.toISOString().substring(0, 10); }
 
 function addDays(date: Date, days: number): Date {
@@ -83,68 +103,79 @@ function addDays(date: Date, days: number): Date {
   return d;
 }
 
-// Spread dates evenly across 2025, 2026, 2027
+// Year ranges spread across 2025, 2026, 2027
 const DATE_RANGES = [
   { start: new Date('2025-01-01'), end: new Date('2025-12-31') },
   { start: new Date('2026-01-01'), end: new Date('2026-12-31') },
   { start: new Date('2027-01-01'), end: new Date('2027-03-22') },
 ];
 
-function randomDate(yearIdx?: number): Date {
-  const range = yearIdx !== undefined ? DATE_RANGES[yearIdx] : pick(DATE_RANGES);
+function randomDate(yearIdx: number): Date {
+  const range = DATE_RANGES[yearIdx];
   const span = range.end.getTime() - range.start.getTime();
   return new Date(range.start.getTime() + Math.random() * span);
 }
 
 const PAYMENT_METHODS = ['Bank Transfer', 'Cash', 'Card', 'Cheque'];
 
-// ─── Build line items from product pool ───────────────────────────────────────
-type Product = { id: number; name: string; sku: string; unitPrice: string };
-
-function buildItems(products: Product[], count: number) {
+function buildItems(products: Product[], count: number): LineItem[] {
   const shuffled = [...products].sort(() => Math.random() - 0.5);
-  const chosen = shuffled.slice(0, count);
-  return chosen.map((p) => {
+  return shuffled.slice(0, count).map((p) => {
     const qty = rand(1, 20);
-    const unitPrice = parseFloat(p.unitPrice) || rand(20, 400);
+    const unitPrice = +(parseFloat(p.unitPrice) || rand(20, 400)).toFixed(2);
     const lineTotal = +(qty * unitPrice).toFixed(2);
-    return {
-      product_id: p.id,
-      product_code: p.sku,
-      description: p.name,
-      quantity: qty,
-      unit_price: +unitPrice.toFixed(2),
-      vat_rate: 0.05,
-      discount: 0,
-      line_total: lineTotal,
-    };
+    return { product_id: p.id, product_code: p.sku, description: p.name, quantity: qty, unit_price: unitPrice, vat_rate: 0.05, discount: 0, line_total: lineTotal };
   });
 }
 
-function calcTotals(items: ReturnType<typeof buildItems>) {
-  const subtotal = +(items.reduce((s, it) => s + it.line_total, 0)).toFixed(2);
-  const vatAmount = +(subtotal * 0.05).toFixed(2);
+function calcTotals(items: LineItem[]): { subtotal: number; vatAmount: number; grandTotal: number } {
+  const subtotal   = +(items.reduce((s, it) => s + it.line_total, 0)).toFixed(2);
+  const vatAmount  = +(subtotal * 0.05).toFixed(2);
   const grandTotal = +(subtotal + vatAmount).toFixed(2);
   return { subtotal, vatAmount, grandTotal };
 }
 
-// ─── 1. Customers ─────────────────────────────────────────────────────────────
+// ─── Fetch base data ───────────────────────────────────────────────────────────
 
-async function fetchCustomers(cookie: string): Promise<Array<{ id: number; name: string }>> {
+async function fetchCustomers(cookie: string): Promise<Customer[]> {
   const { data } = await apiGet('/api/customers', cookie);
-  const list = Array.isArray(data) ? data : (data?.customers ?? []);
-  return list as Array<{ id: number; name: string }>;
+  const list = Array.isArray(data) ? data : (data as { customers?: Customer[] }).customers ?? [];
+  return (list as Customer[]).filter(c => c.id && c.name);
 }
 
 async function fetchProducts(cookie: string): Promise<Product[]> {
   const { data } = await apiGet('/api/products?limit=1000', cookie);
-  const list = Array.isArray(data) ? data : [];
-  return list.filter((p: any) => p.isActive && parseFloat(p.unitPrice) > 0) as Product[];
+  const list = Array.isArray(data) ? (data as Product[]) : [];
+  return list.filter(p => p.isActive && parseFloat(p.unitPrice) > 0);
 }
 
-// ─── 2. Quotations ────────────────────────────────────────────────────────────
+async function fetchSeedQuotations(cookie: string): Promise<Quotation[]> {
+  const { data } = await apiGet('/api/quotations', cookie);
+  const list = Array.isArray(data) ? (data as Quotation[]) : ((data as { quotations?: Quotation[] }).quotations ?? []);
+  return list.filter(q => q.notes?.startsWith(SEED_TAG));
+}
 
-const QUOTE_STATUSES = [
+async function fetchSeedInvoices(cookie: string): Promise<Invoice[]> {
+  const { data } = await apiGet('/api/invoices', cookie);
+  const list = Array.isArray(data) ? (data as Invoice[]) : ((data as { invoices?: Invoice[] }).invoices ?? []);
+  return list.filter(i => i.notes?.startsWith(SEED_TAG));
+}
+
+async function fetchSeedDOs(cookie: string): Promise<DeliveryOrder[]> {
+  const { data } = await apiGet('/api/delivery-orders', cookie);
+  const list = Array.isArray(data) ? (data as DeliveryOrder[]) : ((data as { deliveryOrders?: DeliveryOrder[] }).deliveryOrders ?? []);
+  return list.filter(d => d.notes?.startsWith(SEED_TAG));
+}
+
+async function fetchTotalInvoiceCount(cookie: string): Promise<number> {
+  const { data } = await apiGet('/api/invoices', cookie);
+  const list = Array.isArray(data) ? data : ((data as { invoices?: unknown[] }).invoices ?? []);
+  return list.length;
+}
+
+// ─── 1. Quotations ────────────────────────────────────────────────────────────
+
+const QUOTE_STATUS_POOL: string[] = [
   ...Array(50).fill('Draft'),
   ...Array(100).fill('Sent'),
   ...Array(100).fill('Accepted'),
@@ -153,57 +184,53 @@ const QUOTE_STATUSES = [
 
 async function seedQuotations(
   cookie: string,
-  customers: Array<{ id: number }>,
+  customers: Customer[],
   products: Product[],
-): Promise<{ id: number; status: string; quoteNumber: string }[]> {
+): Promise<Quotation[]> {
   console.log('\n── Quotations ─────────────────────────────────────────────');
 
-  const existing = (await pool.query(
-    `SELECT COUNT(*) FROM quotations WHERE notes LIKE $1`, [`${SEED_TAG}%`]
-  )).rows[0].count;
+  const existing = await fetchSeedQuotations(cookie);
 
-  if (parseInt(existing) >= QUOTE_TARGET) {
-    console.log(`  → Already have ${existing} seeded quotations — skipping`);
-    const rows = await pool.query(
-      `SELECT id, status, quote_number FROM quotations WHERE notes LIKE $1 ORDER BY id`,
-      [`${SEED_TAG}%`]
-    );
-    return rows.rows.map(r => ({ id: Number(r.id), status: r.status, quoteNumber: r.quote_number }));
+  if (existing.length >= QUOTE_TARGET) {
+    console.log(`  → Already have ${existing.length} seeded quotations — skipping`);
+    return existing;
   }
 
-  if (parseInt(existing) > 0) {
-    console.log(`  → Partial batch (${existing}) — clearing`);
-    await pool.query(`DELETE FROM quotation_items WHERE quote_id IN (SELECT id FROM quotations WHERE notes LIKE $1)`, [`${SEED_TAG}%`]);
-    await pool.query(`DELETE FROM quotations WHERE notes LIKE $1`, [`${SEED_TAG}%`]);
+  if (existing.length > 0) {
+    console.log(`  → Partial batch (${existing.length}) — clearing via API`);
+    for (const q of existing) {
+      await apiDelete(`/api/quotations/${q.id}`, cookie);
+    }
   }
 
-  const statuses = [...QUOTE_STATUSES].sort(() => Math.random() - 0.5);
-  const created: { id: number; status: string; quoteNumber: string }[] = [];
+  const statuses = [...QUOTE_STATUS_POOL].sort(() => Math.random() - 0.5);
+  const created: Quotation[] = [];
   let failed = 0;
 
   for (let i = 0; i < QUOTE_TARGET; i++) {
     const customer = customers[i % customers.length];
-    const status = statuses[i];
-    const yearIdx = i % 3; // even spread across years
-    const quoteDate = randomDate(yearIdx);
+    const status   = statuses[i];
+    const yearIdx  = i % 3;
+    const quoteDate  = randomDate(yearIdx);
     const validUntil = addDays(quoteDate, rand(15, 60));
-    const items = buildItems(products, rand(2, 6));
+    const items   = buildItems(products, rand(2, 6));
     const { subtotal, vatAmount, grandTotal } = calcTotals(items);
 
-    const { status: httpStatus, data } = await apiPost('/api/quotations', {
-      customerId: customer.id,
-      quoteDate: isoDate(quoteDate),
-      validUntil: isoDate(validUntil),
+    const { status: http, data } = await apiPost('/api/quotations', {
+      customerId:  customer.id,
+      quoteDate:   isoDate(quoteDate),
+      validUntil:  isoDate(validUntil),
       status,
-      notes: `${SEED_TAG} Quotation #${i + 1} — ${status}`,
+      notes:       `${SEED_TAG} Quotation #${i + 1} — ${status}`,
       totalAmount: subtotal.toFixed(2),
-      vatAmount: vatAmount.toFixed(2),
-      grandTotal: grandTotal.toFixed(2),
+      vatAmount:   vatAmount.toFixed(2),
+      grandTotal:  grandTotal.toFixed(2),
       items,
     }, cookie);
 
-    if (httpStatus === 201) {
-      created.push({ id: (data as any).id, status, quoteNumber: (data as any).quoteNumber });
+    if (http === 201) {
+      const q = data as Quotation;
+      created.push({ id: q.id, quoteNumber: q.quoteNumber, status, notes: `${SEED_TAG} Quotation #${i + 1} — ${status}` });
       if ((i + 1) % 50 === 0) console.log(`  → ${i + 1} quotations created...`);
     } else {
       failed++;
@@ -214,50 +241,41 @@ async function seedQuotations(
   return created;
 }
 
-// ─── 3. Invoices from quotations ──────────────────────────────────────────────
+// ─── 2. Convert quotations → invoices ────────────────────────────────────────
 
-async function convertQuotationsToInvoices(
+async function convertQuotations(
   cookie: string,
-  quotations: { id: number; status: string; quoteNumber: string }[],
-): Promise<Array<{ id: number; invoiceNumber: string }>> {
+  quotations: Quotation[],
+): Promise<Invoice[]> {
   console.log('\n── Convert accepted quotations → invoices ─────────────────');
 
-  // Check how many seed quotations are already Converted — skip if already 80+
   const alreadyConverted = quotations.filter(q => q.status === 'Converted').length;
-  if (alreadyConverted >= 80) {
+  if (alreadyConverted >= CONVERT_TARGET) {
     console.log(`  → Already ${alreadyConverted} quotations converted — skipping`);
     return [];
   }
 
-  // Only convert Accepted ones (not already Converted)
-  const accepted = quotations.filter(q => q.status === 'Accepted');
-  // Convert up to 80 accepted quotations
-  const toConvert = accepted.slice(0, 80);
-
-  const converted: Array<{ id: number; invoiceNumber: string }> = [];
+  const toConvert = quotations.filter(q => q.status === 'Accepted').slice(0, CONVERT_TARGET);
+  const converted: Invoice[] = [];
   let failed = 0;
 
   for (const q of toConvert) {
-    const { status, data } = await apiPost('/api/invoices/from-quotation', {
-      quotationId: q.id,
-    }, cookie);
-    if (status === 201) {
-      converted.push({ id: (data as any).id, invoiceNumber: (data as any).invoiceNumber });
-    } else if ((data as any)?.error?.includes('already been converted')) {
-      // Already converted — find and record it
-      converted.push({ id: 0, invoiceNumber: 'converted' });
+    const { status: http, data } = await apiPost('/api/invoices/from-quotation', { quotationId: q.id }, cookie);
+    if (http === 201) {
+      const inv = data as Invoice;
+      converted.push({ id: inv.id, invoiceNumber: inv.invoiceNumber });
     } else {
       failed++;
     }
   }
 
   console.log(`  ✓ Converted: ${converted.length}, Failed: ${failed}`);
-  return converted.filter(c => c.id > 0);
+  return converted;
 }
 
-// ─── 4. Direct invoices ───────────────────────────────────────────────────────
+// ─── 3. Direct invoices ───────────────────────────────────────────────────────
 
-const INVOICE_STATUSES = [
+const INVOICE_STATUS_POOL: string[] = [
   ...Array(50).fill('draft'),
   ...Array(150).fill('sent'),
   ...Array(150).fill('paid'),
@@ -266,64 +284,59 @@ const INVOICE_STATUSES = [
 
 async function seedDirectInvoices(
   cookie: string,
-  customers: Array<{ id: number }>,
+  customers: Customer[],
   products: Product[],
-  directCount: number,
-): Promise<Array<{ id: number; invoiceNumber: string }>> {
-  console.log(`\n── Direct invoices (${directCount}) ───────────────────────────────────`);
+): Promise<Invoice[]> {
+  console.log(`\n── Direct invoices (${DIRECT_TARGET}) ───────────────────────────────────`);
 
-  const existing = parseInt((await pool.query(
-    `SELECT COUNT(*) FROM invoices WHERE notes LIKE $1`, [`${SEED_TAG}%`]
-  )).rows[0].count);
+  const existing = await fetchSeedInvoices(cookie);
 
-  if (existing >= directCount) {
-    console.log(`  → Already have ${existing} seeded direct invoices — skipping`);
-    const rows = await pool.query(
-      `SELECT id, invoice_number FROM invoices WHERE notes LIKE $1 ORDER BY id`,
-      [`${SEED_TAG}%`]
-    );
-    return rows.rows.map(r => ({ id: Number(r.id), invoiceNumber: r.invoice_number }));
+  if (existing.length >= DIRECT_TARGET) {
+    console.log(`  → Already have ${existing.length} seeded direct invoices — skipping`);
+    return existing;
   }
 
-  if (existing > 0) {
-    console.log(`  → Partial batch (${existing}) — clearing`);
-    await pool.query(`DELETE FROM invoice_line_items WHERE invoice_id IN (SELECT id FROM invoices WHERE notes LIKE $1)`, [`${SEED_TAG}%`]);
-    await pool.query(`DELETE FROM invoices WHERE notes LIKE $1`, [`${SEED_TAG}%`]);
+  if (existing.length > 0) {
+    console.log(`  → Partial batch (${existing.length}) — clearing via API`);
+    for (const inv of existing) {
+      await apiDelete(`/api/invoices/${inv.id}`, cookie);
+    }
   }
 
-  const statuses = [...INVOICE_STATUSES].sort(() => Math.random() - 0.5);
-  const created: Array<{ id: number; invoiceNumber: string }> = [];
+  const statuses = [...INVOICE_STATUS_POOL].sort(() => Math.random() - 0.5);
+  const created: Invoice[] = [];
   let failed = 0;
 
-  for (let i = 0; i < directCount; i++) {
-    const customer = customers[i % customers.length];
-    const status = statuses[i % statuses.length];
-    const yearIdx = i % 3;
+  for (let i = 0; i < DIRECT_TARGET; i++) {
+    const customer    = customers[i % customers.length];
+    const status      = statuses[i % statuses.length];
+    const yearIdx     = i % 3;
     const invoiceDate = randomDate(yearIdx);
-    const items = buildItems(products, rand(2, 6));
-    const { subtotal, vatAmount, grandTotal } = calcTotals(items);
+    const items       = buildItems(products, rand(2, 6));
+    const { vatAmount, grandTotal } = calcTotals(items);
 
-    const { status: httpStatus, data } = await apiPost('/api/invoices', {
-      customer_id: customer.id,
+    const { status: http, data } = await apiPost('/api/invoices', {
+      customer_id:    customer.id,
       status,
-      invoice_date: isoDate(invoiceDate),
-      notes: `${SEED_TAG} Invoice #${i + 1} — ${status}`,
-      tax_amount: vatAmount,
-      total_amount: grandTotal,
-      currency: 'AED',
+      invoice_date:   isoDate(invoiceDate),
+      notes:          `${SEED_TAG} Invoice #${i + 1} — ${status}`,
+      tax_amount:     vatAmount,
+      total_amount:   grandTotal,
+      currency:       'AED',
       payment_method: status === 'paid' ? pick(PAYMENT_METHODS) : undefined,
       items: items.map(it => ({
-        product_id: it.product_id,
+        product_id:   it.product_id,
         product_code: it.product_code,
-        description: it.description,
-        quantity: it.quantity,
-        unit_price: it.unit_price,
-        line_total: it.line_total,
+        description:  it.description,
+        quantity:     it.quantity,
+        unit_price:   it.unit_price,
+        line_total:   it.line_total,
       })),
     }, cookie);
 
-    if (httpStatus === 201) {
-      created.push({ id: (data as any).id, invoiceNumber: (data as any).invoiceNumber });
+    if (http === 201) {
+      const inv = data as Invoice;
+      created.push({ id: inv.id, invoiceNumber: inv.invoiceNumber });
       if ((i + 1) % 80 === 0) console.log(`  → ${i + 1} direct invoices created...`);
     } else {
       failed++;
@@ -334,84 +347,76 @@ async function seedDirectInvoices(
   return created;
 }
 
-// ─── 5. Delivery Orders ───────────────────────────────────────────────────────
+// ─── 4. Delivery Orders ───────────────────────────────────────────────────────
 
-const DO_STATUSES_LINKED     = ['Pending', 'Dispatched', 'Delivered'];
-const DO_STATUS_WEIGHTS      = [20, 40, 40]; // % weights for pending/dispatched/delivered
-const DO_STATUSES_STANDALONE = ['Pending', 'Dispatched', 'Delivered'];
-
-function weightedStatus(statuses: string[], weights: number[]): string {
-  const r = Math.random() * 100;
-  let cum = 0;
-  for (let i = 0; i < weights.length; i++) {
-    cum += weights[i];
-    if (r < cum) return statuses[i];
-  }
-  return statuses[statuses.length - 1];
-}
+const DO_STATUS_POOL: string[] = [
+  ...Array(20).fill('Pending'),
+  ...Array(40).fill('Dispatched'),
+  ...Array(40).fill('Delivered'),
+];
 
 async function seedDeliveryOrders(
   cookie: string,
-  customers: Array<{ id: number }>,
+  customers: Customer[],
   products: Product[],
-  linkedInvoices: Array<{ id: number; invoiceNumber: string }>,
+  linkedInvoices: Invoice[],
 ): Promise<void> {
   console.log('\n── Delivery Orders (300+ via API) ────────────────────────');
 
-  const existing = parseInt((await pool.query(
-    `SELECT COUNT(*) FROM delivery_orders WHERE notes LIKE $1`, [`${SEED_TAG}%`]
-  )).rows[0].count);
+  const existing = await fetchSeedDOs(cookie);
 
-  if (existing >= DO_TARGET) {
-    console.log(`  → Already have ${existing} seeded DOs — skipping`);
+  if (existing.length >= DO_TARGET) {
+    console.log(`  → Already have ${existing.length} seeded DOs — skipping`);
     return;
   }
 
-  if (existing > 0) {
-    console.log(`  → Partial batch (${existing}) — clearing`);
-    await pool.query(`DELETE FROM delivery_order_items WHERE do_id IN (SELECT id FROM delivery_orders WHERE notes LIKE $1)`, [`${SEED_TAG}%`]);
-    await pool.query(`DELETE FROM delivery_orders WHERE notes LIKE $1`, [`${SEED_TAG}%`]);
+  if (existing.length > 0) {
+    console.log(`  → Partial batch (${existing.length}) — clearing via API`);
+    for (const d of existing) {
+      await apiDelete(`/api/delivery-orders/${d.id}`, cookie);
+    }
   }
 
+  const statuses = [...DO_STATUS_POOL].sort(() => Math.random() - 0.5);
   let created = 0;
-  let failed = 0;
+  let failed  = 0;
 
-  // ── A. ~150 DOs linked to invoices ──
+  // A: ~150 DOs linked to invoices
   const invoiceSample = linkedInvoices.slice(0, Math.min(150, linkedInvoices.length));
   console.log(`  Creating ${invoiceSample.length} invoice-linked DOs...`);
 
   for (let i = 0; i < invoiceSample.length; i++) {
-    const inv = invoiceSample[i];
-    const customer = customers[i % customers.length];
-    const yearIdx = i % 3;
+    const inv       = invoiceSample[i];
+    const customer  = customers[i % customers.length];
+    const yearIdx   = i % 3;
     const orderDate = randomDate(yearIdx);
-    const items = buildItems(products, rand(2, 5));
+    const items     = buildItems(products, rand(2, 5));
     const { subtotal, vatAmount, grandTotal } = calcTotals(items);
-    const status = weightedStatus(DO_STATUSES_LINKED, DO_STATUS_WEIGHTS);
+    const status    = statuses[i % statuses.length];
 
-    const { status: httpStatus } = await apiPost('/api/delivery-orders', {
-      customer_id: customer.id,
+    const { status: http } = await apiPost('/api/delivery-orders', {
+      customer_id:    customer.id,
       status,
-      order_date: isoDate(orderDate),
-      reference: inv.invoiceNumber,
+      order_date:     isoDate(orderDate),
+      reference:      inv.invoiceNumber,
       reference_date: isoDate(orderDate),
-      subtotal: subtotal,
-      tax_amount: vatAmount,
-      total_amount: grandTotal,
-      currency: 'AED',
-      tax_rate: 0.05,
-      notes: `${SEED_TAG} DO from invoice ${inv.invoiceNumber}`,
+      subtotal,
+      tax_amount:     vatAmount,
+      total_amount:   grandTotal,
+      currency:       'AED',
+      tax_rate:       0.05,
+      notes:          `${SEED_TAG} DO from invoice ${inv.invoiceNumber}`,
       items: items.map(it => ({
-        product_id: it.product_id,
+        product_id:   it.product_id,
         product_code: it.product_code,
-        description: it.description,
-        quantity: it.quantity,
-        unit_price: it.unit_price,
-        line_total: it.line_total,
+        description:  it.description,
+        quantity:     it.quantity,
+        unit_price:   it.unit_price,
+        line_total:   it.line_total,
       })),
     }, cookie);
 
-    if (httpStatus === 201) {
+    if (http === 201) {
       created++;
       if (created % 50 === 0) console.log(`  → ${created} DOs created...`);
     } else {
@@ -419,45 +424,39 @@ async function seedDeliveryOrders(
     }
   }
 
-  // ── B. Standalone DOs to reach 300 total ──
+  // B: Standalone DOs to fill remaining target
   const standaloneCount = DO_TARGET - created;
   console.log(`  Creating ${standaloneCount} standalone DOs...`);
 
-  const doStatusPool = [
-    ...Array(20).fill('Pending'),
-    ...Array(40).fill('Dispatched'),
-    ...Array(40).fill('Delivered'),
-  ].sort(() => Math.random() - 0.5);
-
   for (let i = 0; i < standaloneCount; i++) {
-    const customer = customers[i % customers.length];
-    const yearIdx = i % 3;
+    const customer  = customers[i % customers.length];
+    const yearIdx   = i % 3;
     const orderDate = randomDate(yearIdx);
-    const items = buildItems(products, rand(2, 5));
+    const items     = buildItems(products, rand(2, 5));
     const { subtotal, vatAmount, grandTotal } = calcTotals(items);
-    const status = doStatusPool[i % doStatusPool.length];
+    const status    = statuses[(invoiceSample.length + i) % statuses.length];
 
-    const { status: httpStatus } = await apiPost('/api/delivery-orders', {
-      customer_id: customer.id,
+    const { status: http } = await apiPost('/api/delivery-orders', {
+      customer_id:  customer.id,
       status,
-      order_date: isoDate(orderDate),
+      order_date:   isoDate(orderDate),
       subtotal,
-      tax_amount: vatAmount,
+      tax_amount:   vatAmount,
       total_amount: grandTotal,
-      currency: 'AED',
-      tax_rate: 0.05,
-      notes: `${SEED_TAG} Standalone DO #${i + 1}`,
+      currency:     'AED',
+      tax_rate:     0.05,
+      notes:        `${SEED_TAG} Standalone DO #${i + 1}`,
       items: items.map(it => ({
-        product_id: it.product_id,
+        product_id:   it.product_id,
         product_code: it.product_code,
-        description: it.description,
-        quantity: it.quantity,
-        unit_price: it.unit_price,
-        line_total: it.line_total,
+        description:  it.description,
+        quantity:     it.quantity,
+        unit_price:   it.unit_price,
+        line_total:   it.line_total,
       })),
     }, cookie);
 
-    if (httpStatus === 201) {
+    if (http === 201) {
       created++;
       if (created % 50 === 0) console.log(`  → ${created} DOs created...`);
     } else {
@@ -468,55 +467,49 @@ async function seedDeliveryOrders(
   console.log(`  ✓ DOs created: ${created}, Failed: ${failed}`);
 }
 
-// ─── 6. Verification ──────────────────────────────────────────────────────────
+// ─── 5. Verification ──────────────────────────────────────────────────────────
 
-async function verify(): Promise<void> {
+async function verify(cookie: string): Promise<void> {
   console.log('\n── Verification ────────────────────────────────────────────');
   let pass = true;
 
-  const [qRes, iRes, doRes] = await Promise.all([
-    pool.query(`SELECT COUNT(*) FROM quotations WHERE notes LIKE $1`, [`${SEED_TAG}%`]),
-    pool.query(`SELECT COUNT(*) FROM invoices WHERE notes LIKE $1 OR (notes IS NULL)`, [`${SEED_TAG}%`]),
-    pool.query(`SELECT COUNT(*) FROM delivery_orders WHERE notes LIKE $1`, [`${SEED_TAG}%`]),
+  const [seedQuotes, seedInvoices, seedDOs, totalInvoiceCount] = await Promise.all([
+    fetchSeedQuotations(cookie),
+    fetchSeedInvoices(cookie),
+    fetchSeedDOs(cookie),
+    fetchTotalInvoiceCount(cookie),
   ]);
 
-  // For invoices, count seed direct + converted (converted don't have seed tag in notes)
-  const directInvCount = parseInt((await pool.query(
-    `SELECT COUNT(*) FROM invoices WHERE notes LIKE $1`, [`${SEED_TAG}%`]
-  )).rows[0].count);
+  const qOk  = seedQuotes.length >= QUOTE_TARGET;
+  const iOk  = totalInvoiceCount >= INVOICE_TARGET;
+  const doOk = seedDOs.length    >= DO_TARGET;
 
-  const totalInvCount = parseInt((await pool.query(`SELECT COUNT(*) FROM invoices`)).rows[0].count);
-
-  const qCount  = parseInt(qRes.rows[0].count);
-  const doCount = parseInt(doRes.rows[0].count);
-
-  const qOk  = qCount  >= QUOTE_TARGET;
-  const iOk  = totalInvCount >= INVOICE_TARGET;
-  const doOk = doCount >= DO_TARGET;
-
-  console.log(`  Quotations (seeded):       ${qCount}  ${qOk  ? '✓' : '✗ (need >= ' + QUOTE_TARGET + ')'}`);
-  console.log(`  Invoices (total in DB):    ${totalInvCount}  ${iOk ? '✓' : '✗ (need >= ' + INVOICE_TARGET + ')'}`);
-  console.log(`  Invoices (direct seeded):  ${directInvCount}`);
-  console.log(`  Delivery Orders (seeded):  ${doCount}  ${doOk ? '✓' : '✗ (need >= ' + DO_TARGET + ')'}`);
+  console.log(`  Quotations (seeded):       ${seedQuotes.length}  ${qOk  ? '✓' : '✗ (need >= ' + QUOTE_TARGET + ')'}`);
+  console.log(`  Invoices (total in DB):    ${totalInvoiceCount}  ${iOk ? '✓' : '✗ (need >= ' + INVOICE_TARGET + ')'}`);
+  console.log(`  Invoices (direct seeded):  ${seedInvoices.length}`);
+  console.log(`  Delivery Orders (seeded):  ${seedDOs.length}  ${doOk ? '✓' : '✗ (need >= ' + DO_TARGET + ')'}`);
 
   if (!qOk)  pass = false;
   if (!iOk)  pass = false;
   if (!doOk) pass = false;
 
-  // Status distribution checks
-  const qStatusRes = await pool.query(
-    `SELECT status, COUNT(*) FROM quotations WHERE notes LIKE $1 GROUP BY status`, [`${SEED_TAG}%`]
-  );
+  // Status distribution
   const qByStatus: Record<string, number> = {};
-  qStatusRes.rows.forEach(r => { qByStatus[r.status] = parseInt(r.count); });
+  seedQuotes.forEach(q => { qByStatus[q.status] = (qByStatus[q.status] ?? 0) + 1; });
   console.log(`  Quote status distribution:`, JSON.stringify(qByStatus));
 
-  const doStatusRes = await pool.query(
-    `SELECT status, COUNT(*) FROM delivery_orders WHERE notes LIKE $1 GROUP BY status`, [`${SEED_TAG}%`]
-  );
   const doByStatus: Record<string, number> = {};
-  doStatusRes.rows.forEach(r => { doByStatus[r.status] = parseInt(r.count); });
+  seedDOs.forEach(d => {
+    const s = (d as unknown as { status?: string }).status ?? 'Unknown';
+    doByStatus[s] = (doByStatus[s] ?? 0) + 1;
+  });
   console.log(`  DO status distribution:   `, JSON.stringify(doByStatus));
+
+  // Converted quotations check
+  const convertedCount = seedQuotes.filter(q => q.status === 'Converted').length;
+  const convOk = convertedCount >= CONVERT_TARGET;
+  console.log(`  Converted quotations:      ${convertedCount}  ${convOk ? '✓' : '✗ (need >= ' + CONVERT_TARGET + ')'}`);
+  if (!convOk) pass = false;
 
   if (pass) console.log('\n  ✓ All verification checks passed');
   else { console.error('\n  ✗ Verification FAILED'); process.exit(1); }
@@ -524,7 +517,7 @@ async function verify(): Promise<void> {
 
 // ─── Main ─────────────────────────────────────────────────────────────────────
 
-async function main() {
+async function main(): Promise<void> {
   console.log('═══════════════════════════════════════════════════════════');
   console.log(' Sales seeding: Quotations, Invoices, Delivery Orders      ');
   console.log('═══════════════════════════════════════════════════════════');
@@ -532,7 +525,6 @@ async function main() {
   const cookie = await login();
   console.log(`✓ Authenticated as ${USERNAME}`);
 
-  // Fetch customers and products
   const customers = await fetchCustomers(cookie);
   if (customers.length < 10) {
     console.error(`  ✗ Not enough customers (${customers.length}) — run populate-customers-api.ts first`);
@@ -547,38 +539,29 @@ async function main() {
   }
   console.log(`✓ Found ${products.length} active products`);
 
-  // 1. Seed quotations
+  // Step 1: Quotations
   const quotations = await seedQuotations(cookie, customers, products);
 
-  // 2. Convert accepted quotations → invoices
-  const convertedInvoices = await convertQuotationsToInvoices(cookie, quotations);
-  console.log(`  Total converted invoice IDs collected: ${convertedInvoices.length}`);
+  // Step 2: Convert accepted quotations
+  const convertedInvoices = await convertQuotations(cookie, quotations);
+  console.log(`  Converted invoice IDs collected: ${convertedInvoices.length}`);
 
-  // 3. Seed direct invoices to reach INVOICE_TARGET total
-  const totalExistingInvoices = parseInt(
-    (await pool.query(`SELECT COUNT(*) FROM invoices`)).rows[0].count
-  );
-  const directNeeded = Math.max(INVOICE_TARGET - totalExistingInvoices, 0);
-  console.log(`  Total invoices in DB: ${totalExistingInvoices}; direct needed: ${directNeeded}`);
+  // Step 3: Direct invoices (always target DIRECT_TARGET regardless of conversions)
+  const directInvoices = await seedDirectInvoices(cookie, customers, products);
 
-  const directInvoices = await seedDirectInvoices(cookie, customers, products, Math.max(directNeeded, 320));
-  const allInvoices = [...convertedInvoices, ...directInvoices];
-
-  // 4. Seed delivery orders
+  // Step 4: Delivery orders
+  const allInvoices: Invoice[] = [...convertedInvoices, ...directInvoices];
   await seedDeliveryOrders(cookie, customers, products, allInvoices);
 
-  // 5. Verify
-  await verify();
+  // Step 5: Verify
+  await verify(cookie);
 
   console.log('\n═══════════════════════════════════════════════════════════');
   console.log(' Sales seeding complete!                                    ');
   console.log('═══════════════════════════════════════════════════════════');
-
-  await pool.end();
 }
 
-main().catch(async (err) => {
+main().catch((err: unknown) => {
   console.error('Fatal error:', err);
-  await pool.end().catch(() => {});
   process.exit(1);
 });
