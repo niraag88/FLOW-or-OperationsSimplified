@@ -1615,6 +1615,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
         referenceDate: body.reference_date || null,
         notes: body.remarks || body.notes || null,
         currency: body.currency || 'AED',
+        paymentMethod: body.payment_method || null,
       }).where(eq(invoices.id, id));
 
       // Replace line items only when new items are explicitly provided
