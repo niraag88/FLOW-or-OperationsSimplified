@@ -315,7 +315,7 @@ export default function POForm({ open, onClose, editingPO, currentUser, onSucces
 
   return (
     <Dialog open={open} onOpenChange={onClose}>
-      <DialogContent className="max-w-6xl max-h-[90vh] overflow-y-auto">
+      <DialogContent className="w-full sm:max-w-6xl max-h-[90vh] overflow-y-auto">
         <DialogHeader>
           <DialogTitle>
             {editingPO ? `Edit Purchase Order ${editingPO.poNumber}` : 'New Purchase Order'}
@@ -458,7 +458,7 @@ export default function POForm({ open, onClose, editingPO, currentUser, onSucces
             )}
 
             {formData.items.length > 0 && (
-              <div className="rounded-md border">
+              <div className="rounded-md border overflow-x-auto">
                 <Table>
                   <TableHeader>
                     <TableRow>

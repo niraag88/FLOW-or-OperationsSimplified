@@ -297,7 +297,7 @@ export default function ProductsTab({
           ) : (
             <>
               {/* Desktop and Mobile Table */}
-              <div>
+              <div className="w-full overflow-x-auto">
                 <Table>
                   <TableHeader>
                     <TableRow>
@@ -361,7 +361,7 @@ export default function ProductsTab({
 
               {/* Pagination Controls */}
               {products.length > 0 && (
-                <div className="flex items-center justify-between mt-6 pt-4 border-t">
+                <div className="flex flex-wrap items-center justify-between gap-4 mt-6 pt-4 border-t">
                   <div className="flex items-center gap-2">
                     <span className="text-sm text-gray-700">
                       Showing {startIndex + 1} to {Math.min(endIndex, products.length)} of {products.length} products

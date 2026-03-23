@@ -78,7 +78,7 @@ export default function POFilters({ filters, onFiltersChange, onFilterChange }) 
   };
 
   return (
-    <div className="flex items-center gap-3">
+    <div className="flex items-center gap-3 flex-wrap">
       <Filter className="w-4 h-4 text-gray-500" />
       
       <Select value={filters.status} onValueChange={(value) => handleFilterChange('status', value)}>

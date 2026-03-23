@@ -23,7 +23,7 @@ export function TopNavigation() {
           </div>
 
           {/* Main Navigation */}
-          <nav className="flex space-x-8">
+          <nav className="hidden md:flex space-x-8">
             <Link to="/">
               <Button
                 variant={location === "/" ? "default" : "ghost"}
@@ -72,7 +72,7 @@ export function TopNavigation() {
           {/* Search and Profile */}
           <div className="flex items-center space-x-4">
             {/* Search Bar */}
-            <div className="relative">
+            <div className="relative hidden md:block">
               <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
                 <Search className="w-4 h-4 text-slate-400" />
               </div>

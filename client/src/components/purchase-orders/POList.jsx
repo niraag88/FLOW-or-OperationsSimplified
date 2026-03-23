@@ -87,7 +87,7 @@ export default function POList({ purchaseOrders, totalCount, loading, canEdit, c
           </CardTitle>
         </CardHeader>
         <CardContent>
-          <div className="w-full">
+          <div className="w-full overflow-x-auto">
             <Table>
               <TableHeader>
                 <TableRow>
