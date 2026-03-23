@@ -404,6 +404,16 @@ export const companySettings = pgTable("company_settings", {
   updatedAt: timestamp("updated_at").defaultNow().notNull(),
 });
 
+// Storage objects tracking table — records file sizes at upload time
+// because the object storage list() API does not return size information.
+export const storageObjects = pgTable("storage_objects", {
+  key: text("key").primaryKey(),
+  sizeBytes: integer("size_bytes").notNull().default(0),
+  uploadedAt: timestamp("uploaded_at").defaultNow().notNull(),
+});
+
+export type StorageObject = typeof storageObjects.$inferSelect;
+
 // Storage monitoring table
 export const storageMonitoring = pgTable("storage_monitoring", {
   id: serial("id").primaryKey(),

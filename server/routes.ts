@@ -5,10 +5,10 @@ import { storage } from "./storage";
 import { businessStorage } from "./businessStorage";
 import { Client } from '@replit/object-storage';
 import { invoices, deliveryOrders, auditLog, users, recycleBin, type InsertAuditLog, type InsertUser, type UpdateUser, type User, type InsertInvoice } from "@shared/schema";
-import { insertBrandSchema, insertSupplierSchema, insertCustomerSchema, insertProductSchema, insertPurchaseOrderSchema, insertQuotationSchema, insertInvoiceSchema, insertDeliveryOrderSchema, stockCounts, stockCountItems, goodsReceipts, goodsReceiptItems, stockMovements, products, purchaseOrders, purchaseOrderItems, invoiceLineItems, deliveryOrderItems, suppliers, brands, quotations, quotationItems, customers, companySettings, financialYears, insertFinancialYearSchema } from "@shared/schema";
+import { insertBrandSchema, insertSupplierSchema, insertCustomerSchema, insertProductSchema, insertPurchaseOrderSchema, insertQuotationSchema, insertInvoiceSchema, insertDeliveryOrderSchema, stockCounts, stockCountItems, goodsReceipts, goodsReceiptItems, stockMovements, products, purchaseOrders, purchaseOrderItems, invoiceLineItems, deliveryOrderItems, suppliers, brands, quotations, quotationItems, customers, companySettings, financialYears, insertFinancialYearSchema, storageObjects } from "@shared/schema";
 import * as XLSX from 'xlsx';
 import { db } from "./db";
-import { eq, desc } from "drizzle-orm";
+import { eq, desc, sum } from "drizzle-orm";
 import pkg from 'pg';
 import crypto from 'crypto';
 import multer from 'multer';
@@ -1701,6 +1701,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       if (invoice.scanKey) {
         try {
           await objectStorageClient.delete(invoice.scanKey);
+          await db.delete(storageObjects).where(eq(storageObjects.key, invoice.scanKey));
         } catch (storageErr) {
           console.warn('Could not delete object from storage (clearing key anyway):', storageErr);
         }
@@ -2003,6 +2004,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       if (doRecord.scanKey) {
         try {
           await objectStorageClient.delete(doRecord.scanKey);
+          await db.delete(storageObjects).where(eq(storageObjects.key, doRecord.scanKey));
         } catch (storageErr) {
           console.warn('Could not delete object from storage (clearing key anyway):', storageErr);
         }
@@ -2740,6 +2742,11 @@ export async function registerRoutes(app: Express): Promise<Server> {
       // Clean up token
       signedTokens.delete(token);
 
+      // Track uploaded file size for accurate total-size reporting
+      await db.insert(storageObjects)
+        .values({ key: tokenData.key, sizeBytes: fileData.length })
+        .onConflictDoUpdate({ target: storageObjects.key, set: { sizeBytes: fileData.length, uploadedAt: new Date() } });
+
       res.json({ success: true, key: tokenData.key });
     } catch (error) {
       console.error('Error uploading file:', error);
@@ -2803,6 +2810,11 @@ export async function registerRoutes(app: Express): Promise<Server> {
       if (!result.ok) {
         throw new Error(`Upload failed: ${result.error}`);
       }
+
+      // Track uploaded file size for accurate total-size reporting
+      await db.insert(storageObjects)
+        .values({ key: storageKey, sizeBytes: req.file.size })
+        .onConflictDoUpdate({ target: storageObjects.key, set: { sizeBytes: req.file.size, uploadedAt: new Date() } });
 
       res.json({ success: true, key: storageKey });
     } catch (error) {
@@ -2935,18 +2947,13 @@ export async function registerRoutes(app: Express): Promise<Server> {
   });
 
   // GET /api/storage/total-size
-  // Get total size of all objects in the bucket
+  // Get total size of all tracked objects in the bucket.
+  // Uses the storage_objects tracking table because Replit's object storage
+  // list() API does not return file sizes.
   app.get('/api/storage/total-size', requireAuth(['Admin']), async (req, res) => {
     try {
-      const result = await objectStorageClient.list();
-      
-      if (!result.ok) {
-        throw new Error('Failed to list objects');
-      }
-
-      // Sum up sizes
-      const totalSize = result.value.reduce((sum: number, obj: any) => sum + (obj.size || 0), 0);
-
+      const [result] = await db.select({ total: sum(storageObjects.sizeBytes) }).from(storageObjects);
+      const totalSize = Number(result?.total ?? 0);
       res.json({ bytes: totalSize });
     } catch (error) {
       console.error('Error calculating total size:', error);
@@ -3034,6 +3041,9 @@ export async function registerRoutes(app: Express): Promise<Server> {
       if (!result.ok) {
         throw new Error('Failed to delete object');
       }
+
+      // Remove size tracking record
+      await db.delete(storageObjects).where(eq(storageObjects.key, key as string));
       
       res.json({ success: true, message: 'Object deleted successfully' });
     } catch (error) {
