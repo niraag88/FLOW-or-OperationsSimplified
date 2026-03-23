@@ -8,7 +8,7 @@ import { invoices, deliveryOrders, auditLog, users, recycleBin, type InsertAudit
 import { insertBrandSchema, insertSupplierSchema, insertCustomerSchema, insertProductSchema, insertPurchaseOrderSchema, insertQuotationSchema, insertInvoiceSchema, insertDeliveryOrderSchema, stockCounts, stockCountItems, goodsReceipts, goodsReceiptItems, stockMovements, products, purchaseOrders, purchaseOrderItems, invoiceLineItems, deliveryOrderItems, suppliers, brands, quotations, quotationItems, customers, companySettings, financialYears, insertFinancialYearSchema, storageObjects } from "@shared/schema";
 import * as XLSX from 'xlsx';
 import { db } from "./db";
-import { eq, desc, sum } from "drizzle-orm";
+import { eq, desc, sum, inArray } from "drizzle-orm";
 import pkg from 'pg';
 import crypto from 'crypto';
 import multer from 'multer';
@@ -2919,7 +2919,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   });
 
   // GET /api/storage/list-prefix
-  // List objects with a given prefix
+  // List objects with a given prefix, enriching sizes from storage_objects tracking table.
   app.get('/api/storage/list-prefix', requireAuth(['Admin']), async (req, res) => {
     try {
       const { prefix = '' } = req.query;
@@ -2930,10 +2930,19 @@ export async function registerRoutes(app: Express): Promise<Server> {
         throw new Error('Failed to list objects');
       }
 
-      // Transform to match expected format
+      // Fetch tracked sizes from storage_objects for all listed keys
+      const keys = result.value.map((obj: any) => obj.name as string).filter(Boolean);
+      const trackedSizes = new Map<string, number>();
+      if (keys.length > 0) {
+        const rows = await db.select({ key: storageObjects.key, sizeBytes: storageObjects.sizeBytes })
+          .from(storageObjects)
+          .where(inArray(storageObjects.key, keys));
+        rows.forEach((r) => trackedSizes.set(r.key, r.sizeBytes));
+      }
+
       const formattedObjects = result.value.map((obj: any) => ({
         key: obj.name,
-        size: obj.size || 0,
+        size: trackedSizes.get(obj.name) ?? obj.size ?? 0,
         lastModified: obj.timeCreated,
         etag: obj.etag
       }));
