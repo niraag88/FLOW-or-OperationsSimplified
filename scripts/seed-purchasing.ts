@@ -450,11 +450,16 @@ async function seedGoodsReceipts(cookie: string, poIds: number[]) {
     )).rows.map(r => parseInt(r.po_id))
   );
 
-  // Candidate POs: submitted or closed, not yet receipted
+  // Candidate POs: MUST be submitted or closed (not draft) and not yet receipted
   let eligible: number[];
   if (poIds.length > 0) {
-    // Filter the in-memory list from this run — fast path
-    eligible = poIds.filter(id => !doneSet.has(id)).slice(0, remaining);
+    // Query DB to confirm status — do NOT rely on in-memory poIds which includes drafts
+    const placeholders = poIds.map((_, i) => `$${i + 1}`).join(',');
+    const rows = (await pool.query(
+      `SELECT id FROM purchase_orders WHERE id IN (${placeholders}) AND status IN ('submitted','closed') ORDER BY id`,
+      poIds
+    )).rows.map(r => parseInt(r.id));
+    eligible = rows.filter(id => !doneSet.has(id)).slice(0, remaining);
   } else {
     // Fallback for reruns: query from DB by seed tag
     const rows = (await pool.query(
@@ -463,7 +468,7 @@ async function seedGoodsReceipts(cookie: string, poIds: number[]) {
     )).rows.map(r => parseInt(r.id));
     eligible = rows.filter(id => !doneSet.has(id)).slice(0, remaining);
   }
-  console.log(`  Eligible POs (no GRN yet): ${eligible.length}`);
+  console.log(`  Eligible POs (submitted/closed, no GRN yet): ${eligible.length}`);
 
   let created = 0, failed = 0;
 
