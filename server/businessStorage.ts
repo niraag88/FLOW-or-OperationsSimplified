@@ -512,12 +512,13 @@ export class BusinessStorage {
   async generatePoNumber() {
     // Get settings for configurable numbering
     const settings = await this.getCompanySettings();
-    const prefix = settings?.poNumberPrefix || 'PO';
+    const rawPrefix = settings?.poNumberPrefix || 'PO';
+    const prefix = rawPrefix.endsWith('-') ? rawPrefix.slice(0, -1) : rawPrefix;
     const nextNumber = settings?.nextPoNumber || 1;
     
-    // Simple format: PREFIX-NUMBER (e.g., PO-1, PO-2025-001)
+    // Simple format: PREFIX-NUMBER (e.g., PO-1, PO-UAE-001)
     const formattedNumber = prefix.includes('-') 
-      ? `${prefix}-${String(nextNumber).padStart(3, '0')}`  // PO-2025-001 style
+      ? `${prefix}-${String(nextNumber).padStart(3, '0')}`  // PO-UAE-001 style
       : `${prefix}-${nextNumber}`;  // PO-1 style
     
     // Update next number in settings
@@ -534,12 +535,13 @@ export class BusinessStorage {
   async getNextPoNumber() {
     // Preview the next number without incrementing it
     const settings = await this.getCompanySettings();
-    const prefix = settings?.poNumberPrefix || 'PO';
+    const rawPrefix = settings?.poNumberPrefix || 'PO';
+    const prefix = rawPrefix.endsWith('-') ? rawPrefix.slice(0, -1) : rawPrefix;
     const nextNumber = settings?.nextPoNumber || 1;
     
-    // Simple format: PREFIX-NUMBER (e.g., PO-1, PO-2025-001)
+    // Simple format: PREFIX-NUMBER (e.g., PO-1, PO-UAE-001)
     const formattedNumber = prefix.includes('-') 
-      ? `${prefix}-${String(nextNumber).padStart(3, '0')}`  // PO-2025-001 style
+      ? `${prefix}-${String(nextNumber).padStart(3, '0')}`  // PO-UAE-001 style
       : `${prefix}-${nextNumber}`;  // PO-1 style
     
     return formattedNumber;
@@ -580,7 +582,8 @@ export class BusinessStorage {
 
   async generateQuotationNumber() {
     const settings = await this.getCompanySettings();
-    const prefix = settings?.quotationNumberPrefix || 'QUO';
+    const rawPrefix = settings?.quotationNumberPrefix || 'QUO';
+    const prefix = rawPrefix.endsWith('-') ? rawPrefix.slice(0, -1) : rawPrefix;
     const nextNumber = settings?.nextQuotationNumber || 1;
 
     const formattedNumber = prefix.includes('-')
@@ -599,7 +602,8 @@ export class BusinessStorage {
 
   async getNextQuotationNumber() {
     const settings = await this.getCompanySettings();
-    const prefix = settings?.quotationNumberPrefix || 'QUO';
+    const rawPrefix = settings?.quotationNumberPrefix || 'QUO';
+    const prefix = rawPrefix.endsWith('-') ? rawPrefix.slice(0, -1) : rawPrefix;
     const nextNumber = settings?.nextQuotationNumber || 1;
 
     const formattedNumber = prefix.includes('-')
@@ -612,12 +616,13 @@ export class BusinessStorage {
   async generateInvoiceNumber() {
     // Get settings for configurable numbering
     const settings = await this.getCompanySettings();
-    const prefix = settings?.invoiceNumberPrefix || 'INV';
+    const rawPrefix = settings?.invoiceNumberPrefix || 'INV';
+    const prefix = rawPrefix.endsWith('-') ? rawPrefix.slice(0, -1) : rawPrefix;
     const nextNumber = settings?.nextInvoiceNumber || 1;
     
-    // Simple format: PREFIX-NUMBER (e.g., INV-1, INV-2025-001)
+    // Simple format: PREFIX-NUMBER (e.g., INV-1, INV-UAE-001)
     const formattedNumber = prefix.includes('-') 
-      ? `${prefix}-${String(nextNumber).padStart(3, '0')}`  // INV-2025-001 style
+      ? `${prefix}-${String(nextNumber).padStart(3, '0')}`  // INV-UAE-001 style
       : `${prefix}-${nextNumber}`;  // INV-1 style
     
     // Update next number in settings
@@ -634,12 +639,13 @@ export class BusinessStorage {
   async getNextInvoiceNumber() {
     // Preview the next number without incrementing it
     const settings = await this.getCompanySettings();
-    const prefix = settings?.invoiceNumberPrefix || 'INV';
+    const rawPrefix = settings?.invoiceNumberPrefix || 'INV';
+    const prefix = rawPrefix.endsWith('-') ? rawPrefix.slice(0, -1) : rawPrefix;
     const nextNumber = settings?.nextInvoiceNumber || 1;
     
-    // Simple format: PREFIX-NUMBER (e.g., INV-1, INV-2025-001)
+    // Simple format: PREFIX-NUMBER (e.g., INV-1, INV-UAE-001)
     const formattedNumber = prefix.includes('-') 
-      ? `${prefix}-${String(nextNumber).padStart(3, '0')}`  // INV-2025-001 style
+      ? `${prefix}-${String(nextNumber).padStart(3, '0')}`  // INV-UAE-001 style
       : `${prefix}-${nextNumber}`;  // INV-1 style
     
     return formattedNumber;
@@ -648,12 +654,13 @@ export class BusinessStorage {
   async generateDoNumber() {
     // Get settings for configurable numbering
     const settings = await this.getCompanySettings();
-    const prefix = settings?.doNumberPrefix || 'DO';
+    const rawDoPrefix = settings?.doNumberPrefix || 'DO';
+    const prefix = rawDoPrefix.endsWith('-') ? rawDoPrefix.slice(0, -1) : rawDoPrefix;
     const nextNumber = settings?.nextDoNumber || 1;
     
-    // Simple format: PREFIX-NUMBER (e.g., DO-1, DO-2025-001)
+    // Simple format: PREFIX-NUMBER (e.g., DO-1, DO-UAE-001)
     const formattedNumber = prefix.includes('-') 
-      ? `${prefix}-${String(nextNumber).padStart(3, '0')}`  // DO-2025-001 style
+      ? `${prefix}-${String(nextNumber).padStart(3, '0')}`  // DO-UAE-001 style
       : `${prefix}-${nextNumber}`;  // DO-1 style
     
     // Update next number in settings
@@ -670,12 +677,13 @@ export class BusinessStorage {
   async getNextDoNumber() {
     // Preview the next number without incrementing it
     const settings = await this.getCompanySettings();
-    const prefix = settings?.doNumberPrefix || 'DO';
+    const rawDoPrefix = settings?.doNumberPrefix || 'DO';
+    const prefix = rawDoPrefix.endsWith('-') ? rawDoPrefix.slice(0, -1) : rawDoPrefix;
     const nextNumber = settings?.nextDoNumber || 1;
     
-    // Simple format: PREFIX-NUMBER (e.g., DO-1, DO-2025-001)
+    // Simple format: PREFIX-NUMBER (e.g., DO-1, DO-UAE-001)
     const formattedNumber = prefix.includes('-') 
-      ? `${prefix}-${String(nextNumber).padStart(3, '0')}`  // DO-2025-001 style
+      ? `${prefix}-${String(nextNumber).padStart(3, '0')}`  // DO-UAE-001 style
       : `${prefix}-${nextNumber}`;  // DO-1 style
     
     return formattedNumber;
