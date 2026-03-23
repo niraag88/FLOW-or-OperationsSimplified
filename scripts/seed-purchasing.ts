@@ -122,6 +122,8 @@ async function seedFinancialYears(cookie: string) {
 
 async function updateCompanySettings(cookie: string) {
   console.log('\n── Company settings ───────────────────────────────────────');
+  // Only update identity/contact fields + document prefixes.
+  // NEVER reset sequence counters (next*Number) — they reflect existing documents.
   const { status, data } = await apiPut('/api/company-settings', {
     companyName: 'Aroma Essence Trading LLC',
     address: 'Office 812, The Prism Tower, Business Bay, Dubai, UAE',
@@ -135,11 +137,6 @@ async function updateCompanySettings(cookie: string) {
     invoiceNumberPrefix: 'INV',
     quotationNumberPrefix: 'QUO',
     grnNumberPrefix: 'GRN',
-    nextPoNumber: 1,
-    nextDoNumber: 1,
-    nextInvoiceNumber: 1,
-    nextQuotationNumber: 1,
-    nextGrnNumber: 1,
   }, cookie);
 
   if (status === 200) {
@@ -155,19 +152,17 @@ async function updateCompanySettings(cookie: string) {
 async function testPrefixChange(cookie: string, supplierId: number, productId: number) {
   console.log('\n── Prefix change test ─────────────────────────────────────');
 
-  // Save current settings first
+  // Capture current settings so we can restore them exactly after the test
   const { data: before } = await apiGet('/api/company-settings', cookie);
-  const origPoNum = before.nextPoNumber ?? 1;
-  const origDoNum = before.nextDoNumber ?? 1;
+  const origPoPfx: string = before.poNumberPrefix ?? 'PO';
+  const origDoPfx: string = before.doNumberPrefix ?? 'DO';
 
   // Change prefix to PO-AE / DO-AE (no trailing dash — system adds "-" separator)
   await apiPut('/api/company-settings', {
     poNumberPrefix: 'PO-AE',
     doNumberPrefix: 'DO-AE',
-    nextPoNumber: origPoNum,
-    nextDoNumber: origDoNum,
   }, cookie);
-  console.log('  → Changed prefixes to PO-AE / DO-AE');
+  console.log(`  → Changed prefixes from "${origPoPfx}"/"${origDoPfx}" → "PO-AE"/"DO-AE"`);
 
   // Create a test PO via API
   let testPoOk = false;
@@ -214,15 +209,12 @@ async function testPrefixChange(cookie: string, supplierId: number, productId: n
     console.error('  ✗ Test DO creation failed:', doData);
   }
 
-  // Restore original prefixes and advance counters past test docs
-  const { data: curr } = await apiGet('/api/company-settings', cookie);
+  // Restore original prefixes (exactly as captured before the test — no counter changes)
   await apiPut('/api/company-settings', {
-    poNumberPrefix: 'PO',
-    doNumberPrefix: 'DO',
-    nextPoNumber: curr.nextPoNumber,
-    nextDoNumber: curr.nextDoNumber,
+    poNumberPrefix: origPoPfx,
+    doNumberPrefix: origDoPfx,
   }, cookie);
-  console.log('  → Restored prefixes to PO / DO');
+  console.log(`  → Restored prefixes to "${origPoPfx}"/"${origDoPfx}"`);
 
   if (!testPoOk || !testDoOk) {
     console.error('  ✗ Prefix test FAILED');
@@ -376,10 +368,15 @@ async function seedPurchaseOrders(cookie: string): Promise<number[]> {
 async function seedGoodsReceipts(cookie: string, poIds: number[]) {
   console.log('\n── Goods receipts (~100 via API) ──────────────────────────');
 
-  // Idempotency
-  const grCount = await pool.query('SELECT COUNT(*) FROM goods_receipts');
-  if (parseInt(grCount.rows[0].count) >= 80) {
-    console.log(`  → Already have ${grCount.rows[0].count} GRNs — skipping`);
+  // Idempotency — count only GRNs linked to SEED-55 POs (not total GRNs in DB)
+  const seedGrnCount = await pool.query(
+    `SELECT COUNT(*) FROM goods_receipts gr
+     JOIN purchase_orders po ON gr.po_id = po.id
+     WHERE po.notes LIKE $1`, [`${SEED_TAG}%`]
+  );
+  const existingGrns = parseInt(seedGrnCount.rows[0].count);
+  if (existingGrns >= 80) {
+    console.log(`  → Already have ${existingGrns} GRNs for seed POs — skipping`);
     return;
   }
 
@@ -442,20 +439,27 @@ async function verify(cookie: string) {
   const [fyRes, poAllRes, poSeedRes, grnRes, smRes, csRes] = await Promise.all([
     pool.query('SELECT year, status FROM financial_years ORDER BY year'),
     pool.query('SELECT currency, status, COUNT(*) as cnt FROM purchase_orders WHERE notes LIKE $1 GROUP BY currency, status ORDER BY currency, status', [`${SEED_TAG}%`]),
-    pool.query('SELECT COUNT(*) as total, COUNT(CASE WHEN currency=\'GBP\' THEN 1 END) as gbp, COUNT(CASE WHEN currency=\'USD\' THEN 1 END) as usd, COUNT(CASE WHEN currency=\'INR\' THEN 1 END) as inr FROM purchase_orders WHERE notes LIKE $1', [`${SEED_TAG}%`]),
-    pool.query('SELECT COUNT(*) FROM goods_receipts'),
-    pool.query('SELECT COUNT(*) FROM stock_movements'),
+    pool.query(`SELECT COUNT(*) as total, COUNT(CASE WHEN currency='GBP' THEN 1 END) as gbp, COUNT(CASE WHEN currency='USD' THEN 1 END) as usd, COUNT(CASE WHEN currency='INR' THEN 1 END) as inr FROM purchase_orders WHERE notes LIKE $1`, [`${SEED_TAG}%`]),
+    pool.query(`SELECT COUNT(*) FROM goods_receipts gr JOIN purchase_orders po ON gr.po_id = po.id WHERE po.notes LIKE $1`, [`${SEED_TAG}%`]),
+    pool.query(`SELECT COUNT(*) FROM stock_movements sm JOIN goods_receipts gr ON sm.reference_id = gr.id WHERE sm.reference_type = 'goods_receipt'`),
     pool.query('SELECT company_name, po_number_prefix, do_number_prefix FROM company_settings LIMIT 1'),
   ]);
 
   const fyMap = new Map(fyRes.rows.map(r => [parseInt(r.year), r.status as string]));
   let pass = true;
 
-  console.log('  Financial years:');
+  // Only validate the three target years; other years are irrelevant to this seed
+  const targetYears = [2025, 2026, 2027];
+  console.log('  Financial years (target: 2025=Closed, 2026=Open, 2027=Open):');
   fyRes.rows.forEach(r => {
-    const ok = (r.year === 2025 && r.status === 'Closed') || (r.year !== 2025 && r.status === 'Open');
+    const yr = parseInt(r.year);
+    if (!targetYears.includes(yr)) {
+      console.log(`    ${yr}: ${r.status} (not in scope — skipped)`);
+      return;
+    }
+    const ok = (yr === 2025 && r.status === 'Closed') || (yr !== 2025 && r.status === 'Open');
     if (!ok) pass = false;
-    console.log(`    ${r.year}: ${r.status} ${ok ? '✓' : '✗'}`);
+    console.log(`    ${yr}: ${r.status} ${ok ? '✓' : '✗'}`);
   });
 
   const seeds = poSeedRes.rows[0];
@@ -468,8 +472,10 @@ async function verify(cookie: string) {
   console.log('  By currency/status:');
   poAllRes.rows.forEach(r => console.log(`    ${r.currency} ${r.status}: ${r.cnt}`));
 
-  console.log(`  GRNs: ${grnRes.rows[0].count} ${parseInt(grnRes.rows[0].count) >= 80 ? '✓' : '✗ (need >= 80)'}`);
-  console.log(`  Stock movements: ${smRes.rows[0].count}`);
+  const grnCount = parseInt(grnRes.rows[0].count);
+  console.log(`  GRNs (seed): ${grnCount} ${grnCount >= 80 ? '✓' : '✗ (need >= 80)'}`)
+  if (grnCount < 80) pass = false;
+  console.log(`  Stock movements (from GRNs): ${smRes.rows[0].count}`);
   console.log(`  Company: ${csRes.rows[0].company_name}`);
 
   // Check company name
