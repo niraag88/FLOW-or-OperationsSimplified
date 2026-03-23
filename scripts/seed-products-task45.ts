@@ -24,6 +24,17 @@
  * This script documents and reproduced those inserts for auditability.
  */
 
+// Hard runtime guard — prevents accidental direct-SQL seeding that bypasses API validation.
+// Use scripts/populate-products-api.ts instead.
+if (process.env.ALLOW_DIRECT_SQL_SEED !== '1') {
+  console.error(
+    '\n❌  BLOCKED: This script bypasses API validation and should not be run.\n' +
+    '   Use scripts/populate-products-api.ts (authenticated REST API) instead.\n' +
+    '   To override this guard (NOT recommended): set ALLOW_DIRECT_SQL_SEED=1\n'
+  );
+  process.exit(1);
+}
+
 import { neon } from '@neondatabase/serverless';
 import { drizzle } from 'drizzle-orm/neon-http';
 
