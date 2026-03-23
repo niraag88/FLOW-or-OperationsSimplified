@@ -1109,33 +1109,38 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const [productToDelete] = await db.select().from(products).where(eq(products.id, productId));
       if (!productToDelete) return res.status(404).json({ error: 'Product not found' });
 
+      // Attempt to save to recycle bin + hard-delete in a transaction
+      let binEntryId: number | null = null;
       try {
-        // Save to recycle bin before hard-deleting
-        await db.insert(recycleBin).values({
-          documentType: 'Product',
-          documentId: String(productId),
-          documentNumber: productToDelete.sku || String(productId),
-          documentData: JSON.stringify({ header: productToDelete, items: [] }),
-          deletedBy: req.user?.username || 'unknown',
-          deletedDate: new Date(),
-          reason: 'Deleted from UI',
-          originalStatus: productToDelete.isActive ? 'Active' : 'Inactive',
-          canRestore: true,
+        await db.transaction(async (tx) => {
+          const [binEntry] = await tx.insert(recycleBin).values({
+            documentType: 'Product',
+            documentId: String(productId),
+            documentNumber: productToDelete.sku || String(productId),
+            documentData: JSON.stringify({ header: productToDelete, items: [] }),
+            deletedBy: req.user?.username || 'unknown',
+            deletedDate: new Date(),
+            reason: 'Deleted from UI',
+            originalStatus: productToDelete.isActive ? 'Active' : 'Inactive',
+            canRestore: true,
+          }).returning({ id: recycleBin.id });
+          binEntryId = binEntry.id;
+          // Hard-delete the product — if FK violation this transaction will roll back
+          await tx.delete(products).where(eq(products.id, productId));
         });
-        await businessStorage.deleteProduct(productId);
       } catch (deleteErr) {
-        // If hard delete fails due to FK references (PostgreSQL error 23503), deactivate instead
+        // If hard delete fails due to FK references (PostgreSQL error 23503), deactivate instead.
+        // The transaction has already rolled back, so the recycle-bin entry was NOT inserted.
+        // binEntryId remains null — no orphan cleanup needed.
         const pgCode = (deleteErr instanceof Object && 'code' in deleteErr) ? String((deleteErr as Record<string, unknown>).code) : '';
         if (pgCode === '23503') {
           await db.update(products).set({ isActive: false }).where(eq(products.id, productId));
-          // Remove the recycle bin entry if we deactivated instead (product still exists)
-          await db.delete(recycleBin).where(eq(recycleBin.documentId, String(productId)));
           writeAuditLog({ actor: req.user!.id, actorName: req.user?.username || String(req.user!.id), targetId: String(productId), targetType: 'product', action: 'DEACTIVATE', details: `Product '${productToDelete?.name || productId}' (SKU: ${productToDelete?.sku || '?'}) deactivated (has order history)` });
           return res.json({ success: true, message: 'Product deactivated (has order history)' });
         }
         throw deleteErr;
       }
-      writeAuditLog({ actor: req.user!.id, actorName: req.user?.username || String(req.user!.id), targetId: String(productId), targetType: 'product', action: 'DELETE', details: `Product '${productToDelete?.name || productId}' (SKU: ${productToDelete?.sku || '?'}) deleted` });
+      writeAuditLog({ actor: req.user!.id, actorName: req.user?.username || String(req.user!.id), targetId: String(productId), targetType: 'product', action: 'DELETE', details: `Product '${productToDelete?.name || productId}' (SKU: ${productToDelete?.sku || '?'}) soft-deleted to recycle bin (bin id: ${binEntryId})` });
       res.json({ success: true, message: 'Product deleted successfully' });
     } catch (error) {
       console.error('Error deleting product:', error);
