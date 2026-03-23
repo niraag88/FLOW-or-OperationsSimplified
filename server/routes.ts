@@ -1402,6 +1402,9 @@ export async function registerRoutes(app: Express): Promise<Server> {
         reference: invoices.reference,
         referenceDate: invoices.referenceDate,
         createdAt: invoices.createdAt,
+        objectKey: invoices.objectKey,
+        scanKey: invoices.scanKey,
+        paymentMethod: invoices.paymentMethod,
         customerContactPerson: customers.contactPerson,
         customerEmail: customers.email,
         customerPhone: customers.phone,
@@ -1470,6 +1473,9 @@ export async function registerRoutes(app: Express): Promise<Server> {
         show_remarks: !!(invoice.notes),
         reference: invoice.reference || '',
         reference_date: invoice.referenceDate ? String(invoice.referenceDate).split('T')[0] : '',
+        object_key: invoice.objectKey || null,
+        scan_key: invoice.scanKey || null,
+        payment_method: invoice.paymentMethod || null,
         attachments: [],
         customer: invoice.customerId ? {
           contact_name: invoice.customerContactPerson || '',
@@ -2339,8 +2345,13 @@ export async function registerRoutes(app: Express): Promise<Server> {
         receivedDate: goodsReceipts.receivedDate,
         status: goodsReceipts.status,
         notes: goodsReceipts.notes,
-        createdAt: goodsReceipts.createdAt
-      }).from(goodsReceipts).orderBy(desc(goodsReceipts.createdAt));
+        createdAt: goodsReceipts.createdAt,
+        poNumber: purchaseOrders.poNumber,
+        supplierName: suppliers.name,
+      }).from(goodsReceipts)
+        .leftJoin(purchaseOrders, eq(purchaseOrders.id, goodsReceipts.poId))
+        .leftJoin(suppliers, eq(suppliers.id, goodsReceipts.supplierId))
+        .orderBy(desc(goodsReceipts.createdAt));
       
       res.json(receipts);
     } catch (error) {
@@ -2739,10 +2750,14 @@ export async function registerRoutes(app: Express): Promise<Server> {
       // Upload to Replit Object Storage
       const result = await objectStorageClient.uploadFromBytes(tokenData.key, fileData);
 
+      if (!result.ok) {
+        throw new Error(`Object storage upload failed: ${result.error?.message || 'unknown error'}`);
+      }
+
       // Clean up token
       signedTokens.delete(token);
 
-      // Track uploaded file size for accurate total-size reporting
+      // Track uploaded file size for accurate total-size reporting (only on confirmed success)
       await db.insert(storageObjects)
         .values({ key: tokenData.key, sizeBytes: fileData.length })
         .onConflictDoUpdate({ target: storageObjects.key, set: { sizeBytes: fileData.length, uploadedAt: new Date() } });
