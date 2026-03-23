@@ -2,6 +2,7 @@ import express, { type Request, Response, NextFunction } from "express";
 import { registerRoutes } from "./routes";
 import { initializeAdminUser } from "./adminInit";
 import { setupVite, serveStatic, log } from "./vite";
+import { pool } from "./db";
 
 const app = express();
 app.use(express.json());
@@ -22,6 +23,19 @@ app.use((req, res, next) => {
 });
 
 (async () => {
+  // Run idempotent startup migrations
+  try {
+    await pool.query(`
+      CREATE TABLE IF NOT EXISTS storage_objects (
+        key TEXT PRIMARY KEY,
+        size_bytes INTEGER NOT NULL DEFAULT 0,
+        uploaded_at TIMESTAMP NOT NULL DEFAULT NOW()
+      )
+    `);
+  } catch (err) {
+    console.error('Startup migration failed (storage_objects):', err);
+  }
+
   // Initialize admin user if needed
   await initializeAdminUser();
   
