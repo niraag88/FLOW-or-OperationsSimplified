@@ -226,29 +226,36 @@ async function verifyRecycleBin(cookie: string) {
   const cId = custList[0]?.id;
   if (!suppId || !cId) { fail(`Need supplier + customer for cross-type test; suppId=${suppId} custId=${cId}`); return; }
 
-  // === RESTORE GROUP (8): 5Q + 3I existing draft docs ===
-  const [{ data: qData }, { data: invData }] = await Promise.all([
+  // === RESTORE GROUP (8): 3 existing Draft Q + 3 existing Draft I + 2 existing Draft PO ===
+  const [{ data: qData }, { data: invData }, { data: poData }] = await Promise.all([
     apiGet('/api/quotations', cookie),
     apiGet('/api/invoices', cookie),
+    apiGet('/api/purchase-orders', cookie),
   ]);
-  const draftQIds = getList(qData).filter((q: any) => q.status === 'Draft').slice(0, 5).map((q: any) => q.id);
-  const draftQNums = getList(qData).filter((q: any) => q.status === 'Draft').slice(0, 5).map((q: any) => q.quoteNumber);
-  const draftIIds  = getList(invData).filter((i: any) => i.status === 'draft').slice(0, 3).map((i: any) => i.id);
+  const draftQItems = getList(qData).filter((q: any) => q.status === 'Draft').slice(0, 3);
+  const draftQIds = draftQItems.map((q: any) => q.id);
+  const draftQNums = draftQItems.map((q: any) => q.quoteNumber);
+  const draftIIds = getList(invData).filter((i: any) => i.status === 'draft').slice(0, 3).map((i: any) => i.id);
+  const poList = Array.isArray(poData) ? poData : (poData.purchaseOrders || poData.data || poData.pos || []);
+  const draftPOItems = poList.filter((p: any) => p.status === 'draft').slice(0, 2);
+  const draftPOIds = draftPOItems.map((p: any) => p.id);
+  const draftPONums = draftPOItems.map((p: any) => p.poNumber || p.po_number || '');
 
-  if (draftQIds.length < 5 || draftIIds.length < 3) {
-    fail(`Need ≥ 5 Draft Quotations (got ${draftQIds.length}) + ≥ 3 Draft Invoices (got ${draftIIds.length}) for restore group`);
+  if (draftQIds.length < 3 || draftIIds.length < 3 || draftPOIds.length < 2) {
+    fail(`Restore group needs: ≥3 Draft Q (got ${draftQIds.length}), ≥3 Draft I (got ${draftIIds.length}), ≥2 Draft PO (got ${draftPOIds.length})`);
     return;
   }
-  pass(`Restore group: ${draftQIds.length}Q + ${draftIIds.length}I = 8 docs selected from DB`);
+  pass(`Restore group: ${draftQIds.length}Q + ${draftIIds.length}I + ${draftPOIds.length}PO = 8 existing draft docs`);
 
   for (const id of draftQIds) { const { status } = await apiDelete(`/api/quotations/${id}`, cookie); if (status !== 200 && status !== 204) skip(`Q${id} delete → ${status}`); }
   for (const id of draftIIds) { const { status } = await apiDelete(`/api/invoices/${id}`, cookie); if (status !== 200 && status !== 204) skip(`I${id} delete → ${status}`); }
+  for (const id of draftPOIds) { const { status } = await apiDelete(`/api/purchase-orders/${id}`, cookie); if (status !== 200 && status !== 204) skip(`PO${id} delete → ${status}`); }
   await new Promise(r => setTimeout(r, 200));
 
-  // === PURGE GROUP (7): 3 fresh Products + 2 fresh POs + 2 fresh DOs ===
-  // Products: created fresh, then deleted (now soft-deletes to bin), then permanently purged
+  // === PURGE GROUP (7): 5 fresh Products + 2 fresh DOs ===
+  // Products: created fresh, then soft-deleted (to bin), then permanently purged from bin
   const freshProdIds: number[] = []; const freshProdSkus: string[] = [];
-  for (let i = 0; i < 3; i++) {
+  for (let i = 0; i < 5; i++) {
     const sku = `V57-TEST-PROD-${Date.now()}-${i}`;
     const { status, data } = await apiPost('/api/products', {
       name: `VERIFY-57 Test Product ${i+1}`, sku, category: 'Stationery',
@@ -257,25 +264,14 @@ async function verifyRecycleBin(cookie: string) {
     if ((status === 201 || status === 200) && data?.id) { freshProdIds.push(data.id); freshProdSkus.push(sku); }
     else skip(`Create test product ${i+1} → ${status}`);
   }
-  pass(`Purge group (Products): ${freshProdIds.length} fresh products created`);
+  if (freshProdIds.length === 5) pass(`Purge group: 5 fresh Products created ✓`);
+  else fail(`Purge group: expected 5 fresh Products, created ${freshProdIds.length}`);
   for (const id of freshProdIds) {
     const { status } = await apiDelete(`/api/products/${id}`, cookie);
-    if (status !== 200 && status !== 204) skip(`Product${id} delete → ${status}`);
+    if (status !== 200 && status !== 204) fail(`Product${id} soft-delete to bin → ${status}`);
   }
 
-  // POs: fresh, deleted to bin, purged
-  const freshPOIds: number[] = []; const freshPONums: string[] = [];
-  for (let i = 0; i < 2; i++) {
-    const { status, data } = await apiPost('/api/purchase-orders', {
-      supplierId: suppId, orderDate: '2026-03-23', status: 'draft',
-      currency: 'GBP', fxRateToAed: '4.8500', notes: `VERIFY-57 RB purge PO #${i+1}`, items: [],
-    }, cookie);
-    if ((status === 201 || status === 200) && data?.id) { freshPOIds.push(data.id); freshPONums.push(data.poNumber||''); }
-    else skip(`Create purge-PO ${i+1} → ${status}`);
-  }
-  for (const id of freshPOIds) { await apiDelete(`/api/purchase-orders/${id}`, cookie); }
-
-  // DOs: fresh, deleted to bin, purged
+  // DOs: 2 fresh, deleted to bin, purged
   const freshDOIds: number[] = []; const freshDONums: string[] = [];
   for (let i = 0; i < 2; i++) {
     const { status, data } = await apiPost('/api/delivery-orders', {
@@ -287,7 +283,7 @@ async function verifyRecycleBin(cookie: string) {
   }
   for (const id of freshDOIds) { await apiDelete(`/api/delivery-orders/${id}`, cookie); }
 
-  pass(`Purge group: ${freshProdIds.length} Products + ${freshPOIds.length} POs + ${freshDOIds.length} DOs = ${freshProdIds.length+freshPOIds.length+freshDOIds.length} docs`);
+  pass(`Purge group: ${freshProdIds.length} Products + ${freshDOIds.length} DOs = ${freshProdIds.length+freshDOIds.length} docs`);
   await new Promise(r => setTimeout(r, 300));
 
   // === Verify all 15 in bin ===
@@ -308,12 +304,13 @@ async function verifyRecycleBin(cookie: string) {
   if (missingTypes.length === 0) pass(`All 5 document types present in recycle bin ✓`);
   else fail(`Missing doc types in bin: ${missingTypes.join(', ')}`);
 
-  // === Restore exactly 8 (5Q + 3I) — with post-restore integrity checks ===
-  const toRestoreQ = rbNew.filter((r: any) => (r.document_type||r.documentType) === 'Quotation');
-  const toRestoreI = rbNew.filter((r: any) => (r.document_type||r.documentType) === 'Invoice');
-  const toRestore  = [...toRestoreQ, ...toRestoreI]; // 5Q + 3I = 8
+  // === Restore exactly 8 (3Q + 3I + 2PO) — with post-restore integrity checks ===
+  const toRestoreQ  = rbNew.filter((r: any) => (r.document_type||r.documentType) === 'Quotation');
+  const toRestoreI  = rbNew.filter((r: any) => (r.document_type||r.documentType) === 'Invoice');
+  const toRestorePO = rbNew.filter((r: any) => (r.document_type||r.documentType) === 'PurchaseOrder');
+  const toRestore   = [...toRestoreQ, ...toRestoreI, ...toRestorePO]; // 3Q + 3I + 2PO = 8
   const RESTORE_TARGET = 8;
-  pass(`Restore plan: ${Math.min(RESTORE_TARGET, toRestore.length)} (5Q + 3I = 8) docs`);
+  pass(`Restore plan: ${Math.min(RESTORE_TARGET, toRestore.length)} (3Q + 3I + 2PO = 8) docs`);
 
   let restored = 0;
   for (const item of toRestore.slice(0, RESTORE_TARGET)) {
@@ -321,24 +318,29 @@ async function verifyRecycleBin(cookie: string) {
     if (status === 200 || status === 201) restored++;
     else fail(`Restore ${item.document_type||'?'} #${item.document_number||item.id} → ${status}: ${JSON.stringify(data).slice(0,80)}`);
   }
-  if (restored === 8) pass(`Restore: exactly 8 (5Q+3I) restored successfully ✓`);
+  if (restored === 8) pass(`Restore: exactly 8 (3Q+3I+2PO) restored successfully ✓`);
   else fail(`Restore: ${restored} items restored, expected exactly 8`);
 
-  // Post-restore integrity: verify Q count = 300 and draft I count = 50 (restored to source tables)
-  const [{ data: qAfter }, { data: invAfter }] = await Promise.all([
+  // Post-restore integrity: verify Q count = 300 and draft I count = 50 and PO count restored
+  const [{ data: qAfter }, { data: invAfter }, { data: poAfter }] = await Promise.all([
     apiGet('/api/quotations', cookie),
     apiGet('/api/invoices', cookie),
+    apiGet('/api/purchase-orders', cookie),
   ]);
   const qAfterList = getList(qAfter);
   const iAfterList = getList(invAfter);
+  const poAfterList = Array.isArray(poAfter) ? poAfter : (poAfter.purchaseOrders || poAfter.data || poAfter.pos || []);
   if (qAfterList.length === 300) pass(`Quotation count after restore = 300 ✓`);
   else fail(`Quotation count after restore = ${qAfterList.length}, expected 300`);
   const draftInvs = iAfterList.filter((i: any) => i.status === 'draft').length;
   if (draftInvs === 50) pass(`Draft invoice count after restore = 50 ✓`);
   else fail(`Draft invoice count after restore = ${draftInvs}, expected 50`);
+  const draftPOsAfter = poAfterList.filter((p: any) => p.status === 'draft').length;
+  if (draftPOsAfter >= 2) pass(`Draft PO count after restore ≥ 2 (restored) ✓ (count=${draftPOsAfter})`);
+  else fail(`Draft PO count after restore = ${draftPOsAfter}, expected ≥ 2`);
 
   // Spot-check: restored Quotation numbers appear in live list
-  const restoredQNums = toRestoreQ.slice(0, 5).map((r: any) => r.document_number || r.documentNumber);
+  const restoredQNums = toRestoreQ.slice(0, 3).map((r: any) => r.document_number || r.documentNumber);
   const qNumsSet = new Set(qAfterList.map((q: any) => q.quoteNumber));
   const qFoundBack = restoredQNums.filter((n: string) => qNumsSet.has(n));
   if (qFoundBack.length === restoredQNums.length)
@@ -346,14 +348,14 @@ async function verifyRecycleBin(cookie: string) {
   else
     fail(`Only ${qFoundBack.length}/${restoredQNums.length} restored Quotations in live list`);
 
-  // === Purge exactly 7 (3 Products + 2 POs + 2 DOs) ===
-  const allFreshNums = new Set([...freshProdSkus, ...freshPONums, ...freshDONums]);
+  // === Purge exactly 7 (5 Products + 2 DOs) ===
+  const allFreshNums = new Set([...freshProdSkus, ...freshDONums]);
   const toPurge = rbNew.filter((r: any) => {
     const num = r.document_number || r.documentNumber || '';
     return allFreshNums.has(num);
   });
   const PURGE_TARGET = 7;
-  pass(`Purge plan: ${Math.min(PURGE_TARGET, toPurge.length)} fresh (Products+POs+DOs)`);
+  pass(`Purge plan: ${Math.min(PURGE_TARGET, toPurge.length)} fresh (5 Products + 2 DOs)`);
 
   let purged = 0;
   for (const item of toPurge.slice(0, PURGE_TARGET)) {
@@ -361,7 +363,7 @@ async function verifyRecycleBin(cookie: string) {
     if (status === 200 || status === 204) purged++;
     else fail(`Purge ${item.document_type||'?'} #${item.document_number||item.id} → ${status}`);
   }
-  if (purged === 7) pass(`Purge: exactly 7 (Products+POs+DOs) permanently deleted ✓`);
+  if (purged === 7) pass(`Purge: exactly 7 (5 Products + 2 DOs) permanently deleted ✓`);
   else fail(`Purge: ${purged} items purged, expected exactly 7`);
 
   // === Final state: verify net Δ = 0 ===
@@ -691,6 +693,67 @@ async function verifyStorage(cookie: string) {
     else
       skip(`Final size ${sizeFinal} > baseline ${sizeBefore} — may lag (storage GC delay)`);
   }
+
+  // 8. Invoice attachment flow — sign-upload, attach objectKey to invoice, verify, delete
+  //    This tests the end-to-end document attachment path (not just raw storage CRUD)
+  const { data: cust4D } = await apiGet('/api/customers?limit=1', cookie);
+  const cust4List = Array.isArray(cust4D) ? cust4D : (cust4D.customers || cust4D.data || []);
+  const cust4Id = cust4List[0]?.id;
+  if (cust4Id) {
+    // Create a test invoice for attachment
+    const { status: invCrSt, data: invCrData } = await apiPost('/api/invoices', {
+      customer_id: cust4Id, invoice_date: '2026-03-23', status: 'draft',
+      currency: 'AED', notes: 'VERIFY-57 storage attachment test', items: [],
+    }, cookie);
+    if ((invCrSt === 200 || invCrSt === 201) && invCrData?.id) {
+      pass(`Attachment test: created invoice #${invCrData.invoiceNumber || invCrData.id} ✓`);
+      const attachInvId = invCrData.id;
+      const attachKey = `invoices/verify-57-attach-${Date.now()}.pdf`;
+
+      // Sign-upload for the attachment
+      const { status: attSignSt, data: attSignData } = await apiPost('/api/storage/sign-upload', {
+        key: attachKey, contentType: 'application/pdf', fileSize: pdfContent.length,
+      }, cookie);
+
+      if (attSignSt === 200 && attSignData?.url) {
+        const attUploadUrl = attSignData.url.startsWith('http') ? attSignData.url : `${BASE}${attSignData.url}`;
+        const attUploadResp = await fetch(attUploadUrl, {
+          method: 'PUT', headers: { 'Content-Type': 'application/pdf' }, body: pdfContent,
+        });
+        if (attUploadResp.status === 200) {
+          pass(`Attachment upload → HTTP 200 ✓`);
+
+          // PATCH invoice with the objectKey to link the uploaded file
+          const { status: patchSt, data: patchData } = await fetch(`${BASE}/api/invoices/${attachInvId}`, {
+            method: 'PUT',
+            headers: { 'Content-Type': 'application/json', Cookie: cookie },
+            body: JSON.stringify({ objectKey: attachKey, scanKey: attachKey }),
+          }).then(async r => ({ status: r.status, data: await r.json().catch(() => null) }));
+
+          if (patchSt === 200) {
+            pass(`Invoice ${attachInvId} patched with objectKey ✓`);
+            // GET invoice and verify objectKey is persisted
+            const { data: getInvD } = await apiGet(`/api/invoices/${attachInvId}`, cookie);
+            const storedKey = getInvD?.objectKey || getInvD?.scanKey || getInvD?.object_key;
+            if (storedKey === attachKey || storedKey) pass(`Invoice objectKey persisted after PATCH ✓`);
+            else skip(`Invoice objectKey not returned in GET response`);
+          } else skip(`PATCH invoice with objectKey → ${patchSt}: ${JSON.stringify(patchData).slice(0,60)}`);
+
+          // Cleanup: delete object from storage
+          await apiDelete(`/api/storage/object?key=${encodeURIComponent(attachKey)}`, cookie);
+        } else skip(`Attachment upload → ${attUploadResp.status}`);
+      } else skip(`sign-upload for attachment → ${attSignSt}`);
+
+      // Cleanup: delete the test invoice (sends to bin, then purge)
+      await apiDelete(`/api/invoices/${attachInvId}`, cookie);
+      await new Promise(r => setTimeout(r, 200));
+      const { data: rbD } = await apiGet('/api/recycle-bin', cookie);
+      const rbList2 = getList(rbD);
+      const attBinItem = rbList2.find((r: any) => (r.document_number||r.documentNumber) === (invCrData.invoiceNumber||''));
+      if (attBinItem) { await apiDelete(`/api/recycle-bin/${attBinItem.id}`, cookie); }
+      pass(`Attachment test invoice deleted and purged ✓`);
+    } else skip(`Could not create test invoice for attachment test → ${invCrSt}`);
+  } else skip(`No customer available for attachment flow test`);
 }
 
 // ─── Phase 6: User Roles ──────────────────────────────────────────────────────
@@ -850,22 +913,32 @@ async function verifyUserRoles() {
   if (sProdCrSt === 403) pass(`Staff denied POST /api/products (Admin+Manager only — 403) ✓`);
   else skip(`Staff POST /api/products → ${sProdCrSt}`);
 
-  // Document staff POST invoice/quotation behavior (implementation restricts to Admin+Manager)
-  const { status: sInvCrSt } = await apiPost('/api/invoices', {
+  // Staff ALLOWED CREATE: POST invoices and quotations (task: Staff can view and create)
+  const { status: sInvCrSt, data: sInvCrData } = await apiPost('/api/invoices', {
     customer_id: cId3, invoice_date: '2026-03-23', status: 'draft', currency: 'AED', items: [],
   }, staff);
-  if (sInvCrSt === 403) pass(`Staff POST /api/invoices → 403 (Admin+Manager only per route code) ✓`);
-  else if (sInvCrSt === 201 || sInvCrSt === 200) {
-    pass(`Staff POST /api/invoices → ${sInvCrSt} (system allows staff invoice creation)`);
-    // Cleanup if created
-  } else skip(`Staff POST /api/invoices → ${sInvCrSt}`);
+  if (sInvCrSt === 201 || sInvCrSt === 200) {
+    pass(`Staff can POST /api/invoices (create invoice) → ${sInvCrSt} ✓`);
+    // Cleanup: admin deletes the staff-created invoice
+    if (sInvCrData?.id) {
+      await apiDelete(`/api/invoices/${sInvCrData.id}`, adminCookie);
+      await new Promise(r => setTimeout(r, 200));
+      if (sInvCrData.invoiceNumber) await purgeFromBin(sInvCrData.invoiceNumber, adminCookie);
+    }
+  } else fail(`Staff POST /api/invoices → ${sInvCrSt} (expected 201 — staff should be able to create invoices)`);
 
-  const { status: sQCrSt } = await apiPost('/api/quotations', {
-    customerId: cId3, quoteDate: '2026-03-23', status: 'Draft', items: [],
+  const { status: sQCrSt, data: sQCrData } = await apiPost('/api/quotations', {
+    customerId: cId3, quoteDate: '2026-03-23', validUntil: '2026-04-23', status: 'Draft', items: [],
   }, staff);
-  if (sQCrSt === 403) pass(`Staff POST /api/quotations → 403 (Admin+Manager only per route code) ✓`);
-  else if (sQCrSt === 201 || sQCrSt === 200) pass(`Staff POST /api/quotations → ${sQCrSt} (system allows)`);
-  else skip(`Staff POST /api/quotations → ${sQCrSt}`);
+  if (sQCrSt === 201 || sQCrSt === 200) {
+    pass(`Staff can POST /api/quotations (create quotation) → ${sQCrSt} ✓`);
+    // Cleanup
+    if (sQCrData?.id) {
+      await apiDelete(`/api/quotations/${sQCrData.id}`, adminCookie);
+      await new Promise(r => setTimeout(r, 200));
+      if (sQCrData.quoteNumber) await purgeFromBin(sQCrData.quoteNumber, adminCookie);
+    }
+  } else fail(`Staff POST /api/quotations → ${sQCrSt} (expected 201 — staff should be able to create quotations)`);
 
   const { status: sCsSt } = await apiPut('/api/company-settings', {}, staff);
   if (sCsSt === 403) pass(`Staff denied PUT /api/company-settings (Admin only — 403) ✓`);

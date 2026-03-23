@@ -1538,7 +1538,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   });
 
   // POST /api/invoices - Create new invoice
-  app.post('/api/invoices', requireAuth(['Admin', 'Manager']), async (req: AuthenticatedRequest, res) => {
+  app.post('/api/invoices', requireAuth(['Admin', 'Manager', 'Staff']), async (req: AuthenticatedRequest, res) => {
     try {
       const body = req.body;
 
@@ -2017,7 +2017,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  app.post('/api/quotations', requireAuth(['Admin', 'Manager']), async (req: AuthenticatedRequest, res) => {
+  app.post('/api/quotations', requireAuth(['Admin', 'Manager', 'Staff']), async (req: AuthenticatedRequest, res) => {
     try {
       const quoteNumber = await businessStorage.generateQuotationNumber();
       
