@@ -115,9 +115,7 @@ export default function POList({ purchaseOrders, totalCount, loading, canEdit, c
                       </TableCell>
                       <TableCell>{formatCurrency(po.totalAmount || 0, currency)}</TableCell>
                       <TableCell className="text-gray-600">
-                        {currency === 'AED'
-                          ? <span className="text-gray-400">—</span>
-                          : formatCurrency(aedTotal, 'AED')}
+                        {formatCurrency(aedTotal, 'AED')}
                       </TableCell>
                       <TableCell>
                         <Badge className={`${getStatusColor(po.status)} border`}>
