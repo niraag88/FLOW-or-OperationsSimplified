@@ -11,13 +11,22 @@ This is a full-stack web application built with a React frontend and Express.js 
 ## Schema Changes (Task #46)
 - **purchase_orders** table: Added `currency` (text, default 'GBP') and `fxRateToAed` (decimal 10,4, default 4.8500) columns via direct SQL (`ALTER TABLE purchase_orders ADD COLUMN IF NOT EXISTS ...`). All 307+ existing POs default to GBP/4.85. Schema updated in `shared/schema.ts`. `getPurchaseOrders()` in `server/businessStorage.ts` now includes these fields in its explicit SELECT and joins `suppliers` table (not `brands`) for `supplierName`.
 
-## Current Database State (as of Task #45)
-- **Products**: 545+ active products across all 12 categories (Essential Oils, Carrier Oils, Bath Salts, Body Butters, Massage Blends, Diffuser Blends, Roll-ons, Balms & Salves, Hydrosols, Supplements, Electronics, Stationery)
-- **Customers**: 190 customers (hotels, spas, retail chains, corporate, export clients across UAE, Oman, Kuwait, KSA, Jordan, Qatar, Egypt and internationally)
-- **Suppliers**: 77 suppliers (UK, India, USA, France, Germany, Australia, Italy, UAE-based)
-- **Brands**: 26 brands (Absolute Aromas, Mystic Moments, Tisserand, Nikura + others)
-- **Purchase Orders**: 307+ records; **Quotations**: 259+; **Invoices**: 511+; **Delivery Orders**: 202
+## Current Database State (as of Task #56)
+- **Products**: 600 active products across all 12 categories (Essential Oils, Carrier Oils, Bath Salts, Body Butters, Massage Blends, Diffuser Blends, Roll-ons, Balms & Salves, Hydrosols, Supplements, Electronics, Stationery)
+- **Customers**: 180 customers (hotels, spas, retail chains, corporate, export clients across UAE, Oman, Kuwait, KSA, Jordan, Qatar, Egypt and internationally); script in `scripts/populate-customers-api.ts`
+- **Suppliers**: 80 suppliers (UK, India, USA, France, Germany, Australia, Italy, UAE-based)
+- **Brands**: 31 brands
+- **Users**: 15 users (1 Admin, 5 Managers, 9 Staff); password = Pass@1234
+- **Purchase Orders**: 300+ records [SEED-55 tagged]; **Quotations**: 300+ [SEED-56]; **Invoices**: 420+ [80 converted + 320 direct SEED-56]; **Delivery Orders**: 300+ [SEED-56]
+- **Financial Years**: 2025 (Closed), 2026 (Open), 2027 (Open)
+- **Company**: Aroma Essence Trading LLC, PO prefix "PO", DO prefix "DO"
 - **Admin credentials**: Stored securely in ADMIN_PASSWORD env var — NEVER change the admin username or password
+
+## Seed Scripts (DB Repopulation)
+- `scripts/seed-foundation.ts` — 15 users, 31 brands, 80 suppliers, 600 products
+- `scripts/seed-purchasing.ts` — financial years, company settings, 300 POs, 100+ GRNs
+- `scripts/populate-customers-api.ts` — 180 customers via REST API (idempotent by name)
+- `scripts/populate-sales-api.ts` — 300 quotations, 400+ invoices (80 converted + 320 direct), 300 DOs [SEED-56 tagged for idempotency]
 
 ## Bug Fixes (Task #45)
 - Fixed: Product deletion failed because `POST /api/recycle-bin` endpoint was missing — added in `server/routes.ts`

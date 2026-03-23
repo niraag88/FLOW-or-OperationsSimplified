@@ -179,6 +179,103 @@ const CUSTOMERS: Array<{
   { name: 'Bloom Naturals New Zealand', email: 'wholesale@bloomnaturals.co.nz', phone: '+64 9 555 0145', billing_address: 'Ponsonby, Auckland, New Zealand', shipping_address: 'Auckland Port, New Zealand' },
   { name: 'Terra Organica Brazil', email: 'compras@terraorganica.com.br', phone: '+55 11 5555 0180', billing_address: 'Jardins, São Paulo, Brazil', shipping_address: 'Guarulhos, São Paulo, Brazil' },
   { name: 'Pure Elements South Africa', email: 'orders@pureelements.co.za', phone: '+27 21 555 0167', billing_address: 'Sea Point, Cape Town, South Africa', shipping_address: 'Cape Town Port, South Africa' },
+
+  // ── UAE Hotels & Resorts (additional) ─────────────────────────────────────
+  { name: 'W Hotel Dubai Palm', email: 'spa@w-dubai.com', phone: '+971 4 245 5555', billing_address: 'Palm Jumeirah, Dubai, UAE', shipping_address: 'Palm Jumeirah, Dubai, UAE' },
+  { name: 'Address Beach Resort Dubai', email: 'wellness@addresshotels.com', phone: '+971 4 555 7222', billing_address: 'JBR, Dubai, UAE', shipping_address: 'JBR, Dubai, UAE' },
+  { name: 'La Mer Beach Hotel Dubai', email: 'procurement@lamerhotel.ae', phone: '+971 4 234 5678', billing_address: 'La Mer, Jumeirah, Dubai, UAE', shipping_address: 'Jumeirah, Dubai, UAE' },
+  { name: 'Kempinski Mall of the Emirates', email: 'spa@kempinski-moe.com', phone: '+971 4 341 0000', billing_address: 'Mall of the Emirates, Dubai, UAE', shipping_address: 'Mall of the Emirates, Dubai, UAE' },
+  { name: 'Hyatt Regency Creek Heights', email: 'wellness@hyattcreek.com', phone: '+971 4 553 1234', billing_address: 'Dubai Creek, Dubai, UAE', shipping_address: 'Dubai Creek, Dubai, UAE' },
+  { name: 'Renaissance Dubai Downtown', email: 'procurement@renaissancedubai.com', phone: '+971 4 512 5555', billing_address: 'Downtown Dubai, UAE', shipping_address: 'Downtown Dubai, UAE' },
+  { name: 'Sheraton Abu Dhabi Hotel', email: 'wellness@sheraton-abudhabi.com', phone: '+971 2 677 3333', billing_address: 'Corniche Road, Abu Dhabi, UAE', shipping_address: 'Corniche Road, Abu Dhabi, UAE' },
+  { name: 'Le Meridien Abu Dhabi', email: 'spa@lemeridien-abudhabi.com', phone: '+971 2 644 6666', billing_address: 'Tourist Club Area, Abu Dhabi, UAE', shipping_address: 'Tourist Club Area, Abu Dhabi, UAE' },
+
+  // ── UAE Spas & Wellness (additional) ──────────────────────────────────────
+  { name: 'Elixir Spa & Wellness Dubai', email: 'orders@elixirspa.ae', phone: '+971 4 380 0000', billing_address: 'Jumeirah Lakes Towers, Dubai, UAE', shipping_address: 'JLT, Dubai, UAE' },
+  { name: 'Serenity Spa & Beauty Lounge', email: 'purchasing@serenityspa.ae', phone: '+971 4 325 6699', billing_address: 'Umm Suqeim 2, Dubai, UAE', shipping_address: 'Umm Suqeim 2, Dubai, UAE' },
+  { name: 'Bloom Skin & Beauty Spa', email: 'orders@bloomspa.ae', phone: '+971 4 367 8800', billing_address: 'Mirdif, Dubai, UAE', shipping_address: 'Mirdif, Dubai, UAE' },
+  { name: 'Zaitoun Spa & Wellness', email: 'procurement@zaitoubwellness.ae', phone: '+971 4 290 4000', billing_address: 'Al Barsha, Dubai, UAE', shipping_address: 'Al Barsha, Dubai, UAE' },
+  { name: 'Al Jawhara Spa Abu Dhabi', email: 'orders@aljawharaspa.ae', phone: '+971 2 443 9000', billing_address: 'Khalidiyah, Abu Dhabi, UAE', shipping_address: 'Khalidiyah, Abu Dhabi, UAE' },
+  { name: 'Nour Spa Sharjah', email: 'orders@nourspa.ae', phone: '+971 6 572 0000', billing_address: 'Al Majaz, Sharjah, UAE', shipping_address: 'Al Majaz, Sharjah, UAE' },
+
+  // ── UAE Retail & Pharmacy (additional) ────────────────────────────────────
+  { name: 'Medcare Hospitals & Clinics', email: 'procurement@medcare.ae', phone: '+971 4 344 0880', billing_address: 'Sheikh Zayed Road, Dubai, UAE', shipping_address: 'Al Quoz, Dubai, UAE' },
+  { name: 'Aster DM Healthcare UAE', email: 'procurement@asterdm.ae', phone: '+971 4 440 0400', billing_address: 'Dubai Healthcare City, UAE', shipping_address: 'Dubai Healthcare City, UAE' },
+  { name: 'City Pharmacy UAE', email: 'wholesale@citypharmacy.ae', phone: '+971 4 266 0055', billing_address: 'Deira, Dubai, UAE', shipping_address: 'Deira, Dubai, UAE' },
+  { name: 'Al Ain Pharmacy Network', email: 'orders@alainpharmacy.ae', phone: '+971 3 765 0000', billing_address: 'Al Ain, Abu Dhabi, UAE', shipping_address: 'Al Ain, Abu Dhabi, UAE' },
+  { name: 'Roots Organic Store UAE', email: 'buying@rootsorganic.ae', phone: '+971 4 385 7788', billing_address: 'Business Bay, Dubai, UAE', shipping_address: 'Business Bay, Dubai, UAE' },
+  { name: 'Sage Natural Foods', email: 'orders@sagenatural.ae', phone: '+971 4 457 0099', billing_address: 'Al Wasl Road, Dubai, UAE', shipping_address: 'Al Quoz, Dubai, UAE' },
+
+  // ── UAE Corporate & Professional (additional) ──────────────────────────────
+  { name: 'Jumeirah Group Procurement', email: 'procurement@jumeirah.com', phone: '+971 4 366 6000', billing_address: 'Jumeirah Beach Road, Dubai, UAE', shipping_address: 'Dubai, UAE' },
+  { name: 'Rotana Hotels UAE', email: 'purchasing@rotana.com', phone: '+971 2 697 0000', billing_address: 'Khalidiyah, Abu Dhabi, UAE', shipping_address: 'Dubai, UAE' },
+  { name: 'ADIB Employee Benefits', email: 'benefits@adib.ae', phone: '+971 2 696 5000', billing_address: 'ADIB HQ, Abu Dhabi, UAE', shipping_address: 'Abu Dhabi, UAE' },
+  { name: 'Masdar City Wellness', email: 'wellness@masdar.ae', phone: '+971 2 653 3000', billing_address: 'Masdar City, Abu Dhabi, UAE', shipping_address: 'Masdar City, Abu Dhabi, UAE' },
+  { name: 'Jumeirah Beach Residence Owners', email: 'community@jbr-management.ae', phone: '+971 4 399 4444', billing_address: 'JBR, Dubai, UAE', shipping_address: 'JBR, Dubai, UAE' },
+  { name: 'Dubai Marina Yacht Club', email: 'orders@dmyc.ae', phone: '+971 4 362 7900', billing_address: 'Dubai Marina, Dubai, UAE', shipping_address: 'Dubai Marina, Dubai, UAE' },
+  { name: 'Sobha Realty Wellness', email: 'wellness@sobharealty.com', phone: '+971 4 811 1000', billing_address: 'Sobha Hartland, Dubai, UAE', shipping_address: 'Mohammed Bin Rashid City, Dubai, UAE' },
+  { name: 'First Abu Dhabi Bank Wellness', email: 'wellness@bankfab.com', phone: '+971 2 681 1511', billing_address: 'FAB HQ, Abu Dhabi, UAE', shipping_address: 'Abu Dhabi, UAE' },
+  { name: 'Emaar Properties Wellness', email: 'wellness@emaar.ae', phone: '+971 4 367 3333', billing_address: 'Downtown Dubai, UAE', shipping_address: 'Downtown Dubai, UAE' },
+  { name: 'Meydan Hotels & Hospitality', email: 'procurement@meydan.ae', phone: '+971 4 381 3333', billing_address: 'Meydan, Nad Al Sheba, Dubai, UAE', shipping_address: 'Meydan, Dubai, UAE' },
+
+  // ── Oman (additional) ─────────────────────────────────────────────────────
+  { name: 'Park Inn by Radisson Muscat', email: 'wellness@radisson-muscat.com', phone: '+968 2440 5000', billing_address: 'Al Khuwair, Muscat, Oman', shipping_address: 'Muscat, Oman' },
+  { name: 'Sundus Rotana Muscat', email: 'spa@sundusrotana.com', phone: '+968 2469 0100', billing_address: 'Al Khuwair, Muscat, Oman', shipping_address: 'Muscat, Oman' },
+  { name: 'Crowne Plaza Muscat', email: 'wellness@crowneplaza-muscat.com', phone: '+968 2466 0660', billing_address: 'Qurum, Muscat, Oman', shipping_address: 'Muscat, Oman' },
+  { name: 'Natural Health Oman', email: 'orders@naturalhealth.om', phone: '+968 2448 0000', billing_address: 'Al Ghubra, Muscat, Oman', shipping_address: 'Muscat, Oman' },
+  { name: 'Oman Wellness Centre Salalah', email: 'orders@omanwellness-salalah.com', phone: '+968 2323 6000', billing_address: 'Salalah, Oman', shipping_address: 'Salalah, Oman' },
+  { name: 'Sabco Pharmacy Oman', email: 'procurement@sabcopharmacy.om', phone: '+968 2479 1234', billing_address: 'Ruwi, Muscat, Oman', shipping_address: 'Muscat, Oman' },
+  { name: 'Radisson Blu Salalah', email: 'spa@radisson-salalah.com', phone: '+968 2321 2300', billing_address: 'Salalah, Oman', shipping_address: 'Salalah, Oman' },
+  { name: 'Al Falaj Hotel Muscat', email: 'procurement@alfalajhotel.com', phone: '+968 2470 2311', billing_address: 'Ruwi, Muscat, Oman', shipping_address: 'Ruwi, Muscat, Oman' },
+
+  // ── KSA (additional) ──────────────────────────────────────────────────────
+  { name: 'Raffles Makkah Palace', email: 'spa@raffles-makkah.com', phone: '+966 12 517 6666', billing_address: 'Abraj Al Bait, Makkah, KSA', shipping_address: 'Makkah, KSA' },
+  { name: 'InterContinental Jeddah', email: 'wellness@ic-jeddah.com', phone: '+966 12 661 1800', billing_address: 'Al Corniche, Jeddah, KSA', shipping_address: 'Jeddah, KSA' },
+  { name: 'Ritz-Carlton Riyadh', email: 'spa@ritzcarlton-riyadh.com', phone: '+966 11 802 8040', billing_address: 'Orouba St, Riyadh, KSA', shipping_address: 'Riyadh, KSA' },
+  { name: 'Shura Island Spa KSA', email: 'spa@shuraisland.sa', phone: '+966 12 234 5678', billing_address: 'Shura Island, Tabuk, KSA', shipping_address: 'Tabuk, KSA' },
+  { name: 'Saudi Health & Wellness LLC', email: 'orders@saudihealthwellness.com.sa', phone: '+966 11 422 3300', billing_address: 'Al Olaya, Riyadh, KSA', shipping_address: 'King Khalid Industrial City, KSA' },
+  { name: 'Gulf Pharma KSA', email: 'procurement@gulfpharma.sa', phone: '+966 13 854 1122', billing_address: 'Dammam, Eastern Province, KSA', shipping_address: 'Dammam, KSA' },
+  { name: 'Al Dawaa Pharmacies KSA', email: 'purchasing@aldawaa.com.sa', phone: '+966 11 462 5757', billing_address: 'Riyadh, KSA', shipping_address: 'Riyadh Distribution, KSA' },
+  { name: 'JW Marriott Riyadh', email: 'spa@jwmarriott-riyadh.com', phone: '+966 11 252 8000', billing_address: 'King Fahd Road, Riyadh, KSA', shipping_address: 'Riyadh, KSA' },
+  { name: 'Kempinski Al Othman Hotel', email: 'spa@kempinski-khobar.com', phone: '+966 13 896 8900', billing_address: 'Al Khobar, Eastern Province, KSA', shipping_address: 'Al Khobar, KSA' },
+  { name: 'Saudi Organic House', email: 'orders@saudiorganic.com.sa', phone: '+966 11 444 7788', billing_address: 'Al Nakheel, Riyadh, KSA', shipping_address: 'Riyadh, KSA' },
+
+  // ── Kuwait (additional) ───────────────────────────────────────────────────
+  { name: 'Jumeirah Messilah Beach Kuwait', email: 'spa@jumeirah-kuwait.com', phone: '+965 2226 5555', billing_address: 'Messilah, Kuwait City, Kuwait', shipping_address: 'Messilah, Kuwait City, Kuwait' },
+  { name: 'Four Seasons Hotel Kuwait', email: 'spa@fourseasons-kuwait.com', phone: '+965 2200 0000', billing_address: 'Burj Alshaya, Kuwait City, Kuwait', shipping_address: 'Kuwait City, Kuwait' },
+  { name: 'Boutique Wellness Kuwait', email: 'orders@boutiquewellness.com.kw', phone: '+965 2234 5678', billing_address: 'Hawally, Kuwait City, Kuwait', shipping_address: 'Hawally, Kuwait City, Kuwait' },
+  { name: 'Alghanim Industries Wellness', email: 'wellness@alghanim.com', phone: '+965 2246 0000', billing_address: 'Shuwaikh, Kuwait City, Kuwait', shipping_address: 'Shuwaikh, Kuwait City, Kuwait' },
+  { name: 'Al Shaya Group Kuwait', email: 'wellness@alshaya.com.kw', phone: '+965 2224 2100', billing_address: 'Salmiya, Kuwait City, Kuwait', shipping_address: 'Mina Abdulla, Kuwait' },
+  { name: 'Zahra Spa Kuwait', email: 'orders@zahraspa.com.kw', phone: '+965 2263 1122', billing_address: 'Rumaithiya, Kuwait City, Kuwait', shipping_address: 'Kuwait City, Kuwait' },
+
+  // ── Qatar (additional) ────────────────────────────────────────────────────
+  { name: 'W Doha Hotel & Residences', email: 'spa@w-doha.com', phone: '+974 4453 5000', billing_address: 'West Bay, Doha, Qatar', shipping_address: 'Doha, Qatar' },
+  { name: 'InterContinental Doha', email: 'wellness@ic-doha.com', phone: '+974 4484 4444', billing_address: 'West Bay, Doha, Qatar', shipping_address: 'Doha, Qatar' },
+  { name: 'Hilton Doha The Pearl', email: 'spa@hilton-doha.com', phone: '+974 4423 3333', billing_address: 'The Pearl-Qatar, Doha, Qatar', shipping_address: 'The Pearl-Qatar, Doha, Qatar' },
+  { name: 'Qatar Airways Corporate Wellness', email: 'wellness@qatarairways.com.qa', phone: '+974 4449 6000', billing_address: 'Qatar Airways Tower, Doha, Qatar', shipping_address: 'Doha, Qatar' },
+  { name: 'Doha Natural Health Centre', email: 'orders@dohanaturalhealth.com', phone: '+974 4465 0000', billing_address: 'Al Waab, Doha, Qatar', shipping_address: 'Al Waab, Doha, Qatar' },
+  { name: 'Al Meera Consumer Goods Qatar', email: 'procurement@almeera.com.qa', phone: '+974 4012 5000', billing_address: 'Al Sailiya, Doha, Qatar', shipping_address: 'Doha, Qatar' },
+
+  // ── Jordan (additional) ───────────────────────────────────────────────────
+  { name: 'Marriott Amman Hotel', email: 'spa@marriott-amman.com', phone: '+962 6 560 7607', billing_address: 'Shmeisani, Amman, Jordan', shipping_address: 'Amman, Jordan' },
+  { name: 'Radisson Blu Aqaba', email: 'wellness@radissonblu-aqaba.com', phone: '+962 3 209 0000', billing_address: 'Aqaba, Jordan', shipping_address: 'Aqaba, Jordan' },
+  { name: 'Arab Jordan Natural Products', email: 'orders@arabjordannatural.com.jo', phone: '+962 6 588 0000', billing_address: 'Marj Al Hamam, Amman, Jordan', shipping_address: 'Amman, Jordan' },
+
+  // ── Egypt (additional) ────────────────────────────────────────────────────
+  { name: 'Kempinski Nile Hotel Cairo', email: 'spa@kempinski-nile.com', phone: '+20 2 2798 0000', billing_address: 'Garden City, Cairo, Egypt', shipping_address: 'Cairo, Egypt' },
+  { name: 'Egypt Natural Products Export', email: 'export@egyptnatural.com.eg', phone: '+20 2 3303 0000', billing_address: 'Heliopolis, Cairo, Egypt', shipping_address: 'Cairo Port, Egypt' },
+
+  // ── Online / E-commerce ───────────────────────────────────────────────────
+  { name: 'Noon Health & Beauty UAE', email: 'supplier@noon.com', phone: '+971 4 270 0000', billing_address: 'Dubai Internet City, Dubai, UAE', shipping_address: 'Dubai South, UAE' },
+  { name: 'Amazon.ae Seller Central', email: 'vendor@amazon.ae', phone: '+971 4 563 7777', billing_address: 'Dubai Internet City, Dubai, UAE', shipping_address: 'Dubai South, UAE' },
+  { name: 'Namshi Beauty UAE', email: 'buying@namshi.com', phone: '+971 4 262 4400', billing_address: 'Media City, Dubai, UAE', shipping_address: 'Jebel Ali, Dubai, UAE' },
+  { name: 'Mumzworld Health UAE', email: 'purchasing@mumzworld.com', phone: '+971 4 231 0230', billing_address: 'Al Quoz, Dubai, UAE', shipping_address: 'Al Quoz, Dubai, UAE' },
+  { name: 'Sivvi.com Beauty', email: 'buying@sivvi.com', phone: '+971 4 252 6000', billing_address: 'Dubai Internet City, Dubai, UAE', shipping_address: 'Dubai South, UAE' },
+  { name: 'Supermama UAE', email: 'orders@supermama.me', phone: '+971 4 392 3344', billing_address: 'Jumeirah 3, Dubai, UAE', shipping_address: 'Dubai, UAE' },
+  { name: 'iHerb UAE Fulfilment', email: 'ae.vendor@iherb.com', phone: '+971 4 509 0000', billing_address: 'Jebel Ali Free Zone, Dubai, UAE', shipping_address: 'Jebel Ali, Dubai, UAE' },
+  { name: 'Cobone Online Deals UAE', email: 'partners@cobone.com', phone: '+971 4 391 6008', billing_address: 'Media City, Dubai, UAE', shipping_address: 'Dubai, UAE' },
+  { name: 'Wigme.com Health', email: 'purchasing@wigme.com', phone: '+971 4 295 5511', billing_address: 'Business Bay, Dubai, UAE', shipping_address: 'Dubai, UAE' },
+  { name: 'Shopitag UAE Health', email: 'vendor@shopitag.com', phone: '+971 4 450 1100', billing_address: 'DIFC, Dubai, UAE', shipping_address: 'Dubai South, UAE' },
 ];
 
 async function main() {
