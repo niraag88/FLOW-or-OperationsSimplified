@@ -1,7 +1,16 @@
 import { Page } from '@playwright/test';
 
-export const BASE_URL = 'http://localhost:5000';
-export const ADMIN = { username: 'admin', password: 'admin123' };
+export const BASE_URL = process.env.E2E_BASE_URL ?? 'http://localhost:5000';
+
+const E2E_USER = process.env.E2E_ADMIN_USERNAME;
+const E2E_PASS = process.env.E2E_ADMIN_PASSWORD;
+if (!E2E_USER || !E2E_PASS) {
+  console.warn('[e2e] E2E_ADMIN_USERNAME / E2E_ADMIN_PASSWORD not set — using dev defaults');
+}
+export const ADMIN = {
+  username: E2E_USER ?? 'admin',
+  password: E2E_PASS ?? 'admin123',
+};
 
 export async function login(page: Page) {
   await page.goto('/');

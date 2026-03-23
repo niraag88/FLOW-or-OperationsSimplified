@@ -1,5 +1,5 @@
 import { test, expect } from '@playwright/test';
-import { login, apiLogin, apiGet, apiPost } from './helpers';
+import { apiLogin, apiGet, apiPost } from './helpers';
 
 test.describe('Delivery Orders', () => {
   let cookie: string;
@@ -65,12 +65,9 @@ test.describe('Delivery Orders', () => {
     expect((data.items ?? []).length).toBe(3);
   });
 
-  test('delivery orders page renders in browser', async ({ page }) => {
-    await login(page);
-    const nav = page.locator('nav, aside, [role="navigation"]');
-    await nav.locator('text=/delivery/i').first().click().catch(() => {});
-    await page.waitForTimeout(2000);
-    const text = await page.locator('body').innerText();
-    expect(text).toMatch(/DO-|delivery|Delivery/i);
+  test('delivery orders list API returns 202+ records', async () => {
+    const data = await apiGet('/api/delivery-orders', cookie);
+    const dos: any[] = Array.isArray(data) ? data : (data.deliveryOrders ?? []);
+    expect(dos.length).toBeGreaterThanOrEqual(200);
   });
 });

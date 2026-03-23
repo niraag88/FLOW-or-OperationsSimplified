@@ -279,6 +279,9 @@ export const insertDeliveryOrderItemSchema = createInsertSchema(deliveryOrderIte
 export type InsertDeliveryOrderItem = z.infer<typeof insertDeliveryOrderItemSchema>;
 
 // Purchase Orders table
+// BUG-005: supplier_id here references brands (not suppliers) to match existing DB constraint.
+// Existing PO data stores brand IDs (1–26) in this field. A data migration is required to
+// fix this properly — for now the schema matches the actual DB FK to avoid migration errors.
 export const purchaseOrders = pgTable("purchase_orders", {
   id: serial("id").primaryKey(),
   poNumber: text("po_number").notNull().unique(),

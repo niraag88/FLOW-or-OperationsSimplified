@@ -172,6 +172,11 @@ const CUSTOMERS: Array<{
   { name: 'Holistic Health India', email: 'procurement@holistichealth.in', phone: '+91 22 6638 0000', billing_address: 'Bandra West, Mumbai, India', shipping_address: 'JNPT, Navi Mumbai, India' },
   { name: 'Aromatherapy Associates US', email: 'wholesale@aromatherapyassociates.com', phone: '+1 310 555 0190', billing_address: 'Beverly Hills, CA, USA', shipping_address: 'Los Angeles, CA, USA' },
   { name: 'Green Market Australia', email: 'orders@greenmarket.com.au', phone: '+61 2 9876 5432', billing_address: 'Surry Hills, Sydney, NSW, Australia', shipping_address: 'Port Botany, Sydney, Australia' },
+  { name: 'Zen Wellness Canada', email: 'orders@zenwellness.ca', phone: '+1 604 555 0212', billing_address: 'Gastown, Vancouver, BC, Canada', shipping_address: 'Vancouver Port, BC, Canada' },
+  { name: 'Herb & Soul Sweden', email: 'info@herbandsoul.se', phone: '+46 8 555 0100', billing_address: 'Södermalm, Stockholm, Sweden', shipping_address: 'Arlanda Freight, Stockholm, Sweden' },
+  { name: 'Bloom Naturals New Zealand', email: 'wholesale@bloomnaturals.co.nz', phone: '+64 9 555 0145', billing_address: 'Ponsonby, Auckland, New Zealand', shipping_address: 'Auckland Port, New Zealand' },
+  { name: 'Terra Organica Brazil', email: 'compras@terraorganica.com.br', phone: '+55 11 5555 0180', billing_address: 'Jardins, São Paulo, Brazil', shipping_address: 'Guarulhos, São Paulo, Brazil' },
+  { name: 'Pure Elements South Africa', email: 'orders@pureelements.co.za', phone: '+27 21 555 0167', billing_address: 'Sea Point, Cape Town, South Africa', shipping_address: 'Cape Town Port, South Africa' },
 ];
 
 async function main() {
