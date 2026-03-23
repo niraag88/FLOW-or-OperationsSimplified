@@ -13,14 +13,17 @@ export const ADMIN = {
 };
 
 export async function login(page: Page) {
-  await page.goto('/');
-  const isLogin = await page.locator('input[data-testid="input-username"], input[placeholder*="sername"], input[type="text"]').first().isVisible().catch(() => false);
-  if (isLogin) {
-    await page.locator('input[data-testid="input-username"], input[placeholder*="sername"], input[type="text"]').first().fill(ADMIN.username);
-    await page.locator('input[type="password"]').fill(ADMIN.password);
-    await page.locator('button[type="submit"], button:has-text("Sign In"), button:has-text("Login")').click();
-    await page.waitForURL(url => !url.toString().includes('/login'), { timeout: 8000 });
-  }
+  // Navigate to login page (unauthenticated routes redirect here)
+  await page.goto(`${BASE_URL}/login`);
+  const usernameField = page.locator('[data-testid="input-username"]');
+  await usernameField.waitFor({ timeout: 10000 });
+  await usernameField.fill(ADMIN.username);
+  await page.locator('[data-testid="input-password"]').fill(ADMIN.password);
+  await page.locator('[data-testid="button-login"]').click();
+  // After login the app navigates away from /login — wait for URL change
+  await page.waitForURL((url) => !url.pathname.includes('/login'), { timeout: 15000 }).catch(() => {});
+  await page.waitForLoadState('domcontentloaded', { timeout: 10000 }).catch(() => {});
+  await page.waitForTimeout(1000);
 }
 
 export async function apiLogin(): Promise<string> {

@@ -591,19 +591,19 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   }));
   // Rate limiters
-  // Strict: 20 attempts per 15 minutes per IP in development, 5 in production
+  // Login: 5/15min in production, 200/15min in development (relaxed for E2E test runs)
   const loginLimiter = rateLimit({
     windowMs: 15 * 60 * 1000,
-    max: process.env.NODE_ENV === 'production' ? 5 : 20,
+    max: process.env.NODE_ENV === 'production' ? 5 : 200,
     message: { error: 'Too many login attempts. Please try again in 15 minutes.' },
     standardHeaders: true,
     legacyHeaders: false,
   });
 
-  // General: 300 requests per minute per IP — prevents API flooding
+  // General: 300 requests per minute per IP in production — prevents API flooding
   const apiLimiter = rateLimit({
     windowMs: 60 * 1000,
-    max: 300,
+    max: process.env.NODE_ENV === 'production' ? 300 : 2000,
     message: { error: 'Too many requests. Please slow down.' },
     standardHeaders: true,
     legacyHeaders: false,
