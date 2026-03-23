@@ -5,7 +5,7 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import { ShoppingCart, CheckCircle2, Package, Truck, MoreHorizontal, XCircle, ChevronDown, ChevronRight, Eye, Download, Trash2, FileText, FileSpreadsheet, Printer } from "lucide-react";
+import { ShoppingCart, CheckCircle2, Package, Truck, MoreHorizontal, XCircle, ChevronDown, ChevronRight, Eye, Download, Trash2, FileText, FileSpreadsheet } from "lucide-react";
 import {
   DropdownMenu,
   DropdownMenuContent,
