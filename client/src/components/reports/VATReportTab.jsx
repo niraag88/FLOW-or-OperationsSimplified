@@ -8,9 +8,9 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Badge } from "@/components/ui/badge";
 import { Skeleton } from "@/components/ui/skeleton";
-import { 
-  Download, 
-  Search, 
+import {
+  Download,
+  Search,
   Lock,
   MoreHorizontal,
   ExternalLink,
@@ -29,30 +29,47 @@ import { format, startOfMonth, endOfMonth, subMonths, isValid, parseISO } from "
 import { useToast } from "@/components/ui/use-toast";
 import { exportToCsv } from "../utils/export";
 
+const fmt = (value) => new Intl.NumberFormat('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 }).format(value);
+
+const ALL_STATUSES = ['draft', 'submitted', 'delivered', 'paid'];
+
 export default function VATReportTab({ invoices, customers, books, companySettings, currentUser, loading }) {
   const [searchDebounced, setSearchDebounced] = useState("");
   const [searchTerm, setSearchTerm] = useState("");
   const { toast } = useToast();
 
   const [filters, setFilters] = useState(() => {
-    const saved = localStorage.getItem('vat-report-filters');
-    const defaultFilters = {
-      dateFrom: format(startOfMonth(new Date()), 'yyyy-MM-dd'),
-      dateTo: format(endOfMonth(new Date()), 'yyyy-MM-dd'),
-      statuses: ['sent'], // Changed back to 'sent' to match schema
-      taxTreatments: ['StandardRated']
-    };
-    return saved ? { ...defaultFilters, ...JSON.parse(saved) } : defaultFilters;
+    try {
+      const saved = localStorage.getItem('vat-report-filters');
+      const defaultFilters = {
+        dateFrom: format(startOfMonth(new Date()), 'yyyy-MM-dd'),
+        dateTo: format(endOfMonth(new Date()), 'yyyy-MM-dd'),
+        statuses: ['submitted', 'delivered'],
+        taxTreatments: ['StandardRated']
+      };
+      if (saved) {
+        const parsed = JSON.parse(saved);
+        if (parsed.statuses && parsed.statuses.includes('sent') && parsed.statuses.length === 1) {
+          parsed.statuses = ['submitted', 'delivered'];
+        }
+        return { ...defaultFilters, ...parsed };
+      }
+      return defaultFilters;
+    } catch {
+      return {
+        dateFrom: format(startOfMonth(new Date()), 'yyyy-MM-dd'),
+        dateTo: format(endOfMonth(new Date()), 'yyyy-MM-dd'),
+        statuses: ['submitted', 'delivered'],
+        taxTreatments: ['StandardRated']
+      };
+    }
   });
 
   const [currentPage, setCurrentPage] = useState(1);
   const [pageSize] = useState(50);
 
   useEffect(() => {
-    const timer = setTimeout(() => {
-      setSearchDebounced(searchTerm);
-    }, 300);
-
+    const timer = setTimeout(() => setSearchDebounced(searchTerm), 300);
     return () => clearTimeout(timer);
   }, [searchTerm]);
 
@@ -61,52 +78,51 @@ export default function VATReportTab({ invoices, customers, books, companySettin
   }, [filters]);
 
   const getCustomerName = (customerId) => {
-    const customer = customers.find(c => c.id === customerId);
-    return customer?.customer_name || 'Unknown Customer';
+    const customer = customers.find(c => c.id === customerId || c.id === Number(customerId));
+    return customer?.name || customer?.customer_name || 'Unknown Customer';
   };
 
   const isClosedPeriod = (invoiceDate) => {
-    const invoice_date = new Date(invoiceDate);
-    return books.some(book => 
+    const d = new Date(invoiceDate);
+    return (books || []).some(book =>
       book.status === 'Closed' &&
-      invoice_date >= new Date(book.start_date) &&
-      invoice_date <= new Date(book.end_date)
+      d >= new Date(book.start_date) &&
+      d <= new Date(book.end_date)
     );
   };
 
   const filteredInvoices = invoices.filter(invoice => {
-    const invoiceDate = new Date(invoice.invoice_date);
-    if (!isValid(invoiceDate)) return false;
+    const dateStr = invoice.invoice_date || invoice.invoiceDate;
+    const invoiceDate = dateStr ? new Date(dateStr) : null;
+    if (!invoiceDate || !isValid(invoiceDate)) return false;
 
     const dateFrom = new Date(filters.dateFrom);
     const dateTo = new Date(filters.dateTo);
+    dateTo.setHours(23, 59, 59, 999);
     if (invoiceDate < dateFrom || invoiceDate > dateTo) return false;
 
     if (!filters.statuses.includes(invoice.status)) return false;
 
-    if (!filters.taxTreatments.includes(invoice.tax_treatment || 'StandardRated')) return false;
+    const treatment = invoice.tax_treatment || invoice.taxTreatment || 'StandardRated';
+    if (!filters.taxTreatments.includes(treatment)) return false;
 
     if (searchDebounced) {
-      const customer = customers.find(c => c.id === invoice.customer_id);
       const searchLower = searchDebounced.toLowerCase();
-      const matchesInvoice = invoice.invoice_number?.toLowerCase().includes(searchLower);
-      const matchesCustomer = customer?.customer_name?.toLowerCase().includes(searchLower);
-      if (!matchesInvoice && !matchesCustomer) return false;
+      const invNum = (invoice.invoice_number || invoice.invoiceNumber || '').toLowerCase();
+      const custName = getCustomerName(invoice.customer_id ?? invoice.customerId).toLowerCase();
+      if (!invNum.includes(searchLower) && !custName.includes(searchLower)) return false;
     }
 
     return true;
   });
 
   const totalPages = Math.ceil(filteredInvoices.length / pageSize);
-  const paginatedInvoices = filteredInvoices.slice(
-    (currentPage - 1) * pageSize,
-    currentPage * pageSize
-  );
+  const paginatedInvoices = filteredInvoices.slice((currentPage - 1) * pageSize, currentPage * pageSize);
 
   const totals = filteredInvoices.reduce((acc, invoice) => {
-    acc.subtotal += invoice.subtotal || 0;
-    acc.tax += invoice.tax_amount || 0;
-    acc.total += invoice.total_amount || 0;
+    acc.subtotal += Number(invoice.subtotal || 0);
+    acc.tax += Number(invoice.tax_amount || 0);
+    acc.total += Number(invoice.total_amount || invoice.amount || 0);
     return acc;
   }, { subtotal: 0, tax: 0, total: 0 });
 
@@ -117,6 +133,7 @@ export default function VATReportTab({ invoices, customers, books, companySettin
       dateFrom: format(startOfMonth(date), 'yyyy-MM-dd'),
       dateTo: format(endOfMonth(date), 'yyyy-MM-dd')
     }));
+    setCurrentPage(1);
   };
 
   const handleStatusToggle = (status) => {
@@ -126,6 +143,7 @@ export default function VATReportTab({ invoices, customers, books, companySettin
         ? prev.statuses.filter(s => s !== status)
         : [...prev.statuses, status]
     }));
+    setCurrentPage(1);
   };
 
   const handleTaxTreatmentToggle = (treatment) => {
@@ -135,6 +153,7 @@ export default function VATReportTab({ invoices, customers, books, companySettin
         ? prev.taxTreatments.filter(t => t !== treatment)
         : [...prev.taxTreatments, treatment]
     }));
+    setCurrentPage(1);
   };
 
   const formatDate = (dateString) => {
@@ -142,7 +161,7 @@ export default function VATReportTab({ invoices, customers, books, companySettin
     try {
       const date = typeof dateString === 'string' ? parseISO(dateString) : new Date(dateString);
       return isValid(date) ? format(date, 'dd-MMM-yyyy') : '-';
-    } catch (error) {
+    } catch {
       return '-';
     }
   };
@@ -152,36 +171,32 @@ export default function VATReportTab({ invoices, customers, books, companySettin
     try {
       const date = typeof dateString === 'string' ? parseISO(dateString) : new Date(dateString);
       return isValid(date) ? format(date, 'MMMM yyyy') : '-';
-    } catch (error) {
+    } catch {
       return '-';
     }
   };
 
   const handleExportXLSX = () => {
     const exportData = filteredInvoices.map(invoice => {
-      const customer = customers.find(c => c.id === invoice.customer_id);
+      const custId = invoice.customer_id ?? invoice.customerId;
       return {
-        'Date': formatDate(invoice.invoice_date),
-        'Invoice #': invoice.invoice_number,
-        'Customer': customer?.customer_name || '',
+        'Date': formatDate(invoice.invoice_date || invoice.invoiceDate),
+        'Invoice #': invoice.invoice_number || invoice.invoiceNumber,
+        'Customer': getCustomerName(custId),
         'Currency': invoice.currency,
-        'Amount (ex-VAT)': (invoice.subtotal || 0).toFixed(2),
-        'VAT Amount': (invoice.tax_amount || 0).toFixed(2),
-        'Total (incl VAT)': (invoice.total_amount || 0).toFixed(2),
+        'Amount (ex-VAT)': fmt(invoice.subtotal || 0),
+        'VAT Amount': fmt(invoice.tax_amount || 0),
+        'Total (incl VAT)': fmt(invoice.total_amount || invoice.amount || 0),
         'Status': invoice.status
       };
     });
-
     exportToCsv(exportData, `VAT_Report_${filters.dateFrom}_to_${filters.dateTo}`);
   };
 
   const handleCopyInvoiceLink = (invoice) => {
     const url = `${window.location.origin}/invoices/${invoice.id}`;
     navigator.clipboard.writeText(url);
-    toast({
-      title: "Link copied",
-      description: "Invoice link copied to clipboard"
-    });
+    toast({ title: "Link copied", description: "Invoice link copied to clipboard" });
   };
 
   return (
@@ -202,25 +217,21 @@ export default function VATReportTab({ invoices, customers, books, companySettin
                 </Button>
               </DropdownMenuTrigger>
               <DropdownMenuContent align="end">
-                <DropdownMenuItem onClick={handleExportXLSX}>
-                  Export to XLSX
-                </DropdownMenuItem>
-                <DropdownMenuItem onClick={() => toast({ title: "PDF export", description: "PDF export feature coming soon" })}>
-                  Export to PDF
-                </DropdownMenuItem>
+                <DropdownMenuItem onClick={handleExportXLSX}>Export to XLSX</DropdownMenuItem>
+                <DropdownMenuItem onClick={() => toast({ title: "PDF export", description: "PDF export feature coming soon" })}>Export to PDF</DropdownMenuItem>
               </DropdownMenuContent>
             </DropdownMenu>
           </div>
         </CardHeader>
         <CardContent className="space-y-4">
-          {/* Filters */}
+          {/* Date filters */}
           <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
             <div className="space-y-2">
               <Label>From Date</Label>
               <Input
                 type="date"
                 value={filters.dateFrom}
-                onChange={(e) => setFilters(prev => ({ ...prev, dateFrom: e.target.value }))}
+                onChange={(e) => { setFilters(prev => ({ ...prev, dateFrom: e.target.value })); setCurrentPage(1); }}
               />
             </div>
             <div className="space-y-2">
@@ -228,15 +239,13 @@ export default function VATReportTab({ invoices, customers, books, companySettin
               <Input
                 type="date"
                 value={filters.dateTo}
-                onChange={(e) => setFilters(prev => ({ ...prev, dateTo: e.target.value }))}
+                onChange={(e) => { setFilters(prev => ({ ...prev, dateTo: e.target.value })); setCurrentPage(1); }}
               />
             </div>
             <div className="space-y-2">
               <Label>Quick Select</Label>
               <Select onValueChange={(value) => handleQuickDateRange(parseInt(value))}>
-                <SelectTrigger>
-                  <SelectValue placeholder="Jump to month" />
-                </SelectTrigger>
+                <SelectTrigger><SelectValue placeholder="Jump to month" /></SelectTrigger>
                 <SelectContent>
                   {Array.from({ length: 12 }, (_, i) => {
                     const date = subMonths(new Date(), i);
@@ -262,27 +271,27 @@ export default function VATReportTab({ invoices, customers, books, companySettin
               </div>
             </div>
           </div>
+
+          {/* Status + Tax Treatment filters */}
           <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
             <div className="space-y-2">
               <Label>Invoice Status</Label>
-              <div className="flex flex-wrap gap-2">
-                {['draft', 'submitted'].map(status => (
+              <div className="flex flex-wrap gap-4">
+                {ALL_STATUSES.map(status => (
                   <div key={status} className="flex items-center space-x-2">
                     <Checkbox
                       id={`status-${status}`}
                       checked={filters.statuses.includes(status)}
                       onCheckedChange={() => handleStatusToggle(status)}
                     />
-                    <Label htmlFor={`status-${status}`} className="capitalize">
-                      {status}
-                    </Label>
+                    <Label htmlFor={`status-${status}`} className="capitalize cursor-pointer">{status}</Label>
                   </div>
                 ))}
               </div>
             </div>
             <div className="space-y-2">
               <Label>Tax Treatment</Label>
-              <div className="flex flex-wrap gap-2">
+              <div className="flex flex-wrap gap-4">
                 {['StandardRated', 'ZeroRated', 'Exempt', 'OutOfScope'].map(treatment => (
                   <div key={treatment} className="flex items-center space-x-2">
                     <Checkbox
@@ -290,9 +299,7 @@ export default function VATReportTab({ invoices, customers, books, companySettin
                       checked={filters.taxTreatments.includes(treatment)}
                       onCheckedChange={() => handleTaxTreatmentToggle(treatment)}
                     />
-                    <Label htmlFor={`tax-${treatment}`}>
-                      {treatment}
-                    </Label>
+                    <Label htmlFor={`tax-${treatment}`} className="cursor-pointer">{treatment}</Label>
                   </div>
                 ))}
               </div>
@@ -326,49 +333,55 @@ export default function VATReportTab({ invoices, customers, books, companySettin
                 </TableRow>
               </TableHeader>
               <TableBody>
-                {paginatedInvoices.map((invoice) => (
-                  <TableRow key={invoice.id}>
-                    <TableCell>
-                      <div className="flex items-center gap-2">
-                        {formatDate(invoice.invoice_date)}
-                        {isClosedPeriod(invoice.invoice_date) && (
-                          <Lock className="w-3 h-3 text-gray-400" title="Closed year — read-only" />
-                        )}
-                      </div>
-                    </TableCell>
-                    <TableCell className="font-medium">{invoice.invoice_number}</TableCell>
-                    <TableCell>{getCustomerName(invoice.customer_id)}</TableCell>
-                    <TableCell>
-                      <Badge variant="outline">{invoice.currency}</Badge>
-                    </TableCell>
-                    <TableCell className="text-right">{(invoice.subtotal || 0).toFixed(2)}</TableCell>
-                    <TableCell className="text-right">{(invoice.tax_amount || 0).toFixed(2)}</TableCell>
-                    <TableCell className="text-right font-semibold">{(invoice.total_amount || 0).toFixed(2)}</TableCell>
-                    <TableCell>
-                      <DropdownMenu>
-                        <DropdownMenuTrigger asChild>
-                          <Button variant="ghost" size="sm">
-                            <MoreHorizontal className="w-4 h-4" />
-                          </Button>
-                        </DropdownMenuTrigger>
-                        <DropdownMenuContent align="end">
-                          <DropdownMenuItem onClick={() => window.open(`/Print?type=invoice&id=${invoice.id}`, '_blank')}>
-                            <ExternalLink className="w-4 h-4 mr-2" />
-                            Open Invoice
-                          </DropdownMenuItem>
-                          <DropdownMenuItem onClick={() => toast({ title: "Email feature", description: "Email PDF feature coming soon" })}>
-                            <Mail className="w-4 h-4 mr-2" />
-                            Email PDF
-                          </DropdownMenuItem>
-                          <DropdownMenuItem onClick={() => handleCopyInvoiceLink(invoice)}>
-                            <Copy className="w-4 h-4 mr-2" />
-                            Copy Link
-                          </DropdownMenuItem>
-                        </DropdownMenuContent>
-                      </DropdownMenu>
+                {paginatedInvoices.length === 0 ? (
+                  <TableRow>
+                    <TableCell colSpan={8} className="text-center py-12 text-gray-500">
+                      No invoices found for the selected filters
                     </TableCell>
                   </TableRow>
-                ))}
+                ) : paginatedInvoices.map((invoice) => {
+                  const invDate = invoice.invoice_date || invoice.invoiceDate;
+                  const invNum = invoice.invoice_number || invoice.invoiceNumber;
+                  const custId = invoice.customer_id ?? invoice.customerId;
+                  return (
+                    <TableRow key={invoice.id}>
+                      <TableCell>
+                        <div className="flex items-center gap-2">
+                          {formatDate(invDate)}
+                          {invDate && isClosedPeriod(invDate) && (
+                            <Lock className="w-3 h-3 text-gray-400" title="Closed year — read-only" />
+                          )}
+                        </div>
+                      </TableCell>
+                      <TableCell className="font-medium">{invNum}</TableCell>
+                      <TableCell>{getCustomerName(custId)}</TableCell>
+                      <TableCell>
+                        <Badge variant="outline">{invoice.currency || 'AED'}</Badge>
+                      </TableCell>
+                      <TableCell className="text-right">{fmt(invoice.subtotal || 0)}</TableCell>
+                      <TableCell className="text-right">{fmt(invoice.tax_amount || 0)}</TableCell>
+                      <TableCell className="text-right font-semibold">{fmt(invoice.total_amount || invoice.amount || 0)}</TableCell>
+                      <TableCell>
+                        <DropdownMenu>
+                          <DropdownMenuTrigger asChild>
+                            <Button variant="ghost" size="sm"><MoreHorizontal className="w-4 h-4" /></Button>
+                          </DropdownMenuTrigger>
+                          <DropdownMenuContent align="end">
+                            <DropdownMenuItem onClick={() => window.open(`/Print?type=invoice&id=${invoice.id}`, '_blank')}>
+                              <ExternalLink className="w-4 h-4 mr-2" />Open Invoice
+                            </DropdownMenuItem>
+                            <DropdownMenuItem onClick={() => toast({ title: "Email feature", description: "Email PDF feature coming soon" })}>
+                              <Mail className="w-4 h-4 mr-2" />Email PDF
+                            </DropdownMenuItem>
+                            <DropdownMenuItem onClick={() => handleCopyInvoiceLink(invoice)}>
+                              <Copy className="w-4 h-4 mr-2" />Copy Link
+                            </DropdownMenuItem>
+                          </DropdownMenuContent>
+                        </DropdownMenu>
+                      </TableCell>
+                    </TableRow>
+                  );
+                })}
               </TableBody>
             </Table>
           </div>
@@ -378,29 +391,16 @@ export default function VATReportTab({ invoices, customers, books, companySettin
                 Showing {((currentPage - 1) * pageSize) + 1} to {Math.min(currentPage * pageSize, filteredInvoices.length)} of {filteredInvoices.length} results
               </p>
               <div className="flex items-center gap-2">
-                <Button
-                  variant="outline"
-                  size="sm"
-                  onClick={() => setCurrentPage(prev => Math.max(1, prev - 1))}
-                  disabled={currentPage === 1}
-                >
-                  Previous
-                </Button>
+                <Button variant="outline" size="sm" onClick={() => setCurrentPage(prev => Math.max(1, prev - 1))} disabled={currentPage === 1}>Previous</Button>
                 <span className="text-sm">Page {currentPage} of {totalPages}</span>
-                <Button
-                  variant="outline"
-                  size="sm"
-                  onClick={() => setCurrentPage(prev => Math.min(totalPages, prev + 1))}
-                  disabled={currentPage === totalPages}
-                >
-                  Next
-                </Button>
+                <Button variant="outline" size="sm" onClick={() => setCurrentPage(prev => Math.min(totalPages, prev + 1))} disabled={currentPage === totalPages}>Next</Button>
               </div>
             </div>
           )}
         </CardContent>
       </Card>
 
+      {/* Summary Totals */}
       <Card>
         <CardHeader>
           <CardTitle>Summary Totals (AED)</CardTitle>
@@ -409,15 +409,15 @@ export default function VATReportTab({ invoices, customers, books, companySettin
           <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
             <div className="text-center">
               <p className="text-gray-600">Total Amount (ex-VAT)</p>
-              <p className="text-2xl font-bold text-blue-600">{totals.subtotal.toFixed(2)}</p>
+              <p className="text-2xl font-bold text-blue-600">AED {fmt(totals.subtotal)}</p>
             </div>
             <div className="text-center">
               <p className="text-gray-600">Total VAT</p>
-              <p className="text-2xl font-bold text-green-600">{totals.tax.toFixed(2)}</p>
+              <p className="text-2xl font-bold text-green-600">AED {fmt(totals.tax)}</p>
             </div>
             <div className="text-center">
               <p className="text-gray-600">Grand Total (incl. VAT)</p>
-              <p className="text-2xl font-bold text-purple-600">{totals.total.toFixed(2)}</p>
+              <p className="text-2xl font-bold text-purple-600">AED {fmt(totals.total)}</p>
             </div>
           </div>
         </CardContent>

@@ -229,17 +229,19 @@ export class BusinessStorage {
       vatAmount: purchaseOrders.vatAmount,
       grandTotal: purchaseOrders.grandTotal,
       notes: purchaseOrders.notes,
+      currency: purchaseOrders.currency,
+      fxRateToAed: purchaseOrders.fxRateToAed,
       objectKey: purchaseOrders.objectKey,
       createdBy: purchaseOrders.createdBy,
       createdAt: purchaseOrders.createdAt,
       updatedAt: purchaseOrders.updatedAt,
-      supplierName: brands.name,
-      brandName: brands.name,
+      supplierName: suppliers.name,
+      brandName: suppliers.name,
       lineItems: sql<number>`coalesce(${itemsAgg.lineItems}, 0)`.as('lineItems'),
       orderedQty: sql<number>`coalesce(${itemsAgg.orderedQty}, 0)`.as('orderedQty'),
       receivedQty: sql<number>`coalesce(${receivedAgg.receivedQty}, 0)`.as('receivedQty')
     }).from(purchaseOrders)
-      .leftJoin(brands, eq(purchaseOrders.supplierId, brands.id))
+      .leftJoin(suppliers, eq(purchaseOrders.supplierId, suppliers.id))
       .leftJoin(itemsAgg, eq(itemsAgg.poId, purchaseOrders.id))
       .leftJoin(receivedAgg, eq(receivedAgg.poId, purchaseOrders.id))
       .where(whereCondition)

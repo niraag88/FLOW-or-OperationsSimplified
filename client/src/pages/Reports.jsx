@@ -9,22 +9,44 @@ import {
   ShoppingCart,
   BarChart3
 } from "lucide-react";
-import { Product } from "@/api/entities";
-import { InventoryLot } from "@/api/entities";
-import { PurchaseOrder } from "@/api/entities";
-import { GoodsReceipt } from "@/api/entities";
-import { Invoice } from "@/api/entities";
-import { Customer } from "@/api/entities";
-import { Supplier } from "@/api/entities";
-import { User } from "@/api/entities";
-import { Books } from "@/api/entities";
-import { CompanySettings } from "@/api/entities";
 
 // Import Report Components
 import PoGrnReport from "../components/reports/PoGrnReport";
 import SalesAgedInvoicesReport from "../components/reports/SalesAgedInvoicesReport";
 import PurchasesReport from "../components/reports/PurchasesReport";
 import VATReportTab from "../components/reports/VATReportTab";
+
+function normalizeTaxTreatment(raw) {
+  if (!raw) return 'StandardRated';
+  const map = {
+    standard: 'StandardRated',
+    standardrated: 'StandardRated',
+    zero_rated: 'ZeroRated',
+    zerorated: 'ZeroRated',
+    exempt: 'Exempt',
+    out_of_scope: 'OutOfScope',
+    outofscope: 'OutOfScope',
+  };
+  return map[raw.toLowerCase().replace(/-/g, '_')] || raw;
+}
+
+function normalizeInvoice(inv) {
+  const amount = parseFloat(inv.amount || inv.total_amount || 0);
+  const vatAmount = parseFloat(inv.vatAmount || inv.tax_amount || 0);
+  const subtotal = amount - vatAmount;
+  return {
+    ...inv,
+    status: (inv.status || '').toLowerCase(),
+    invoice_number: inv.invoice_number || inv.invoiceNumber,
+    invoice_date: inv.invoice_date || inv.invoiceDate,
+    customer_id: inv.customer_id ?? inv.customerId,
+    customer_name: inv.customer_name || inv.customerName,
+    tax_treatment: normalizeTaxTreatment(inv.tax_treatment || inv.taxTreatment),
+    subtotal,
+    tax_amount: vatAmount,
+    total_amount: amount,
+  };
+}
 
 export default function Reports() {
   const [data, setData] = useState({
@@ -48,22 +70,30 @@ export default function Reports() {
   const loadAllData = async () => {
     setLoading(true);
     try {
-      // Use single optimized dashboard endpoint instead of 9+ individual calls
-      const response = await fetch('/api/dashboard', { credentials: 'include' });
-      if (!response.ok) {
-        throw new Error('Failed to fetch dashboard data');
+      const [dashboardRes, invoicesRes] = await Promise.all([
+        fetch('/api/dashboard', { credentials: 'include' }),
+        fetch('/api/invoices', { credentials: 'include' }),
+      ]);
+
+      if (!dashboardRes.ok) throw new Error('Failed to fetch dashboard data');
+      const dashboardData = await dashboardRes.json();
+
+      let invoicesData = [];
+      if (invoicesRes.ok) {
+        const raw = await invoicesRes.json();
+        const rawList = Array.isArray(raw) ? raw : (raw.data || []);
+        invoicesData = rawList.map(normalizeInvoice);
       }
-      const dashboardData = await response.json();
 
       setData({
         products: dashboardData.products,
         lots: dashboardData.lots,
         purchaseOrders: dashboardData.purchaseOrders,
         goodsReceipts: dashboardData.goodsReceipts,
-        invoices: dashboardData.invoices,
+        invoices: invoicesData,
         customers: dashboardData.customers,
         suppliers: dashboardData.suppliers,
-        books: [], // Books not implemented in dashboard yet
+        books: [],
         companySettings: dashboardData.companySettings,
       });
     } catch (error) {
@@ -72,7 +102,9 @@ export default function Reports() {
       setLoading(false);
     }
   };
-  
+
+  const exchangeRate = parseFloat(data.companySettings?.fxGbpToAed || data.companySettings?.fx_gbp_to_aed || 4.85);
+
   const canEdit = currentUser && (currentUser.role === 'Admin' || currentUser.role === 'Manager');
 
   if (loading) {
@@ -130,6 +162,7 @@ export default function Reports() {
             purchaseOrders={data.purchaseOrders}
             goodsReceipts={data.goodsReceipts}
             suppliers={data.suppliers}
+            exchangeRate={exchangeRate}
             canExport={!!currentUser}
           />
         </TabsContent>
@@ -144,6 +177,7 @@ export default function Reports() {
           <PurchasesReport
             purchaseOrders={data.purchaseOrders}
             suppliers={data.suppliers}
+            exchangeRate={exchangeRate}
             canExport={!!currentUser}
           />
         </TabsContent>

@@ -7,63 +7,53 @@ import ExportDropdown from "../common/ExportDropdown";
 import { format } from 'date-fns';
 import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer } from 'recharts';
 
-export default function PurchasesReport({ purchaseOrders, suppliers, canExport }) {
-  // Include all purchase orders regardless of status
+const fmt = (value) => new Intl.NumberFormat('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 }).format(value);
+
+export default function PurchasesReport({ purchaseOrders, suppliers, exchangeRate = 4.85, canExport }) {
   const allPurchaseOrders = purchaseOrders;
 
   const getSupplierName = (supplierId) => {
-    const supplier = suppliers.find(s => s.id === supplierId);
+    const supplier = (suppliers || []).find(s => s.id === supplierId || s.id === Number(supplierId));
     return supplier?.name || 'Unknown Supplier';
   };
 
   const purchasesByMonth = useMemo(() => {
     const purchases = {};
     allPurchaseOrders.forEach(po => {
-      // Handle potential date field variations and null values
       const dateValue = po.orderDate || po.order_date;
-      if (!dateValue) return; // Skip if no date
-      
+      if (!dateValue) return;
       try {
         const month = format(new Date(dateValue), 'yyyy-MM');
-      if (!purchases[month]) {
-        purchases[month] = { 
-          total: 0, 
-          totalAED: 0,
-          count: 0,
-          gbpAmount: 0,
-          aedAmount: 0
-        };
-      }
-      
-      const amount = Number(po.totalAmount || po.total_amount || 0);
-      purchases[month].total += amount;
-      purchases[month].count += 1;
-      
-      if (po.currency === 'GBP') {
-        purchases[month].gbpAmount += amount;
-        purchases[month].totalAED += amount * Number(po.fxRateToAed || po.fx_rate_to_aed || 4.85);
-      } else {
-        purchases[month].aedAmount += amount;
-        purchases[month].totalAED += amount;
-      }
+        if (!purchases[month]) {
+          purchases[month] = { total: 0, totalAED: 0, count: 0, gbpAmount: 0, aedAmount: 0 };
+        }
+        const amount = Number(po.totalAmount || po.total_amount || 0);
+        const currency = po.currency || 'GBP';
+        const rate = parseFloat(po.fxRateToAed || po.fx_rate_to_aed || exchangeRate);
+
+        purchases[month].total += amount;
+        purchases[month].count += 1;
+
+        if (currency === 'AED') {
+          purchases[month].aedAmount += amount;
+          purchases[month].totalAED += amount;
+        } else {
+          purchases[month].gbpAmount += amount;
+          purchases[month].totalAED += amount * rate;
+        }
       } catch (error) {
-        console.warn('Invalid date in purchase order:', po.poNumber || po.po_number, dateValue);
-        return; // Skip this PO if date is invalid
+        console.warn('Invalid date in PO:', po.poNumber || po.po_number, dateValue);
       }
     });
     return Object.entries(purchases).sort(([a], [b]) => b.localeCompare(a)).slice(0, 12);
-  }, [allPurchaseOrders]);
+  }, [allPurchaseOrders, exchangeRate]);
 
-  // Prepare chart data
   const chartData = purchasesByMonth.map(([month, values]) => ({
     month: format(new Date(month + '-01'), 'MMM yyyy'),
     totalAED: values.totalAED,
-    gbpAmount: values.gbpAmount * 4.85, // Convert to AED for chart
-    aedAmount: values.aedAmount,
     count: values.count
-  })).reverse(); // Show chronologically
+  })).reverse();
 
-  // Prepare data for export in standard internal document format
   const exportData = purchasesByMonth.map(([month, values]) => ({
     month: format(new Date(month + '-01'), 'MMMM yyyy'),
     total_orders: values.count,
@@ -71,15 +61,16 @@ export default function PurchasesReport({ purchaseOrders, suppliers, canExport }
     total_aed: values.totalAED.toFixed(2)
   }));
 
-  // Calculate totals
   const totals = allPurchaseOrders.reduce((acc, po) => {
     acc.totalOrders += 1;
     const amount = Number(po.totalAmount || po.total_amount || 0);
-    if (po.currency === 'GBP') {
-      acc.totalGBP += amount;
-      acc.totalAED += amount * Number(po.fxRateToAed || po.fx_rate_to_aed || 4.85);
-    } else {
+    const currency = po.currency || 'GBP';
+    const rate = parseFloat(po.fxRateToAed || po.fx_rate_to_aed || exchangeRate);
+    if (currency === 'AED') {
       acc.totalAED += amount;
+    } else {
+      acc.totalGBP += amount;
+      acc.totalAED += amount * rate;
     }
     return acc;
   }, { totalOrders: 0, totalGBP: 0, totalAED: 0 });
@@ -96,13 +87,13 @@ export default function PurchasesReport({ purchaseOrders, suppliers, canExport }
         </Card>
         <Card className="p-4">
           <div className="text-center">
-            <p className="text-2xl font-bold text-green-600">{totals.totalGBP.toFixed(2)} GBP</p>
+            <p className="text-2xl font-bold text-green-600">GBP {fmt(totals.totalGBP)}</p>
             <p className="text-sm text-gray-600">Total in GBP</p>
           </div>
         </Card>
         <Card className="p-4">
           <div className="text-center">
-            <p className="text-2xl font-bold text-purple-600">{totals.totalAED.toFixed(2)} AED</p>
+            <p className="text-2xl font-bold text-purple-600">AED {fmt(totals.totalAED)}</p>
             <p className="text-sm text-gray-600">Total Value (AED)</p>
           </div>
         </Card>
@@ -119,7 +110,7 @@ export default function PurchasesReport({ purchaseOrders, suppliers, canExport }
             <p className="text-sm text-gray-500 mt-1">Purchase orders breakdown by month and currency.</p>
           </div>
           {canExport && (
-            <ExportDropdown 
+            <ExportDropdown
               data={exportData}
               type="Monthly Purchases Report"
               filename="monthly_purchases_report"
@@ -144,14 +135,16 @@ export default function PurchasesReport({ purchaseOrders, suppliers, canExport }
                 </TableRow>
               </TableHeader>
               <TableBody>
-                {purchasesByMonth.map(([month, data]) => (
+                {purchasesByMonth.length === 0 ? (
+                  <TableRow>
+                    <TableCell colSpan={4} className="text-center py-8 text-gray-500">No purchase order data found</TableCell>
+                  </TableRow>
+                ) : purchasesByMonth.map(([month, data]) => (
                   <TableRow key={month}>
-                    <TableCell className="font-medium">
-                      {format(new Date(month + '-01'), 'MMMM yyyy')}
-                    </TableCell>
+                    <TableCell className="font-medium">{format(new Date(month + '-01'), 'MMMM yyyy')}</TableCell>
                     <TableCell>{data.count}</TableCell>
-                    <TableCell className="text-blue-600">{data.gbpAmount.toFixed(2)}</TableCell>
-                    <TableCell className="font-semibold">{data.totalAED.toFixed(2)}</TableCell>
+                    <TableCell className="text-blue-600">GBP {fmt(data.gbpAmount)}</TableCell>
+                    <TableCell className="font-semibold">AED {fmt(data.totalAED)}</TableCell>
                   </TableRow>
                 ))}
               </TableBody>
@@ -159,7 +152,7 @@ export default function PurchasesReport({ purchaseOrders, suppliers, canExport }
           </div>
         </CardContent>
       </Card>
-      
+
       {/* Purchases Chart */}
       <Card className="border-0 shadow-lg">
         <CardHeader>
@@ -175,11 +168,10 @@ export default function PurchasesReport({ purchaseOrders, suppliers, canExport }
               <BarChart data={chartData}>
                 <CartesianGrid strokeDasharray="3 3" />
                 <XAxis dataKey="month" />
-                <YAxis />
+                <YAxis tickFormatter={(v) => `AED ${fmt(v)}`} />
                 <Tooltip formatter={(value, name) => [
-                  name === 'count' ? value : `AED ${value.toFixed(2)}`,
-                  name === 'totalAED' ? 'Total (AED)' : 
-                  name === 'count' ? 'Order Count' : name
+                  name === 'count' ? value : `AED ${fmt(value)}`,
+                  name === 'totalAED' ? 'Total (AED)' : name === 'count' ? 'Order Count' : name
                 ]} />
                 <Bar dataKey="totalAED" fill="#8b5cf6" name="Total Value (AED)" />
               </BarChart>

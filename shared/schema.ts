@@ -290,6 +290,8 @@ export const purchaseOrders = pgTable("purchase_orders", {
   vatAmount: decimal("vat_amount", { precision: 10, scale: 2 }).default("0.00"),
   grandTotal: decimal("grand_total", { precision: 10, scale: 2 }).default("0.00"),
   notes: text("notes"),
+  currency: text("currency").default("GBP"),
+  fxRateToAed: decimal("fx_rate_to_aed", { precision: 8, scale: 4 }).default("4.8500"),
   objectKey: text("object_key"), // Storage key for uploaded PDF
   createdBy: varchar("created_by").references(() => users.id).notNull(),
   createdAt: timestamp("created_at").defaultNow().notNull(),
@@ -554,6 +556,8 @@ export const insertPurchaseOrderSchema = createInsertSchema(purchaseOrders).pick
   vatAmount: true,
   grandTotal: true,
   notes: true,
+  currency: true,
+  fxRateToAed: true,
   objectKey: true,
   createdBy: true,
 });
