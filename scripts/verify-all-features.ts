@@ -392,26 +392,28 @@ async function verifyDocumentNumbering(cookie: string) {
   const origINV = cs.invoiceNumberPrefix || 'INV';
   pass(`Original prefixes — PO="${origPO}", DO="${origDO}", INV="${origINV}"`);
 
-  const newPOPfx = 'PO-UAE', newDOPfx = 'DO-UAE', newINVPfx = 'INV-UAE';
+  // Use trailing-hyphen variant to verify backend normalisation (PO-UAE- → PO-UAE-NNN, no double-hyphen)
+  const newPOPfx = 'PO-UAE-', newDOPfx = 'DO-UAE-', newINVPfx = 'INV-UAE-';
   const { status: putSt } = await apiPut('/api/company-settings', {
     ...cs, poNumberPrefix: newPOPfx, doNumberPrefix: newDOPfx, invoiceNumberPrefix: newINVPfx,
   }, cookie);
-  if (putSt === 200) pass(`Prefixes updated → PO="${newPOPfx}", DO="${newDOPfx}", INV="${newINVPfx}"`);
+  if (putSt === 200) pass(`Prefixes updated (trailing-hyphen input) → PO="${newPOPfx}", DO="${newDOPfx}", INV="${newINVPfx}"`);
   else { fail(`PUT /api/company-settings returned HTTP ${putSt}`); return; }
 
-  // Verify next-number previews
+  // Verify next-number previews — normalised prefix should produce PO-UAE-NNN (not PO-UAE--NNN)
+  const normalPO = 'PO-UAE', normalDO = 'DO-UAE', normalINV = 'INV-UAE';
   const { data: npPO  } = await apiGet('/api/purchase-orders/next-number',  cookie);
   const { data: npDO  } = await apiGet('/api/delivery-orders/next-number',  cookie);
   const { data: npINV } = await apiGet('/api/invoices/next-number', cookie);
   const previewPO  = npPO?.nextNumber  || '';
   const previewDO  = npDO?.nextNumber  || '';
   const previewINV = npINV?.nextNumber || '';
-  if (previewPO.startsWith(newPOPfx))   pass(`PO next-number preview: "${previewPO}" ✓`);
-  else fail(`PO preview "${previewPO}" does not start with "${newPOPfx}"`);
-  if (previewDO.startsWith(newDOPfx))   pass(`DO next-number preview: "${previewDO}" ✓`);
-  else fail(`DO preview "${previewDO}" does not start with "${newDOPfx}"`);
-  if (previewINV.startsWith(newINVPfx)) pass(`INV next-number preview: "${previewINV}" ✓`);
-  else fail(`INV preview "${previewINV}" does not start with "${newINVPfx}"`);
+  if (previewPO.startsWith(normalPO) && !previewPO.includes('--'))   pass(`PO next-number preview: "${previewPO}" (no double-hyphen) ✓`);
+  else fail(`PO preview "${previewPO}" does not start with "${normalPO}" or contains double-hyphen`);
+  if (previewDO.startsWith(normalDO) && !previewDO.includes('--'))   pass(`DO next-number preview: "${previewDO}" (no double-hyphen) ✓`);
+  else fail(`DO preview "${previewDO}" does not start with "${normalDO}" or contains double-hyphen`);
+  if (previewINV.startsWith(normalINV) && !previewINV.includes('--')) pass(`INV next-number preview: "${previewINV}" (no double-hyphen) ✓`);
+  else fail(`INV preview "${previewINV}" does not start with "${normalINV}" or contains double-hyphen`);
 
   // Get a supplier, customer, and product for creation
   const { data: suppData } = await apiGet('/api/suppliers', cookie);
@@ -432,8 +434,8 @@ async function verifyDocumentNumbering(cookie: string) {
     }, cookie);
     if (poCrSt === 201 && createdPO?.poNumber) {
       const num: string = createdPO.poNumber;
-      if (num.startsWith(newPOPfx)) pass(`Created PO "${num}" uses prefix "${newPOPfx}" ✓`);
-      else fail(`Created PO "${num}" does NOT use prefix "${newPOPfx}"`);
+      if (num.startsWith(normalPO) && !num.includes('--')) pass(`Created PO "${num}" uses prefix "${normalPO}" (no double-hyphen) ✓`);
+      else fail(`Created PO "${num}" does NOT use prefix "${normalPO}" or contains double-hyphen`);
       // Delete to bin, then purge
       await apiDelete(`/api/purchase-orders/${createdPO.id}`, cookie);
       await new Promise(r => setTimeout(r, 200));
@@ -451,8 +453,8 @@ async function verifyDocumentNumbering(cookie: string) {
     if (doCrSt === 201 || doCrSt === 200) {
       const doRecord = createdDO?.deliveryOrder || createdDO;
       const num: string = doRecord?.orderNumber || doRecord?.order_number || '';
-      if (num && num.startsWith(newDOPfx)) pass(`Created DO "${num}" uses prefix "${newDOPfx}" ✓`);
-      else if (num) fail(`Created DO "${num}" does NOT use prefix "${newDOPfx}"`);
+      if (num && num.startsWith(normalDO) && !num.includes('--')) pass(`Created DO "${num}" uses prefix "${normalDO}" (no double-hyphen) ✓`);
+      else if (num) fail(`Created DO "${num}" does NOT use prefix "${normalDO}" or contains double-hyphen`);
       else pass(`DO created (status ${doCrSt}) — number field: ${JSON.stringify(Object.keys(createdDO||{}))}`);
       if (doRecord?.id) {
         await apiDelete(`/api/delivery-orders/${doRecord.id}`, cookie);
@@ -471,8 +473,8 @@ async function verifyDocumentNumbering(cookie: string) {
     }, cookie);
     if (invCrSt === 201 && createdInv?.invoiceNumber) {
       const num: string = createdInv.invoiceNumber;
-      if (num.startsWith(newINVPfx)) pass(`Created invoice "${num}" uses prefix "${newINVPfx}" ✓`);
-      else fail(`Created invoice "${num}" does NOT use prefix "${newINVPfx}"`);
+      if (num.startsWith(normalINV) && !num.includes('--')) pass(`Created invoice "${num}" uses prefix "${normalINV}" (no double-hyphen) ✓`);
+      else fail(`Created invoice "${num}" does NOT use prefix "${normalINV}" or contains double-hyphen`);
       await apiDelete(`/api/invoices/${createdInv.id}`, cookie);
       await new Promise(r => setTimeout(r, 200));
       const purged = await purgeFromBin(num, cookie);
