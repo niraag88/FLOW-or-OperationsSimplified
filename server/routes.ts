@@ -2982,6 +2982,9 @@ export async function registerRoutes(app: Express): Promise<Server> {
   // Get total size of all tracked objects in the bucket.
   // Uses the storage_objects tracking table because Replit's object storage
   // list() API does not return file sizes.
+  // NOTE: Objects uploaded before this tracking table was introduced (pre-Task-#58)
+  // are not included in the total until they are re-uploaded. This is a known
+  // limitation — the count is accurate for all new uploads going forward.
   app.get('/api/storage/total-size', requireAuth(['Admin']), async (req, res) => {
     try {
       const [result] = await db.select({ total: sum(storageObjects.sizeBytes) }).from(storageObjects);
