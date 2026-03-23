@@ -38,6 +38,15 @@ export async function apiPost(path: string, body: object, cookie: string) {
   return { status: r.status, data: await r.json() };
 }
 
+export async function apiPut(path: string, body: object, cookie: string) {
+  const r = await fetch(`${BASE_URL}${path}`, {
+    method: 'PUT',
+    headers: { 'Content-Type': 'application/json', Cookie: cookie },
+    body: JSON.stringify(body),
+  });
+  return { status: r.status, data: await r.json() };
+}
+
 export async function apiDelete(path: string, cookie: string) {
   const r = await fetch(`${BASE_URL}${path}`, {
     method: 'DELETE',

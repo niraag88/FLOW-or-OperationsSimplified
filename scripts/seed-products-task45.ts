@@ -1,4 +1,14 @@
 /**
+ * FLOW — Products Seed Script (Task #45) — LEGACY / ARCHIVED
+ *
+ * ⚠️  DEPRECATED: This script uses direct Neon SQL inserts, bypassing the
+ * authenticated REST API and all server-side validation/audit controls.
+ * It is kept only as a historical reference. DO NOT run it in any environment.
+ *
+ * USE INSTEAD: scripts/populate-products-api.ts
+ * That script creates 319+ products via authenticated POST /api/products calls,
+ * respects all validations, and is skip-safe against existing SKUs.
+ *
  * FLOW — Products Seed Script (Task #45)
  *
  * Populates the database with 300+ realistic aromatherapy/wellness products.

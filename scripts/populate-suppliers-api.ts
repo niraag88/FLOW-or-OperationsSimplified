@@ -76,6 +76,20 @@ const SUPPLIERS: Array<{
   { name: 'Global Natural Ingredients FZE', email: 'sales@gnifze.com', phone: '+971 4 883 8700', address: 'Jebel Ali Free Zone, Dubai, UAE', country: 'UAE', payment_terms: 'Net 45', notes: 'Import-export hub for natural ingredients — Indian Ocean sourcing' },
   { name: 'Al Haramain Perfumes Co LLC', email: 'b2b@alharamain.com', phone: '+971 6 569 9002', address: 'Ajman Industrial Area, Ajman, UAE', country: 'UAE', payment_terms: 'Net 30', notes: 'Oudh, bukhoor, Arabic perfume bases' },
   { name: 'Dibaj Aromatics Trading', email: 'orders@dibajaro.ae', phone: '+971 4 339 1122', address: 'Al Quoz Industrial 4, Dubai, UAE', country: 'UAE', payment_terms: 'Net 30' },
+  // Morocco
+  { name: 'Atlas Botanicals Maroc', email: 'export@atlasbotanicals.ma', phone: '+212 5 24 43 22 00', address: '12 Rue Ibn Sina, Marrakech 40000, Morocco', country: 'Morocco', payment_terms: 'Net 60', notes: 'Rose de Damas, argan oil, thyme, rosemary — Atlas mountain sourcing' },
+  // Sri Lanka
+  { name: 'Cinnamon Dreams Lanka', email: 'export@cinnamondreams.lk', phone: '+94 11 234 5678', address: 'No. 55 Galle Road, Colombo 3, Sri Lanka', country: 'Sri Lanka', payment_terms: 'Net 60', notes: 'Ceylon cinnamon, clove, cardamom, vetiver — organic certified' },
+  // Madagascar
+  { name: 'Madagascar Oils SARL', email: 'export@madagascaroils.mg', phone: '+261 20 22 34 567', address: 'Zone Industrielle, Antananarivo 101, Madagascar', country: 'Madagascar', payment_terms: 'Net 60', notes: 'Ylang ylang, ravintsara, niaouli, clove — wild-harvested' },
+  // Nepal
+  { name: 'Himalayan Herb Works', email: 'export@himalayanherbworks.com.np', phone: '+977 1 553 0088', address: 'New Baneshwor, Kathmandu, Nepal', payment_terms: 'Net 45', country: 'Nepal', notes: 'Juniper, rhododendron, neem — Himalayan foothills wildcrafted' },
+  // Spain
+  { name: 'Treatt España SL', email: 'ventas@treatt-espana.com', phone: '+34 93 741 2200', address: 'Polígono Industrial Can Torrella, 08233 Vacarisses, Barcelona, Spain', country: 'Spain', payment_terms: 'Net 45', notes: 'Citrus oils — cold-pressed lemon, orange, lime, grapefruit' },
+  // Brazil
+  { name: 'Citróleo Group', email: 'export@citroleo.com.br', phone: '+55 19 3872 2000', address: 'Rua Comendador Monteiro, Limeira, SP 13480-000, Brazil', country: 'Brazil', payment_terms: 'Net 60', notes: 'Copaiba, buriti, andiroba, Amazonian carrier oils' },
+  // Japan
+  { name: 'Nippon Essential Oil Co', email: 'export@nipponessentialoil.co.jp', phone: '+81 3 3665 1234', address: '2-15-1 Nihonbashi, Chuo-ku, Tokyo 103-0027, Japan', country: 'Japan', payment_terms: 'Net 60', notes: 'Hinoki cypress, yuzu, shiso — premium Japanese aromatics' },
 ];
 
 async function main() {

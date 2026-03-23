@@ -1,5 +1,5 @@
 import { test, expect } from '@playwright/test';
-import { login, apiLogin, apiGet, apiPost, apiDelete } from './helpers';
+import { login, apiLogin, apiGet, apiPost, apiPut, apiDelete } from './helpers';
 
 test.describe('Products CRUD', () => {
   let cookie: string;
@@ -54,6 +54,24 @@ test.describe('Products CRUD', () => {
     expect(found.name).toBe('E2E Test Product');
   });
 
+  test('update product name and price via API', async () => {
+    expect(testProductId).toBeTruthy();
+    const { status, data } = await apiPut(`/api/products/${testProductId}`, {
+      name: 'E2E Test Product UPDATED',
+      unitPrice: '65.00',
+    }, cookie);
+    expect(status).toBe(200);
+    expect(data.name).toBe('E2E Test Product UPDATED');
+    expect(parseFloat(data.unitPrice)).toBeCloseTo(65.0, 1);
+  });
+
+  test('updated product reflects new values in list', async () => {
+    const prods = await apiGet('/api/products', cookie);
+    const found = prods.find((p: any) => p.id === testProductId);
+    expect(found).toBeTruthy();
+    expect(found.name).toBe('E2E Test Product UPDATED');
+  });
+
   test('delete unreferenced product (hard delete)', async () => {
     expect(testProductId).toBeTruthy();
     const status = await apiDelete(`/api/products/${testProductId}`, cookie);
@@ -90,6 +108,14 @@ test.describe('Products CRUD', () => {
     expect(r.status).toBe(200);
     const body = await r.json();
     expect(Array.isArray(body)).toBe(true);
+  });
+
+  test('products list API responds under 150ms at full scale', async () => {
+    const start = Date.now();
+    const prods = await apiGet('/api/products', cookie);
+    const elapsed = Date.now() - start;
+    expect(Array.isArray(prods)).toBe(true);
+    expect(elapsed).toBeLessThan(150);
   });
 
   test('products page renders in browser with count badge', async ({ page }) => {

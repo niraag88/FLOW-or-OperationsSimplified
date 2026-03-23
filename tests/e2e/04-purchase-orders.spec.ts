@@ -1,10 +1,11 @@
 import { test, expect } from '@playwright/test';
-import { apiLogin, apiGet, apiPost } from './helpers';
+import { login, apiLogin, apiGet, apiPost, apiPut } from './helpers';
 
 test.describe('Purchase Orders', () => {
   let cookie: string;
   let supplierId: number;
   let productId: number;
+  let lifecyclePoId: number;
 
   test.beforeAll(async () => {
     cookie = await apiLogin();
@@ -22,6 +23,15 @@ test.describe('Purchase Orders', () => {
     const raw = await apiGet('/api/purchase-orders', cookie);
     const pos: any[] = Array.isArray(raw) ? raw : (raw.purchaseOrders ?? raw.data ?? []);
     expect(pos.length).toBeGreaterThanOrEqual(300);
+  });
+
+  test('purchase orders list responds under 150ms at full scale', async () => {
+    const start = Date.now();
+    const raw = await apiGet('/api/purchase-orders', cookie);
+    const elapsed = Date.now() - start;
+    const pos: any[] = Array.isArray(raw) ? raw : (raw.purchaseOrders ?? raw.data ?? []);
+    expect(pos.length).toBeGreaterThan(0);
+    expect(elapsed).toBeLessThan(150);
   });
 
   test('create purchase order with line items via API', async () => {
@@ -52,6 +62,46 @@ test.describe('Purchase Orders', () => {
     expect(data.id ?? data.poNumber).toBeTruthy();
   });
 
+  test('PO lifecycle: draft → submitted → closed', async () => {
+    const prodsRaw = await apiGet('/api/products', cookie);
+    const prods: any[] = Array.isArray(prodsRaw) ? prodsRaw : [];
+
+    const { status: createStatus, data: po } = await apiPost('/api/purchase-orders', {
+      supplierId,
+      orderDate: '2026-03-23',
+      expectedDelivery: '2026-04-30',
+      status: 'draft',
+      notes: 'E2E lifecycle test PO',
+      totalAmount: '500.00',
+      vatAmount: '25.00',
+      grandTotal: '525.00',
+      items: [{ productId: prods[0]?.id ?? productId, description: 'Lifecycle test item', quantity: 10, unitPrice: 50, lineTotal: 500 }],
+    }, cookie);
+    expect(createStatus).toBe(201);
+    lifecyclePoId = po.id;
+
+    const { status: submitStatus, data: submitted } = await apiPut(`/api/purchase-orders/${lifecyclePoId}`, {
+      status: 'submitted',
+    }, cookie);
+    expect(submitStatus).toBe(200);
+    expect(submitted.status).toBe('submitted');
+
+    const { status: closeStatus, data: closed } = await apiPut(`/api/purchase-orders/${lifecyclePoId}`, {
+      status: 'closed',
+    }, cookie);
+    expect(closeStatus).toBe(200);
+    expect(closed.status).toBe('closed');
+  });
+
+  test('PO detail reflects closed status after lifecycle', async () => {
+    expect(lifecyclePoId).toBeTruthy();
+    const raw = await apiGet('/api/purchase-orders', cookie);
+    const pos: any[] = Array.isArray(raw) ? raw : (raw.purchaseOrders ?? raw.data ?? []);
+    const found = pos.find((p: any) => p.id === lifecyclePoId);
+    expect(found).toBeTruthy();
+    expect(found.status).toBe('closed');
+  });
+
   test('77+ suppliers available', async () => {
     const raw = await apiGet('/api/suppliers', cookie);
     const supps: any[] = Array.isArray(raw) ? raw : (raw.suppliers ?? []);
@@ -62,5 +112,14 @@ test.describe('Purchase Orders', () => {
     const raw = await apiGet('/api/customers', cookie);
     const custs: any[] = Array.isArray(raw) ? raw : (raw.customers ?? []);
     expect(custs.length).toBeGreaterThanOrEqual(148);
+  });
+
+  test('purchase orders page renders in browser', async ({ page }) => {
+    await login(page);
+    const nav = page.locator('nav, aside, [role="navigation"]');
+    await nav.locator('text=/purchase.*order|PO/i').first().click().catch(() => {});
+    await page.waitForTimeout(2000);
+    const text = await page.locator('body').innerText();
+    expect(text).toMatch(/PO-\d{4}-\d+/i);
   });
 });

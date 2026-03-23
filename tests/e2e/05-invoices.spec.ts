@@ -60,6 +60,24 @@ test.describe('Invoices — create, large document, filters', () => {
     expect(data.total_amount).toBeCloseTo(17671.5, 0);
   });
 
+  test('invoice filter by status=Draft returns only Draft invoices', async () => {
+    const data = await apiGet('/api/invoices?status=Draft', cookie);
+    const invs: any[] = Array.isArray(data) ? data : (data.invoices ?? []);
+    expect(invs.length).toBeGreaterThan(0);
+    for (const inv of invs) {
+      expect(inv.status).toBe('Draft');
+    }
+  });
+
+  test('invoice filter by customerId returns only that customer invoices', async () => {
+    const data = await apiGet(`/api/invoices?customerId=${customerId}`, cookie);
+    const invs: any[] = Array.isArray(data) ? data : (data.invoices ?? []);
+    expect(invs.length).toBeGreaterThan(0);
+    for (const inv of invs) {
+      expect(inv.customerId ?? inv.customer_id).toBe(customerId);
+    }
+  });
+
   test('invoice requires valid customer_id — rejects missing', async () => {
     const { status, data } = await apiPost('/api/invoices', {
       invoice_date: '2026-03-23',
