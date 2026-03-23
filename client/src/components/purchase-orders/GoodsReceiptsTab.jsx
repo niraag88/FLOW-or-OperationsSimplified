@@ -5,7 +5,7 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import { ShoppingCart, CheckCircle2, Package, Truck, MoreHorizontal, XCircle, ChevronDown, ChevronRight, Eye, Download, Trash2 } from "lucide-react";
+import { ShoppingCart, CheckCircle2, Package, Truck, MoreHorizontal, XCircle, ChevronDown, ChevronRight, Eye, Download, Trash2, FileText, FileSpreadsheet, Printer } from "lucide-react";
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -19,6 +19,7 @@ import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, D
 import { Textarea } from "@/components/ui/textarea";
 import { Label } from "@/components/ui/label";
 import ExportDropdown from "../common/ExportDropdown";
+import { exportToXLSX } from "../utils/export";
 import { format } from "date-fns";
 import { PurchaseOrder } from "@/api/entities";
 import { GoodsReceipt } from "@/api/entities";
@@ -142,13 +143,50 @@ export default function GoodsReceiptsTab({
     printWindow.document.close();
   };
 
-  const handleExportToXLSX = (po) => {
-    // TODO: Implement XLSX export functionality
-    toast({
-      title: "Export to XLSX",
-      description: `Exporting PO ${po.poNumber} to Excel`,
-      variant: "default"
-    });
+  const handleExportToXLSX = async (po) => {
+    try {
+      const response = await fetch(`/api/purchase-orders/${po.id}/items`);
+      const items = response.ok ? await response.json() : [];
+
+      const exportData = items.length > 0
+        ? items.map((item) => ({
+            'PO Number': po.poNumber,
+            'Supplier': po.supplierName || po.brandName || '',
+            'Order Date': po.orderDate ? format(new Date(po.orderDate), 'dd/MM/yyyy') : '',
+            'Product Code': item.productCode || item.sku || '',
+            'Product Name': item.productName || item.name || item.description || '',
+            'Qty Ordered': item.quantity,
+            'Qty Received': item.receivedQuantity ?? 0,
+            [`Unit Price (${po.currency || 'GBP'})`]: parseFloat(item.unitPrice || 0).toFixed(2),
+            [`Line Total (${po.currency || 'GBP'})`]: parseFloat(item.lineTotal || 0).toFixed(2),
+            'Status': po.status?.toUpperCase() || '',
+          }))
+        : [{
+            'PO Number': po.poNumber,
+            'Supplier': po.supplierName || po.brandName || '',
+            'Order Date': po.orderDate ? format(new Date(po.orderDate), 'dd/MM/yyyy') : '',
+            [`Total (${po.currency || 'GBP'})`]: parseFloat(po.totalAmount || 0).toFixed(2),
+            'Total (AED)': parseFloat(po.grandTotal || 0).toFixed(2),
+            'Line Items': po.lineItems || 0,
+            'Qty Ordered': po.orderedQty || 0,
+            'Qty Received': po.receivedQty || 0,
+            'Status': po.status?.toUpperCase() || '',
+          }];
+
+      exportToXLSX(exportData, `PO_${po.poNumber}`, 'Purchase Order');
+      toast({
+        title: "Export successful",
+        description: `${po.poNumber} exported to Excel.`,
+        variant: "default"
+      });
+    } catch (error) {
+      console.error('XLSX export error:', error);
+      toast({
+        title: "Export failed",
+        description: "Could not export to Excel. Please try again.",
+        variant: "destructive"
+      });
+    }
   };
 
   const handleDeletePO = (po) => {

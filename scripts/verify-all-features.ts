@@ -120,8 +120,13 @@ async function verifyReports(cookie: string) {
     if (grnSt === 200) {
       const grns = getList(grnData);
       const poIds = new Set(pos.map((p: any) => p.id));
-      const matchedGrns = grns.filter((g: any) => poIds.has(g.purchaseOrderId ?? g.purchase_order_id));
-      pass(`GRN matching: ${grns.length} GRNs, ${matchedGrns.length} reference valid PO IDs ✓`);
+      const matchedGrns = grns.filter((g: any) => poIds.has(g.poId ?? g.purchaseOrderId ?? g.purchase_order_id));
+      if (matchedGrns.length === grns.length && grns.length > 0)
+        pass(`GRN matching: ${grns.length} GRNs, all ${matchedGrns.length} linked to valid PO IDs ✓`);
+      else if (matchedGrns.length > 0)
+        pass(`GRN matching: ${grns.length} GRNs, ${matchedGrns.length} reference valid PO IDs ✓`);
+      else
+        fail(`GRN matching: ${grns.length} GRNs found but 0 reference valid PO IDs — check poId field`);
     } else skip(`GET /api/goods-receipts returned ${grnSt}`);
   }
 
