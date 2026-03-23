@@ -408,7 +408,7 @@ export const companySettings = pgTable("company_settings", {
 // because the object storage list() API does not return size information.
 export const storageObjects = pgTable("storage_objects", {
   key: text("key").primaryKey(),
-  sizeBytes: integer("size_bytes").notNull().default(0),
+  sizeBytes: bigint("size_bytes", { mode: "number" }).notNull().default(0),
   uploadedAt: timestamp("uploaded_at").defaultNow().notNull(),
 });
 

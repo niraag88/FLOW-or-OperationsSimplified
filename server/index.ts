@@ -28,9 +28,22 @@ app.use((req, res, next) => {
     await pool.query(`
       CREATE TABLE IF NOT EXISTS storage_objects (
         key TEXT PRIMARY KEY,
-        size_bytes INTEGER NOT NULL DEFAULT 0,
+        size_bytes BIGINT NOT NULL DEFAULT 0,
         uploaded_at TIMESTAMP NOT NULL DEFAULT NOW()
       )
+    `);
+    // Upgrade existing INTEGER column to BIGINT if needed
+    await pool.query(`
+      DO $$ BEGIN
+        IF EXISTS (
+          SELECT 1 FROM information_schema.columns
+          WHERE table_name = 'storage_objects'
+            AND column_name = 'size_bytes'
+            AND data_type = 'integer'
+        ) THEN
+          ALTER TABLE storage_objects ALTER COLUMN size_bytes TYPE BIGINT;
+        END IF;
+      END $$
     `);
   } catch (err) {
     console.error('Startup migration failed (storage_objects):', err);
