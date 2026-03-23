@@ -9,6 +9,7 @@ import {
 import { Button } from "@/components/ui/button";
 import { Download, Eye } from "lucide-react";
 import { exportToCsv, exportToXLSX, exportToPDF } from "../utils/export";
+import { formatCurrency } from "@/utils/currency";
 
 export default function ExportDropdown({ products, activeTab, stockSubTab, stockMovements, lowStockProducts, outOfStockProducts }) {
   const [isExporting, setIsExporting] = useState(false);
@@ -20,7 +21,7 @@ export default function ExportDropdown({ products, activeTab, stockSubTab, stock
       'Product Code': product.sku,
       'Product Name': product.name,
       Size: product.description || '-',
-      'Cost Price': `£${product.costPrice}`,
+      'Cost Price': formatCurrency(product.costPrice, product.costPriceCurrency || 'GBP'),
       'Sale Price': `AED ${product.unitPrice}`,
       Status: product.isActive ? 'Active' : 'Inactive'
     }));
@@ -83,7 +84,7 @@ export default function ExportDropdown({ products, activeTab, stockSubTab, stock
                     <td>${product.sku || '-'}</td>
                     <td>${product.name || '-'}</td>
                     <td>${product.size || '-'}</td>
-                    <td>£${parseFloat(product.costPrice || 0).toFixed(2)}</td>
+                    <td>${formatCurrency(product.costPrice, product.costPriceCurrency || 'GBP')}</td>
                     <td>AED ${product.unitPrice}</td>
                     <td>${product.isActive ? 'Active' : 'Inactive'}</td>
                   </tr>

@@ -111,7 +111,7 @@ export default function StockTab({ products, loading, canEdit, currentUser, onRe
   const stockSummary = stockData ? {
     totalProducts: stockData.products.length,
     totalQuantity: stockData.stockSummary.totalItems,
-    totalValue: stockData.stockSummary.totalValue * parseFloat(companySettings?.fxGbpToAed || 4.85), // Convert to AED
+    totalValue: stockData.stockSummary.totalValue, // Already in AED (converted per-product currency server-side)
     lowStock: stockData.stockSummary.lowStockCount,
     outOfStock: stockData.stockSummary.outOfStockCount,
   } : {

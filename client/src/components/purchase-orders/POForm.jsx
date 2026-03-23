@@ -24,6 +24,7 @@ export default function POForm({ open, onClose, editingPO, currentUser, onSucces
   const [brands, setBrands] = useState([]);
   const [products, setProducts] = useState([]);
   const [companySettings, setCompanySettings] = useState(null);
+  const [currencyExplicitlySet, setCurrencyExplicitlySet] = useState(false);
   
   const [formData, setFormData] = useState({
     poNumber: "",
@@ -65,6 +66,7 @@ export default function POForm({ open, onClose, editingPO, currentUser, onSucces
       if (editingPO) {
         await loadEditingData(filteredBrands, settings);
       } else {
+        setCurrencyExplicitlySet(false);
         generatePONumber();
         if (settings) {
           const defaultRate = getRateToAed('GBP', settings);
@@ -162,6 +164,7 @@ export default function POForm({ open, onClose, editingPO, currentUser, onSucces
 
   const handleCurrencyChange = (currency) => {
     const rate = companySettings ? getRateToAed(currency, companySettings) : 4.85;
+    setCurrencyExplicitlySet(true);
     setFormData(prev => ({
       ...prev,
       currency,
@@ -199,8 +202,9 @@ export default function POForm({ open, onClose, editingPO, currentUser, onSucces
         newItems[index].lineTotal = newItems[index].quantity * (parseFloat(product.costPrice) || 0);
 
         // Auto-set PO currency from product's costPriceCurrency when first item is selected on a new PO
+        // Only if user has NOT explicitly changed the currency themselves
         const productCurrency = product.costPriceCurrency || 'GBP';
-        const isFirstItem = index === 0 && !editingPO && newItems.filter(i => i.productId).length <= 1;
+        const isFirstItem = index === 0 && !editingPO && !currencyExplicitlySet && newItems.filter(i => i.productId).length <= 1;
         if (isFirstItem) {
           const rate = companySettings ? getRateToAed(productCurrency, companySettings) : 4.85;
           setFormData(prev => ({
@@ -280,6 +284,7 @@ export default function POForm({ open, onClose, editingPO, currentUser, onSucces
   };
 
   const resetForm = () => {
+    setCurrencyExplicitlySet(false);
     setFormData({
       poNumber: "",
       supplierId: "",

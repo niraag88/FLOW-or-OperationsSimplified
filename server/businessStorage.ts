@@ -828,6 +828,7 @@ export class BusinessStorage {
       unitPrice: products.unitPrice,
       stockQuantity: products.stockQuantity,
       costPrice: products.costPrice,
+      costPriceCurrency: products.costPriceCurrency,
       unit: products.unit,
       minStockLevel: products.minStockLevel,
       maxStockLevel: products.maxStockLevel,
@@ -839,9 +840,22 @@ export class BusinessStorage {
       .where(eq(products.isActive, true))
       .orderBy(desc(products.updatedAt));
 
+    // Fetch FX rates for multi-currency AED conversion
+    const settings = await this.getCompanySettings();
+    const fxGbpToAed = parseFloat(String(settings?.fxGbpToAed ?? 4.85));
+    const fxUsdToAed = parseFloat(String(settings?.fxUsdToAed ?? 3.6725));
+    const fxInrToAed = parseFloat(String(settings?.fxInrToAed ?? 0.044));
+    const getRateToAed = (currency: string | null) => {
+      const c = String(currency ?? 'GBP').toUpperCase();
+      if (c === 'AED') return 1.0;
+      if (c === 'USD') return fxUsdToAed;
+      if (c === 'INR') return fxInrToAed;
+      return fxGbpToAed; // default GBP
+    };
+
     // Calculate stock summary aggregations server-side
     let totalItems = 0;
-    let totalValue = 0; // GBP
+    let totalValue = 0; // AED (converted per product currency)
     let lowStockCount = 0;
     let outOfStockCount = 0;
     const lowStockProducts: typeof allProducts = [];
@@ -850,9 +864,10 @@ export class BusinessStorage {
     allProducts.forEach(product => {
       const stock = product.stockQuantity || 0;
       const costPrice = parseFloat(String(product.costPrice) || '0');
+      const rate = getRateToAed(product.costPriceCurrency);
       
       totalItems += stock;
-      totalValue += stock * costPrice; // Use cost price for proper inventory valuation
+      totalValue += stock * costPrice * rate; // Convert to AED using per-product currency rate
 
       if (stock === 0) {
         outOfStockCount++;
