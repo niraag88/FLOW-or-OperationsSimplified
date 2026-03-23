@@ -4,7 +4,7 @@ import {
   brands, suppliers, customers, products, purchaseOrders, quotations,
   vatReturns, companySettings, purchaseOrderItems, quotationItems,
   stockCounts, stockCountItems, users, goodsReceipts, goodsReceiptItems,
-  invoices, deliveryOrders,
+  invoices, invoiceLineItems, deliveryOrders,
   type Brand, type Supplier, type Customer, type Product, 
   type PurchaseOrder, type Quotation, type VatReturn, type CompanySettings,
   type StockCount, type StockCountItem, type Invoice, type DeliveryOrder,
@@ -419,6 +419,46 @@ export class BusinessStorage {
     // Then delete the quotation itself
     const [deletedQuote] = await db.delete(quotations).where(eq(quotations.id, id)).returning();
     return deletedQuote;
+  }
+
+  async createInvoiceFromQuotation(quotationId: number, invoiceNumber: string, userId: number) {
+    const quote = await this.getQuotationWithItems(quotationId);
+    if (!quote) throw new Error(`Quotation with id ${quotationId} not found`);
+    if (quote.status === 'Converted') throw new Error(`Quotation ${quote.quoteNumber} has already been converted to an invoice`);
+    if (!quote.customerId) throw new Error(`Quotation ${quote.quoteNumber} has no customer assigned`);
+
+    const invoiceData: InsertInvoice = {
+      invoiceNumber,
+      customerId: quote.customerId,
+      customerName: quote.customerName ?? 'Unknown Customer',
+      amount: quote.grandTotal ?? quote.totalAmount ?? '0',
+      vatAmount: quote.vatAmount ?? undefined,
+      status: 'draft',
+      invoiceDate: new Date().toISOString().split('T')[0],
+      reference: quote.quoteNumber,
+      notes: `Converted from Quotation ${quote.quoteNumber}`,
+      currency: 'AED',
+    };
+
+    const [invoice] = await db.insert(invoices).values(invoiceData).returning();
+
+    for (const item of (quote.items ?? [])) {
+      if (Number(item.quantity) > 0) {
+        await db.insert(invoiceLineItems).values({
+          invoiceId: invoice.id,
+          productId: item.productId ?? null,
+          productCode: item.productCode ?? null,
+          description: item.description ?? '',
+          quantity: Number(item.quantity),
+          unitPrice: item.unitPrice?.toString() ?? '0',
+          lineTotal: item.lineTotal?.toString() ?? '0',
+        });
+      }
+    }
+
+    await this.updateQuotation(quotationId, { status: 'Converted' });
+
+    return { ...invoice, items: quote.items ?? [] };
   }
 
   // Company Settings operations

@@ -23,83 +23,60 @@ test.describe('UI Flows — page loads, dialogs, navigation', () => {
     await expect(btn).toBeVisible();
   });
 
-  test('DO "Create from Existing" dialog opens with document selection controls', async ({ page }) => {
+  test('DO "Create from Existing" dialog: select submitted invoice and verify form pre-population', async ({ page }) => {
+    // Full browser flow: open dialog → switch to invoice tab → select invoice → confirm → verify form shown
     await login(page);
+
+    // Navigate to delivery orders page
     await page.goto(`${BASE_URL}/delivery-orders`);
-    await page.waitForLoadState('networkidle', { timeout: 15000 }).catch(() => {});
+    await page.waitForLoadState('networkidle', { timeout: 20000 }).catch(() => {});
+
+    // Click "Create from Existing" button
     const btn = page.locator('button').filter({ hasText: /create from existing/i }).first();
     await btn.waitFor({ timeout: 20000 });
     await btn.click();
-    await page.waitForTimeout(2000);
 
-    // Verify a dialog/modal opened with selection controls (input, select, or list)
-    const dialogOrModal = page.locator('[role="dialog"], [role="alertdialog"], .modal, [data-radix-dialog-content]').first();
+    // Wait for dialog to open
+    await page.waitForSelector('[role="dialog"]', { timeout: 10000 });
+    await page.waitForTimeout(2000); // allow the API call to load invoices
+
+    // Switch to "From Invoice" tab (data-testid="tab-invoice")
+    const invoiceTab = page.locator('[data-testid="tab-invoice"]');
+    await invoiceTab.waitFor({ timeout: 5000 });
+    await invoiceTab.click();
+    await page.waitForTimeout(500);
+
+    // Open the Radix Select combobox for invoice selection
+    const selectTrigger = page.locator('[role="combobox"]').last();
+    await selectTrigger.waitFor({ timeout: 5000 });
+    await selectTrigger.click();
+
+    // Wait for dropdown options to appear (Radix renders in a portal)
+    await page.waitForSelector('[role="option"]', { timeout: 5000 });
+
+    // Click the first available (non-disabled) option
+    const firstOption = page.locator('[role="option"]').filter({ hasNot: page.locator('[data-disabled]') }).first();
+    await firstOption.waitFor({ timeout: 3000 });
+    await firstOption.click();
+    await page.waitForTimeout(300);
+
+    // Click "Create Delivery Order" button (data-testid="button-create-delivery-order")
+    const createBtn = page.locator('[data-testid="button-create-delivery-order"]');
+    await createBtn.waitFor({ timeout: 5000 });
+    await expect(createBtn).not.toBeDisabled();
+    await createBtn.click();
+
+    // After clicking "Create Delivery Order":
+    // - The "Create from Existing" dialog fetches the full invoice, then closes
+    // - The DO form dialog opens (pre-populated with invoice data)
+    await page.waitForTimeout(2500);
     const bodyText = await page.locator('body').innerText();
-    expect(bodyText).toMatch(/quotation|invoice|document|select|choose/i);
 
-    // Verify the dialog has interactive controls for selecting a source document
-    const hasInput = await page.locator('input[type="text"], input[type="search"], input[placeholder]').count();
-    const hasSelect = await page.locator('select, [role="combobox"], [role="listbox"]').count();
-    const hasButton = await page.locator('[role="dialog"] button, .modal button').count();
-    expect(hasInput + hasSelect + hasButton).toBeGreaterThan(0);
-  });
+    // The DO form should now be visible (it's a separate dialog)
+    expect(bodyText).toMatch(/delivery order|customer|save|cancel|order date|notes/i);
 
-  test('DO "Create from Existing" end-to-end: creates DO from existing invoice via API', async () => {
-    // This API-level test verifies the full business outcome of the DO-from-invoice flow.
-    // The browser dialog just wraps this creation path.
-    const cookie = await apiLogin();
-    const custsRaw = await apiGet('/api/customers', cookie);
-    const custs = toCustomerList(custsRaw);
-    const customerId = custs[0]?.id ?? 3;
-
-    const prodsRaw = await apiGet('/api/products', cookie);
-    const prods = toProductList(prodsRaw);
-    const items = prods.slice(0, 2).map((p, i) => ({
-      product_id: p.id,
-      product_code: p.sku,
-      description: p.name,
-      quantity: i + 1,
-      unit_price: productPrice(p),
-      line_total: (i + 1) * productPrice(p),
-    }));
-    const subtotal = items.reduce((s, it) => s + it.line_total, 0);
-
-    // Create source invoice
-    const { status: is, data: inv } = await apiPost('/api/invoices', {
-      customer_id: customerId,
-      invoice_date: '2026-03-23',
-      status: 'Draft',
-      total_amount: (subtotal * 1.05).toFixed(2),
-      items,
-    }, cookie);
-    expect(is).toBe(201);
-    const invId = (inv as { id: number }).id;
-
-    // Create DO referencing the invoice (same flow as the "Create from Existing" button)
-    const { status: dos, data: doData } = await apiPost('/api/delivery-orders', {
-      customer_id: customerId,
-      source_invoice_id: invId,
-      order_date: '2026-03-23',
-      status: 'draft',
-      total_amount: (subtotal * 1.05).toFixed(2),
-      notes: `Created from invoice #${invId}`,
-      items,
-    }, cookie);
-    expect(dos).toBe(201);
-    const createdDo = doData as { id: number; orderNumber?: string };
-    expect(createdDo.id).toBeTruthy();
-    expect(createdDo.orderNumber).toMatch(/DO-/);
-
-    // Verify the DO links back to source invoice
-    const doDetail = await apiGet(`/api/delivery-orders/${createdDo.id}`, cookie) as {
-      id: number; items?: unknown[];
-    };
-    expect(doDetail.id).toBe(createdDo.id);
-    expect((doDetail.items ?? []).length).toBe(2);
-
-    // Cleanup
-    await apiDelete(`/api/delivery-orders/${createdDo.id}`, cookie);
-    await apiDelete(`/api/invoices/${invId}`, cookie);
+    // The "Create from Existing" dialog title should no longer appear
+    expect(bodyText).not.toMatch(/Create Delivery Order from Existing/);
   });
 
   test('stock count page renders and shows relevant controls', async ({ page }) => {

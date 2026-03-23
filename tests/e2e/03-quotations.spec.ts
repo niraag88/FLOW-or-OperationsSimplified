@@ -127,7 +127,7 @@ test.describe('Quotations — create, view, convert to invoice', () => {
     expect(parseFloat(data.vatAmount ?? '0')).toBeGreaterThan(0);
   });
 
-  test('convert quotation to invoice: create invoice referencing quote, then mark quote Converted', async () => {
+  test('convert quotation to invoice via POST /api/invoices/from-quotation (dedicated conversion route)', async () => {
     let prods: ApiProduct[] = [];
     for (let attempt = 0; attempt < 3; attempt++) {
       const r = await apiGet('/api/products', cookie);
@@ -148,6 +148,7 @@ test.describe('Quotations — create, view, convert to invoice', () => {
     const subtotal = items.reduce((s, it) => s + it.line_total, 0);
     const vat = subtotal * 0.05;
 
+    // Create source quotation
     const { status: qs, data: qData } = await apiPost('/api/quotations', {
       customerId,
       quoteDate: '2026-03-23',
@@ -162,41 +163,29 @@ test.describe('Quotations — create, view, convert to invoice', () => {
     const srcQuote = qData as { id: number; quoteNumber: string };
     const srcQuoteId = srcQuote.id;
 
-    const invItems = items.map((it) => ({
-      product_id: it.product_id,
-      description: it.description,
-      product_code: it.product_code,
-      quantity: it.quantity,
-      unit_price: it.unit_price,
-      line_total: it.line_total,
-    }));
-    const { status: is, data: invData } = await apiPost('/api/invoices', {
-      customer_id: customerId,
-      invoice_date: '2026-03-23',
-      reference: srcQuote.quoteNumber,
-      notes: `Converted from quotation ${srcQuote.quoteNumber}`,
-      tax_amount: vat.toFixed(2),
-      total_amount: (subtotal + vat).toFixed(2),
-      items: invItems,
+    // Use the dedicated conversion route — this is the actual conversion path,
+    // not a manual invoice creation + separate status update.
+    const { status: is, data: invData } = await apiPost('/api/invoices/from-quotation', {
+      quotationId: srcQuoteId,
     }, cookie);
     expect(is).toBe(201);
-    const inv = invData as { id: number };
+    const inv = invData as { id: number; invoiceNumber?: string; reference?: string; notes?: string; items?: unknown[] };
     expect(inv.id).toBeTruthy();
 
+    // Verify the invoice was created with the quotation's items and reference
     const invDetail = await apiGet(`/api/invoices/${inv.id}`, cookie) as {
-      items?: unknown[]; reference?: string; notes?: string;
+      items?: unknown[]; reference?: string; notes?: string; status?: string;
     };
     expect((invDetail.items ?? []).length).toBe(3);
     expect(invDetail.reference ?? invDetail.notes).toMatch(
-      new RegExp(srcQuote.quoteNumber.replace('-', '\\-')),
+      new RegExp(srcQuote.quoteNumber.replace(/[-]/g, '\\-')),
     );
 
-    const { status: us, data: updated } = await apiPut(`/api/quotations/${srcQuoteId}`, {
-      status: 'Converted',
-    }, cookie);
-    expect(us).toBe(200);
-    expect((updated as { status: string }).status).toBe('Converted');
+    // Verify the source quotation status was automatically set to 'Converted'
+    const updatedQuote = await apiGet(`/api/quotations/${srcQuoteId}`, cookie) as { status?: string };
+    expect(updatedQuote.status).toBe('Converted');
 
+    // Cleanup
     await apiDelete(`/api/invoices/${inv.id}`, cookie);
     await apiDelete(`/api/quotations/${srcQuoteId}`, cookie);
   });

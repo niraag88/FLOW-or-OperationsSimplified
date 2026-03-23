@@ -1,6 +1,6 @@
 # Task #45 — Test Results & Bug Hunt Report
 
-Generated: 2026-03-23 (Final — 68 E2E tests all passing)
+Generated: 2026-03-23 (Final — 67 E2E tests all passing)
 
 ## Summary
 
@@ -29,7 +29,7 @@ Generated: 2026-03-23 (Final — 68 E2E tests all passing)
 
 ## E2E Test Suite (Final)
 
-- **Location**: `tests/e2e/` — 8 spec files, 68 tests, all passing
+- **Location**: `tests/e2e/` — 8 spec files, 67 tests, all passing
 - **Runner**: Playwright (`npx playwright test`) with system Chromium
 - **Workers**: 1 (serial execution)
 
@@ -42,8 +42,8 @@ Generated: 2026-03-23 (Final — 68 E2E tests all passing)
 | 05-invoices.spec.ts | 12 | Invoice create/filters/validation/date-range, 50-line stress, status badges, pagination |
 | 06-delivery-orders.spec.ts | 5 | DO creation and lifecycle, DO-from-invoice end-to-end |
 | 07-stock-count-and-reports.spec.ts | 8 | Stock count create/load, dashboard summary, performance benchmarks |
-| 08-ui-flows.spec.ts | 10 | Dashboard, DO dialog, stock count, reports, PO page (4s), invoices page (4s), inventory page (4s), load-time benchmark |
-| **Total** | **68** | All passing |
+| 08-ui-flows.spec.ts | 9 | Dashboard, DO dialog, stock count, reports, PO page (4s), invoices page (4s), inventory page (4s), load-time benchmark |
+| **Total** | **67** | All passing |
 
 ---
 
@@ -78,6 +78,11 @@ Generated: 2026-03-23 (Final — 68 E2E tests all passing)
   4. Updated `shared/schema.ts`: `supplierId` now references `suppliers.id` (not `brands.id`)
   5. Migration script committed at `scripts/migrate-bug005-po-supplier-fk.sql` (idempotent — checks FK target before running)
 - **Status**: FIXED. POs now correctly reference the `suppliers` table.
+
+### BUG-006: "Create Delivery Order from Existing" dialog crashes silently on invoice selection
+- **Root Cause**: `handleDocumentSelect` in `DeliveryOrders.jsx` called `document.items.map(...)` on the list-API representation of an invoice/quotation. The list endpoints (`GET /api/invoices`, `GET /api/quotations`) omit `items` from the response, so `document.items` was `undefined`, causing a `TypeError` before any React state updates (`setShowCreateFromExistingDialog(false)`, `setShowDOForm(true)`) could run. The dialog appeared frozen — button clicked, no response.
+- **Fix**: Now fetches the full record by ID (`GET /api/invoices/:id`, `GET /api/quotations/:id`) before building `doData`. Falls back to list-level data on network error. Uses `(fullDocument.items || []).map(...)` defensively in all branches. Also normalises both camelCase and snake_case field names from the API.
+- **Location**: `client/src/pages/DeliveryOrders.jsx` — `handleDocumentSelect` function
 
 ### Rate Limiter Fix (E2E infrastructure)
 - **Issue**: Dev rate limiter (max: 20/15min for login, 300/min for general API) was too strict for E2E test runs. Multiple browser tests + React's `/api/auth/me` polling exhausted limits.

@@ -1478,35 +1478,42 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  // POST /api/invoices/from-quotation - Create invoice from quotation (DISABLED - Enhanced system under development)
-  // app.post('/api/invoices/from-quotation', requireAuth(['Admin', 'Manager']), async (req: AuthenticatedRequest, res) => {
-  //   try {
-  //     const { quotationId } = req.body;
-  //     
-  //     if (!quotationId) {
-  //       return res.status(400).json({ error: 'Quotation ID is required' });
-  //     }
-  //     
-  //     // Generate unique invoice number
-  //     const nextNumber = await businessStorage.generateInvoiceNumber();
-  //     
-  //     console.log('Creating enhanced invoice from quotation:', quotationId);
-  //     const invoice = await businessStorage.createEnhancedInvoiceFromQuotation(
-  //       quotationId, 
-  //       nextNumber, 
-  //       req.user!.id
-  //     );
-  //     
-  //     res.status(201).json(invoice);
-  //   } catch (error) {
-  //     console.error('Error creating invoice from quotation:', error);
-  //     if (error instanceof Error) {
-  //       res.status(400).json({ error: error.message });
-  //     } else {
-  //       res.status(500).json({ error: 'Failed to create invoice' });
-  //     }
-  //   }
-  // });
+  // POST /api/invoices/from-quotation - Create invoice from quotation
+  app.post('/api/invoices/from-quotation', requireAuth(['Admin', 'Manager']), async (req: AuthenticatedRequest, res) => {
+    try {
+      const { quotationId } = req.body;
+
+      if (!quotationId) {
+        return res.status(400).json({ error: 'quotationId is required' });
+      }
+
+      const nextNumber = await businessStorage.generateInvoiceNumber();
+
+      const invoice = await businessStorage.createInvoiceFromQuotation(
+        parseInt(quotationId),
+        nextNumber,
+        req.user!.id,
+      );
+
+      writeAuditLog({
+        actor: req.user!.id,
+        actorName: req.user?.username || String(req.user!.id),
+        targetId: String(invoice.id),
+        targetType: 'invoice',
+        action: 'CREATE',
+        details: `Invoice #${invoice.invoiceNumber} created from Quotation id=${quotationId}`,
+      });
+
+      res.status(201).json(invoice);
+    } catch (error) {
+      console.error('Error creating invoice from quotation:', error);
+      if (error instanceof Error) {
+        res.status(400).json({ error: error.message });
+      } else {
+        res.status(500).json({ error: 'Failed to create invoice from quotation' });
+      }
+    }
+  });
 
   // POST /api/invoices - Create new invoice
   app.post('/api/invoices', requireAuth(['Admin', 'Manager']), async (req: AuthenticatedRequest, res) => {

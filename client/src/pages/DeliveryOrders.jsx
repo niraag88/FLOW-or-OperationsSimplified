@@ -143,41 +143,55 @@ export default function DeliveryOrders() {
     const doNumber = `DO-${timestamp}`;
     
     if (documentType === 'quotation') {
+      // Fetch the full quotation (with line items) since the list API omits items
+      let fullQuotation = document;
+      try {
+        const res = await fetch(`/api/quotations/${document.id}`, { credentials: 'include' });
+        if (res.ok) fullQuotation = await res.json();
+      } catch (_) { /* use list-level data as fallback */ }
+
       // Transform quotation to delivery order
       doData = {
-        do_number: doNumber, // Add generated DO number
-        customer_id: document.customer_id,
+        do_number: doNumber,
+        customer_id: fullQuotation.customer_id ?? fullQuotation.customerId,
         order_date: new Date().toISOString().split('T')[0],
-        reference: document.reference,
-        reference_date: document.reference_date,
+        reference: fullQuotation.reference,
+        reference_date: fullQuotation.reference_date ?? fullQuotation.referenceDate,
         status: 'draft',
-        currency: document.currency,
-        tax_treatment: document.tax_treatment,
-        tax_rate: document.tax_rate,
-        subtotal: document.subtotal,
-        tax_amount: document.tax_amount,
-        total_amount: document.total_amount,
-        remarks: `Based on Quotation #${document.quotation_number}\n${document.remarks || ''}`.trim(),
-        items: document.items.map(item => ({ ...item })),
+        currency: fullQuotation.currency,
+        tax_treatment: fullQuotation.tax_treatment ?? fullQuotation.taxTreatment,
+        tax_rate: fullQuotation.tax_rate ?? fullQuotation.taxRate,
+        subtotal: fullQuotation.subtotal ?? fullQuotation.totalAmount,
+        tax_amount: fullQuotation.tax_amount ?? fullQuotation.vatAmount,
+        total_amount: fullQuotation.total_amount ?? fullQuotation.grandTotal,
+        remarks: `Based on Quotation #${fullQuotation.quotation_number || fullQuotation.quoteNumber}\n${fullQuotation.remarks || fullQuotation.notes || ''}`.trim(),
+        items: (fullQuotation.items || []).map(item => ({ ...item })),
         attachments: []
       };
     } else if (documentType === 'invoice') {
+      // Fetch the full invoice (with line items) since the list API omits items
+      let fullInvoice = document;
+      try {
+        const res = await fetch(`/api/invoices/${document.id}`, { credentials: 'include' });
+        if (res.ok) fullInvoice = await res.json();
+      } catch (_) { /* use list-level data as fallback */ }
+
       // Transform invoice to delivery order
       doData = {
-        do_number: doNumber, // Add generated DO number
-        customer_id: document.customer_id,
+        do_number: doNumber,
+        customer_id: fullInvoice.customer_id ?? fullInvoice.customerId,
         order_date: new Date().toISOString().split('T')[0],
-        reference: document.reference,
-        reference_date: document.reference_date,
+        reference: fullInvoice.reference,
+        reference_date: fullInvoice.reference_date ?? fullInvoice.referenceDate,
         status: 'draft',
-        currency: document.currency,
-        tax_treatment: document.tax_treatment,
-        tax_rate: document.tax_rate,
-        subtotal: document.subtotal,
-        tax_amount: document.tax_amount,
-        total_amount: document.total_amount,
-        remarks: `Based on Invoice #${document.invoice_number}\n${document.remarks || ''}`.trim(),
-        items: document.items.map(item => ({ ...item })),
+        currency: fullInvoice.currency,
+        tax_treatment: fullInvoice.tax_treatment ?? fullInvoice.taxTreatment,
+        tax_rate: fullInvoice.tax_rate ?? fullInvoice.taxRate,
+        subtotal: fullInvoice.subtotal,
+        tax_amount: fullInvoice.tax_amount ?? fullInvoice.vatAmount,
+        total_amount: fullInvoice.total_amount ?? fullInvoice.amount,
+        remarks: `Based on Invoice #${fullInvoice.invoice_number || fullInvoice.invoiceNumber}\n${fullInvoice.remarks || ''}`.trim(),
+        items: (fullInvoice.items || []).map(item => ({ ...item })),
         attachments: []
       };
     }
