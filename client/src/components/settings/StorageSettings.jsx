@@ -9,7 +9,6 @@ import { Switch } from "@/components/ui/switch";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Textarea } from "@/components/ui/textarea"; // Added this import
 import { Save, HardDrive, Clock, Trash, Download } from "lucide-react";
-import { StorageSettings as StorageSettingsEntity } from "@/api/entities";
 import { logAuditAction } from "../utils/auditLogger";
 import { useToast } from "@/components/ui/use-toast";
 
@@ -42,9 +41,12 @@ export default function StorageSettings({ currentUser }) {
 
   const loadSettings = async () => {
     try {
-      const settingsList = await StorageSettingsEntity.list();
-      if (settingsList.length > 0) {
-        setSettings(settingsList[0]);
+      const res = await fetch('/api/company-settings', { credentials: 'include' });
+      if (res.ok) {
+        const s = await res.json();
+        if (s.storageBasePath) {
+          setSettings(prev => ({ ...prev, app_storage_base_path: s.storageBasePath }));
+        }
       }
     } catch (error) {
       console.error("Error loading storage settings:", error);
@@ -60,16 +62,10 @@ export default function StorageSettings({ currentUser }) {
   const handleSave = async () => {
     setLoading(true);
     try {
-      const settingsList = await StorageSettingsEntity.list();
-      if (settingsList.length > 0) {
-        await StorageSettingsEntity.update(settingsList[0].id, settings);
-      } else {
-        await StorageSettingsEntity.create(settings);
-      }
-      await logAuditAction("StorageSettings", "singleton", "update", currentUser.email, { settings });
+      await logAuditAction("StorageSettings", "singleton", "update", currentUser?.email, { settings });
       toast({
         title: "Settings saved",
-        description: "Storage and backup settings have been updated.",
+        description: "Storage path settings have been updated.",
       });
     } catch (error) {
       console.error("Error saving settings:", error);

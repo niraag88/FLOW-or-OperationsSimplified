@@ -3202,6 +3202,35 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  // POST /api/audit-logs — write a frontend-originated audit log entry (any authenticated user)
+  app.post('/api/audit-logs', requireAuth(), async (req: AuthenticatedRequest, res) => {
+    try {
+      const { entity_type, entity_id, action, changes, metadata } = req.body;
+
+      if (!entity_type || !action) {
+        return res.status(400).json({ error: 'entity_type and action are required' });
+      }
+
+      const details = changes && Object.keys(changes).length > 0
+        ? JSON.stringify(changes)
+        : (metadata && Object.keys(metadata).length > 0 ? JSON.stringify(metadata) : undefined);
+
+      const [entry] = await db.insert(auditLog).values({
+        actor: req.user!.id,
+        actorName: req.user?.username || req.user!.id,
+        targetId: entity_id ? String(entity_id) : 'unknown',
+        targetType: entity_type,
+        action: String(action).toUpperCase(),
+        details: details ?? null,
+      }).returning();
+
+      res.status(201).json(entry);
+    } catch (error) {
+      console.error('Error writing audit log:', error);
+      res.status(500).json({ error: 'Failed to write audit log' });
+    }
+  });
+
   // ── Recycle Bin routes ──────────────────────────────────────────────────────
 
   // GET /api/recycle-bin — list all items, newest first

@@ -185,7 +185,7 @@ _recycleBinEntity.restore = async function(id) {
   return await response.json();
 };
 export const RecycleBin = _recycleBinEntity;
-export const AuditLog = new FallbackEntity('AuditLog');
+export const AuditLog = new ApiEntity('audit-logs');
 export const InventoryAudit = new FallbackEntity('InventoryAudit');
 
 // User auth entity
