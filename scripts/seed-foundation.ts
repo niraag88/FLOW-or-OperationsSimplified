@@ -792,24 +792,37 @@ async function verifySeedResults(cookie: string) {
   console.log('\n── Post-seed verification ─────────────────────────────────');
   const r = await fetch(`${BASE_URL}/api/products`, { headers: { Cookie: cookie } });
   const raw = await r.json() as unknown;
-  const all: Array<{ costPriceCurrency?: string }> =
-    Array.isArray(raw) ? raw as Array<{ costPriceCurrency?: string }> :
-    ((raw as { products?: Array<{ costPriceCurrency?: string }> }).products ?? []);
+  const all: Array<{ costPriceCurrency?: string; category?: string }> =
+    Array.isArray(raw) ? raw as Array<{ costPriceCurrency?: string; category?: string }> :
+    ((raw as { products?: Array<{ costPriceCurrency?: string; category?: string }> }).products ?? []);
 
-  const totals: Record<string, number> = { GBP: 0, USD: 0, INR: 0, AED: 0 };
-  for (const p of all) { const c = p.costPriceCurrency ?? 'AED'; totals[c] = (totals[c] ?? 0) + 1; }
+  const currTotals: Record<string, number> = { GBP: 0, USD: 0, INR: 0, AED: 0 };
+  const catTotals: Record<string, number> = {};
+  for (const p of all) {
+    const c = p.costPriceCurrency ?? 'AED';
+    currTotals[c] = (currTotals[c] ?? 0) + 1;
+    const cat = p.category ?? 'Unknown';
+    catTotals[cat] = (catTotals[cat] ?? 0) + 1;
+  }
 
   const total = all.length;
-  const minRequired = 150;
+  const minCurrency = 150;
   let pass = true;
 
-  console.log(`  Total products in DB: ${total}`);
-  for (const [cur, count] of Object.entries(totals)) {
-    const ok = count >= minRequired;
+  console.log(`  Total products in DB: ${total} ${total >= 600 ? '✓' : '✗ (need >= 600)'}`);
+  if (total < 600) pass = false;
+
+  console.log('  Currency distribution:');
+  for (const [cur, count] of Object.entries(currTotals)) {
+    const ok = count >= minCurrency;
     if (!ok) pass = false;
-    console.log(`  ${cur}: ${count} ${ok ? '✓' : `✗ (need >= ${minRequired})`}`);
+    console.log(`    ${cur}: ${count} ${ok ? '✓' : `✗ (need >= ${minCurrency})`}`);
   }
-  if (total < 600) { pass = false; console.log(`  ✗ Total < 600`); }
+
+  console.log('  Category distribution:');
+  for (const [cat, count] of Object.entries(catTotals).sort(([a], [b]) => a.localeCompare(b))) {
+    console.log(`    ${cat}: ${count}`);
+  }
 
   if (pass) console.log('  ✓ All verification checks passed');
   else { console.error('  ✗ Verification FAILED — check currency distribution'); process.exit(1); }
