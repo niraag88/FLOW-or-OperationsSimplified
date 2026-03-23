@@ -218,8 +218,8 @@ export default function PurchaseOrders() {
       transform: (date) => date && !isNaN(new Date(date)) ? new Date(date).toLocaleDateString('en-GB') : ''
     },
     totalAmount: {
-      label: "Total (GBP)",
-      transform: (amount) => `GBP ${parseFloat(amount || 0).toFixed(2)}`
+      label: "Total",
+      transform: (amount, row) => `${row?.currency || 'GBP'} ${parseFloat(amount || 0).toFixed(2)}`
     },
     grandTotal: {
       label: "Total (AED)", 

@@ -124,7 +124,7 @@ export default function GoodsReceiptsTab({
           <tr><th>PO Number:</th><td>${po.poNumber}</td></tr>
           <tr><th>Brand:</th><td>${po.brandName || 'Unknown Brand'}</td></tr>
           <tr><th>Order Date:</th><td>${po.orderDate ? new Date(po.orderDate).toLocaleDateString('en-GB') : '-'}</td></tr>
-          <tr><th>Total (GBP):</th><td>GBP ${parseFloat(po.totalAmount || 0).toFixed(2)}</td></tr>
+          <tr><th>Total (${po.currency || 'GBP'}):</th><td>${po.currency || 'GBP'} ${parseFloat(po.totalAmount || 0).toFixed(2)}</td></tr>
           <tr><th>Total (AED):</th><td>AED ${parseFloat(po.grandTotal || 0).toFixed(2)}</td></tr>
           <tr><th>Line Items:</th><td>${po.lineItems || 0}</td></tr>
           <tr><th>Ordered Quantity:</th><td>${po.orderedQty || 0}</td></tr>
@@ -226,7 +226,7 @@ export default function GoodsReceiptsTab({
           <TableHead className="w-[120px]">PO Number</TableHead>
           <TableHead className="w-[140px]">Brand</TableHead>
           <TableHead className="w-[100px]">Order Date</TableHead>
-          <TableHead className="w-[110px]">Total (GBP)</TableHead>
+          <TableHead className="w-[110px]">Total</TableHead>
           <TableHead className="w-[110px]">Total (AED)</TableHead>
           <TableHead className="w-[90px]">Line Items</TableHead>
           <TableHead className="w-[80px]">Ordered</TableHead>
@@ -246,7 +246,7 @@ export default function GoodsReceiptsTab({
                 '-'
               }
             </TableCell>
-            <TableCell className="w-[110px]">GBP {parseFloat(po.totalAmount || 0).toFixed(2)}</TableCell>
+            <TableCell className="w-[110px]">{po.currency || 'GBP'} {parseFloat(po.totalAmount || 0).toFixed(2)}</TableCell>
             <TableCell className="w-[110px]">AED {parseFloat(po.grandTotal || 0).toFixed(2)}</TableCell>
             <TableCell className="w-[90px]">{getLineItemsCount(po)}</TableCell>
             <TableCell className="w-[80px]">{getTotalOrderedQuantity(po)}</TableCell>
@@ -660,8 +660,8 @@ export default function GoodsReceiptsTab({
       transform: (date) => date && !isNaN(new Date(date)) ? format(new Date(date), 'dd/MM/yyyy') : ''
     },
     totalAmount: {
-      label: "Total (GBP)",
-      transform: (amount) => `GBP ${parseFloat(amount || 0).toFixed(2)}`
+      label: "Total",
+      transform: (amount, row) => `${row?.currency || 'GBP'} ${parseFloat(amount || 0).toFixed(2)}`
     },
     grandTotal: {
       label: "Total (AED)", 
@@ -723,7 +723,7 @@ export default function GoodsReceiptsTab({
                           <th className="h-10 px-2 text-left align-middle font-medium text-muted-foreground" style={{width: '120px'}}>PO Number</th>
                           <th className="h-10 px-2 text-left align-middle font-medium text-muted-foreground" style={{width: '140px'}}>Brand</th>
                           <th className="h-10 px-2 text-left align-middle font-medium text-muted-foreground" style={{width: '100px'}}>Order Date</th>
-                          <th className="h-10 px-2 text-left align-middle font-medium text-muted-foreground" style={{width: '110px'}}>Total (GBP)</th>
+                          <th className="h-10 px-2 text-left align-middle font-medium text-muted-foreground" style={{width: '110px'}}>Total</th>
                           <th className="h-10 px-2 text-left align-middle font-medium text-muted-foreground" style={{width: '110px'}}>Total (AED)</th>
                           <th className="h-10 px-2 text-left align-middle font-medium text-muted-foreground" style={{width: '90px'}}>Line Items</th>
                           <th className="h-10 px-2 text-left align-middle font-medium text-muted-foreground" style={{width: '80px'}}>Ordered</th>
@@ -743,7 +743,7 @@ export default function GoodsReceiptsTab({
                                 '-'
                               }
                             </td>
-                            <td className="p-2 align-middle" style={{width: '110px'}}>GBP {parseFloat(po.totalAmount || 0).toFixed(2)}</td>
+                            <td className="p-2 align-middle" style={{width: '110px'}}>{po.currency || 'GBP'} {parseFloat(po.totalAmount || 0).toFixed(2)}</td>
                             <td className="p-2 align-middle" style={{width: '110px'}}>AED {parseFloat(po.grandTotal || 0).toFixed(2)}</td>
                             <td className="p-2 align-middle" style={{width: '90px'}}>{getLineItemsCount(po)}</td>
                             <td className="p-2 align-middle" style={{width: '80px'}}>{getTotalOrderedQuantity(po)}</td>
@@ -803,7 +803,7 @@ export default function GoodsReceiptsTab({
                         <th className="h-10 px-2 text-left align-middle font-medium text-muted-foreground" style={{width: '120px'}}>PO Number</th>
                         <th className="h-10 px-2 text-left align-middle font-medium text-muted-foreground" style={{width: '140px'}}>Brand</th>
                         <th className="h-10 px-2 text-left align-middle font-medium text-muted-foreground" style={{width: '100px'}}>Order Date</th>
-                        <th className="h-10 px-2 text-left align-middle font-medium text-muted-foreground" style={{width: '110px'}}>Total (GBP)</th>
+                        <th className="h-10 px-2 text-left align-middle font-medium text-muted-foreground" style={{width: '110px'}}>Total</th>
                         <th className="h-10 px-2 text-left align-middle font-medium text-muted-foreground" style={{width: '110px'}}>Total (AED)</th>
                         <th className="h-10 px-2 text-left align-middle font-medium text-muted-foreground" style={{width: '90px'}}>Line Items</th>
                         <th className="h-10 px-2 text-left align-middle font-medium text-muted-foreground" style={{width: '80px'}}>Ordered</th>
@@ -823,7 +823,7 @@ export default function GoodsReceiptsTab({
                               '-'
                             }
                           </td>
-                          <td className="p-2 align-middle" style={{width: '110px'}}>GBP {parseFloat(po.totalAmount || 0).toFixed(2)}</td>
+                          <td className="p-2 align-middle" style={{width: '110px'}}>{po.currency || 'GBP'} {parseFloat(po.totalAmount || 0).toFixed(2)}</td>
                           <td className="p-2 align-middle" style={{width: '110px'}}>AED {parseFloat(po.grandTotal || 0).toFixed(2)}</td>
                           <td className="p-2 align-middle" style={{width: '90px'}}>{getLineItemsCount(po)}</td>
                           <td className="p-2 align-middle" style={{width: '80px'}}>{getTotalOrderedQuantity(po)}</td>

@@ -94,7 +94,6 @@ export default function POList({ purchaseOrders, totalCount, loading, canEdit, c
                   <TableHead>PO Number</TableHead>
                   <TableHead>Supplier</TableHead>
                   <TableHead>Order Date</TableHead>
-                  <TableHead>Currency</TableHead>
                   <TableHead>Total</TableHead>
                   <TableHead>Total (AED)</TableHead>
                   <TableHead>Status</TableHead>
@@ -110,9 +109,6 @@ export default function POList({ purchaseOrders, totalCount, loading, canEdit, c
                       <TableCell className="font-medium">{po.poNumber}</TableCell>
                       <TableCell>{getBrandName(po)}</TableCell>
                       <TableCell>{formatDate(po.orderDate)}</TableCell>
-                      <TableCell>
-                        <Badge variant="outline" className="font-mono text-xs">{currency}</Badge>
-                      </TableCell>
                       <TableCell>{formatCurrency(po.totalAmount || 0, currency)}</TableCell>
                       <TableCell className="text-gray-600">
                         {formatCurrency(aedTotal, 'AED')}

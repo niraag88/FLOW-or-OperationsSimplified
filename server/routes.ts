@@ -192,7 +192,7 @@ async function generatePOPDF(purchaseOrder: any): Promise<string> {
         <div>
           <h3>Order Details:</h3>
           <p>Status: <strong>${purchaseOrder.status}</strong></p>
-          <p>Currency: <strong>GBP</strong></p>
+          <p>Currency: <strong>${purchaseOrder.currency || 'GBP'}</strong></p>
         </div>
       </div>
 
@@ -202,8 +202,8 @@ async function generatePOPDF(purchaseOrder: any): Promise<string> {
             <th>Product Code</th>
             <th>Description</th>
             <th>Quantity</th>
-            <th>Unit Price (GBP)</th>
-            <th>Line Total (GBP)</th>
+            <th>Unit Price (${purchaseOrder.currency || 'GBP'})</th>
+            <th>Line Total (${purchaseOrder.currency || 'GBP'})</th>
           </tr>
         </thead>
         <tbody>
@@ -224,10 +224,10 @@ async function generatePOPDF(purchaseOrder: any): Promise<string> {
 
       <div class="totals">
         <div class="total-line">
-          <span>Total (GBP): <strong>${parseFloat(purchaseOrder.totalAmount || 0).toFixed(2)}</strong></span>
+          <span>Total (${purchaseOrder.currency || 'GBP'}): <strong>${parseFloat(purchaseOrder.totalAmount || 0).toFixed(2)}</strong></span>
         </div>
         <div class="total-line">
-          <span>Total (AED): <strong>${(parseFloat(purchaseOrder.totalAmount || 0) * 5.0).toFixed(2)}</strong></span>
+          <span>Total (AED): <strong>${(parseFloat(purchaseOrder.totalAmount || 0) * parseFloat(purchaseOrder.fxRateToAed || 4.85)).toFixed(2)}</strong></span>
         </div>
       </div>
 
