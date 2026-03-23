@@ -3501,14 +3501,16 @@ export async function registerRoutes(app: Express): Promise<Server> {
         orderDate: purchaseOrders.orderDate,
         expectedDelivery: purchaseOrders.expectedDelivery,
         totalAmount: purchaseOrders.totalAmount,
+        currency: purchaseOrders.currency,
+        fxRateToAed: purchaseOrders.fxRateToAed,
         notes: purchaseOrders.notes,
-        supplierName: brands.name, // Since supplierId is actually brandId
-        supplierAddress: brands.description, // Address is stored in description field
-        supplierContactPerson: brands.contactPerson,
-        supplierEmail: brands.contactEmail,
-        supplierPhone: brands.contactPhone,
+        supplierName: suppliers.name,
+        supplierAddress: suppliers.address,
+        supplierContactPerson: suppliers.contactPerson,
+        supplierEmail: suppliers.email,
+        supplierPhone: suppliers.phone,
       }).from(purchaseOrders)
-        .leftJoin(brands, eq(purchaseOrders.supplierId, brands.id)) // Join to brands instead
+        .leftJoin(suppliers, eq(purchaseOrders.supplierId, suppliers.id))
         .where(eq(purchaseOrders.id, parseInt(poId as string)));
       
       if (!purchaseOrder) {
