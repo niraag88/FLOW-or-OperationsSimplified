@@ -1307,7 +1307,9 @@ export async function registerRoutes(app: Express): Promise<Server> {
               productId: parseInt(item.productId),
               quantity: item.quantity,
               unitPrice: item.unitPrice.toString(),
-              lineTotal: item.lineTotal.toString()
+              lineTotal: item.lineTotal.toString(),
+              descriptionOverride: item.productName || null,
+              sizeOverride: item.size || null,
             });
           }
         }
@@ -1350,7 +1352,9 @@ export async function registerRoutes(app: Express): Promise<Server> {
               productId: parseInt(item.productId),
               quantity: item.quantity,
               unitPrice: item.unitPrice.toString(),
-              lineTotal: item.lineTotal.toString()
+              lineTotal: item.lineTotal.toString(),
+              descriptionOverride: item.productName || null,
+              sizeOverride: item.size || null,
             });
           }
         }
@@ -1404,12 +1408,14 @@ export async function registerRoutes(app: Express): Promise<Server> {
     try {
       const poId = parseInt(req.params.id);
       
-      const items = await db.select({
+      const rawItems = await db.select({
         id: purchaseOrderItems.id,
         productId: purchaseOrderItems.productId,
         productName: products.name,
         productSku: products.sku,
-        size: products.size,
+        productSize: products.size,
+        descriptionOverride: purchaseOrderItems.descriptionOverride,
+        sizeOverride: purchaseOrderItems.sizeOverride,
         quantity: purchaseOrderItems.quantity,
         receivedQuantity: purchaseOrderItems.receivedQuantity,
         unitPrice: purchaseOrderItems.unitPrice,
@@ -1418,6 +1424,12 @@ export async function registerRoutes(app: Express): Promise<Server> {
       .from(purchaseOrderItems)
       .leftJoin(products, eq(purchaseOrderItems.productId, products.id))
       .where(eq(purchaseOrderItems.poId, poId));
+
+      const items = rawItems.map(item => ({
+        ...item,
+        productName: item.descriptionOverride ?? item.productName,
+        size: item.sizeOverride ?? item.productSize,
+      }));
       
       res.json(items);
     } catch (error) {

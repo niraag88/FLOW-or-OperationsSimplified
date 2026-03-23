@@ -262,6 +262,7 @@ export default function POForm({ open, onClose, editingPO, currentUser, onSucces
           productId: parseInt(item.productId),
           productSku: item.productSku,
           productName: item.productName,
+          size: item.size || null,
           quantity: parseInt(item.quantity),
           unitPrice: parseFloat(item.unitPrice),
           lineTotal: parseFloat(item.lineTotal)

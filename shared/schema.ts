@@ -313,6 +313,8 @@ export const purchaseOrderItems = pgTable("purchase_order_items", {
   vatRate: decimal("vat_rate", { precision: 5, scale: 2 }).default("0.00"),
   lineTotal: decimal("line_total", { precision: 10, scale: 2 }).notNull(),
   receivedQuantity: integer("received_quantity").default(0),
+  descriptionOverride: text("description_override"),
+  sizeOverride: text("size_override"),
   createdAt: timestamp("created_at").defaultNow().notNull(),
 });
 
