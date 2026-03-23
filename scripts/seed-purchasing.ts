@@ -105,17 +105,15 @@ async function seedFinancialYears(cookie: string) {
     }
   }
 
-  // Close 2025 — explicitly demonstrate open→close cycle on every run
+  // Explicitly demonstrate open→close lifecycle for 2025 on every run (including first run)
   const fy2025 = yearMap.get(2025);
   if (fy2025) {
-    // Ensure 2025 is Open first (so the close is a visible state transition)
-    if (fy2025.status !== 'Open') {
-      const { status: openStatus } = await apiPut(`/api/books/${fy2025.id}`, { status: 'Open' }, cookie);
-      console.log(openStatus === 200 ? '  ✓ Reopened 2025 (for cycle demonstration)' : '  ✗ Failed to reopen 2025');
-    }
-    // Now close it
+    // Always PUT Open first — makes the state transition visible even when already Closed
+    const { status: openStatus } = await apiPut(`/api/books/${fy2025.id}`, { status: 'Open' }, cookie);
+    console.log(openStatus === 200 ? '  ✓ PUT 2025 → Open (cycle start)' : '  ✗ Failed to open 2025');
+    // Then PUT Closed — completes the full open→close cycle on every run
     const { status: closeStatus } = await apiPut(`/api/books/${fy2025.id}`, { status: 'Closed' }, cookie);
-    console.log(closeStatus === 200 ? '  ✓ Closed 2025 (open→close demonstrated)' : '  ✗ Failed to close 2025');
+    console.log(closeStatus === 200 ? '  ✓ PUT 2025 → Closed (cycle complete)' : '  ✗ Failed to close 2025');
   }
 
   // Ensure 2026 and 2027 are Open
@@ -564,7 +562,10 @@ async function verify(cookie: string) {
   const grnOk = grnCount >= 100;
   console.log(`  GRNs (seed): ${grnCount} ${grnOk ? '✓' : '✗ (need >= 100)'}`);
   if (!grnOk) pass = false;
-  console.log(`  Stock movements (seed GRNs): ${smRes.rows[0].count}`);
+  const smCount = parseInt(smRes.rows[0].count);
+  const smOk = smCount >= 5;
+  console.log(`  Stock movements (seed GRNs): ${smCount} ${smOk ? '✓' : '✗ (need >= 5)'}`);
+  if (!smOk) pass = false;
   console.log(`  Company: ${csRes.rows[0].company_name}`);
 
   // Check company name
