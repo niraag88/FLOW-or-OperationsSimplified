@@ -1,6 +1,6 @@
 # Task #45 — Test Results & Bug Hunt Report
 
-Generated: 2026-03-22
+Generated: 2026-03-23 (Final update — stress-test & edge case phase)
 
 ## Summary
 
@@ -10,9 +10,15 @@ Generated: 2026-03-22
 | Recycle Bin (product deletion) | PASS | POST /api/recycle-bin endpoint was missing — now added and tested |
 | Product FK-safe deletion | PASS | Products with order history soft-deleted (is_active=false) instead of 500 error |
 | Quotation creation | PASS | POST /api/quotations returns 201 with success toast |
-| Invoice list | PASS | 506 invoices load with AED currency format |
+| Invoice list | PASS | 511 invoices load with AED currency format |
 | Suppliers list | PASS | 52 suppliers return from GET /api/suppliers |
-| Data Population | PASS | 498+ products, 150 customers, 52 suppliers in DB |
+| Data Population | PASS | 498 active products, 150 customers, 52 suppliers in DB |
+| Large invoice (50 line items) | PASS | INV-2025-554 renders correctly, all items stored, total AED 17,671.50 |
+| Large quotation (50 line items) | PASS | QUO-2025-301 created and loads all 50 items |
+| Invoice customer validation | PASS | BUG-004 fix: invoices without customer_id now return 400 |
+| SQL injection (search) | PASS | Search with `'; DROP TABLE products; --` returns 200 safely |
+| Very long search (500 chars) | PASS | No crash or timeout |
+| Performance — all endpoints | PASS | All endpoints respond within 50ms at full data scale |
 
 ---
 
@@ -35,84 +41,66 @@ Generated: 2026-03-22
 - **Root Cause**: One product had `category = 'massage'` instead of the canonical `'Massage Blends'`, causing it to not appear in the correct category filter.
 - **Fix**: `UPDATE products SET category = 'Massage Blends' WHERE category = 'massage'` — 1 row corrected.
 
----
-
-## Data Population
-
-### Products
-- **Baseline**: 188 products
-- **Final**: 498+ active products (501 total before e2e test deletions)
-- **Added**: 313 products via SQL inserts with `ON CONFLICT (sku) DO NOTHING`
-- **Categories covered** (12 total):
-  - Essential Oils: 92 products
-  - Carrier Oils: 77 products
-  - Diffuser Blends: 50 products
-  - Massage Blends: 50 products
-  - Bath Salts: 46 products
-  - Body Butters: 39 products
-  - Roll-ons: 37 products
-  - Balms & Salves: 27 products
-  - Supplements: 23 products
-  - Hydrosols: 23 products
-  - Electronics: 15 products
-  - Stationery: 15 products
-- **Brands**: Absolute Aromas, Mystic Moments, Tisserand, Nikura, TechCore, ProFlow
-
-### Customers
-- **Baseline**: 55 | **Final**: 150 (+95)
-- Coverage: Hotels, Spas, Retail chains, Corporate clients, Export clients across UAE, Oman, KSA
-
-### Suppliers
-- **Baseline**: 22 | **Final**: 52 (+30)
-- Coverage: UK, India, USA, France, Germany, Italy, Australia, UAE-based wholesale suppliers
+### BUG-004: Invoice API allows creation without a valid customer (data integrity hole)
+- **Root Cause**: `POST /api/invoices` defaulted `customerName` to `'Unknown Customer'` when no `customer_id` was supplied, allowing invoices to be created with no customer linkage. An invalid `customer_id` would silently create an invoice with `customer_name: 'Unknown Customer'` and no `customer_id`.
+- **Fix**: Added early validation in `POST /api/invoices`:
+  1. If `customer_id` is missing → return `400 { error: 'customer_id is required' }`
+  2. If `customer_id` is provided but not found in DB → return `400 { error: 'Customer with id X not found' }`
+- **Location**: `server/routes.ts` — `POST /api/invoices` handler, early validation block before invoice number generation
+- **Verified**: API tests confirm 400 on missing customer_id, 400 on invalid customer_id, 201 on valid customer_id
 
 ---
 
-## E2E Test Evidence
+## Stress Tests
 
-All tests run against the live development database using automated browser testing (Playwright).
+### Large Invoice Test (50 line items)
+- **Invoice**: INV-2025-554 (ID: 516), Customer: Anantara Hotel Palm Jumeirah
+- **Line items**: 50 products, varying quantities (2–6 units each)
+- **Subtotal**: AED 16,830 | **VAT (5%)**: AED 841.50 | **Total**: AED 17,671.50
+- **API performance**: Detail endpoint responds in 11–12ms with all 50 items
+- **Result**: PASS — All 50 items stored and retrieved correctly
 
-### Test Run 1 — Products, recycle bin, quotations
-```
-Status: SUCCESS
-- Login as admin: ✅
-- Products page loads (498+ items with pagination): ✅
-- Product deletion triggers POST /api/recycle-bin → 200 OK: ✅
-- No error toast or JSON parse error: ✅
-- Quotations page loads with data: ✅
-```
+### Large Quotation Test (50 line items)
+- **Quotation**: QUO-2025-301 (ID: 271), Customer: Anantara Hotel Palm Jumeirah
+- **Line items**: 50 products, varying quantities
+- **Grand Total**: AED 17,671.50
+- **API performance**: Detail endpoint responds in 11–12ms
+- **Result**: PASS
 
-### Test Run 2 — Quotation creation, invoice list, suppliers
-```
-Status: SUCCESS
-- Quotation creation (POST /api/quotations → 201 + success toast): ✅
-- Invoice list loads (506 items, AED amounts visible): ✅
-- Suppliers list (GET /api/suppliers → 47+ suppliers): ✅
-```
-
-### Test Run 3 — FK-safe product deletion
-```
-Status: SUCCESS
-- Product with quotation_items reference selected for deletion: ✅
-- DELETE /api/products/:id → 200 (no 500 error): ✅
-- Product row removed from active list: ✅
-- No error toast: ✅
-```
+### Invoice with 8 Line Items (UI E2E test)
+- **Scenario**: Created via browser UI (manual UI test)
+- **Result**: PASS — Invoice INV-2025-551 created for Hyatt Regency Dubai, 8 line items, AED 84.00 total, success toast shown, invoice detail modal opened with all items visible
 
 ---
 
-## Performance Assessment
+## Performance Benchmarks (at full data scale)
 
-| Page | Load Behaviour | Notes |
-|------|----------------|-------|
-| Products (/inventory) | Paginated, loads quickly | 500+ products served with server-side pagination |
-| Invoices (/invoices) | 506 rows load via API | Status filter present and functional |
-| Quotations (/quotations) | 258 rows load via API | List renders without delay |
-| Purchase Orders | 307 rows | Existing pagination keeps page responsive |
-| Suppliers | 52 rows | No pagination needed at current scale |
-| Customers | 150 rows | Loads without delay |
+| Endpoint | Records | Response Time | Status |
+|----------|---------|---------------|--------|
+| GET /api/products | 498 | 21–35ms | 200 |
+| GET /api/invoices | 511 | 19–20ms | 200 |
+| GET /api/quotations | 259 | 18–19ms | 200 |
+| GET /api/customers | 150 | 11–12ms | 200 |
+| GET /api/suppliers | 52 | 8–9ms | 200 |
+| GET /api/purchase-orders | 307 | 25–41ms | 200 |
+| GET /api/delivery-orders | 202 | 20ms | 200 |
+| GET /api/invoices/:id (50 items) | 50 line items | 11–12ms | 200 |
+| GET /api/quotations/:id (50 items) | 50 line items | 11–12ms | 200 |
 
-No performance bottlenecks identified at current data volumes. Server-side pagination on all major list pages prevents large payload issues.
+**All endpoints respond within 50ms even at maximum data volumes.** No performance bottlenecks identified.
+
+---
+
+## Edge Case Results
+
+| Test Case | Result | Notes |
+|-----------|--------|-------|
+| Invoice with 0-quantity line item | Line item silently skipped, invoice created | By design: `quantity > 0` check in route |
+| Invoice with negative unit_price | Line item silently skipped | By design: `unit_price >= 0` check |
+| Invoice with no customer_id | **400 error** (BUG-004 fix) | Was previously creating with "Unknown Customer" |
+| Invoice with invalid customer_id | **400 error** (BUG-004 fix) | Was previously creating with "Unknown Customer" |
+| Search with SQL injection attempt | 200 — safe, no crash | Parameterized queries prevent injection |
+| Search with 500-character string | 200 — no crash or timeout | Gracefully handled |
 
 ---
 
@@ -123,3 +111,27 @@ No performance bottlenecks identified at current data volumes. Server-side pagin
 | Admin credentials in tracked file | Removed from `replit.md` — credentials in `ADMIN_PASSWORD` env var only |
 | Client-controlled audit fields | `deleted_by` and `deleted_date` now always set server-side in `POST /api/recycle-bin` |
 | Input validation on recycle-bin | `document_type` and `document_id` required; 400 returned on missing fields |
+| Invoice customer validation | `customer_id` required and validated against DB; 400 on missing/invalid |
+
+---
+
+## Data Population
+
+### Products
+- **Baseline**: 188 products
+- **Final**: 498 active products
+- **Categories covered** (12 total):
+  - Essential Oils: 92 | Carrier Oils: 77 | Diffuser Blends: 50 | Massage Blends: 50
+  - Bath Salts: 46 | Body Butters: 39 | Roll-ons: 37 | Balms & Salves: 27
+  - Supplements: 23 | Hydrosols: 23 | Electronics: 15 | Stationery: 15
+
+### Customers
+- **Baseline**: 55 | **Final**: 150 (+95)
+- Coverage: Hotels, Spas, Retail chains, Corporate, Export clients across UAE, Oman, KSA
+
+### Suppliers
+- **Baseline**: 22 | **Final**: 52 (+30)
+- Coverage: UK, India, USA, France, Germany, Italy, Australia, UAE
+
+### Transactions
+- Purchase Orders: 307 | Quotations: 259 | Invoices: 511 | Delivery Orders: 202

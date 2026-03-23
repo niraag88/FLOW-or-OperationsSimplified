@@ -1511,19 +1511,24 @@ export async function registerRoutes(app: Express): Promise<Server> {
   // POST /api/invoices - Create new invoice
   app.post('/api/invoices', requireAuth(['Admin', 'Manager']), async (req: AuthenticatedRequest, res) => {
     try {
-      const nextNumber = await businessStorage.generateInvoiceNumber();
       const body = req.body;
+
+      // BUG-004 fix: require a valid customer_id
+      if (!body.customer_id) {
+        return res.status(400).json({ error: 'customer_id is required' });
+      }
+
+      const nextNumber = await businessStorage.generateInvoiceNumber();
 
       // Look up customer name from customer_id
       let customerName = body.customer_name || 'Unknown Customer';
       let customerId: number | undefined = undefined;
-      if (body.customer_id) {
-        const customer = await businessStorage.getCustomerById(parseInt(body.customer_id));
-        if (customer) {
-          customerName = customer.name;
-          customerId = customer.id;
-        }
+      const customer = await businessStorage.getCustomerById(parseInt(body.customer_id));
+      if (!customer) {
+        return res.status(400).json({ error: `Customer with id ${body.customer_id} not found` });
       }
+      customerName = customer.name;
+      customerId = customer.id;
 
       const invoiceData: InsertInvoice = {
         invoiceNumber: nextNumber,
