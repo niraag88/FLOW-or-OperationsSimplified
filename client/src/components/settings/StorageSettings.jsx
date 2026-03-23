@@ -62,6 +62,13 @@ export default function StorageSettings({ currentUser }) {
   const handleSave = async () => {
     setLoading(true);
     try {
+      const res = await fetch('/api/company-settings', {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        credentials: 'include',
+        body: JSON.stringify({ storageBasePath: settings.app_storage_base_path }),
+      });
+      if (!res.ok) throw new Error('Failed to save');
       await logAuditAction("StorageSettings", "singleton", "update", currentUser?.email, { settings });
       toast({
         title: "Settings saved",

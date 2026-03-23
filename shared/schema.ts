@@ -402,6 +402,8 @@ export const companySettings = pgTable("company_settings", {
   nextQuotationNumber: integer("next_quotation_number").default(1),
   updatedBy: varchar("updated_by").references(() => users.id),
   updatedAt: timestamp("updated_at").defaultNow().notNull(),
+  warnAtPercent: integer("warn_at_percent").default(80),
+  criticalAtPercent: integer("critical_at_percent").default(90),
 });
 
 // Storage objects tracking table — records file sizes at upload time
