@@ -19,6 +19,7 @@ export default function PoGrnReport({ purchaseOrders, goodsReceipts, suppliers =
   const [dateRange, setDateRange] = useState("all");
   const [dateRangeOpen, setDateRangeOpen] = useState(false);
   const [customRange, setCustomRange] = useState({ from: null, to: null });
+  const [pendingRange, setPendingRange] = useState({ from: null, to: null });
   const [currentPage, setCurrentPage] = useState(1);
   const [itemsPerPage, setItemsPerPage] = useState(20);
   const [grnCurrentPage, setGrnCurrentPage] = useState(1);
@@ -67,6 +68,7 @@ export default function PoGrnReport({ purchaseOrders, goodsReceipts, suppliers =
     setSelectedSuppliers([]);
     setDateRange("all");
     setCustomRange({ from: null, to: null });
+    setPendingRange({ from: null, to: null });
     resetPagination();
   };
 
@@ -85,8 +87,9 @@ export default function PoGrnReport({ purchaseOrders, goodsReceipts, suppliers =
   };
 
   const handleCustomDateRange = () => {
-    if (customRange.from && customRange.to) {
-      setDateRange({ type: 'custom', startDate: customRange.from, endDate: customRange.to });
+    if (pendingRange.from && pendingRange.to) {
+      setCustomRange(pendingRange);
+      setDateRange({ type: 'custom', startDate: pendingRange.from, endDate: pendingRange.to });
       setDateRangeOpen(false);
     }
   };
@@ -315,7 +318,10 @@ export default function PoGrnReport({ purchaseOrders, goodsReceipts, suppliers =
             </Select>
 
             {(dateRange === 'custom' || typeof dateRange === 'object') && (
-              <Popover open={dateRangeOpen} onOpenChange={setDateRangeOpen}>
+              <Popover open={dateRangeOpen} onOpenChange={(open) => {
+                if (open) setPendingRange(customRange);
+                setDateRangeOpen(open);
+              }}>
                 <PopoverTrigger asChild>
                   <Button
                     variant="outline"
@@ -332,15 +338,15 @@ export default function PoGrnReport({ purchaseOrders, goodsReceipts, suppliers =
                   </div>
                   <Calendar
                     mode="range"
-                    selected={customRange}
-                    onSelect={(range) => setCustomRange(range || { from: null, to: null })}
+                    selected={pendingRange}
+                    onSelect={(range) => setPendingRange(range || { from: null, to: null })}
                     numberOfMonths={2}
                     disabled={(date) => date > new Date()}
                     initialFocus
                   />
                   <div className="flex justify-end gap-2 p-3 border-t">
-                    <Button variant="outline" size="sm" onClick={() => { setCustomRange({ from: null, to: null }); setDateRangeOpen(false); }}>Cancel</Button>
-                    <Button size="sm" onClick={handleCustomDateRange} disabled={!customRange.from || !customRange.to}>Apply</Button>
+                    <Button variant="outline" size="sm" onClick={() => setDateRangeOpen(false)}>Cancel</Button>
+                    <Button size="sm" onClick={handleCustomDateRange} disabled={!pendingRange.from || !pendingRange.to}>Apply</Button>
                   </div>
                 </PopoverContent>
               </Popover>
