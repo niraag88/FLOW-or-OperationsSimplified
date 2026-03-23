@@ -6,7 +6,7 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { Upload, Building, Save, PoundSterling, DollarSign, Edit2, X, ArrowRight } from "lucide-react";
+import { Upload, Building, Save, PoundSterling, DollarSign, Edit2, X } from "lucide-react";
 import { CompanySettings } from "@/api/entities";
 import { UploadFile } from "@/api/integrations";
 import { useToast } from "@/components/ui/use-toast";
@@ -440,7 +440,7 @@ export default function CompanySettingsComponent() {
                   readOnly={!isEditMode}
                 />
               </div>
-              <div className="text-xs text-gray-500 w-40">1 GBP = {parseFloat(settings.fxGbpToAed || 4.85).toFixed(4)} AED</div>
+              <div className="text-xs text-gray-500 w-40">1 GBP = {parseFloat(settings.fxGbpToAed ?? 4.85).toFixed(4)} AED</div>
             </div>
 
             {/* USD */}
@@ -459,7 +459,7 @@ export default function CompanySettingsComponent() {
                   readOnly={!isEditMode}
                 />
               </div>
-              <div className="text-xs text-gray-500 w-40">1 USD = {parseFloat(settings.fxUsdToAed || 3.6725).toFixed(4)} AED</div>
+              <div className="text-xs text-gray-500 w-40">1 USD = {parseFloat(settings.fxUsdToAed ?? 3.6725).toFixed(4)} AED</div>
             </div>
 
             {/* INR */}
@@ -478,7 +478,7 @@ export default function CompanySettingsComponent() {
                   readOnly={!isEditMode}
                 />
               </div>
-              <div className="text-xs text-gray-500 w-40">1 INR = {parseFloat(settings.fxInrToAed || 0.044).toFixed(4)} AED</div>
+              <div className="text-xs text-gray-500 w-40">1 INR = {parseFloat(settings.fxInrToAed ?? 0.044).toFixed(4)} AED</div>
             </div>
           </div>
         </div>
