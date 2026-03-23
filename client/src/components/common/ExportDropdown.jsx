@@ -21,7 +21,8 @@ export default function ExportDropdown({
   isLoading = false,
   showExternalDocument = false,
   onExternalDocumentClick = null,
-  fetchAllData = null
+  fetchAllData = null,
+  totalCount = null
 }) {
   const [isExporting, setIsExporting] = useState(false);
 
@@ -150,7 +151,7 @@ export default function ExportDropdown({
     }
   };
 
-  const itemCount = data?.length || 0;
+  const exportCount = totalCount !== null ? totalCount : (data?.length || 0);
   const disabled = isLoading || isExporting;
 
   return (
@@ -163,7 +164,7 @@ export default function ExportDropdown({
       </DropdownMenuTrigger>
       <DropdownMenuContent align="end" className="w-56">
         <div className="px-3 py-2 text-sm font-medium text-gray-700 border-b">
-          Export {type} ({itemCount} items)
+          Export {type} ({exportCount} records)
         </div>
         
         <DropdownMenuItem 
@@ -186,7 +187,7 @@ export default function ExportDropdown({
         <DropdownMenuSeparator />
         
         <div className="px-3 py-2 text-xs text-gray-500">
-          Exports all filtered {type.toLowerCase()}
+          {fetchAllData ? `All ${exportCount} filtered records across all pages` : `${exportCount} records currently shown`}
         </div>
       </DropdownMenuContent>
     </DropdownMenu>

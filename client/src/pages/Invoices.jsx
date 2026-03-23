@@ -403,6 +403,7 @@ export default function Invoices() {
           <ExportDropdown 
             data={visibleInvoices}
             fetchAllData={fetchAllForExport}
+            totalCount={totalCount}
             type="Invoices"
             filename="invoices"
             columns={{

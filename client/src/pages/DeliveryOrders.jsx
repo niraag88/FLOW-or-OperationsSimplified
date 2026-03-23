@@ -246,6 +246,7 @@ export default function DeliveryOrders() {
           <ExportDropdown 
             data={visibleDOs}
             fetchAllData={fetchAllForExport}
+            totalCount={totalCount}
             type="Delivery Orders"
             filename="delivery-orders"
             columns={{

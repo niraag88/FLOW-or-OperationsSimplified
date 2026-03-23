@@ -168,6 +168,7 @@ export default function Quotations() {
           <ExportDropdown 
             data={visibleQuotations}
             fetchAllData={fetchAllForExport}
+            totalCount={totalCount}
             type="Quotations"
             filename="quotations"
             columns={{

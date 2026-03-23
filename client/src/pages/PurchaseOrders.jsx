@@ -247,6 +247,7 @@ export default function PurchaseOrders() {
           <ExportDropdown 
             data={activeTab === 'purchase-orders' ? visiblePOs : getGoodsReceiptsExportData()}
             fetchAllData={activeTab === 'purchase-orders' ? fetchAllForExport : null}
+            totalCount={activeTab === 'purchase-orders' ? totalCount : undefined}
             type={activeTab === 'purchase-orders' ? 'Purchase Orders' : 'Goods Receipts'}
             filename={activeTab === 'purchase-orders' ? 'purchase-orders' : 'goods-receipts'}
             columns={activeTab === 'purchase-orders' ? {
