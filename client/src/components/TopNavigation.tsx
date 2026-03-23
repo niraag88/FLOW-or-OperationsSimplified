@@ -70,16 +70,16 @@ export function TopNavigation() {
           </nav>
 
           {/* Search and Profile */}
-          <div className="flex items-center space-x-4">
+          <div className="flex items-center space-x-2 sm:space-x-4 min-w-0">
             {/* Search Bar */}
-            <div className="relative hidden md:block">
+            <div className="relative min-w-0 flex-1 max-w-xs">
               <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
                 <Search className="w-4 h-4 text-slate-400" />
               </div>
               <Input
                 type="text"
-                placeholder="Search SKU, orders, customers..."
-                className="bg-slate-700 text-white placeholder-slate-400 border-slate-600 pl-10 w-64 focus:ring-green-500 focus:border-green-500"
+                placeholder="Search..."
+                className="bg-slate-700 text-white placeholder-slate-400 border-slate-600 pl-10 w-full md:w-64 focus:ring-green-500 focus:border-green-500"
                 data-testid="search-input"
               />
             </div>
