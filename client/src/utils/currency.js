@@ -1,10 +1,3 @@
-const CURRENCY_SYMBOLS = {
-  GBP: '£',
-  USD: '$',
-  INR: '₹',
-  AED: 'AED',
-};
-
 const SUPPORTED_CURRENCIES = ['AED', 'GBP', 'USD', 'INR'];
 
 export function getRateToAed(currency, settings) {
@@ -22,14 +15,6 @@ export function convertToAed(amount, currency, settings) {
 }
 
 export function formatCurrency(amount, currency) {
-  const c = String(currency || 'AED').toUpperCase();
-  const num = parseFloat(amount || 0).toFixed(2);
-  if (c === 'AED') return `AED ${num}`;
-  const sym = CURRENCY_SYMBOLS[c] || c;
-  return `${sym}${num}`;
-}
-
-export function formatCurrencyCode(amount, currency) {
   const c = String(currency || 'AED').toUpperCase();
   const num = parseFloat(amount || 0).toFixed(2);
   return `${c} ${num}`;

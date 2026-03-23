@@ -10,8 +10,12 @@ import { Upload, Building, Save, PoundSterling, DollarSign, Edit2, X, ArrowRight
 import { CompanySettings } from "@/api/entities";
 import { UploadFile } from "@/api/integrations";
 import { useToast } from "@/components/ui/use-toast";
+import { useAuth } from "@/hooks/useAuth";
 
 export default function CompanySettingsComponent() {
+  const { hasRole } = useAuth();
+  const isAdmin = hasRole(['Admin']);
+
   const [settings, setSettings] = useState({
     companyName: "",
     logo: "", // Changed from company_logo_url to match schema
@@ -191,7 +195,7 @@ export default function CompanySettingsComponent() {
             Company Settings
           </div>
           <div className="flex gap-2">
-            {!isEditMode ? (
+            {isAdmin && !isEditMode && (
               <Button
                 variant="outline"
                 size="sm"
@@ -201,7 +205,8 @@ export default function CompanySettingsComponent() {
                 <Edit2 className="w-4 h-4" />
                 Edit
               </Button>
-            ) : (
+            )}
+            {isAdmin && isEditMode && (
               <Button
                 variant="outline"
                 size="sm"
