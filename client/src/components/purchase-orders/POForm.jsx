@@ -13,7 +13,7 @@ import { Textarea } from "@/components/ui/textarea";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Plus, Trash2 } from "lucide-react";
-import { Brand } from "@/api/entities";
+import { Supplier } from "@/api/entities";
 import { Product } from "@/api/entities";
 import { PurchaseOrder } from "@/api/entities";
 import { formatDate } from "@/utils/dateUtils";
@@ -21,7 +21,7 @@ import { getRateToAed, formatCurrency, SUPPORTED_CURRENCIES } from "@/utils/curr
 
 export default function POForm({ open, onClose, editingPO, currentUser, onSuccess }) {
   const [loading, setLoading] = useState(false);
-  const [brands, setBrands] = useState([]);
+  const [suppliers, setSuppliers] = useState([]);
   const [products, setProducts] = useState([]);
   const [companySettings, setCompanySettings] = useState(null);
   const [currencyExplicitlySet, setCurrencyExplicitlySet] = useState(false);
@@ -47,14 +47,14 @@ export default function POForm({ open, onClose, editingPO, currentUser, onSucces
 
   const loadInitialData = async () => {
     try {
-      const [brandsData, productsData, settingsResponse] = await Promise.all([
-        Brand.list(),
+      const [suppliersData, productsData, settingsResponse] = await Promise.all([
+        Supplier.list(),
         Product.list(),
         fetch('/api/company-settings')
       ]);
       
-      const filteredBrands = brandsData.filter(b => b.isActive);
-      setBrands(filteredBrands);
+      const filteredSuppliers = suppliersData.filter(s => s.isActive !== false).sort((a, b) => (a.name || '').localeCompare(b.name || ''));
+      setSuppliers(filteredSuppliers);
       setProducts(productsData);
       
       let settings = null;
@@ -64,7 +64,7 @@ export default function POForm({ open, onClose, editingPO, currentUser, onSucces
       }
       
       if (editingPO) {
-        await loadEditingData(filteredBrands, settings);
+        await loadEditingData(filteredSuppliers, settings);
       } else {
         setCurrencyExplicitlySet(false);
         generatePONumber();
@@ -82,7 +82,7 @@ export default function POForm({ open, onClose, editingPO, currentUser, onSucces
     }
   };
 
-  const loadEditingData = async (availableBrands = brands, settings = companySettings) => {
+  const loadEditingData = async (availableSuppliers = suppliers, settings = companySettings) => {
     if (!editingPO) return;
     
     try {
@@ -302,7 +302,7 @@ export default function POForm({ open, onClose, editingPO, currentUser, onSucces
 
   const getFilteredProducts = () => {
     if (!formData.supplierId) return [];
-    return products.filter(p => p.brandId === parseInt(formData.supplierId));
+    return products.filter(p => p.isActive !== false);
   };
 
   const canEdit = !editingPO || editingPO.status !== 'closed';
@@ -339,19 +339,19 @@ export default function POForm({ open, onClose, editingPO, currentUser, onSucces
               />
             </div>
             <div className="space-y-2">
-              <Label htmlFor="supplierId">Brand *</Label>
+              <Label htmlFor="supplierId">Supplier *</Label>
               <Select 
                 value={formData.supplierId} 
                 onValueChange={(value) => handleInputChange('supplierId', value)}
                 disabled={!canEdit}
               >
-                <SelectTrigger data-testid="select-brand">
-                  <SelectValue placeholder="Select brand" />
+                <SelectTrigger data-testid="select-supplier">
+                  <SelectValue placeholder="Select supplier" />
                 </SelectTrigger>
                 <SelectContent>
-                  {brands.map(brand => (
-                    <SelectItem key={brand.id} value={brand.id.toString()}>
-                      {brand.name}
+                  {suppliers.map(supplier => (
+                    <SelectItem key={supplier.id} value={supplier.id.toString()}>
+                      {supplier.name}
                     </SelectItem>
                   ))}
                 </SelectContent>
@@ -452,7 +452,7 @@ export default function POForm({ open, onClose, editingPO, currentUser, onSucces
 
             {!formData.supplierId && (
               <div className="text-center py-8 text-gray-500 border-2 border-dashed border-gray-200 rounded-lg">
-                <p>Please select a brand first to add line items</p>
+                <p>Please select a supplier first to add line items</p>
               </div>
             )}
 

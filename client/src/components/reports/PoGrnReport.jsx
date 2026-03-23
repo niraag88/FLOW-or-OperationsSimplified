@@ -18,8 +18,7 @@ export default function PoGrnReport({ purchaseOrders, goodsReceipts, suppliers =
   const [selectedSuppliers, setSelectedSuppliers] = useState([]);
   const [dateRange, setDateRange] = useState("all");
   const [dateRangeOpen, setDateRangeOpen] = useState(false);
-  const [customStartDate, setCustomStartDate] = useState(null);
-  const [customEndDate, setCustomEndDate] = useState(null);
+  const [customRange, setCustomRange] = useState({ from: null, to: null });
   const [currentPage, setCurrentPage] = useState(1);
   const [itemsPerPage, setItemsPerPage] = useState(20);
   const [grnCurrentPage, setGrnCurrentPage] = useState(1);
@@ -67,8 +66,7 @@ export default function PoGrnReport({ purchaseOrders, goodsReceipts, suppliers =
     setSelectedStatuses([]);
     setSelectedSuppliers([]);
     setDateRange("all");
-    setCustomStartDate(null);
-    setCustomEndDate(null);
+    setCustomRange({ from: null, to: null });
     resetPagination();
   };
 
@@ -76,25 +74,29 @@ export default function PoGrnReport({ purchaseOrders, goodsReceipts, suppliers =
 
   const uniqueStatuses = [...new Set(purchaseOrders.map(po => po.status).filter(Boolean))].sort();
 
+  const sortedSuppliers = [...suppliers].sort((a, b) => (a.name || '').localeCompare(b.name || ''));
+
   const handleDateRangeChange = (value) => {
     if (value !== 'custom') {
-      setCustomStartDate(null);
-      setCustomEndDate(null);
+      setCustomRange({ from: null, to: null });
     }
     setDateRange(value);
     resetPagination();
   };
 
   const handleCustomDateRange = () => {
-    if (customStartDate && customEndDate) {
-      setDateRange({ type: 'custom', startDate: customStartDate, endDate: customEndDate });
+    if (customRange.from && customRange.to) {
+      setDateRange({ type: 'custom', startDate: customRange.from, endDate: customRange.to });
       setDateRangeOpen(false);
     }
   };
 
   const formatCustomDateRange = () => {
-    if (customStartDate && customEndDate) {
-      return `${format(customStartDate, 'MMM dd')} - ${format(customEndDate, 'MMM dd')}`;
+    if (customRange.from && customRange.to) {
+      return `${format(customRange.from, 'MMM dd')} - ${format(customRange.to, 'MMM dd')}`;
+    }
+    if (customRange.from) {
+      return `${format(customRange.from, 'MMM dd')} - ...`;
     }
     return 'Pick date range';
   };
@@ -277,7 +279,7 @@ export default function PoGrnReport({ purchaseOrders, goodsReceipts, suppliers =
                 <div className="space-y-3">
                   <h4 className="font-medium leading-none">Select Suppliers</h4>
                   <div className="space-y-2 max-h-60 overflow-y-auto">
-                    {suppliers.map(supplier => (
+                    {sortedSuppliers.map(supplier => (
                       <div key={supplier.id} className="flex items-center space-x-2">
                         <Checkbox
                           id={`supplier-${supplier.id}`}
@@ -317,31 +319,28 @@ export default function PoGrnReport({ purchaseOrders, goodsReceipts, suppliers =
                 <PopoverTrigger asChild>
                   <Button
                     variant="outline"
-                    className={cn("w-48 justify-start text-left font-normal", !customStartDate && !customEndDate && "text-muted-foreground")}
+                    className={cn("w-48 justify-start text-left font-normal", !customRange.from && "text-muted-foreground")}
                   >
                     <CalendarIcon className="mr-2 h-4 w-4" />
                     {formatCustomDateRange()}
                   </Button>
                 </PopoverTrigger>
-                <PopoverContent className="w-auto p-4" align="start">
-                  <div className="space-y-4">
-                    <div className="text-sm font-medium">Select Date Range</div>
-                    <div className="grid grid-cols-2 gap-4">
-                      <div>
-                        <div className="text-xs text-gray-500 mb-2">Start Date</div>
-                        <Calendar mode="single" selected={customStartDate} onSelect={setCustomStartDate}
-                          disabled={(date) => date > new Date() || (customEndDate && date > customEndDate)} initialFocus />
-                      </div>
-                      <div>
-                        <div className="text-xs text-gray-500 mb-2">End Date</div>
-                        <Calendar mode="single" selected={customEndDate} onSelect={setCustomEndDate}
-                          disabled={(date) => date > new Date() || (customStartDate && date < customStartDate)} initialFocus />
-                      </div>
-                    </div>
-                    <div className="flex justify-end gap-2 pt-2 border-t">
-                      <Button variant="outline" size="sm" onClick={() => setDateRangeOpen(false)}>Cancel</Button>
-                      <Button size="sm" onClick={handleCustomDateRange} disabled={!customStartDate || !customEndDate}>Apply</Button>
-                    </div>
+                <PopoverContent className="w-auto p-0" align="start">
+                  <div className="p-3 border-b">
+                    <p className="text-sm font-medium">Select date range</p>
+                    <p className="text-xs text-muted-foreground">Click start date, then end date</p>
+                  </div>
+                  <Calendar
+                    mode="range"
+                    selected={customRange}
+                    onSelect={(range) => setCustomRange(range || { from: null, to: null })}
+                    numberOfMonths={2}
+                    disabled={(date) => date > new Date()}
+                    initialFocus
+                  />
+                  <div className="flex justify-end gap-2 p-3 border-t">
+                    <Button variant="outline" size="sm" onClick={() => { setCustomRange({ from: null, to: null }); setDateRangeOpen(false); }}>Cancel</Button>
+                    <Button size="sm" onClick={handleCustomDateRange} disabled={!customRange.from || !customRange.to}>Apply</Button>
                   </div>
                 </PopoverContent>
               </Popover>
@@ -412,7 +411,6 @@ export default function PoGrnReport({ purchaseOrders, goodsReceipts, suppliers =
                   <TableHead>PO Number</TableHead>
                   <TableHead>Supplier</TableHead>
                   <TableHead>Order Date</TableHead>
-                  <TableHead>Currency</TableHead>
                   <TableHead>Total (original)</TableHead>
                   <TableHead>Total (AED)</TableHead>
                   <TableHead>Status</TableHead>
@@ -429,7 +427,6 @@ export default function PoGrnReport({ purchaseOrders, goodsReceipts, suppliers =
                       <TableCell className="font-medium">{po.poNumber || po.po_number}</TableCell>
                       <TableCell>{getSupplierName(suppId)}</TableCell>
                       <TableCell>{formatDate(po.orderDate || po.order_date)}</TableCell>
-                      <TableCell><Badge variant="outline">{currency}</Badge></TableCell>
                       <TableCell>{formatCurrency(originalAmount, currency)}</TableCell>
                       <TableCell>{formatCurrency(aedAmount, 'AED')}</TableCell>
                       <TableCell>
