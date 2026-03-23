@@ -11,8 +11,9 @@ import { Checkbox } from "@/components/ui/checkbox";
 import { format } from "date-fns";
 import { cn } from "@/lib/utils";
 import ExportDropdown from "../common/ExportDropdown";
+import { getRateToAed } from "@/utils/currency";
 
-export default function PoGrnReport({ purchaseOrders, goodsReceipts, suppliers = [], exchangeRate = 4.85, canExport }) {
+export default function PoGrnReport({ purchaseOrders, goodsReceipts, suppliers = [], companySettings, canExport }) {
   const [selectedStatuses, setSelectedStatuses] = useState([]);
   const [selectedSuppliers, setSelectedSuppliers] = useState([]);
   const [dateRange, setDateRange] = useState("all");
@@ -38,12 +39,18 @@ export default function PoGrnReport({ purchaseOrders, goodsReceipts, suppliers =
     return `${currency} ${formatter.format(numericAmount)}`;
   };
 
+  const getFxRate = (po) => {
+    const storedRate = parseFloat(po.fxRateToAed || po.fx_rate_to_aed);
+    if (!isNaN(storedRate) && storedRate > 0) return storedRate;
+    const currency = po.currency || 'GBP';
+    return companySettings ? getRateToAed(currency, companySettings) : 4.85;
+  };
+
   const calculateAEDAmount = (po) => {
     const numericAmount = parseFloat(po.totalAmount || po.total_amount || 0);
-    const poRate = parseFloat(po.fxRateToAed || po.fx_rate_to_aed || exchangeRate);
     const currency = po.currency || 'GBP';
     if (currency === 'AED') return numericAmount;
-    return numericAmount * poRate;
+    return numericAmount * getFxRate(po);
   };
 
   const formatDate = (dateString) => {
@@ -142,12 +149,10 @@ export default function PoGrnReport({ purchaseOrders, goodsReceipts, suppliers =
 
   const totals = useMemo(() => {
     return filteredPOs.reduce((acc, po) => {
-      const gbpAmount = Number(po.totalAmount || po.total_amount || 0);
       const aedAmount = calculateAEDAmount(po);
-      acc.totalGBP += gbpAmount;
       acc.totalAED += aedAmount;
       return acc;
-    }, { totalGBP: 0, totalAED: 0, pos: filteredPOs.length, grns: filteredGRNs.length });
+    }, { totalAED: 0, pos: filteredPOs.length, grns: filteredGRNs.length });
   }, [filteredPOs, filteredGRNs]);
 
   const startIndex = (currentPage - 1) * itemsPerPage;
@@ -167,7 +172,7 @@ export default function PoGrnReport({ purchaseOrders, goodsReceipts, suppliers =
 
   const exportData = [
     ...filteredPOs.map(po => {
-      const gbpAmount = Number(po.totalAmount || po.total_amount || 0);
+      const originalAmount = Number(po.totalAmount || po.total_amount || 0);
       const aedAmount = calculateAEDAmount(po);
       return {
         type: 'Purchase Order',
@@ -175,13 +180,13 @@ export default function PoGrnReport({ purchaseOrders, goodsReceipts, suppliers =
         date: formatDate(po.orderDate || po.order_date),
         supplier: getSupplierName(po.supplierId || po.supplier_id),
         currency: po.currency || 'GBP',
-        total_gbp: gbpAmount.toFixed(2),
+        total_original: originalAmount.toFixed(2),
         total_aed: aedAmount.toFixed(2),
         status: po.status
       };
     }),
     ...filteredGRNs.map(po => {
-      const gbpAmount = Number(po.totalAmount || po.total_amount || 0);
+      const originalAmount = Number(po.totalAmount || po.total_amount || 0);
       const aedAmount = calculateAEDAmount(po);
       return {
         type: 'Goods Receipt',
@@ -189,7 +194,7 @@ export default function PoGrnReport({ purchaseOrders, goodsReceipts, suppliers =
         date: po.status === 'closed' ? formatDate(po.updatedAt || po.updated_at) : '-',
         supplier: getSupplierName(po.supplierId || po.supplier_id),
         currency: po.currency || 'GBP',
-        total_gbp: gbpAmount.toFixed(2),
+        total_original: originalAmount.toFixed(2),
         total_aed: aedAmount.toFixed(2),
         status: po.status
       };
@@ -215,7 +220,7 @@ export default function PoGrnReport({ purchaseOrders, goodsReceipts, suppliers =
                 date: 'Date',
                 supplier: 'Supplier',
                 currency: 'Currency',
-                total_gbp: 'Total (GBP)',
+                total_original: 'Total (original currency)',
                 total_aed: 'Total (AED)',
                 status: 'Status'
               }}
@@ -371,7 +376,7 @@ export default function PoGrnReport({ purchaseOrders, goodsReceipts, suppliers =
           )}
 
           {/* Summary Cards */}
-          <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
             <Card className="p-4">
               <div className="text-center">
                 <p className="text-2xl font-bold text-blue-600">{totals.pos}</p>
@@ -382,12 +387,6 @@ export default function PoGrnReport({ purchaseOrders, goodsReceipts, suppliers =
               <div className="text-center">
                 <p className="text-2xl font-bold text-green-600">{totals.grns}</p>
                 <p className="text-sm text-gray-600">Goods Receipts</p>
-              </div>
-            </Card>
-            <Card className="p-4">
-              <div className="text-center">
-                <p className="text-2xl font-bold text-purple-600">{formatCurrency(totals.totalGBP, 'GBP')}</p>
-                <p className="text-sm text-gray-600">Total Value (GBP)</p>
               </div>
             </Card>
             <Card className="p-4">
@@ -414,7 +413,7 @@ export default function PoGrnReport({ purchaseOrders, goodsReceipts, suppliers =
                   <TableHead>Supplier</TableHead>
                   <TableHead>Order Date</TableHead>
                   <TableHead>Currency</TableHead>
-                  <TableHead>Total (GBP)</TableHead>
+                  <TableHead>Total (original)</TableHead>
                   <TableHead>Total (AED)</TableHead>
                   <TableHead>Status</TableHead>
                 </TableRow>
@@ -423,7 +422,7 @@ export default function PoGrnReport({ purchaseOrders, goodsReceipts, suppliers =
                 {paginatedPOs.map((po) => {
                   const suppId = po.supplierId || po.supplier_id;
                   const currency = po.currency || 'GBP';
-                  const gbpAmount = Number(po.totalAmount || po.total_amount || 0);
+                  const originalAmount = Number(po.totalAmount || po.total_amount || 0);
                   const aedAmount = calculateAEDAmount(po);
                   return (
                     <TableRow key={po.id}>
@@ -431,7 +430,7 @@ export default function PoGrnReport({ purchaseOrders, goodsReceipts, suppliers =
                       <TableCell>{getSupplierName(suppId)}</TableCell>
                       <TableCell>{formatDate(po.orderDate || po.order_date)}</TableCell>
                       <TableCell><Badge variant="outline">{currency}</Badge></TableCell>
-                      <TableCell>{formatCurrency(gbpAmount, 'GBP')}</TableCell>
+                      <TableCell>{formatCurrency(originalAmount, currency)}</TableCell>
                       <TableCell>{formatCurrency(aedAmount, 'AED')}</TableCell>
                       <TableCell>
                         <Badge variant="outline" className={

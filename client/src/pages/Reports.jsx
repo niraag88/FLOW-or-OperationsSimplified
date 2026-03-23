@@ -103,7 +103,7 @@ export default function Reports() {
     }
   };
 
-  const exchangeRate = parseFloat(data.companySettings?.fxGbpToAed || data.companySettings?.fx_gbp_to_aed || 4.85);
+  const companySettings = data.companySettings;
 
   const canEdit = currentUser && (currentUser.role === 'Admin' || currentUser.role === 'Manager');
 
@@ -162,7 +162,7 @@ export default function Reports() {
             purchaseOrders={data.purchaseOrders}
             goodsReceipts={data.goodsReceipts}
             suppliers={data.suppliers}
-            exchangeRate={exchangeRate}
+            companySettings={companySettings}
             canExport={!!currentUser}
           />
         </TabsContent>
@@ -177,7 +177,7 @@ export default function Reports() {
           <PurchasesReport
             purchaseOrders={data.purchaseOrders}
             suppliers={data.suppliers}
-            exchangeRate={exchangeRate}
+            companySettings={companySettings}
             canExport={!!currentUser}
           />
         </TabsContent>
