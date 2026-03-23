@@ -384,6 +384,8 @@ export const companySettings = pgTable("company_settings", {
   defaultVatRate: decimal("default_vat_rate", { precision: 5, scale: 2 }).default("0.00"),
   lowStockThreshold: integer("low_stock_threshold").default(6),
   fxGbpToAed: decimal("fx_gbp_to_aed", { precision: 8, scale: 4 }).default("4.8500"),
+  fxUsdToAed: decimal("fx_usd_to_aed", { precision: 8, scale: 4 }).default("3.6725"),
+  fxInrToAed: decimal("fx_inr_to_aed", { precision: 8, scale: 4 }).default("0.0440"),
   // Document numbering fields
   poNumberPrefix: text("po_number_prefix").default("PO"),
   doNumberPrefix: text("do_number_prefix").default("DO"), 

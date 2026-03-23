@@ -6,7 +6,7 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { Upload, Building, Save, PoundSterling, Edit2, X } from "lucide-react"; // Added Edit2 and X icons
+import { Upload, Building, Save, PoundSterling, DollarSign, Edit2, X, ArrowRight } from "lucide-react";
 import { CompanySettings } from "@/api/entities";
 import { UploadFile } from "@/api/integrations";
 import { useToast } from "@/components/ui/use-toast";
@@ -21,7 +21,9 @@ export default function CompanySettingsComponent() {
     vatNumber: "", // Changed from company_trn to match schema
     defaultVatRate: 0.05, // Changed to camelCase to match schema
     currency: "AED", // Changed from default_currency to match schema
-    fxGbpToAed: 4.85, // Changed to camelCase to match schema
+    fxGbpToAed: 4.85,
+    fxUsdToAed: 3.6725,
+    fxInrToAed: 0.0440,
     // Note: Document numbering fields are not in the schema yet
     poNumberPrefix: "PO",
     doNumberPrefix: "DO",
@@ -55,7 +57,9 @@ export default function CompanySettingsComponent() {
           ...prev,
           ...loadedSettings,
           defaultVatRate: loadedSettings.defaultVatRate !== undefined ? loadedSettings.defaultVatRate : 0.05,
-          fxGbpToAed: loadedSettings.fxGbpToAed !== undefined ? loadedSettings.fxGbpToAed : 4.85
+          fxGbpToAed: loadedSettings.fxGbpToAed !== undefined ? loadedSettings.fxGbpToAed : 4.85,
+          fxUsdToAed: loadedSettings.fxUsdToAed !== undefined ? loadedSettings.fxUsdToAed : 3.6725,
+          fxInrToAed: loadedSettings.fxInrToAed !== undefined ? loadedSettings.fxInrToAed : 0.0440
         }));
       }
     } catch (error) {
@@ -398,23 +402,78 @@ export default function CompanySettingsComponent() {
         {/* Financial Settings */}
         <div className="space-y-4 pt-6 border-t">
           <h3 className="text-lg font-semibold">Financial Settings</h3>
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-            <div className="space-y-2">
-                <Label htmlFor="fx_gbp_to_aed">Exchange Rate (GBP to AED)</Label>
-                <div className="relative">
-                  <PoundSterling className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-gray-400" />
-                  <Input
-                    id="fx_gbp_to_aed"
-                    type="number"
-                    step="0.01"
-                    min="0"
-                    value={settings.fxGbpToAed}
-                    onChange={(e) => handleInputChange('fxGbpToAed', parseFloat(e.target.value) || 0)}
-                    className={`pl-9 ${!isEditMode ? "bg-gray-50" : ""}`}
-                    readOnly={!isEditMode}
-                  />
-                </div>
-                <p className="text-xs text-gray-500">1 GBP = {settings.fx_gbp_to_aed} AED</p>
+          <div className="space-y-3">
+            <Label>Exchange Rates to AED</Label>
+            <p className="text-xs text-gray-500">Used for converting supplier costs to AED in purchase orders and reports.</p>
+
+            {/* AED — fixed base */}
+            <div className="flex items-center gap-3 p-3 bg-gray-50 rounded-lg border">
+              <div className="w-16 text-sm font-semibold text-gray-700">AED</div>
+              <div className="flex-1">
+                <Input
+                  value="1.0000"
+                  readOnly
+                  className="bg-white text-gray-500 cursor-not-allowed"
+                />
+              </div>
+              <div className="text-xs text-gray-500 w-40">Base currency (fixed)</div>
+            </div>
+
+            {/* GBP */}
+            <div className="flex items-center gap-3 p-3 bg-gray-50 rounded-lg border">
+              <div className="w-16 text-sm font-semibold text-gray-700">GBP</div>
+              <div className="flex-1 relative">
+                <PoundSterling className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-gray-400" />
+                <Input
+                  id="fx_gbp_to_aed"
+                  type="number"
+                  step="0.0001"
+                  min="0"
+                  value={settings.fxGbpToAed}
+                  onChange={(e) => handleInputChange('fxGbpToAed', parseFloat(e.target.value) || 0)}
+                  className={`pl-9 ${!isEditMode ? "bg-white text-gray-500 cursor-not-allowed" : ""}`}
+                  readOnly={!isEditMode}
+                />
+              </div>
+              <div className="text-xs text-gray-500 w-40">1 GBP = {parseFloat(settings.fxGbpToAed || 4.85).toFixed(4)} AED</div>
+            </div>
+
+            {/* USD */}
+            <div className="flex items-center gap-3 p-3 bg-gray-50 rounded-lg border">
+              <div className="w-16 text-sm font-semibold text-gray-700">USD</div>
+              <div className="flex-1 relative">
+                <DollarSign className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-gray-400" />
+                <Input
+                  id="fx_usd_to_aed"
+                  type="number"
+                  step="0.0001"
+                  min="0"
+                  value={settings.fxUsdToAed}
+                  onChange={(e) => handleInputChange('fxUsdToAed', parseFloat(e.target.value) || 0)}
+                  className={`pl-9 ${!isEditMode ? "bg-white text-gray-500 cursor-not-allowed" : ""}`}
+                  readOnly={!isEditMode}
+                />
+              </div>
+              <div className="text-xs text-gray-500 w-40">1 USD = {parseFloat(settings.fxUsdToAed || 3.6725).toFixed(4)} AED</div>
+            </div>
+
+            {/* INR */}
+            <div className="flex items-center gap-3 p-3 bg-gray-50 rounded-lg border">
+              <div className="w-16 text-sm font-semibold text-gray-700">INR</div>
+              <div className="flex-1 relative">
+                <span className="absolute left-3 top-1/2 -translate-y-1/2 text-sm text-gray-400 font-medium">₹</span>
+                <Input
+                  id="fx_inr_to_aed"
+                  type="number"
+                  step="0.0001"
+                  min="0"
+                  value={settings.fxInrToAed}
+                  onChange={(e) => handleInputChange('fxInrToAed', parseFloat(e.target.value) || 0)}
+                  className={`pl-9 ${!isEditMode ? "bg-white text-gray-500 cursor-not-allowed" : ""}`}
+                  readOnly={!isEditMode}
+                />
+              </div>
+              <div className="text-xs text-gray-500 w-40">1 INR = {parseFloat(settings.fxInrToAed || 0.044).toFixed(4)} AED</div>
             </div>
           </div>
         </div>
