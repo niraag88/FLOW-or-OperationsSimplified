@@ -1,16 +1,23 @@
 /**
  * FLOW — Task #55: Purchasing Seed Script
  *
- * Creates (via authenticated REST API except where noted):
- *  1. Financial years: 2025 (Closed), 2026 (Open), 2027 (Open) — via API
- *  2. Company settings: Aroma Essence Trading LLC — via API
- *  3. Prefix change test: PO-AE / DO-AE prefixes, create test PO + DO, restore — via API
- *  4. 300 purchase orders (120 GBP / 90 USD / 90 INR) with 2–5 items — via POST /api/purchase-orders
+ * Creates (via authenticated REST API):
+ *  1. Financial years: 2025 (Closed), 2026 (Open), 2027 (Open) — via /api/books
+ *  2. Company settings: Aroma Essence Trading LLC — via /api/company-settings
+ *  3. Prefix change test: PO-AE / DO-AE, create test PO + DO, restore — via API
+ *  4. 300 purchase orders (120 GBP / 90 USD / 90 INR) — via POST /api/purchase-orders
  *  5. ~100 GRNs for submitted/closed POs — via POST /api/goods-receipts
  *
- * Idempotent: skips POs if count >= 300, GRNs if count >= 80
+ * Idempotent:
+ *  - POs: skips if count >= 300; clears partial batch (1–299) with stock reversion
+ *  - GRNs: creates up to 100; skips if count already >= 100 for seed POs
+ *
+ * Prefix format note: document number prefix stored without trailing dash (e.g. "PO")
+ *  because generatePoNumber() in businessStorage adds a "-" separator automatically,
+ *  producing "PO-001". Prefix "PO-" would yield "PO--001" (double dash).
  *
  * Run: npx tsx scripts/seed-purchasing.ts
+ * Env overrides: APP_URL, ADMIN_USERNAME, ADMIN_PASSWORD
  */
 
 import pkg from 'pg';
@@ -80,8 +87,9 @@ async function apiPut(path: string, body: object, cookie: string) {
 async function seedFinancialYears(cookie: string) {
   console.log('\n── Financial years ────────────────────────────────────────');
   const { data: existing } = await apiGet('/api/books', cookie);
-  const years = Array.isArray(existing) ? existing as Array<{ id: number; year: number; status: string }> : [];
-  const yearMap = new Map(years.map((y) => [y.year, y]));
+  const years = Array.isArray(existing) ? existing as Array<{ id: number; year: number | string; status: string }> : [];
+  // Coerce year to number since API may return it as string from JSON
+  const yearMap = new Map(years.map((y) => [Number(y.year), { ...y, id: Number(y.id) }]));
 
   for (const yr of [2025, 2026, 2027]) {
     if (!yearMap.has(yr)) {
@@ -425,28 +433,37 @@ async function seedGoodsReceipts(cookie: string, poIds: number[]) {
      WHERE po.notes LIKE $1`, [`${SEED_TAG}%`]
   );
   const existingGrns = parseInt(seedGrnCount.rows[0].count);
-  if (existingGrns >= 90) {
-    console.log(`  → Already have ${existingGrns} GRNs for seed POs — skipping`);
+  const GRN_TARGET = 100;
+  if (existingGrns >= GRN_TARGET) {
+    console.log(`  → Already have ${existingGrns} GRNs for seed POs (>= ${GRN_TARGET}) — skipping`);
     return;
   }
+  const remaining = GRN_TARGET - existingGrns;
+  console.log(`  Creating ${remaining} GRNs (existing: ${existingGrns}, target: ${GRN_TARGET})`);
 
-  // Get up to 100 submitted+closed POs from the seeded batch (ordered deterministically)
+  // Find POs from this seed batch that already have a GRN (to skip on rerun)
+  const doneSet = new Set<number>(
+    (await pool.query(
+      `SELECT DISTINCT gr.po_id FROM goods_receipts gr
+       JOIN purchase_orders po ON gr.po_id = po.id
+       WHERE po.notes LIKE $1`, [`${SEED_TAG}%`]
+    )).rows.map(r => parseInt(r.po_id))
+  );
+
+  // Candidate POs: submitted or closed, not yet receipted
   let eligible: number[];
   if (poIds.length > 0) {
-    const placeholders = poIds.map((_, i) => `$${i + 1}`).join(',');
-    const res = await pool.query(
-      `SELECT id FROM purchase_orders WHERE id IN (${placeholders}) AND status IN ('submitted','closed') ORDER BY id LIMIT 100`,
-      poIds
-    );
-    eligible = res.rows.map(r => r.id);
+    // Filter the in-memory list from this run — fast path
+    eligible = poIds.filter(id => !doneSet.has(id)).slice(0, remaining);
   } else {
-    const res = await pool.query(
-      `SELECT id FROM purchase_orders WHERE notes LIKE $1 AND status IN ('submitted','closed') ORDER BY id LIMIT 100`,
+    // Fallback for reruns: query from DB by seed tag
+    const rows = (await pool.query(
+      `SELECT id FROM purchase_orders WHERE notes LIKE $1 AND status IN ('submitted','closed') ORDER BY id`,
       [`${SEED_TAG}%`]
-    );
-    eligible = res.rows.map(r => r.id);
+    )).rows.map(r => parseInt(r.id));
+    eligible = rows.filter(id => !doneSet.has(id)).slice(0, remaining);
   }
-  console.log(`  Eligible POs: ${eligible.length} (targeting 100 GRNs)`);
+  console.log(`  Eligible POs (no GRN yet): ${eligible.length}`);
 
   let created = 0, failed = 0;
 
@@ -537,10 +554,10 @@ async function verify(cookie: string) {
   if (nonDraft !== 250) { pass = false; console.log(`  ✗ Submitted+Closed: got ${nonDraft}, need 250`); }
   else console.log(`  ✓ Submitted+Closed: ${nonDraft} (exact)`);
 
-  // ── GRN target ~100 (at least 90 required)
+  // ── GRN target 100 (at least 90 as a safe margin for reruns on sparse PO pools)
   const grnCount = parseInt(grnRes.rows[0].count);
   const grnOk = grnCount >= 90;
-  console.log(`  GRNs (seed): ${grnCount} ${grnOk ? '✓' : '✗ (need >= 90)'}`);
+  console.log(`  GRNs (seed): ${grnCount} ${grnOk ? '✓' : '✗ (need >= 90, target 100)'}`);
   if (!grnOk) pass = false;
   console.log(`  Stock movements (seed GRNs): ${smRes.rows[0].count}`);
   console.log(`  Company: ${csRes.rows[0].company_name}`);
