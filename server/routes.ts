@@ -3185,6 +3185,15 @@ export async function registerRoutes(app: Express): Promise<Server> {
         } else if (item.documentType === 'Product') {
           // Restore product: re-insert with original data, excluding auto-generated fields
           const { id: _id, createdAt: _ca, updatedAt: _ua, ...productData } = header;
+          // Check for SKU collision before inserting
+          if (productData.skuCode) {
+            const [existing] = await tx.select({ id: products.id })
+              .from(products)
+              .where(eq(products.skuCode, productData.skuCode));
+            if (existing) {
+              throw Object.assign(new Error(`A product with SKU "${productData.skuCode}" already exists. Rename the existing product's SKU first, then retry.`), { code: 'SKU_CONFLICT' });
+            }
+          }
           await tx.insert(products).values({
             ...productData,
             isActive: true,
@@ -3196,8 +3205,15 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
       writeAuditLog({ actor: req.user!.id, actorName: req.user?.username || String(req.user!.id), targetId: String(id), targetType: 'recycle_bin', action: 'UPDATE', details: `Restored ${item.documentType} #${item.documentNumber} from recycle bin` });
       res.json({ success: true, message: `${item.documentNumber} has been restored successfully` });
-    } catch (error) {
+    } catch (error: any) {
       console.error('Error restoring document:', error);
+      if (error?.code === 'SKU_CONFLICT') {
+        return res.status(409).json({ error: error.message });
+      }
+      // PostgreSQL unique violation on SKU
+      if (error?.code === '23505' && error?.constraint?.includes('sku')) {
+        return res.status(409).json({ error: `SKU conflict: a product with that SKU already exists. Rename the existing product's SKU first, then retry.` });
+      }
       res.status(500).json({ error: 'Failed to restore document' });
     }
   });

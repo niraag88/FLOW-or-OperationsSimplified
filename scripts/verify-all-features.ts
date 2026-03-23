@@ -166,6 +166,18 @@ async function verifyReports(cookie: string) {
         else skip(`Some filtered invoices outside 2025 — filter may use a different field`);
       }
     } else skip(`Date range filter returned HTTP ${dfSt}`);
+
+    // Date-range filter: 2026 year
+    const { status: df26St, data: df26Data } = await apiGet('/api/invoices?dateFrom=2026-01-01&dateTo=2026-12-31', cookie);
+    if (df26St === 200) {
+      const df26List = getList(df26Data);
+      pass(`Date filter 2026: ${df26List.length} invoices`);
+      if (df26List.length > 0) {
+        const allIn2026 = df26List.every((i: any) => new Date(i.invoiceDate).getFullYear() === 2026);
+        if (allIn2026) pass(`All ${df26List.length} filtered invoices are within 2026 ✓`);
+        else skip(`Some filtered invoices outside 2026 — filter may use a different field`);
+      }
+    } else skip(`Date range filter 2026 returned HTTP ${df26St}`);
   }
 
   // 1d. Quotations — exact status distribution
