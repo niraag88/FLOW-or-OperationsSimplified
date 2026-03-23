@@ -406,14 +406,14 @@ export default function Invoices() {
             type="Invoices"
             filename="invoices"
             columns={{
-              invoice_number: 'Invoice Number',
-              customer_name: 'Customer',
-              invoice_date: { label: 'Invoice Date', transform: (date) => date ? new Date(date).toLocaleDateString('en-GB') : '' },
+              invoiceNumber: 'Invoice Number',
+              customerName: 'Customer',
+              invoiceDate: { label: 'Invoice Date', transform: (date) => date ? new Date(date).toLocaleDateString('en-GB') : '' },
               reference: 'Reference',
-              status: 'Status',
-              subtotal: { label: 'Subtotal (AED)', transform: (val) => `${val || 0}` },
-              tax_amount: { label: 'VAT (AED)', transform: (val) => `${val || 0}` },
-              total_amount: { label: 'Total (AED)', transform: (val) => `${val || 0}` }
+              status: { label: 'Status', transform: (val) => val ? val.toUpperCase() : '' },
+              vatAmount: { label: 'VAT (AED)', transform: (val, item) => `AED ${parseFloat(val || 0).toFixed(2)}` },
+              amount: { label: 'Total (AED)', transform: (val) => `AED ${parseFloat(val || 0).toFixed(2)}` },
+              currency: 'Currency'
             }}
             isLoading={loading}
           />

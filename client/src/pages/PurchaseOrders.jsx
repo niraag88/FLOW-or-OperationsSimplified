@@ -250,13 +250,13 @@ export default function PurchaseOrders() {
             type={activeTab === 'purchase-orders' ? 'Purchase Orders' : 'Goods Receipts'}
             filename={activeTab === 'purchase-orders' ? 'purchase-orders' : 'goods-receipts'}
             columns={activeTab === 'purchase-orders' ? {
-              po_number: 'PO Number',
-              supplier_name: 'Supplier',
-              order_date: { label: 'Order Date', transform: (date) => date ? new Date(date).toLocaleDateString('en-GB') : '' },
-              status: 'Status',
-              subtotal: { label: 'Subtotal', transform: (val) => `${val || 0}` },
-              tax_amount: { label: 'VAT', transform: (val) => `${val || 0}` },
-              total_amount: { label: 'Total', transform: (val) => `${val || 0}` },
+              poNumber: 'PO Number',
+              supplierName: 'Supplier',
+              orderDate: { label: 'Order Date', transform: (date) => date ? new Date(date).toLocaleDateString('en-GB') : '' },
+              status: { label: 'Status', transform: (val) => val ? val.toUpperCase() : '' },
+              totalAmount: { label: 'Subtotal (GBP)', transform: (val) => `GBP ${parseFloat(val || 0).toFixed(2)}` },
+              vatAmount: { label: 'VAT (GBP)', transform: (val) => `GBP ${parseFloat(val || 0).toFixed(2)}` },
+              grandTotal: { label: 'Total (GBP)', transform: (val) => `GBP ${parseFloat(val || 0).toFixed(2)}` },
               currency: 'Currency'
             } : goodsReceiptsColumns}
             isLoading={loading}
