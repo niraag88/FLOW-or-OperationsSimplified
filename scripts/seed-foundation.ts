@@ -715,21 +715,21 @@ function buildProducts(): ProductRow[] {
 async function seedProducts(cookie: string, brandMap: Record<string, number>) {
   console.log('\n── Creating products ──────────────────────────────────────');
   const r = await fetch(`${BASE_URL}/api/products`, { headers: { Cookie: cookie } });
-  const existing = await r.json() as Array<{ sku: string }>;
-  const existingSkus = new Set(existing.map((p) => p.sku));
+  const existingRaw = await r.json() as unknown;
+  const existingArr: Array<{ id: number; sku: string; costPriceCurrency?: string }> =
+    Array.isArray(existingRaw) ? existingRaw as Array<{ id: number; sku: string; costPriceCurrency?: string }> :
+    ((existingRaw as { products?: Array<{ id: number; sku: string; costPriceCurrency?: string }> }).products ?? []);
+  const existingMap = new Map(existingArr.map((p) => [p.sku, p]));
 
   const products = buildProducts();
   console.log(`  Generated ${products.length} product definitions`);
 
-  // Fallback brand for plants not in the brand map
   const fallbackBrandId = Object.values(brandMap)[0];
 
-  let created = 0, skipped = 0, failed = 0;
+  let created = 0, updated = 0, skipped = 0, failed = 0;
   const currencyCounts: Record<string, number> = { GBP: 0, USD: 0, INR: 0, AED: 0 };
 
   for (const prod of products) {
-    if (existingSkus.has(prod.sku)) { skipped++; continue; }
-
     const brandId = brandMap[prod.brand] ?? fallbackBrandId;
     if (!brandId) { console.warn(`  ⚠ No brand ID for: ${prod.brand}`); failed++; continue; }
 
@@ -749,27 +749,70 @@ async function seedProducts(cookie: string, brandMap: Record<string, number>) {
       minStockLevel: Math.max(2, Math.floor(prod.stock * 0.15)),
     };
 
-    const resp = await fetch(`${BASE_URL}/api/products`, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json', Cookie: cookie },
-      body: JSON.stringify(payload),
-    });
-
-    if (resp.status === 201) {
-      created++;
-      currencyCounts[prod.costPriceCurrency] = (currencyCounts[prod.costPriceCurrency] ?? 0) + 1;
-      process.stdout.write(`  ✓ [${prod.costPriceCurrency}] ${prod.sku}\n`);
+    const existing = existingMap.get(prod.sku);
+    if (existing) {
+      if (existing.costPriceCurrency !== prod.costPriceCurrency) {
+        const { status } = await apiFetch('PUT', `/api/products/${existing.id}`, payload, cookie);
+        if (status === 200) {
+          updated++;
+          currencyCounts[prod.costPriceCurrency] = (currencyCounts[prod.costPriceCurrency] ?? 0) + 1;
+        } else {
+          console.error(`  ✗ Update failed: ${prod.sku}`);
+          failed++;
+        }
+      } else {
+        skipped++;
+        currencyCounts[prod.costPriceCurrency] = (currencyCounts[prod.costPriceCurrency] ?? 0) + 1;
+      }
     } else {
-      failed++;
-      const err = await resp.json();
-      console.error(`  ✗ ${prod.sku}: ${JSON.stringify(err).substring(0, 100)}`);
+      const resp = await fetch(`${BASE_URL}/api/products`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', Cookie: cookie },
+        body: JSON.stringify(payload),
+      });
+      if (resp.status === 201) {
+        created++;
+        currencyCounts[prod.costPriceCurrency] = (currencyCounts[prod.costPriceCurrency] ?? 0) + 1;
+        process.stdout.write(`  ✓ [${prod.costPriceCurrency}] ${prod.sku}\n`);
+      } else {
+        failed++;
+        const err = await resp.json();
+        console.error(`  ✗ ${prod.sku}: ${JSON.stringify(err).substring(0, 100)}`);
+      }
     }
   }
 
-  console.log(`\n  Products created: ${created}`);
-  console.log(`  Skipped (existing): ${skipped}`);
+  console.log(`\n  Products created: ${created}, updated: ${updated}`);
+  console.log(`  Skipped (correct): ${skipped}`);
   console.log(`  Failed: ${failed}`);
-  console.log(`  Currency breakdown: GBP=${currencyCounts.GBP} USD=${currencyCounts.USD} INR=${currencyCounts.INR} AED=${currencyCounts.AED}`);
+  console.log(`  Currency breakdown (this run): GBP=${currencyCounts.GBP} USD=${currencyCounts.USD} INR=${currencyCounts.INR} AED=${currencyCounts.AED}`);
+}
+
+async function verifySeedResults(cookie: string) {
+  console.log('\n── Post-seed verification ─────────────────────────────────');
+  const r = await fetch(`${BASE_URL}/api/products`, { headers: { Cookie: cookie } });
+  const raw = await r.json() as unknown;
+  const all: Array<{ costPriceCurrency?: string }> =
+    Array.isArray(raw) ? raw as Array<{ costPriceCurrency?: string }> :
+    ((raw as { products?: Array<{ costPriceCurrency?: string }> }).products ?? []);
+
+  const totals: Record<string, number> = { GBP: 0, USD: 0, INR: 0, AED: 0 };
+  for (const p of all) { const c = p.costPriceCurrency ?? 'AED'; totals[c] = (totals[c] ?? 0) + 1; }
+
+  const total = all.length;
+  const minRequired = 150;
+  let pass = true;
+
+  console.log(`  Total products in DB: ${total}`);
+  for (const [cur, count] of Object.entries(totals)) {
+    const ok = count >= minRequired;
+    if (!ok) pass = false;
+    console.log(`  ${cur}: ${count} ${ok ? '✓' : `✗ (need >= ${minRequired})`}`);
+  }
+  if (total < 600) { pass = false; console.log(`  ✗ Total < 600`); }
+
+  if (pass) console.log('  ✓ All verification checks passed');
+  else { console.error('  ✗ Verification FAILED — check currency distribution'); process.exit(1); }
 }
 
 // ─── MAIN ──────────────────────────────────────────────────────────────────
@@ -785,6 +828,7 @@ async function main() {
   const brandMap = await seedBrands(cookie);
   await seedSuppliers(cookie);
   await seedProducts(cookie, brandMap);
+  await verifySeedResults(cookie);
 
   console.log('\n═══════════════════════════════════════════════════════════');
   console.log(' Foundation seeding complete!');
