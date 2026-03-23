@@ -174,7 +174,13 @@ async function fetchSeedInvoices(cookie: string): Promise<Invoice[]> {
 async function fetchConvertedInvoices(cookie: string): Promise<Invoice[]> {
   const { data } = await apiGet('/api/invoices', cookie);
   const list = Array.isArray(data) ? (data as Invoice[]) : ((data as { invoices?: Invoice[] }).invoices ?? []);
-  return list.filter(i => i.notes?.startsWith('Converted from Quotation'));
+  // Primary filter: seed-tagged converted invoices (tagged after conversion below)
+  const tagged = list.filter((i: Invoice) => i.notes?.includes(SEED_TAG) && i.notes?.includes('Converted from Quotation'));
+  // Fallback: untagged converted invoices (pre-existing from before SEED-56 tagging was added)
+  if (tagged.length === 0) {
+    return list.filter((i: Invoice) => i.notes?.startsWith('Converted from Quotation'));
+  }
+  return tagged;
 }
 
 async function fetchSeedDOs(cookie: string): Promise<DeliveryOrder[]> {
@@ -279,9 +285,21 @@ async function convertQuotations(
     const { status: http, data } = await apiPost('/api/invoices/from-quotation', { quotationId: q.id }, cookie);
     if (http === 201) {
       const inv = data as Invoice;
+      // Tag the converted invoice with SEED_TAG so the rebalance step only touches seed-owned records
+      const taggedNotes = `${SEED_TAG} Converted from Quotation ${q.quoteNumber}`;
+      await apiFetch(`/api/invoices/${inv.id}`, 'PUT', cookie, {
+        customer_id:  inv.customerId,
+        status:       'draft',
+        total_amount: inv.amount ?? '0',
+        tax_amount:   inv.vatAmount ?? '0',
+        invoice_date: inv.invoiceDate,
+        currency:     inv.currency ?? 'AED',
+        notes:        taggedNotes,
+      });
       converted.push({
         id: inv.id,
         invoiceNumber: inv.invoiceNumber,
+        notes: taggedNotes,
         amount: inv.amount,
         vatAmount: inv.vatAmount,
         invoiceDate: inv.invoiceDate,
@@ -299,15 +317,16 @@ async function convertQuotations(
 }
 
 // ─── 2b. Reassign statuses on converted invoices to achieve exact totals ───────
-// Converted invoices start as 'draft'. We target exact non-draft counts:
-//   Sent=20, Paid=25, Overdue=5 from converted invoices
-// This leaves exactly Draft=50 from converted (assuming 100 converted total).
-// Direct invoices cover the remaining: Sent=130, Paid=125, Overdue=45
-// Grand total: Draft=50, Sent=150, Paid=150, Overdue=50 = 400 ✓
+// Split: CONVERT_TARGET=100 converted + DIRECT_TARGET=300 direct = 400 total invoices
+// Converted invoices start as 'draft'. We reassign a subset to exact non-draft counts:
+//   Converted: Draft=50 | Sent=20 | Paid=25 | Overdue=5  (total = 100)
+//   Direct:    Sent=130 | Paid=125 | Overdue=45           (total = 300)
+//   Grand total: Draft=50, Sent=150, Paid=150, Overdue=50 = 400 ✓
+// Only invoices tagged with SEED_TAG are touched (protects any non-seed converted invoices).
 
-const CONVERT_DRAFT_TARGET = 50; // leave exactly this many converted invoices as draft
-// Exact target counts for converted non-draft invoices:
+const CONVERT_DRAFT_TARGET = 50;  // leave exactly this many converted invoices as draft
 const CONVERT_NON_DRAFT_TARGETS = { sent: 20, paid: 25, overdue: 5 } as const;
+// Verify: 50 + 20 + 25 + 5 = 100 = CONVERT_TARGET ✓
 
 async function reassignConvertedStatuses(
   cookie: string,
