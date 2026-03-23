@@ -1188,7 +1188,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
         case 'decrease':
           quantityChange = -Math.round(qty);
           newStock = Math.max(0, previousStock + quantityChange);
-          quantityChange = newStock - previousStock; // recalc in case clamped to 0
+          quantityChange = newStock - previousStock; // recalc in case clamped at 0
           break;
         case 'correction':
           newStock = Math.max(0, Math.round(qty));
@@ -1198,23 +1198,29 @@ export async function registerRoutes(app: Express): Promise<Server> {
           return res.status(400).json({ error: 'Invalid adjustment type' });
       }
 
-      // Update product stock quantity
-      await db.update(products)
-        .set({ stockQuantity: newStock, updatedAt: new Date() })
-        .where(eq(products.id, productId));
+      // Reject zero net-change adjustments
+      if (quantityChange === 0) {
+        return res.status(400).json({ error: 'Adjustment results in no stock change. Current stock is already at the requested level.' });
+      }
 
-      // Record stock movement
-      await db.insert(stockMovements).values({
-        productId,
-        movementType: 'adjustment',
-        referenceId: null,
-        referenceType: 'manual',
-        quantity: quantityChange,
-        previousStock,
-        newStock,
-        unitCost: null,
-        notes: `${adjustmentType.charAt(0).toUpperCase() + adjustmentType.slice(1)} adjustment: ${reason.trim()}${referenceDocument ? ` | Ref: ${referenceDocument.trim()}` : ''}`,
-        createdBy: req.user!.id,
+      // Atomically update stock and record movement in a single transaction
+      await db.transaction(async (tx) => {
+        await tx.update(products)
+          .set({ stockQuantity: newStock, updatedAt: new Date() })
+          .where(eq(products.id, productId));
+
+        await tx.insert(stockMovements).values({
+          productId,
+          movementType: 'adjustment',
+          referenceId: null,
+          referenceType: 'manual',
+          quantity: quantityChange,
+          previousStock,
+          newStock,
+          unitCost: null,
+          notes: `${adjustmentType.charAt(0).toUpperCase() + adjustmentType.slice(1)} adjustment: ${reason.trim()}${referenceDocument ? ` | Ref: ${referenceDocument.trim()}` : ''}`,
+          createdBy: req.user!.id,
+        });
       });
 
       writeAuditLog({
