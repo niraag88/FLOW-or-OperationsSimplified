@@ -1105,14 +1105,31 @@ export async function registerRoutes(app: Express): Promise<Server> {
   app.delete('/api/products/:id', requireAuth(['Admin', 'Manager']), async (req: AuthenticatedRequest, res) => {
     try {
       const productId = parseInt(req.params.id);
-      const [productToDelete] = await db.select({ name: products.name, sku: products.sku }).from(products).where(eq(products.id, productId));
+      // Load full product data for recycle bin snapshot
+      const [productToDelete] = await db.select().from(products).where(eq(products.id, productId));
+      if (!productToDelete) return res.status(404).json({ error: 'Product not found' });
+
       try {
+        // Save to recycle bin before hard-deleting
+        await db.insert(recycleBin).values({
+          documentType: 'Product',
+          documentId: String(productId),
+          documentNumber: productToDelete.sku || String(productId),
+          documentData: JSON.stringify({ header: productToDelete, items: [] }),
+          deletedBy: req.user?.username || 'unknown',
+          deletedDate: new Date(),
+          reason: 'Deleted from UI',
+          originalStatus: productToDelete.isActive ? 'Active' : 'Inactive',
+          canRestore: true,
+        });
         await businessStorage.deleteProduct(productId);
       } catch (deleteErr) {
-        // If hard delete fails due to FK references (PostgreSQL error 23503), soft-delete instead
+        // If hard delete fails due to FK references (PostgreSQL error 23503), deactivate instead
         const pgCode = (deleteErr instanceof Object && 'code' in deleteErr) ? String((deleteErr as Record<string, unknown>).code) : '';
         if (pgCode === '23503') {
           await db.update(products).set({ isActive: false }).where(eq(products.id, productId));
+          // Remove the recycle bin entry if we deactivated instead (product still exists)
+          await db.delete(recycleBin).where(eq(recycleBin.documentId, String(productId)));
           writeAuditLog({ actor: req.user!.id, actorName: req.user?.username || String(req.user!.id), targetId: String(productId), targetType: 'product', action: 'DEACTIVATE', details: `Product '${productToDelete?.name || productId}' (SKU: ${productToDelete?.sku || '?'}) deactivated (has order history)` });
           return res.json({ success: true, message: 'Product deactivated (has order history)' });
         }
@@ -3117,7 +3134,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
       const { header, items: lineItems = [] } = JSON.parse(item.documentData);
 
-      if (!['Invoice', 'DeliveryOrder', 'Quotation', 'PurchaseOrder'].includes(item.documentType)) {
+      if (!['Invoice', 'DeliveryOrder', 'Quotation', 'PurchaseOrder', 'Product'].includes(item.documentType)) {
         return res.status(400).json({ error: `Unknown document type: ${item.documentType}` });
       }
 
@@ -3160,6 +3177,13 @@ export async function registerRoutes(app: Express): Promise<Server> {
             const { id: _lid, createdAt: _lca, poId: _pid, ...liData } = li;
             await tx.insert(purchaseOrderItems).values({ ...liData, poId: restored.id });
           }
+        } else if (item.documentType === 'Product') {
+          // Restore product: re-insert with original data, excluding auto-generated fields
+          const { id: _id, createdAt: _ca, updatedAt: _ua, ...productData } = header;
+          await tx.insert(products).values({
+            ...productData,
+            isActive: true,
+          });
         }
         // Remove from recycle bin atomically with the restore
         await tx.delete(recycleBin).where(eq(recycleBin.id, id));

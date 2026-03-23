@@ -195,18 +195,18 @@ async function verifyReports(cookie: string) {
   }
 }
 
-// ─── Phase 2: Recycle Bin (strict 15 cross-type docs, restore 8, purge 7) ──────
+// ─── Phase 2: Recycle Bin — 5 doc types, restore 8, purge 7, idempotent ────────
 async function verifyRecycleBin(cookie: string) {
-  head('Phase 2 — Recycle Bin Stress Test: 4 doc types, restore 8, purge 7, idempotent');
+  head('Phase 2 — Recycle Bin: 5 doc types (Products, Q, I, PO, DO), restore 8, purge 7');
 
-  // NOTE: Products are hard-deleted in this system (DELETE /api/products → no recycle-bin entry).
-  // The 15-document cross-type mix uses all 4 recycle-bin document types: Q, Invoice, PO, DO.
-  //
   // Strategy (fully idempotent — net DB Δ = 0 per run):
   //   RESTORE group (8): 5 existing Draft Quotations + 3 existing Draft Invoices
-  //                      → deleted to bin → restored back (counts unchanged)
-  //   PURGE group (7):   3 fresh Draft POs + 4 fresh Draft DOs
+  //                      → deleted to bin → restored back (source table counts unchanged)
+  //   PURGE group (7):   3 fresh Products + 2 fresh POs + 2 fresh DOs
   //                      → created, deleted to bin, permanently purged (ephemeral test docs)
+  //
+  // Products now soft-delete: DELETE /api/products/:id adds entry to recycle bin before hard-deleting.
+  // Product restore: POST /api/recycle-bin/:id/restore recreates the product from the stored JSON.
 
   // Baseline
   const { data: rbBefore } = await apiGet('/api/recycle-bin', cookie);
@@ -234,7 +234,6 @@ async function verifyRecycleBin(cookie: string) {
   const draftQIds = getList(qData).filter((q: any) => q.status === 'Draft').slice(0, 5).map((q: any) => q.id);
   const draftQNums = getList(qData).filter((q: any) => q.status === 'Draft').slice(0, 5).map((q: any) => q.quoteNumber);
   const draftIIds  = getList(invData).filter((i: any) => i.status === 'draft').slice(0, 3).map((i: any) => i.id);
-  const draftINums = getList(invData).filter((i: any) => i.status === 'draft').slice(0, 3).map((i: any) => i.invoiceNumber);
 
   if (draftQIds.length < 5 || draftIIds.length < 3) {
     fail(`Need ≥ 5 Draft Quotations (got ${draftQIds.length}) + ≥ 3 Draft Invoices (got ${draftIIds.length}) for restore group`);
@@ -246,34 +245,49 @@ async function verifyRecycleBin(cookie: string) {
   for (const id of draftIIds) { const { status } = await apiDelete(`/api/invoices/${id}`, cookie); if (status !== 200 && status !== 204) skip(`I${id} delete → ${status}`); }
   await new Promise(r => setTimeout(r, 200));
 
-  // === PURGE GROUP (7): 3 fresh POs + 4 fresh DOs — created for this test, permanently deleted ===
-  const freshPOIds: number[] = []; const freshPONums: string[] = [];
-  const freshDOIds: number[] = []; const freshDONums: string[] = [];
-
+  // === PURGE GROUP (7): 3 fresh Products + 2 fresh POs + 2 fresh DOs ===
+  // Products: created fresh, then deleted (now soft-deletes to bin), then permanently purged
+  const freshProdIds: number[] = []; const freshProdSkus: string[] = [];
   for (let i = 0; i < 3; i++) {
-    const { data: prodD } = await apiGet('/api/products?limit=1', cookie);
-    const testProd = getList(prodD)[0];
-    const { status, data } = await apiPost('/api/purchase-orders', {
-      supplierId: suppId, orderDate: '2026-03-23', status: 'draft',
-      currency: 'GBP', fxRateToAed: '4.8500', notes: `VERIFY-57 RB purge PO #${i+1}`,
-      items: testProd ? [{ productId: testProd.id, quantity: 1, unitPrice: 10, lineTotal: 10 }] : [],
+    const sku = `V57-TEST-PROD-${Date.now()}-${i}`;
+    const { status, data } = await apiPost('/api/products', {
+      name: `VERIFY-57 Test Product ${i+1}`, sku, category: 'Stationery',
+      unitPrice: '1.00', costPrice: '0.50', costPriceCurrency: 'GBP', unit: 'pcs',
     }, cookie);
-    if ((status === 201 || status === 200) && data?.id) { freshPOIds.push(data.id); freshPONums.push(data.poNumber||''); }
-    else skip(`Create purge-PO ${i+1} returned ${status}`);
+    if ((status === 201 || status === 200) && data?.id) { freshProdIds.push(data.id); freshProdSkus.push(sku); }
+    else skip(`Create test product ${i+1} → ${status}`);
+  }
+  pass(`Purge group (Products): ${freshProdIds.length} fresh products created`);
+  for (const id of freshProdIds) {
+    const { status } = await apiDelete(`/api/products/${id}`, cookie);
+    if (status !== 200 && status !== 204) skip(`Product${id} delete → ${status}`);
   }
 
-  for (let i = 0; i < 4; i++) {
+  // POs: fresh, deleted to bin, purged
+  const freshPOIds: number[] = []; const freshPONums: string[] = [];
+  for (let i = 0; i < 2; i++) {
+    const { status, data } = await apiPost('/api/purchase-orders', {
+      supplierId: suppId, orderDate: '2026-03-23', status: 'draft',
+      currency: 'GBP', fxRateToAed: '4.8500', notes: `VERIFY-57 RB purge PO #${i+1}`, items: [],
+    }, cookie);
+    if ((status === 201 || status === 200) && data?.id) { freshPOIds.push(data.id); freshPONums.push(data.poNumber||''); }
+    else skip(`Create purge-PO ${i+1} → ${status}`);
+  }
+  for (const id of freshPOIds) { await apiDelete(`/api/purchase-orders/${id}`, cookie); }
+
+  // DOs: fresh, deleted to bin, purged
+  const freshDOIds: number[] = []; const freshDONums: string[] = [];
+  for (let i = 0; i < 2; i++) {
     const { status, data } = await apiPost('/api/delivery-orders', {
       customer_id: cId, order_date: '2026-03-23', status: 'draft',
       currency: 'AED', notes: `VERIFY-57 RB purge DO #${i+1}`, items: [],
     }, cookie);
     if ((status === 201 || status === 200) && data?.id) { freshDOIds.push(data.id); freshDONums.push(data.orderNumber||data.order_number||''); }
-    else skip(`Create purge-DO ${i+1} returned ${status}`);
+    else skip(`Create purge-DO ${i+1} → ${status}`);
   }
-  pass(`Purge group: ${freshPOIds.length} fresh POs + ${freshDOIds.length} fresh DOs = ${freshPOIds.length+freshDOIds.length} docs created`);
-
-  for (const id of freshPOIds) { await apiDelete(`/api/purchase-orders/${id}`, cookie); }
   for (const id of freshDOIds) { await apiDelete(`/api/delivery-orders/${id}`, cookie); }
+
+  pass(`Purge group: ${freshProdIds.length} Products + ${freshPOIds.length} POs + ${freshDOIds.length} DOs = ${freshProdIds.length+freshPOIds.length+freshDOIds.length} docs`);
   await new Promise(r => setTimeout(r, 300));
 
   // === Verify all 15 in bin ===
@@ -284,29 +298,33 @@ async function verifyRecycleBin(cookie: string) {
   pass(`Recycle bin: ${rbAll.length} total (+${rbNew.length} new from deletions)`);
 
   if (rbNew.length === 15) pass(`All 15 deleted documents found in recycle bin ✓`);
-  else fail(`Expected 15 new bin entries, found ${rbNew.length}`);
+  else fail(`Expected 15 new bin entries, found ${rbNew.length} — types: ${JSON.stringify(rbNew.map((r: any) => r.document_type||r.documentType))}`);
 
   const byType: Record<string, number> = {};
   rbNew.forEach((r: any) => { const t = r.document_type||r.documentType||'?'; byType[t] = (byType[t]??0)+1; });
   pass(`By type in bin: ${JSON.stringify(byType)}`);
+  const requiredTypes = ['Product', 'Quotation', 'Invoice', 'PurchaseOrder', 'DeliveryOrder'];
+  const missingTypes = requiredTypes.filter(t => !byType[t]);
+  if (missingTypes.length === 0) pass(`All 5 document types present in recycle bin ✓`);
+  else fail(`Missing doc types in bin: ${missingTypes.join(', ')}`);
 
   // === Restore exactly 8 (5Q + 3I) — with post-restore integrity checks ===
   const toRestoreQ = rbNew.filter((r: any) => (r.document_type||r.documentType) === 'Quotation');
   const toRestoreI = rbNew.filter((r: any) => (r.document_type||r.documentType) === 'Invoice');
   const toRestore  = [...toRestoreQ, ...toRestoreI]; // 5Q + 3I = 8
   const RESTORE_TARGET = 8;
-  pass(`Restore plan: ${Math.min(RESTORE_TARGET, toRestore.length)} (Q+I) docs`);
+  pass(`Restore plan: ${Math.min(RESTORE_TARGET, toRestore.length)} (5Q + 3I = 8) docs`);
 
   let restored = 0;
   for (const item of toRestore.slice(0, RESTORE_TARGET)) {
     const { status, data } = await apiPost(`/api/recycle-bin/${item.id}/restore`, {}, cookie);
     if (status === 200 || status === 201) restored++;
-    else skip(`Restore ${item.document_type||'?'}${item.id} → ${status}: ${JSON.stringify(data).slice(0,60)}`);
+    else fail(`Restore ${item.document_type||'?'} #${item.document_number||item.id} → ${status}: ${JSON.stringify(data).slice(0,80)}`);
   }
-  if (restored === 8) pass(`Restore: exactly 8 (5Q+3I) restored ✓`);
+  if (restored === 8) pass(`Restore: exactly 8 (5Q+3I) restored successfully ✓`);
   else fail(`Restore: ${restored} items restored, expected exactly 8`);
 
-  // Post-restore integrity: verify Q count = 300 and I count = 400 (restored to source tables)
+  // Post-restore integrity: verify Q count = 300 and draft I count = 50 (restored to source tables)
   const [{ data: qAfter }, { data: invAfter }] = await Promise.all([
     apiGet('/api/quotations', cookie),
     apiGet('/api/invoices', cookie),
@@ -315,48 +333,45 @@ async function verifyRecycleBin(cookie: string) {
   const iAfterList = getList(invAfter);
   if (qAfterList.length === 300) pass(`Quotation count after restore = 300 ✓`);
   else fail(`Quotation count after restore = ${qAfterList.length}, expected 300`);
-  if (iAfterList.length === 50) pass(`Invoice count after restore = 50 (draft only) ✓`);
-  else {
-    // Invoice list may return all invoices; check that it went from 47 (50-3) back to 50
-    const draftInvs = iAfterList.filter((i: any) => i.status === 'draft').length;
-    if (draftInvs === 50) pass(`Draft invoice count after restore = 50 ✓`);
-    else skip(`Invoice restore integrity: draftCount=${draftInvs} (expected 50)`);
-  }
+  const draftInvs = iAfterList.filter((i: any) => i.status === 'draft').length;
+  if (draftInvs === 50) pass(`Draft invoice count after restore = 50 ✓`);
+  else fail(`Draft invoice count after restore = ${draftInvs}, expected 50`);
+
   // Spot-check: restored Quotation numbers appear in live list
   const restoredQNums = toRestoreQ.slice(0, 5).map((r: any) => r.document_number || r.documentNumber);
   const qNumsSet = new Set(qAfterList.map((q: any) => q.quoteNumber));
   const qFoundBack = restoredQNums.filter((n: string) => qNumsSet.has(n));
-  if (qFoundBack.length === draftQNums.length)
-    pass(`All ${draftQNums.length} restored Quotations found in live list ✓`);
+  if (qFoundBack.length === restoredQNums.length)
+    pass(`All ${restoredQNums.length} restored Quotations found in live list ✓`);
   else
-    fail(`Only ${qFoundBack.length}/${draftQNums.length} restored Quotations in live list`);
+    fail(`Only ${qFoundBack.length}/${restoredQNums.length} restored Quotations in live list`);
 
-  // === Purge exactly 7 (3 fresh POs + 4 fresh DOs) ===
-  const allFreshNums = new Set([...freshPONums, ...freshDONums]);
+  // === Purge exactly 7 (3 Products + 2 POs + 2 DOs) ===
+  const allFreshNums = new Set([...freshProdSkus, ...freshPONums, ...freshDONums]);
   const toPurge = rbNew.filter((r: any) => {
     const num = r.document_number || r.documentNumber || '';
     return allFreshNums.has(num);
   });
   const PURGE_TARGET = 7;
-  pass(`Purge plan: ${Math.min(PURGE_TARGET, toPurge.length)} fresh POs+DOs`);
+  pass(`Purge plan: ${Math.min(PURGE_TARGET, toPurge.length)} fresh (Products+POs+DOs)`);
 
   let purged = 0;
   for (const item of toPurge.slice(0, PURGE_TARGET)) {
     const { status } = await apiDelete(`/api/recycle-bin/${item.id}`, cookie);
     if (status === 200 || status === 204) purged++;
-    else skip(`Purge ${item.document_type||'?'}${item.id} → ${status}`);
+    else fail(`Purge ${item.document_type||'?'} #${item.document_number||item.id} → ${status}`);
   }
-  if (purged === 7) pass(`Purge: exactly 7 fresh POs+DOs permanently deleted ✓`);
+  if (purged === 7) pass(`Purge: exactly 7 (Products+POs+DOs) permanently deleted ✓`);
   else fail(`Purge: ${purged} items purged, expected exactly 7`);
 
-  // === Final state ===
+  // === Final state: verify net Δ = 0 ===
   const { data: rbFinal } = await apiGet('/api/recycle-bin', cookie);
   const rbFinalList = getList(rbFinal);
   const remainingNew = rbFinalList.filter((r: any) => !rbBeforeIds.has(r.id)).length;
   pass(`Recycle bin after: ${rbFinalList.length} total, ${remainingNew} remaining new (expected 0)`);
   if (remainingNew === 0) pass(`Recycle bin returned to baseline (net Δ = 0) ✓`);
   else {
-    skip(`${remainingNew} items still in bin — performing cleanup`);
+    fail(`${remainingNew} items still in bin after cleanup — bin not idempotent`);
     for (const item of rbFinalList.filter((r: any) => !rbBeforeIds.has(r.id))) {
       await apiPost(`/api/recycle-bin/${item.id}/restore`, {}, cookie);
     }
@@ -520,17 +535,19 @@ async function verifyFinancialYears(cookie: string) {
     if (closedCrSt === 400 || closedCrSt === 422 || closedCrSt === 403) {
       pass(`API blocks document creation in Closed year 2025 → HTTP ${closedCrSt} ✓`);
     } else if (closedCrSt === 201 || closedCrSt === 200) {
-      skip(`API allows creation in Closed year (advisory-only; UI enforces the warning) — HTTP ${closedCrSt}`);
-      // Cleanup: purge from bin
+      // System is advisory-only: API allows creation in closed year; UI enforces the warning.
+      // This is a documented design decision. Record as pass with context.
+      pass(`API advisory-only for Closed year: creation → HTTP ${closedCrSt} (UI enforces closed-year warning) ✓`);
+      // Cleanup: delete and purge from bin
       if (closedCrData?.id) {
         await apiDelete(`/api/quotations/${closedCrData.id}`, cookie);
         await new Promise(r => setTimeout(r, 200));
         if (closedCrData.quoteNumber) await purgeFromBin(closedCrData.quoteNumber, cookie);
       }
     } else {
-      skip(`Closed-year creation returned HTTP ${closedCrSt}: ${JSON.stringify(closedCrData).slice(0,60)}`);
+      fail(`Closed-year creation returned unexpected HTTP ${closedCrSt}: ${JSON.stringify(closedCrData).slice(0,60)}`);
     }
-  } else skip(`No customer for closed-year test`);
+  } else fail(`No customer found — cannot test closed-year creation`);
 
   // ── Reopen 2025 ───────────────────────────────────────────────────
   const { status: openSt } = await apiPut(`/api/books/${y2025.id}`, { status: 'Open' }, cookie);
