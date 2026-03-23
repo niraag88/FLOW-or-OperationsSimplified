@@ -13,8 +13,7 @@ import { Textarea } from "@/components/ui/textarea";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Badge } from "@/components/ui/badge";
 import { AlertTriangle, Plus, Minus } from "lucide-react";
-import { InventoryLot } from "@/api/entities";
-import { InventoryAudit } from "@/api/entities";
+import { useToast } from "@/hooks/use-toast";
 
 export default function AdjustQuantityDialog({ open, onClose, lot, product, currentUser, onSuccess }) {
   const [adjustmentType, setAdjustmentType] = useState("increase");
@@ -22,6 +21,8 @@ export default function AdjustQuantityDialog({ open, onClose, lot, product, curr
   const [reason, setReason] = useState("");
   const [referenceDocument, setReferenceDocument] = useState("");
   const [loading, setLoading] = useState(false);
+  const [error, setError] = useState("");
+  const { toast } = useToast();
 
   if (!lot || !product) return null;
 
@@ -46,35 +47,49 @@ export default function AdjustQuantityDialog({ open, onClose, lot, product, curr
 
   const handleSubmit = async (e) => {
     e.preventDefault();
-    if (!quantity || !reason.trim()) return;
+    setError("");
+
+    const qty = parseFloat(quantity);
+    if (!quantity || isNaN(qty) || qty <= 0) {
+      setError("Please enter a valid positive quantity.");
+      return;
+    }
+    if (!reason.trim()) {
+      setError("Please provide a reason for the adjustment.");
+      return;
+    }
 
     setLoading(true);
     try {
-      const newQuantity = calculateNewQuantity();
-      const difference = getDifference();
-
-      // Update inventory lot
-      await InventoryLot.update(lot.id, {
-        qty_on_hand: newQuantity
+      const response = await fetch(`/api/products/${product.id}/adjust-stock`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          adjustmentType,
+          quantity: qty,
+          reason: reason.trim(),
+          referenceDocument: referenceDocument.trim() || undefined,
+        }),
       });
 
-      // Create audit log entry
-      await InventoryAudit.create({
-        inventory_lot_id: lot.id,
-        product_id: lot.product_id,
-        adjustment_type: adjustmentType,
-        previous_qty: lot.qty_on_hand,
-        adjusted_qty: newQuantity,
-        difference: difference,
-        reason: reason.trim(),
-        reference_document: referenceDocument.trim() || null,
-        adjusted_by: currentUser.email,
-        adjustment_date: new Date().toISOString()
+      if (!response.ok) {
+        const data = await response.json().catch(() => ({}));
+        throw new Error(data.error || `Request failed (${response.status})`);
+      }
+
+      const result = await response.json();
+
+      toast({
+        title: "Stock adjusted",
+        description: `${product.name}: ${result.previousStock} → ${result.newStock} units.`,
+        variant: "default",
       });
 
       onSuccess();
-    } catch (error) {
-      console.error("Error adjusting quantity:", error);
+      handleClose();
+    } catch (err) {
+      console.error("Error adjusting quantity:", err);
+      setError(err.message || "Failed to adjust stock. Please try again.");
     } finally {
       setLoading(false);
     }
@@ -85,6 +100,7 @@ export default function AdjustQuantityDialog({ open, onClose, lot, product, curr
     setQuantity("");
     setReason("");
     setReferenceDocument("");
+    setError("");
     onClose();
   };
 
@@ -113,7 +129,7 @@ export default function AdjustQuantityDialog({ open, onClose, lot, product, curr
                 <span className="text-gray-500">Location:</span> {lot.location}
               </div>
               <div>
-                <span className="text-gray-500">Current Qty:</span> 
+                <span className="text-gray-500">Current Qty:</span>
                 <Badge variant="outline" className="ml-2">{lot.qty_on_hand}</Badge>
               </div>
             </div>
@@ -156,20 +172,20 @@ export default function AdjustQuantityDialog({ open, onClose, lot, product, curr
               <Input
                 id="quantity"
                 type="number"
-                min="0"
+                min="1"
                 step="1"
                 value={quantity}
-                onChange={(e) => setQuantity(e.target.value)}
+                onChange={(e) => { setQuantity(e.target.value); setError(""); }}
                 placeholder="Enter quantity"
                 required
               />
             </div>
 
-            {quantity && (
+            {quantity && parseFloat(quantity) > 0 && (
               <div className="bg-blue-50 p-3 rounded-lg">
                 <div className="text-sm">
                   <p><strong>New Quantity:</strong> {calculateNewQuantity()}</p>
-                  <p><strong>Net Change:</strong> 
+                  <p><strong>Net Change:</strong>
                     <span className={getDifference() >= 0 ? 'text-green-600' : 'text-red-600'}>
                       {getDifference() >= 0 ? '+' : ''}{getDifference()}
                     </span>
@@ -183,7 +199,7 @@ export default function AdjustQuantityDialog({ open, onClose, lot, product, curr
               <Textarea
                 id="reason"
                 value={reason}
-                onChange={(e) => setReason(e.target.value)}
+                onChange={(e) => { setReason(e.target.value); setError(""); }}
                 placeholder="Explain the reason for this adjustment..."
                 rows={3}
                 required
@@ -200,12 +216,18 @@ export default function AdjustQuantityDialog({ open, onClose, lot, product, curr
               />
             </div>
 
+            {error && (
+              <div className="text-sm text-red-600 bg-red-50 border border-red-200 rounded p-2">
+                {error}
+              </div>
+            )}
+
             <div className="flex justify-end gap-3 pt-4">
               <Button type="button" variant="outline" onClick={handleClose} disabled={loading}>
                 Cancel
               </Button>
-              <Button 
-                type="submit" 
+              <Button
+                type="submit"
                 disabled={loading || !quantity || !reason.trim()}
                 className="bg-emerald-600 hover:bg-emerald-700"
               >

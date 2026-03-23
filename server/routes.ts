@@ -1148,6 +1148,98 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  // Stock adjustment endpoint
+  app.post('/api/products/:id/adjust-stock', requireAuth(['Admin', 'Manager']), async (req: AuthenticatedRequest, res) => {
+    try {
+      const productId = parseInt(req.params.id);
+      if (isNaN(productId)) {
+        return res.status(400).json({ error: 'Invalid product ID' });
+      }
+
+      const { adjustmentType, quantity, reason, referenceDocument } = req.body;
+
+      // Validate input
+      if (!adjustmentType || !['increase', 'decrease', 'correction'].includes(adjustmentType)) {
+        return res.status(400).json({ error: 'adjustmentType must be "increase", "decrease", or "correction"' });
+      }
+      const qty = parseFloat(quantity);
+      if (isNaN(qty) || qty <= 0) {
+        return res.status(400).json({ error: 'quantity must be a positive number' });
+      }
+      if (!reason || !String(reason).trim()) {
+        return res.status(400).json({ error: 'reason is required' });
+      }
+
+      // Get current product stock
+      const [product] = await db.select().from(products).where(eq(products.id, productId));
+      if (!product) {
+        return res.status(404).json({ error: 'Product not found' });
+      }
+
+      const previousStock = product.stockQuantity ?? 0;
+      let newStock: number;
+      let quantityChange: number;
+
+      switch (adjustmentType) {
+        case 'increase':
+          quantityChange = Math.round(qty);
+          newStock = previousStock + quantityChange;
+          break;
+        case 'decrease':
+          quantityChange = -Math.round(qty);
+          newStock = Math.max(0, previousStock + quantityChange);
+          quantityChange = newStock - previousStock; // recalc in case clamped to 0
+          break;
+        case 'correction':
+          newStock = Math.max(0, Math.round(qty));
+          quantityChange = newStock - previousStock;
+          break;
+        default:
+          return res.status(400).json({ error: 'Invalid adjustment type' });
+      }
+
+      // Update product stock quantity
+      await db.update(products)
+        .set({ stockQuantity: newStock, updatedAt: new Date() })
+        .where(eq(products.id, productId));
+
+      // Record stock movement
+      await db.insert(stockMovements).values({
+        productId,
+        movementType: 'adjustment',
+        referenceId: null,
+        referenceType: 'manual',
+        quantity: quantityChange,
+        previousStock,
+        newStock,
+        unitCost: null,
+        notes: `${adjustmentType.charAt(0).toUpperCase() + adjustmentType.slice(1)} adjustment: ${reason.trim()}${referenceDocument ? ` | Ref: ${referenceDocument.trim()}` : ''}`,
+        createdBy: req.user!.id,
+      });
+
+      writeAuditLog({
+        actor: req.user!.id,
+        actorName: req.user?.username || String(req.user!.id),
+        targetId: String(productId),
+        targetType: 'product',
+        action: 'UPDATE',
+        details: `Stock adjusted for '${product.name}' (SKU: ${product.sku}): ${adjustmentType} by ${Math.abs(quantityChange)} — ${previousStock} → ${newStock}. Reason: ${reason.trim()}`
+      });
+
+      res.json({
+        success: true,
+        previousStock,
+        newStock,
+        quantityChange,
+        productId,
+        productName: product.name,
+      });
+    } catch (error) {
+      console.error('Error adjusting stock:', error);
+      res.status(500).json({ error: 'Failed to adjust stock' });
+    }
+  });
+
   // Purchase Order management routes
   app.get('/api/purchase-orders', requireAuth(['Admin', 'Manager']), async (req: AuthenticatedRequest, res) => {
     try {
