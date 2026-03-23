@@ -17,7 +17,7 @@ This is a full-stack web application built with a React frontend and Express.js 
 - **Suppliers**: 80 suppliers (UK, India, USA, France, Germany, Australia, Italy, UAE-based)
 - **Brands**: 31 brands
 - **Users**: 15 users (1 Admin, 5 Managers, 9 Staff); password = Pass@1234
-- **Purchase Orders**: 300+ records [SEED-55 tagged]; **Quotations**: 300+ [SEED-56]; **Invoices**: 420+ [80 converted + 320 direct SEED-56]; **Delivery Orders**: 300+ [SEED-56]
+- **Purchase Orders**: 300 records [SEED-55 tagged]; **Quotations**: 300 [SEED-56 tagged: Draft=50, Sent=100, Converted=100, Expired=50]; **Invoices**: 400 [SEED-56: Draft=50, Sent=150, Paid=150, Overdue=50 — 100 converted from quotations + 300 direct]; **Delivery Orders**: 300 [SEED-56 tagged]
 - **Financial Years**: 2025 (Closed), 2026 (Open), 2027 (Open)
 - **Company**: Aroma Essence Trading LLC, PO prefix "PO", DO prefix "DO"
 - **Admin credentials**: Stored securely in ADMIN_PASSWORD env var — NEVER change the admin username or password
@@ -26,7 +26,7 @@ This is a full-stack web application built with a React frontend and Express.js 
 - `scripts/seed-foundation.ts` — 15 users, 31 brands, 80 suppliers, 600 products
 - `scripts/seed-purchasing.ts` — financial years, company settings, 300 POs, 100+ GRNs
 - `scripts/populate-customers-api.ts` — 180 customers via REST API (idempotent by name)
-- `scripts/populate-sales-api.ts` — 300 quotations, 400+ invoices (80 converted + 320 direct), 300 DOs [SEED-56 tagged for idempotency]
+- `scripts/populate-sales-api.ts` — 300 quotations, 400 invoices (100 converted + 300 direct; Draft=50, Sent=150, Paid=150, Overdue=50), 300 DOs [SEED-56 tagged for idempotency; API-only, no pg pool or execSync]
 
 ## Bug Fixes (Task #45)
 - Fixed: Product deletion failed because `POST /api/recycle-bin` endpoint was missing — added in `server/routes.ts`
