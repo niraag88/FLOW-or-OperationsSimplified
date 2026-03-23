@@ -201,11 +201,12 @@ export default function POForm({ open, onClose, editingPO, currentUser, onSucces
         newItems[index].unitPrice = parseFloat(product.costPrice) || 0;
         newItems[index].lineTotal = newItems[index].quantity * (parseFloat(product.costPrice) || 0);
 
-        // Auto-set PO currency from product's costPriceCurrency when first item is selected on a new PO
-        // Only if user has NOT explicitly changed the currency themselves
+        // Auto-set PO currency from product's costPriceCurrency when first product is selected on a new PO
+        // Only if user has NOT explicitly changed the currency themselves, and no other product is already selected
         const productCurrency = product.costPriceCurrency || 'GBP';
-        const isFirstItem = index === 0 && !editingPO && !currencyExplicitlySet && newItems.filter(i => i.productId).length <= 1;
-        if (isFirstItem) {
+        const selectedProductCount = newItems.filter(i => i.productId).length;
+        const isFirstProductSelected = !editingPO && !currencyExplicitlySet && selectedProductCount <= 1;
+        if (isFirstProductSelected) {
           const rate = companySettings ? getRateToAed(productCurrency, companySettings) : 4.85;
           setFormData(prev => ({
             ...prev,
