@@ -125,10 +125,11 @@ test.describe('UI Flows — page loads, dialogs, navigation', () => {
 
   // ── Page-level performance checks at full data scale ──────────────────────
   // Database contains: POs 307+, Invoices 511+, Products 545+, Customers 190+
-  // These pages load paginated data so full-collection scale stresses the API.
-  // Threshold: interactive content visible within 8 seconds of navigation start.
+  // These pages load data from a large DB; noticeably slow (>2s) would indicate
+  // a missing pagination, an N+1 query, or an absent DB index.
+  // Threshold: domcontentloaded + 2s render buffer must complete within 4s total.
 
-  test('purchase orders page loads within 8s at full scale (307+ records in DB)', async ({ page }) => {
+  test('purchase orders page loads within 4s at full scale (307+ records in DB)', async ({ page }) => {
     await login(page);
     const start = Date.now();
     await page.goto(`${BASE_URL}/PurchaseOrders`);
@@ -137,10 +138,12 @@ test.describe('UI Flows — page loads, dialogs, navigation', () => {
     const elapsed = Date.now() - start;
     const text = await page.locator('body').innerText();
     expect(text).toMatch(/purchase order|new purchase order/i);
-    expect(elapsed).toBeLessThan(8000);
+    // 4s threshold: domcontentloaded + 2s data render budget.
+    // If this fails, investigate API response time and query plans.
+    expect(elapsed).toBeLessThan(4000);
   });
 
-  test('invoices page loads within 8s at full scale (511+ records in DB)', async ({ page }) => {
+  test('invoices page loads within 4s at full scale (511+ records in DB)', async ({ page }) => {
     await login(page);
     const start = Date.now();
     await page.goto(`${BASE_URL}/Invoices`);
@@ -149,10 +152,10 @@ test.describe('UI Flows — page loads, dialogs, navigation', () => {
     const elapsed = Date.now() - start;
     const text = await page.locator('body').innerText();
     expect(text).toMatch(/invoice|new invoice/i);
-    expect(elapsed).toBeLessThan(8000);
+    expect(elapsed).toBeLessThan(4000);
   });
 
-  test('inventory page loads within 8s at full scale (545+ products in DB)', async ({ page }) => {
+  test('inventory page loads within 4s at full scale (545+ products in DB)', async ({ page }) => {
     await login(page);
     const start = Date.now();
     await page.goto(`${BASE_URL}/Inventory`);
@@ -161,7 +164,7 @@ test.describe('UI Flows — page loads, dialogs, navigation', () => {
     const elapsed = Date.now() - start;
     const text = await page.locator('body').innerText();
     expect(text).toMatch(/product|inventory|add product/i);
-    expect(elapsed).toBeLessThan(8000);
+    expect(elapsed).toBeLessThan(4000);
   });
 
   test('dashboard page total navigation + load time under 12 seconds', async ({ page }) => {

@@ -163,4 +163,37 @@ test.describe('Invoices — create, large document, filters', () => {
     const c2 = toInvoiceList(d2).length;
     expect(c1).toBe(c2);
   });
+
+  test('invoice status badges are valid — all returned statuses within expected set', async () => {
+    const raw = await apiGet('/api/invoices', cookie);
+    const invs = toInvoiceList(raw);
+    // All status values found in the DB (case-normalised to lowercase for comparison)
+    const validStatuses = new Set(['draft', 'sent', 'paid', 'overdue', 'cancelled', 'partial', 'submitted', 'delivered']);
+    for (const inv of invs.slice(0, 50)) {
+      if (inv.status) {
+        expect(
+          validStatuses.has(inv.status.toLowerCase()),
+          `Unexpected status: "${inv.status}"`,
+        ).toBe(true);
+      }
+    }
+  });
+
+  test('invoice API supports pagination via page + pageSize params', async () => {
+    // Paginated response format: { data: [...], total: N }
+    const raw = await apiGet('/api/invoices?page=1&pageSize=5', cookie);
+    const resp1 = raw as { data?: ApiInvoice[]; total?: number };
+    const page1 = resp1.data ?? toInvoiceList(raw);
+    expect(page1.length).toBeGreaterThan(0);
+    expect(page1.length).toBeLessThanOrEqual(5);
+    expect(typeof (resp1.total ?? 0)).toBe('number');
+
+    const raw2 = await apiGet('/api/invoices?page=2&pageSize=5', cookie);
+    const resp2 = raw2 as { data?: ApiInvoice[]; total?: number };
+    const page2 = resp2.data ?? toInvoiceList(raw2);
+    expect(page2.length).toBeGreaterThan(0);
+    if (page1.length > 0 && page2.length > 0) {
+      expect(page1[0]!.id).not.toBe(page2[0]!.id);
+    }
+  });
 });

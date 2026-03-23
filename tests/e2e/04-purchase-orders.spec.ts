@@ -154,6 +154,36 @@ test.describe('Purchase Orders', () => {
     expect(custs.length).toBeGreaterThanOrEqual(148);
   });
 
+  test('purchase orders API supports pagination (page + pageSize params)', async () => {
+    // When both page and pageSize are provided, the API returns a paginated subset
+    const raw = await apiGet('/api/purchase-orders?page=1&pageSize=10', cookie);
+    // Paginated response returns { data: [...], total: N }
+    const resp = raw as { data?: ApiPurchaseOrder[]; total?: number };
+    const page1 = resp.data ?? toPurchaseOrderList(raw);
+    expect(page1.length).toBeGreaterThan(0);
+    expect(page1.length).toBeLessThanOrEqual(10);
+
+    // Page 2 should return a different set
+    const raw2 = await apiGet('/api/purchase-orders?page=2&pageSize=10', cookie);
+    const resp2 = raw2 as { data?: ApiPurchaseOrder[]; total?: number };
+    const page2 = resp2.data ?? toPurchaseOrderList(raw2);
+    expect(page2.length).toBeGreaterThan(0);
+    if (page1.length > 0 && page2.length > 0) {
+      expect(page1[0]!.id).not.toBe(page2[0]!.id);
+    }
+  });
+
+  test('purchase order status values are within the valid set', async () => {
+    const raw = await apiGet('/api/purchase-orders', cookie);
+    const pos = toPurchaseOrderList(raw);
+    const validStatuses = new Set(['draft', 'submitted', 'approved', 'received', 'closed', 'cancelled']);
+    for (const po of pos.slice(0, 50)) {
+      if (po.status) {
+        expect(validStatuses.has(po.status.toLowerCase()), `Invalid status: ${po.status}`).toBe(true);
+      }
+    }
+  });
+
   test('purchase orders page renders in browser', async ({ page }) => {
     await login(page);
     await page.locator('body').waitFor({ timeout: 10000 });
