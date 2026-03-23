@@ -9,7 +9,6 @@ export default function POPrintView() {
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
-    // Get PO ID from URL params
     const urlParams = new URLSearchParams(window.location.search);
     const poId = urlParams.get('id');
     
@@ -23,7 +22,6 @@ export default function POPrintView() {
 
   const loadPrintData = async (poId) => {
     try {
-      // Load PO data and company settings
       const [poResponse, companyResponse] = await Promise.all([
         fetch(`/api/export/po?poId=${poId}`),
         fetch('/api/company-settings')
@@ -57,9 +55,9 @@ export default function POPrintView() {
     });
   };
 
-  const formatCurrency = (amount) => {
+  const formatAmount = (amount, currency) => {
     const num = parseFloat(amount) || 0;
-    return `GBP ${num.toFixed(2)}`;
+    return `${currency} ${num.toFixed(2)}`;
   };
 
   if (loading) {
@@ -77,6 +75,11 @@ export default function POPrintView() {
       </div>
     );
   }
+
+  const currency = poData.currency || 'GBP';
+  const fxRate = parseFloat(poData.fxRateToAed) || 4.85;
+  const totalAmount = parseFloat(poData.totalAmount) || 0;
+  const aedTotal = currency === 'AED' ? totalAmount : totalAmount * fxRate;
 
   return (
     <div className="print-container">
@@ -123,6 +126,16 @@ export default function POPrintView() {
               <span className="po-label">Expected Delivery</span>
               <span className="po-value">{formatDate(poData.expectedDelivery)}</span>
             </div>
+            <div className="po-info-row">
+              <span className="po-label">Currency</span>
+              <span className="po-value">{currency}</span>
+            </div>
+            {currency !== 'AED' && (
+              <div className="po-info-row">
+                <span className="po-label">FX Rate (to AED)</span>
+                <span className="po-value">{fxRate.toFixed(4)}</span>
+              </div>
+            )}
           </div>
         </div>
 
@@ -153,8 +166,8 @@ export default function POPrintView() {
                 <th className="col-description">Description</th>
                 <th className="col-size">Size</th>
                 <th className="col-qty">Qty</th>
-                <th className="col-price">Unit Price (GBP)</th>
-                <th className="col-total">Line Total (GBP)</th>
+                <th className="col-price">Unit Price ({currency})</th>
+                <th className="col-total">Line Total ({currency})</th>
               </tr>
             </thead>
             <tbody>
@@ -176,12 +189,18 @@ export default function POPrintView() {
         <div className="print-totals-section">
           <div className="totals-row">
             <span className="totals-label">Subtotal</span>
-            <span className="totals-value">{formatCurrency(poData.totalAmount)}</span>
+            <span className="totals-value">{formatAmount(poData.totalAmount, currency)}</span>
           </div>
           <div className="totals-row total-final">
             <span className="totals-label">Total</span>
-            <span className="totals-value">{formatCurrency(poData.totalAmount)}</span>
+            <span className="totals-value">{formatAmount(poData.totalAmount, currency)}</span>
           </div>
+          {currency !== 'AED' && (
+            <div className="totals-row">
+              <span className="totals-label">Total (AED equivalent)</span>
+              <span className="totals-value">{formatAmount(aedTotal, 'AED')}</span>
+            </div>
+          )}
         </div>
 
         {/* Footer */}

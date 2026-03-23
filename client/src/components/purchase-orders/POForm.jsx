@@ -17,6 +17,7 @@ import { Brand } from "@/api/entities";
 import { Product } from "@/api/entities";
 import { PurchaseOrder } from "@/api/entities";
 import { formatDate } from "@/utils/dateUtils";
+import { getRateToAed, formatCurrency, SUPPORTED_CURRENCIES } from "@/utils/currency";
 
 export default function POForm({ open, onClose, editingPO, currentUser, onSuccess }) {
   const [loading, setLoading] = useState(false);
@@ -24,7 +25,6 @@ export default function POForm({ open, onClose, editingPO, currentUser, onSucces
   const [products, setProducts] = useState([]);
   const [companySettings, setCompanySettings] = useState(null);
   
-  // Simple form state
   const [formData, setFormData] = useState({
     poNumber: "",
     supplierId: "",
@@ -32,11 +32,12 @@ export default function POForm({ open, onClose, editingPO, currentUser, onSucces
     expectedDelivery: "",
     status: "draft",
     notes: "",
+    currency: "GBP",
+    fxRateToAed: "4.8500",
     totalAmount: "0.00",
     items: []
   });
 
-  // Load data when dialog opens
   useEffect(() => {
     if (open) {
       loadInitialData();
@@ -55,28 +56,34 @@ export default function POForm({ open, onClose, editingPO, currentUser, onSucces
       setBrands(filteredBrands);
       setProducts(productsData);
       
+      let settings = null;
       if (settingsResponse.ok) {
-        const settings = await settingsResponse.json();
+        settings = await settingsResponse.json();
         setCompanySettings(settings);
       }
       
       if (editingPO) {
-        // Load editing data, passing the brands data directly
-        await loadEditingData(filteredBrands);
+        await loadEditingData(filteredBrands, settings);
       } else {
         generatePONumber();
+        if (settings) {
+          const defaultRate = getRateToAed('GBP', settings);
+          setFormData(prev => ({
+            ...prev,
+            currency: 'GBP',
+            fxRateToAed: defaultRate.toFixed(4)
+          }));
+        }
       }
     } catch (error) {
       console.error("Error loading data:", error);
     }
   };
 
-  const loadEditingData = async (availableBrands = brands) => {
+  const loadEditingData = async (availableBrands = brands, settings = companySettings) => {
     if (!editingPO) return;
     
     try {
-      
-      // Set basic form data
       const formDataToSet = {
         poNumber: editingPO.poNumber || "",
         supplierId: editingPO.supplierId?.toString() || "",
@@ -84,19 +91,17 @@ export default function POForm({ open, onClose, editingPO, currentUser, onSucces
         expectedDelivery: editingPO.expectedDelivery ? new Date(editingPO.expectedDelivery).toISOString().split('T')[0] : "",
         status: editingPO.status || "draft",
         notes: editingPO.notes || "",
+        currency: editingPO.currency || "GBP",
+        fxRateToAed: editingPO.fxRateToAed || (settings ? getRateToAed(editingPO.currency || 'GBP', settings).toFixed(4) : "4.8500"),
         totalAmount: editingPO.totalAmount || "0.00",
         items: []
       };
       
       setFormData(formDataToSet);
       
-      // Force a small delay to ensure React state updates are processed
       await new Promise(resolve => setTimeout(resolve, 100));
-      
-      // Set the supplier ID again separately to force Select component update
       setFormData(prev => ({ ...prev, supplierId: editingPO.supplierId?.toString() || "" }));
       
-      // Load line items
       if (editingPO.id) {
         const response = await fetch(`/api/purchase-orders/${editingPO.id}/items`);
         if (response.ok) {
@@ -125,7 +130,6 @@ export default function POForm({ open, onClose, editingPO, currentUser, onSucces
 
   const generatePONumber = async () => {
     try {
-      // Get the latest PO number to calculate the next sequence
       const response = await fetch('/api/purchase-orders');
       const existingPOs = await response.json();
       
@@ -136,7 +140,6 @@ export default function POForm({ open, onClose, editingPO, currentUser, onSucces
       
       let nextNumber = 1;
       if (currentYearPOs.length > 0) {
-        // Extract sequence numbers and find the highest
         const sequenceNumbers = currentYearPOs.map(po => {
           const match = po.poNumber.match(/PO-\d{4}-(\d{3})/);
           return match ? parseInt(match[1]) : 0;
@@ -148,7 +151,6 @@ export default function POForm({ open, onClose, editingPO, currentUser, onSucces
       setFormData(prev => ({ ...prev, poNumber }));
     } catch (error) {
       console.error("Error generating PO number:", error);
-      // Fallback to simple numbering
       const poNumber = `PO-${new Date().getFullYear()}-001`;
       setFormData(prev => ({ ...prev, poNumber }));
     }
@@ -156,6 +158,15 @@ export default function POForm({ open, onClose, editingPO, currentUser, onSucces
 
   const handleInputChange = (field, value) => {
     setFormData(prev => ({ ...prev, [field]: value }));
+  };
+
+  const handleCurrencyChange = (currency) => {
+    const rate = companySettings ? getRateToAed(currency, companySettings) : 4.85;
+    setFormData(prev => ({
+      ...prev,
+      currency,
+      fxRateToAed: rate.toFixed(4)
+    }));
   };
 
   const addItem = () => {
@@ -178,7 +189,6 @@ export default function POForm({ open, onClose, editingPO, currentUser, onSucces
     const newItems = [...formData.items];
     newItems[index] = { ...newItems[index], [field]: value };
     
-    // Auto-fill product details when product is selected
     if (field === 'productId' && value) {
       const product = products.find(p => p.id === parseInt(value));
       if (product) {
@@ -190,14 +200,12 @@ export default function POForm({ open, onClose, editingPO, currentUser, onSucces
       }
     }
     
-    // Calculate line total when quantity or price changes
     if (field === 'quantity' || field === 'unitPrice') {
       newItems[index].lineTotal = (newItems[index].quantity || 0) * (newItems[index].unitPrice || 0);
     }
     
     setFormData(prev => ({ ...prev, items: newItems }));
     
-    // Update total amount
     const total = newItems.reduce((sum, item) => sum + (item.lineTotal || 0), 0);
     setFormData(prev => ({ ...prev, totalAmount: total.toFixed(2) }));
   };
@@ -206,7 +214,6 @@ export default function POForm({ open, onClose, editingPO, currentUser, onSucces
     const newItems = formData.items.filter((_, i) => i !== index);
     setFormData(prev => ({ ...prev, items: newItems }));
     
-    // Update total amount
     const total = newItems.reduce((sum, item) => sum + (item.lineTotal || 0), 0);
     setFormData(prev => ({ ...prev, totalAmount: total.toFixed(2) }));
   };
@@ -216,6 +223,9 @@ export default function POForm({ open, onClose, editingPO, currentUser, onSucces
     setLoading(true);
 
     try {
+      const fxRate = parseFloat(formData.fxRateToAed) || 4.85;
+      const totalAed = (parseFloat(formData.totalAmount) * fxRate).toFixed(2);
+
       const submitData = {
         poNumber: formData.poNumber,
         supplierId: parseInt(formData.supplierId),
@@ -223,8 +233,10 @@ export default function POForm({ open, onClose, editingPO, currentUser, onSucces
         expectedDelivery: formData.expectedDelivery ? formData.expectedDelivery + 'T00:00:00.000Z' : null,
         status: formData.status,
         notes: formData.notes,
+        currency: formData.currency,
+        fxRateToAed: formData.fxRateToAed,
         totalAmount: formData.totalAmount,
-        grandTotal: formData.totalAmount,
+        grandTotal: formData.currency === 'AED' ? formData.totalAmount : totalAed,
         items: formData.items.map(item => ({
           productId: parseInt(item.productId),
           productSku: item.productSku,
@@ -259,6 +271,8 @@ export default function POForm({ open, onClose, editingPO, currentUser, onSucces
       expectedDelivery: "",
       status: "draft",
       notes: "",
+      currency: "GBP",
+      fxRateToAed: "4.8500",
       totalAmount: "0.00",
       items: []
     });
@@ -270,6 +284,11 @@ export default function POForm({ open, onClose, editingPO, currentUser, onSucces
   };
 
   const canEdit = !editingPO || editingPO.status !== 'closed';
+
+  const currency = formData.currency || 'GBP';
+  const fxRate = parseFloat(formData.fxRateToAed) || 4.85;
+  const totalInCurrency = parseFloat(formData.totalAmount) || 0;
+  const totalAed = currency === 'AED' ? totalInCurrency : totalInCurrency * fxRate;
 
   return (
     <Dialog open={open} onOpenChange={onClose}>
@@ -335,7 +354,7 @@ export default function POForm({ open, onClose, editingPO, currentUser, onSucces
             </div>
           </div>
 
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
             <div className="space-y-2">
               <Label htmlFor="orderDate">Order Date *</Label>
               <Input
@@ -359,7 +378,43 @@ export default function POForm({ open, onClose, editingPO, currentUser, onSucces
                 data-testid="input-expected-delivery"
               />
             </div>
+            <div className="space-y-2">
+              <Label htmlFor="currency">Currency</Label>
+              <Select
+                value={formData.currency}
+                onValueChange={handleCurrencyChange}
+                disabled={!canEdit}
+              >
+                <SelectTrigger data-testid="select-currency">
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  {SUPPORTED_CURRENCIES.map(c => (
+                    <SelectItem key={c} value={c}>{c}</SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
           </div>
+
+          {/* FX Rate row — only show when currency is not AED */}
+          {currency !== 'AED' && (
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+              <div className="space-y-2">
+                <Label htmlFor="fxRateToAed">FX Rate ({currency} → AED)</Label>
+                <Input
+                  id="fxRateToAed"
+                  type="number"
+                  step="0.0001"
+                  min="0.0001"
+                  value={formData.fxRateToAed}
+                  onChange={(e) => handleInputChange('fxRateToAed', e.target.value)}
+                  disabled={!canEdit}
+                  data-testid="input-fx-rate"
+                />
+              </div>
+            </div>
+          )}
 
           {/* Line Items */}
           <div className="space-y-4">
@@ -389,8 +444,8 @@ export default function POForm({ open, onClose, editingPO, currentUser, onSucces
                       <TableHead>Description</TableHead>
                       <TableHead>Size</TableHead>
                       <TableHead>Quantity</TableHead>
-                      <TableHead>Unit Price (GBP)</TableHead>
-                      <TableHead>Line Total</TableHead>
+                      <TableHead>Unit Price ({currency})</TableHead>
+                      <TableHead>Line Total ({currency})</TableHead>
                       {canEdit && <TableHead></TableHead>}
                     </TableRow>
                   </TableHeader>
@@ -438,7 +493,7 @@ export default function POForm({ open, onClose, editingPO, currentUser, onSucces
                             className="w-24"
                           />
                         </TableCell>
-                        <TableCell>GBP {item.lineTotal.toFixed(2)}</TableCell>
+                        <TableCell>{currency} {item.lineTotal.toFixed(2)}</TableCell>
                         {canEdit && (
                           <TableCell>
                             <Button
@@ -466,16 +521,16 @@ export default function POForm({ open, onClose, editingPO, currentUser, onSucces
               <div className="space-y-2">
                 <div className="flex justify-between items-center">
                   <span className="font-medium">Subtotal</span>
-                  <span data-testid="text-subtotal">GBP {formData.totalAmount}</span>
+                  <span data-testid="text-subtotal">{formatCurrency(formData.totalAmount, currency)}</span>
                 </div>
                 <div className="flex justify-between items-center text-lg font-bold">
                   <span>Total</span>
-                  <span data-testid="text-total">GBP {formData.totalAmount}</span>
+                  <span data-testid="text-total">{formatCurrency(formData.totalAmount, currency)}</span>
                 </div>
-                {companySettings && (
+                {currency !== 'AED' && (
                   <div className="flex justify-between items-center text-sm text-gray-600">
                     <span>Total (AED)</span>
-                    <span data-testid="text-total-aed">AED {(parseFloat(formData.totalAmount) * parseFloat(companySettings.fxGbpToAed || 4.85)).toFixed(2)}</span>
+                    <span data-testid="text-total-aed">{formatCurrency(totalAed, 'AED')}</span>
                   </div>
                 )}
               </div>

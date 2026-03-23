@@ -3,7 +3,7 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
-import { ShoppingCart, Edit2, Copy, Download, Eye, Truck } from "lucide-react";
+import { ShoppingCart } from "lucide-react";
 import { Skeleton } from "@/components/ui/skeleton";
 import { formatDate } from "@/utils/dateUtils";
 import { 
@@ -15,14 +15,14 @@ import {
 } from "@/components/ui/dropdown-menu";
 import ReceiveGoodsDialog from "./ReceiveGoodsDialog";
 import POActionsDropdown from "./POActionsDropdown";
+import { formatCurrency } from "@/utils/currency";
 
 export default function POList({ purchaseOrders, totalCount, loading, canEdit, currentUser, onEdit, onRefresh }) {
   const [showReceiveDialog, setShowReceiveDialog] = useState(false);
   const [selectedPO, setSelectedPO] = useState(null);
 
-  // Use supplier name as brand since line items aren't saved with PO
   const getBrandName = (po) => {
-    return po.supplierName || 'Unknown Brand';
+    return po.supplierName || 'Unknown Supplier';
   };
 
   const getStatusColor = (status) => {
@@ -34,24 +34,13 @@ export default function POList({ purchaseOrders, totalCount, loading, canEdit, c
     }
   };
 
-  const formatCurrency = (amount, currency) => {
-    const formatter = new Intl.NumberFormat('en-US', {
-      style: 'decimal',
-      minimumFractionDigits: 2,
-      maximumFractionDigits: 2
-    });
-    const numericAmount = parseFloat(amount) || 0;
-    return `${currency} ${formatter.format(numericAmount)}`;
+  const getAedEquivalent = (po) => {
+    const amount = parseFloat(po.totalAmount) || 0;
+    const currency = po.currency || 'GBP';
+    if (currency === 'AED') return amount;
+    const rate = parseFloat(po.fxRateToAed) || 4.85;
+    return amount * rate;
   };
-
-  // Calculate AED equivalent (assuming 5.00 exchange rate from company settings)
-  const calculateAEDAmount = (gbpAmount) => {
-    const exchangeRate = 5.00; // This should come from company settings
-    const numericAmount = parseFloat(gbpAmount) || 0;
-    return numericAmount * exchangeRate;
-  };
-
-  // Using shared date utility
 
   const handleReceiveGoods = (po) => {
     setSelectedPO(po);
@@ -98,49 +87,54 @@ export default function POList({ purchaseOrders, totalCount, loading, canEdit, c
           </CardTitle>
         </CardHeader>
         <CardContent>
-          {/* Table Format - Always show table, no mobile cards */}
           <div className="w-full">
             <Table>
               <TableHeader>
                 <TableRow>
                   <TableHead>PO Number</TableHead>
-                  <TableHead>Brand</TableHead>
+                  <TableHead>Supplier</TableHead>
                   <TableHead>Order Date</TableHead>
-                  <TableHead>Total (GBP)</TableHead>
+                  <TableHead>Currency</TableHead>
+                  <TableHead>Total</TableHead>
                   <TableHead>Total (AED)</TableHead>
                   <TableHead>Status</TableHead>
                   <TableHead>Actions</TableHead>
                 </TableRow>
               </TableHeader>
               <TableBody>
-                {purchaseOrders.map((po) => (
-                  <TableRow key={po.id} className="hover:bg-gray-50">
-                    <TableCell className="font-medium">{po.poNumber}</TableCell>
-                    <TableCell>{getBrandName(po)}</TableCell>
-                    <TableCell>
-                      {formatDate(po.orderDate)}
-                    </TableCell>
-                    <TableCell>
-                      {formatCurrency(po.totalAmount || 0, 'GBP')}
-                    </TableCell>
-                    <TableCell>
-                      {formatCurrency(calculateAEDAmount(po.totalAmount), 'AED')}
-                    </TableCell>
-                    <TableCell>
-                      <Badge className={`${getStatusColor(po.status)} border`}>
-                        {po.status?.replace(/_/g, ' ').toUpperCase()}
-                      </Badge>
-                    </TableCell>
-                    <TableCell>
-                      <POActionsDropdown 
-                        po={po}
-                        canEdit={canEdit}
-                        onEdit={onEdit}
-                        onRefresh={onRefresh}
-                      />
-                    </TableCell>
-                  </TableRow>
-                ))}
+                {purchaseOrders.map((po) => {
+                  const currency = po.currency || 'GBP';
+                  const aedTotal = getAedEquivalent(po);
+                  return (
+                    <TableRow key={po.id} className="hover:bg-gray-50">
+                      <TableCell className="font-medium">{po.poNumber}</TableCell>
+                      <TableCell>{getBrandName(po)}</TableCell>
+                      <TableCell>{formatDate(po.orderDate)}</TableCell>
+                      <TableCell>
+                        <Badge variant="outline" className="font-mono text-xs">{currency}</Badge>
+                      </TableCell>
+                      <TableCell>{formatCurrency(po.totalAmount || 0, currency)}</TableCell>
+                      <TableCell className="text-gray-600">
+                        {currency === 'AED'
+                          ? <span className="text-gray-400">—</span>
+                          : formatCurrency(aedTotal, 'AED')}
+                      </TableCell>
+                      <TableCell>
+                        <Badge className={`${getStatusColor(po.status)} border`}>
+                          {po.status?.replace(/_/g, ' ').toUpperCase()}
+                        </Badge>
+                      </TableCell>
+                      <TableCell>
+                        <POActionsDropdown 
+                          po={po}
+                          canEdit={canEdit}
+                          onEdit={onEdit}
+                          onRefresh={onRefresh}
+                        />
+                      </TableCell>
+                    </TableRow>
+                  );
+                })}
               </TableBody>
             </Table>
           </div>

@@ -255,10 +255,17 @@ export default function PurchaseOrders() {
               supplierName: 'Supplier',
               orderDate: { label: 'Order Date', transform: (date) => date ? new Date(date).toLocaleDateString('en-GB') : '' },
               status: { label: 'Status', transform: (val) => val ? val.toUpperCase() : '' },
-              totalAmount: { label: 'Subtotal (GBP)', transform: (val) => `GBP ${parseFloat(val || 0).toFixed(2)}` },
-              vatAmount: { label: 'VAT (GBP)', transform: (val) => `GBP ${parseFloat(val || 0).toFixed(2)}` },
-              grandTotal: { label: 'Total (GBP)', transform: (val) => `GBP ${parseFloat(val || 0).toFixed(2)}` },
-              currency: 'Currency'
+              currency: 'Currency',
+              fxRateToAed: { label: 'FX Rate (to AED)', transform: (val) => val ? parseFloat(val).toFixed(4) : '' },
+              totalAmount: { label: 'Subtotal', transform: (val, row) => `${row?.currency || 'GBP'} ${parseFloat(val || 0).toFixed(2)}` },
+              vatAmount: { label: 'VAT', transform: (val, row) => `${row?.currency || 'GBP'} ${parseFloat(val || 0).toFixed(2)}` },
+              grandTotal: { label: 'Total (AED)', transform: (val, row) => {
+                const amt = parseFloat(row?.totalAmount || 0);
+                const cur = row?.currency || 'GBP';
+                const rate = parseFloat(row?.fxRateToAed || 4.85);
+                const aed = cur === 'AED' ? amt : amt * rate;
+                return `AED ${aed.toFixed(2)}`;
+              }}
             } : goodsReceiptsColumns}
             isLoading={loading}
           />
