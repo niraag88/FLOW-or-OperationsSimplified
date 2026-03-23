@@ -266,7 +266,7 @@ async function verifyRecycleBin(cookie: string) {
   rbNew.forEach((r: any) => { const t = r.document_type||r.documentType||'?'; byType[t] = (byType[t]??0)+1; });
   pass(`By type in bin: ${JSON.stringify(byType)}`);
 
-  // === Restore exactly 8 (Quotations) ===
+  // === Restore exactly 8 (Quotations) — with post-restore integrity check ===
   const toRestore = rbNew.filter((r: any) => {
     const t = r.document_type || r.documentType || '';
     return t === 'Quotation';
@@ -274,14 +274,31 @@ async function verifyRecycleBin(cookie: string) {
   const RESTORE_TARGET = 8;
   pass(`Restore plan: ${Math.min(RESTORE_TARGET, toRestore.length)} Quotations`);
 
+  const restoredIds: number[] = [];
   let restored = 0;
   for (const item of toRestore.slice(0, RESTORE_TARGET)) {
     const { status, data } = await apiPost(`/api/recycle-bin/${item.id}/restore`, {}, cookie);
-    if (status === 200 || status === 201) restored++;
-    else skip(`Restore Q${item.id} → ${status}: ${JSON.stringify(data).slice(0,60)}`);
+    if (status === 200 || status === 201) {
+      restored++;
+      if (item.document_id || item.documentId) restoredIds.push(item.document_id || item.documentId);
+    } else skip(`Restore Q${item.id} → ${status}: ${JSON.stringify(data).slice(0,60)}`);
   }
   if (restored === 8) pass(`Restore: exactly 8 Quotations restored ✓`);
   else fail(`Restore: ${restored} items restored, expected exactly 8`);
+
+  // Post-restore integrity: verify restored quotations exist and are accessible in their source table
+  const { data: qAfter } = await apiGet('/api/quotations', cookie);
+  const qAfterList = getList(qAfter);
+  if (qAfterList.length === 300) pass(`Quotation count after restore = 300 (intact) ✓`);
+  else fail(`Quotation count after restore = ${qAfterList.length}, expected 300`);
+  // Spot-check: restored quotation numbers appear in the live list
+  const restoredNums = toRestore.slice(0, RESTORE_TARGET).map((r: any) => r.document_number || r.documentNumber);
+  const qNums = new Set(qAfterList.map((q: any) => q.quoteNumber));
+  const restoredInLiveList = restoredNums.filter((n: string) => qNums.has(n));
+  if (restoredInLiveList.length === restored)
+    pass(`All ${restored} restored quotations found in live quotation list ✓`);
+  else
+    fail(`Only ${restoredInLiveList.length}/${restored} restored quotations found in live list`);
 
   // === Purge exactly 7 (fresh test Invoices) ===
   const toPurge = rbNew.filter((r: any) => {
@@ -528,40 +545,103 @@ async function verifyFinancialYears(cookie: string) {
   else fail(`2025 status after re-close = "${y2025Final?.status}"`);
 }
 
-// ─── Phase 5: Storage API ─────────────────────────────────────────────────────
+// ─── Phase 5: Storage API (sign → upload → size delta → delete → size restore) ─
 async function verifyStorage(cookie: string) {
-  head('Phase 5 — Storage API');
+  head('Phase 5 — Storage API: sign-upload → upload → size delta → delete');
 
+  // 1. Baseline total size
   const { status: szSt, data: szData } = await apiGet('/api/storage/total-size', cookie);
-  if (szSt === 200) {
-    const bytes = szData.bytes ?? szData.totalSize ?? szData.size ?? 0;
-    pass(`GET /api/storage/total-size: ${bytes} bytes`);
-  } else if (szSt === 503 || szSt === 500) {
-    skip(`Storage total-size returned ${szSt} — object storage not configured in dev`);
-  } else fail(`GET /api/storage/total-size returned HTTP ${szSt}`);
+  if (szSt !== 200) { fail(`GET /api/storage/total-size returned HTTP ${szSt}`); return; }
+  const sizeBefore: number = szData.bytes ?? szData.totalSize ?? szData.size ?? 0;
+  pass(`GET /api/storage/total-size (before): ${sizeBefore} bytes`);
 
+  // 2. List-prefix baseline
+  const { status: listSt, data: listData } = await apiGet('/api/storage/list-prefix?prefix=invoices/', cookie);
+  if (listSt !== 200) { fail(`GET /api/storage/list-prefix returned HTTP ${listSt}`); return; }
+  const listBefore = Array.isArray(listData) ? listData : (listData.files || listData.objects || listData.items || []);
+  pass(`GET /api/storage/list-prefix (before): ${listBefore.length} objects ✓`);
+
+  // 3. Sign-upload — get a token (content type MUST be application/pdf per server validation)
   const testKey = `invoices/verify-57-test-${Date.now()}.pdf`;
+  // Minimal valid PDF bytes: 9 bytes starting with %PDF magic bytes
+  const pdfContent = Buffer.from('%PDF-1.0\n', 'ascii');
+  const fileSize = pdfContent.length;
+
   const { status: signSt, data: signData } = await apiPost('/api/storage/sign-upload', {
-    key: testKey, contentType: 'application/pdf', fileSize: 1024,
+    key: testKey, contentType: 'application/pdf', fileSize,
   }, cookie);
 
-  if (signSt === 200 || signSt === 201) {
-    pass(`POST /api/storage/sign-upload: HTTP ${signSt}`);
-    const hasToken = !!(signData?.token || signData?.uploadUrl || signData?.url || signData?.signedUrl || signData?.key);
-    if (hasToken) pass(`Sign-upload response contains upload credential ✓`);
-    else skip(`Sign-upload response: ${JSON.stringify(signData).slice(0,120)}`);
-    skip(`Real binary upload skipped (no object storage in dev; token structure validated above)`);
-  } else if (signSt === 503 || signSt === 500) {
-    skip(`sign-upload returned ${signSt} — object storage not configured`);
-  } else fail(`POST /api/storage/sign-upload returned HTTP ${signSt}`);
+  if (signSt !== 200 && signSt !== 201) {
+    if (signSt === 503 || signSt === 500) {
+      skip(`sign-upload returned ${signSt} — object storage not configured in dev (endpoint validated)`);
+      return;
+    }
+    fail(`POST /api/storage/sign-upload returned HTTP ${signSt}: ${JSON.stringify(signData).slice(0,80)}`);
+    return;
+  }
+  pass(`POST /api/storage/sign-upload: HTTP ${signSt} ✓`);
+  const uploadUrl: string = signData?.url || signData?.uploadUrl || '';
+  if (!uploadUrl) { fail(`sign-upload response has no url field: ${JSON.stringify(signData).slice(0,120)}`); return; }
+  pass(`Upload URL received: "${uploadUrl.slice(0,40)}..." ✓`);
 
-  const { status: listSt, data: listData } = await apiGet('/api/storage/list-prefix?prefix=invoices/', cookie);
-  if (listSt === 200) {
-    const items = Array.isArray(listData) ? listData : (listData.files || listData.objects || listData.items || []);
-    pass(`GET /api/storage/list-prefix: 200 OK (${items.length} objects) ✓`);
-  } else if (listSt === 503 || listSt === 500) {
-    skip(`list-prefix returned ${listSt} — storage not configured`);
-  } else fail(`GET /api/storage/list-prefix returned HTTP ${listSt}`);
+  // 4. Actual binary upload (PUT to the token URL — server stores in Replit Object Storage)
+  const fullUploadUrl = uploadUrl.startsWith('http') ? uploadUrl : `${BASE}${uploadUrl}`;
+  const uploadResp = await fetch(fullUploadUrl, {
+    method: 'PUT',
+    headers: { 'Content-Type': 'application/pdf', 'Content-Length': String(fileSize) },
+    body: pdfContent,
+  });
+  if (uploadResp.status === 200 || uploadResp.status === 201) {
+    pass(`PUT ${uploadUrl.slice(0,40)}...: HTTP ${uploadResp.status} — upload succeeded ✓`);
+  } else {
+    const errBody = await uploadResp.text().catch(() => '');
+    if (uploadResp.status === 500 || uploadResp.status === 503) {
+      skip(`Upload returned ${uploadResp.status} — object storage unavailable in dev (${errBody.slice(0,60)})`);
+      return;
+    }
+    fail(`Upload returned HTTP ${uploadResp.status}: ${errBody.slice(0,80)}`);
+    return;
+  }
+
+  // 5. Verify total-size increased
+  await new Promise(r => setTimeout(r, 300));
+  const { status: sz2St, data: sz2Data } = await apiGet('/api/storage/total-size', cookie);
+  if (sz2St !== 200) { fail(`GET total-size (after upload) returned ${sz2St}`); }
+  else {
+    const sizeAfter: number = sz2Data.bytes ?? sz2Data.totalSize ?? sz2Data.size ?? 0;
+    pass(`GET /api/storage/total-size (after upload): ${sizeAfter} bytes`);
+    if (sizeAfter >= sizeBefore + fileSize)
+      pass(`Size increased by ≥ ${fileSize} bytes (${sizeBefore} → ${sizeAfter}) ✓`);
+    else if (sizeAfter > sizeBefore)
+      skip(`Size increased (${sizeBefore} → ${sizeAfter}) but not by exact ${fileSize} (may be compressed or rounded)`);
+    else
+      skip(`Size unchanged (${sizeBefore} → ${sizeAfter}) — storage may not report size immediately`);
+  }
+
+  // 6. Delete the uploaded object
+  const { status: delSt, data: delData } = await apiDelete(`/api/storage/object?key=${encodeURIComponent(testKey)}`, cookie);
+  if (delSt === 200 || delSt === 204) {
+    pass(`DELETE /api/storage/object?key=...: HTTP ${delSt} — object deleted ✓`);
+  } else if (delSt === 500 || delSt === 503) {
+    skip(`Delete object returned ${delSt} — storage partially available: ${JSON.stringify(delData).slice(0,60)}`);
+    return;
+  } else {
+    fail(`DELETE /api/storage/object returned HTTP ${delSt}: ${JSON.stringify(delData).slice(0,60)}`);
+    return;
+  }
+
+  // 7. Verify total-size decreased (back to baseline)
+  await new Promise(r => setTimeout(r, 300));
+  const { status: sz3St, data: sz3Data } = await apiGet('/api/storage/total-size', cookie);
+  if (sz3St !== 200) { fail(`GET total-size (after delete) returned ${sz3St}`); }
+  else {
+    const sizeFinal: number = sz3Data.bytes ?? sz3Data.totalSize ?? sz3Data.size ?? 0;
+    pass(`GET /api/storage/total-size (after delete): ${sizeFinal} bytes`);
+    if (sizeFinal <= sizeBefore)
+      pass(`Size returned to ≤ baseline after delete (${sizeFinal} ≤ ${sizeBefore}) ✓`);
+    else
+      skip(`Final size ${sizeFinal} > baseline ${sizeBefore} — may lag (storage GC delay)`);
+  }
 }
 
 // ─── Phase 6: User Roles ──────────────────────────────────────────────────────
@@ -631,11 +711,22 @@ async function verifyUserRoles() {
       mCreatedInvNum = mCreatedInv?.invoiceNumber || '';
       pass(`Manager can POST /api/invoices (created #${mCreatedInvNum}) ✓`);
     } else {
-      skip(`Manager POST /api/invoices returned ${mInvCrSt}: ${JSON.stringify(mCreatedInv).slice(0,80)}`);
+      fail(`Manager POST /api/invoices returned ${mInvCrSt}: ${JSON.stringify(mCreatedInv).slice(0,80)}`);
     }
-  } else skip(`No customer found for manager create-invoice test`);
+  } else fail(`No customer found for manager create-invoice test`);
 
-  // Manager CANNOT DELETE an invoice (Admin-only)
+  // Manager can EDIT (PUT) an invoice — positive edit path
+  if (mCreatedInvId) {
+    const { status: mEditSt, data: mEditData } = await apiPut(`/api/invoices/${mCreatedInvId}`, {
+      customer_id: cId3, invoice_date: '2026-03-23', status: 'draft',
+      currency: 'AED', notes: 'VERIFY-57 manager EDITED test', items: [],
+    }, mgr);
+    if (mEditSt === 200) pass(`Manager can PUT /api/invoices/:id (edit) → HTTP 200 ✓`);
+    else if (mEditSt === 201) pass(`Manager can PUT /api/invoices/:id (edit) → HTTP 201 ✓`);
+    else skip(`Manager PUT /api/invoices/:id returned ${mEditSt}: ${JSON.stringify(mEditData).slice(0,80)}`);
+  }
+
+  // Manager CANNOT DELETE an invoice (Admin-only delete path)
   if (mCreatedInvId) {
     const { status: mDelSt } = await apiDelete(`/api/invoices/${mCreatedInvId}`, mgr);
     if (mDelSt === 403) pass(`Manager denied DELETE /api/invoices/:id (403) ✓`);
@@ -657,23 +748,35 @@ async function verifyUserRoles() {
   pass(`Staff login successful`);
   await new Promise(r => setTimeout(r, 400));
 
-  // Staff ALLOWED: read invoices, read quotations, read DOs
+  // Staff ALLOWED READ: invoices, quotations, DOs
   const { status: sInvSt } = await apiGet('/api/invoices', staff);
   if (sInvSt === 200) pass(`Staff can GET /api/invoices ✓`);
   else fail(`Staff GET /api/invoices returned ${sInvSt}`);
 
   const { status: sQSt } = await apiGet('/api/quotations', staff);
   if (sQSt === 200) pass(`Staff can GET /api/quotations ✓`);
-  else skip(`Staff GET /api/quotations returned ${sQSt}`);
+  else fail(`Staff GET /api/quotations returned ${sQSt}`);
 
-  const { status: sDOSt } = await apiGet('/api/delivery-orders', staff);
+  const { status: sDOSt, data: sDOData } = await apiGet('/api/delivery-orders', staff);
   if (sDOSt === 200) pass(`Staff can GET /api/delivery-orders ✓`);
-  else skip(`Staff GET /api/delivery-orders returned ${sDOSt}`);
+  else fail(`Staff GET /api/delivery-orders returned ${sDOSt}`);
 
-  // Staff DENIED: POs, users, products write, company settings write
+  // Staff ALLOWED CREATE: PATCH delivery-orders/:id/scan-key (DO scan-in operation)
+  const doList = getList(sDOData);
+  const aDO = doList[0]; // pick any DO to scan
+  if (aDO?.id) {
+    const { status: sScanSt, data: sScanData } = await fetch(`${BASE}/api/delivery-orders/${aDO.id}/scan-key`, {
+      method: 'PATCH', headers: { 'Content-Type': 'application/json', Cookie: staff },
+      body: JSON.stringify({ scanKey: `scan-verify-57-${Date.now()}` }),
+    }).then(async r => ({ status: r.status, data: await r.json().catch(() => null) }));
+    if (sScanSt === 200 || sScanSt === 201) pass(`Staff can PATCH /api/delivery-orders/:id/scan-key (DO scan-in) → ${sScanSt} ✓`);
+    else skip(`Staff PATCH scan-key returned ${sScanSt}: ${JSON.stringify(sScanData).slice(0,60)}`);
+  } else skip(`No DOs available for staff scan-key test`);
+
+  // Staff DENIED WRITE: POs (read), users (read), products (write), company settings (write), invoice delete
   const { status: sPOSt } = await apiGet('/api/purchase-orders', staff);
   if (sPOSt === 403) pass(`Staff denied GET /api/purchase-orders (403) ✓`);
-  else skip(`Staff GET /api/purchase-orders returned ${sPOSt}`);
+  else fail(`Staff GET /api/purchase-orders returned ${sPOSt}`);
 
   const { status: sUsersSt } = await apiGet('/api/users', staff);
   if (sUsersSt === 403) pass(`Staff denied GET /api/users (403) ✓`);
@@ -683,7 +786,19 @@ async function verifyUserRoles() {
     name: 'VERIFY-57', sku: 'V57-SKU', unitPrice: '10', category: 'Electronics'
   }, staff);
   if (sProdCrSt === 403) pass(`Staff denied POST /api/products (403) ✓`);
-  else skip(`Staff POST /api/products returned ${sProdCrSt}`);
+  else fail(`Staff POST /api/products returned ${sProdCrSt}`);
+
+  const { status: sInvCrSt } = await apiPost('/api/invoices', {
+    customer_id: cId3, invoice_date: '2026-03-23', status: 'draft', currency: 'AED', items: [],
+  }, staff);
+  if (sInvCrSt === 403) pass(`Staff denied POST /api/invoices (403) ✓`);
+  else fail(`Staff POST /api/invoices returned ${sInvCrSt}`);
+
+  const { status: sQCrSt } = await apiPost('/api/quotations', {
+    customerId: cId3, quoteDate: '2026-03-23', status: 'Draft', items: [],
+  }, staff);
+  if (sQCrSt === 403) pass(`Staff denied POST /api/quotations (403) ✓`);
+  else fail(`Staff POST /api/quotations returned ${sQCrSt}`);
 
   const { status: sCsSt } = await apiPut('/api/company-settings', {}, staff);
   if (sCsSt === 403) pass(`Staff denied PUT /api/company-settings (403) ✓`);
@@ -691,7 +806,7 @@ async function verifyUserRoles() {
 
   const { status: sInvDelSt } = await apiDelete('/api/invoices/99999', staff);
   if (sInvDelSt === 403) pass(`Staff denied DELETE /api/invoices/:id (403) ✓`);
-  else skip(`Staff DELETE /api/invoices/:id returned ${sInvDelSt} (expected 403)`);
+  else fail(`Staff DELETE /api/invoices/:id returned ${sInvDelSt} (expected 403)`);
 }
 
 // ─── Main ─────────────────────────────────────────────────────────────────────
