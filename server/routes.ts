@@ -3186,12 +3186,12 @@ export async function registerRoutes(app: Express): Promise<Server> {
           // Restore product: re-insert with original data, excluding auto-generated fields
           const { id: _id, createdAt: _ca, updatedAt: _ua, ...productData } = header;
           // Check for SKU collision before inserting
-          if (productData.skuCode) {
+          if (productData.sku) {
             const [existing] = await tx.select({ id: products.id })
               .from(products)
-              .where(eq(products.skuCode, productData.skuCode));
+              .where(eq(products.sku, productData.sku));
             if (existing) {
-              throw Object.assign(new Error(`A product with SKU "${productData.skuCode}" already exists. Rename the existing product's SKU first, then retry.`), { code: 'SKU_CONFLICT' });
+              throw Object.assign(new Error(`A product with SKU "${productData.sku}" already exists. Rename the existing product's SKU first, then retry.`), { code: 'SKU_CONFLICT' });
             }
           }
           await tx.insert(products).values({
