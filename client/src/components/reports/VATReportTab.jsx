@@ -1,5 +1,5 @@
 
-import React, { useState, useEffect } from "react";
+import React, { useState, useEffect, useMemo } from "react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -31,9 +31,14 @@ import { exportToCsv } from "../utils/export";
 
 const fmt = (value) => new Intl.NumberFormat('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 }).format(value);
 
-const ALL_STATUSES = ['draft', 'submitted', 'delivered', 'paid'];
+const DEFAULT_STATUSES = ['submitted', 'delivered'];
 
 export default function VATReportTab({ invoices, customers, books, companySettings, currentUser, loading }) {
+  const allStatuses = useMemo(() => {
+    const set = new Set(invoices.map(i => i.status).filter(Boolean));
+    ['draft', 'submitted', 'delivered', 'paid'].forEach(s => set.add(s));
+    return [...set].sort();
+  }, [invoices]);
   const [searchDebounced, setSearchDebounced] = useState("");
   const [searchTerm, setSearchTerm] = useState("");
   const { toast } = useToast();
@@ -44,13 +49,13 @@ export default function VATReportTab({ invoices, customers, books, companySettin
       const defaultFilters = {
         dateFrom: format(startOfMonth(new Date()), 'yyyy-MM-dd'),
         dateTo: format(endOfMonth(new Date()), 'yyyy-MM-dd'),
-        statuses: ['submitted', 'delivered'],
+        statuses: DEFAULT_STATUSES,
         taxTreatments: ['StandardRated']
       };
       if (saved) {
         const parsed = JSON.parse(saved);
-        if (parsed.statuses && parsed.statuses.includes('sent') && parsed.statuses.length === 1) {
-          parsed.statuses = ['submitted', 'delivered'];
+        if (parsed.statuses && parsed.statuses.includes('sent') && !parsed.statuses.includes('submitted')) {
+          parsed.statuses = DEFAULT_STATUSES;
         }
         return { ...defaultFilters, ...parsed };
       }
@@ -59,7 +64,7 @@ export default function VATReportTab({ invoices, customers, books, companySettin
       return {
         dateFrom: format(startOfMonth(new Date()), 'yyyy-MM-dd'),
         dateTo: format(endOfMonth(new Date()), 'yyyy-MM-dd'),
-        statuses: ['submitted', 'delivered'],
+        statuses: DEFAULT_STATUSES,
         taxTreatments: ['StandardRated']
       };
     }
@@ -277,7 +282,7 @@ export default function VATReportTab({ invoices, customers, books, companySettin
             <div className="space-y-2">
               <Label>Invoice Status</Label>
               <div className="flex flex-wrap gap-4">
-                {ALL_STATUSES.map(status => (
+                {allStatuses.map(status => (
                   <div key={status} className="flex items-center space-x-2">
                     <Checkbox
                       id={`status-${status}`}

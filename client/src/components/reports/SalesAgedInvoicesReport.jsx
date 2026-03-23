@@ -7,12 +7,12 @@ import ExportDropdown from "../common/ExportDropdown";
 import { format } from 'date-fns';
 import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer } from 'recharts';
 
-const INCLUDED_STATUSES = ['submitted', 'delivered', 'paid', 'sent'];
+const EXCLUDED_STATUSES = new Set(['cancelled']);
 
 const fmt = (value) => new Intl.NumberFormat('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 }).format(value);
 
 export default function SalesAgedInvoicesReport({ invoices, customers, canExport }) {
-  const submittedInvoices = invoices.filter(inv => INCLUDED_STATUSES.includes(inv.status));
+  const submittedInvoices = invoices.filter(inv => !EXCLUDED_STATUSES.has(inv.status));
 
   const agingData = useMemo(() => {
     const buckets = {

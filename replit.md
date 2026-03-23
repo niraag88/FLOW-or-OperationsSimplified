@@ -2,6 +2,9 @@
 
 This is a full-stack web application built with a React frontend and Express.js backend, designed as FLOW - a UAE business operations platform (AED currency, 5% VAT). The application features a modern UI built with shadcn/ui components and Tailwind CSS, with PostgreSQL database integration using Drizzle ORM.
 
+## Schema Changes (Task #46)
+- **purchase_orders** table: Added `currency` (text, default 'GBP') and `fxRateToAed` (decimal 10,4, default 4.8500) columns via direct SQL (`ALTER TABLE purchase_orders ADD COLUMN IF NOT EXISTS ...`). All 307+ existing POs default to GBP/4.85. Schema updated in `shared/schema.ts`. `getPurchaseOrders()` in `server/businessStorage.ts` now includes these fields in its explicit SELECT and joins `suppliers` table (not `brands`) for `supplierName`.
+
 ## Current Database State (as of Task #45)
 - **Products**: 545+ active products across all 12 categories (Essential Oils, Carrier Oils, Bath Salts, Body Butters, Massage Blends, Diffuser Blends, Roll-ons, Balms & Salves, Hydrosols, Supplements, Electronics, Stationery)
 - **Customers**: 190 customers (hotels, spas, retail chains, corporate, export clients across UAE, Oman, Kuwait, KSA, Jordan, Qatar, Egypt and internationally)
