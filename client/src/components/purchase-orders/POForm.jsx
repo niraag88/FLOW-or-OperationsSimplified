@@ -7,6 +7,7 @@ import {
   DialogTitle,
 } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
+import { Badge } from "@/components/ui/badge";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
@@ -360,20 +361,28 @@ export default function POForm({ open, onClose, editingPO, currentUser, onSucces
             </div>
             <div className="space-y-2">
               <Label htmlFor="status">Status</Label>
-              <Select 
-                value={formData.status} 
-                onValueChange={(value) => handleInputChange('status', value)}
-                disabled={!canEdit}
-              >
-                <SelectTrigger data-testid="select-status">
-                  <SelectValue />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="draft">Draft</SelectItem>
-                  <SelectItem value="submitted">Submitted</SelectItem>
-                  <SelectItem value="closed">Closed</SelectItem>
-                </SelectContent>
-              </Select>
+              {editingPO?.status === 'closed' ? (
+                <div className="flex items-center h-10">
+                  <Badge className="bg-green-100 text-green-800 hover:bg-green-100 text-sm font-medium px-3 py-1">
+                    Closed
+                  </Badge>
+                  <span className="ml-2 text-xs text-muted-foreground">Set automatically via Goods Receipts</span>
+                </div>
+              ) : (
+                <Select
+                  value={formData.status}
+                  onValueChange={(value) => handleInputChange('status', value)}
+                  disabled={!canEdit}
+                >
+                  <SelectTrigger data-testid="select-status">
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="draft">Draft</SelectItem>
+                    <SelectItem value="submitted">Submitted</SelectItem>
+                  </SelectContent>
+                </Select>
+              )}
             </div>
           </div>
 
