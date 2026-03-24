@@ -70,6 +70,8 @@ export const invoices = pgTable("invoices", {
   paymentRemarks: text("payment_remarks"),
 }, (table) => ({
   invoicesStatusCustomerIdx: index("invoices_status_customer_idx").on(table.status, table.customerId),
+  invoicesCreatedAtIdx: index("invoices_created_at_idx").on(table.createdAt),
+  invoicesPaymentStatusIdx: index("invoices_payment_status_idx").on(table.paymentStatus),
 }));
 
 // Delivery Orders table  
@@ -251,6 +253,8 @@ export const products = pgTable("products", {
   updatedAt: timestamp("updated_at").defaultNow().notNull(),
 }, (table) => ({
   productsSkuIdx: index("products_sku_idx").on(table.sku),
+  productsIsActiveIdx: index("products_is_active_idx").on(table.isActive),
+  productsCategoryIdx: index("products_category_idx").on(table.category),
 }));
 
 // Invoice Line Items table
@@ -265,7 +269,9 @@ export const invoiceLineItems = pgTable("invoice_line_items", {
   unitPrice: decimal("unit_price", { precision: 10, scale: 2 }).notNull(),
   lineTotal: decimal("line_total", { precision: 10, scale: 2 }).notNull(),
   createdAt: timestamp("created_at").defaultNow().notNull(),
-});
+}, (table) => ({
+  invoiceLineItemsInvoiceIdx: index("invoice_line_items_invoice_id_idx").on(table.invoiceId),
+}));
 
 export const insertInvoiceLineItemSchema = createInsertSchema(invoiceLineItems).omit({ id: true, createdAt: true });
 export type InsertInvoiceLineItem = z.infer<typeof insertInvoiceLineItemSchema>;
@@ -282,7 +288,9 @@ export const deliveryOrderItems = pgTable("delivery_order_items", {
   unitPrice: decimal("unit_price", { precision: 10, scale: 2 }).notNull(),
   lineTotal: decimal("line_total", { precision: 10, scale: 2 }).notNull(),
   createdAt: timestamp("created_at").defaultNow().notNull(),
-});
+}, (table) => ({
+  doItemsDoIdx: index("delivery_order_items_do_id_idx").on(table.doId),
+}));
 
 export const insertDeliveryOrderItemSchema = createInsertSchema(deliveryOrderItems).omit({ id: true, createdAt: true });
 export type InsertDeliveryOrderItem = z.infer<typeof insertDeliveryOrderItemSchema>;
@@ -310,6 +318,9 @@ export const purchaseOrders = pgTable("purchase_orders", {
   paymentRemarks: text("payment_remarks"),
 }, (table) => ({
   poStatusIdx: index("purchase_orders_status_idx").on(table.status),
+  poOrderDateIdx: index("purchase_orders_order_date_idx").on(table.orderDate),
+  poSupplierIdx: index("purchase_orders_supplier_id_idx").on(table.supplierId),
+  poPaymentStatusIdx: index("purchase_orders_payment_status_idx").on(table.paymentStatus),
 }));
 
 // Purchase Order Items table
@@ -325,7 +336,9 @@ export const purchaseOrderItems = pgTable("purchase_order_items", {
   descriptionOverride: text("description_override"),
   sizeOverride: text("size_override"),
   createdAt: timestamp("created_at").defaultNow().notNull(),
-});
+}, (table) => ({
+  poItemsPoIdx: index("purchase_order_items_po_id_idx").on(table.poId),
+}));
 
 // Quotations table
 export const quotations = pgTable("quotations", {
@@ -362,7 +375,9 @@ export const quotationItems = pgTable("quotation_items", {
   vatRate: decimal("vat_rate", { precision: 5, scale: 2 }).default("0.00"),
   lineTotal: decimal("line_total", { precision: 10, scale: 2 }).notNull(),
   createdAt: timestamp("created_at").defaultNow().notNull(),
-});
+}, (table) => ({
+  quotationItemsQuoteIdx: index("quotation_items_quote_id_idx").on(table.quoteId),
+}));
 
 // VAT Returns table
 export const vatReturns = pgTable("vat_returns", {
@@ -488,7 +503,9 @@ export const goodsReceipts = pgTable("goods_receipts", {
   createdBy: varchar("created_by").references(() => users.id).notNull(),
   createdAt: timestamp("created_at").defaultNow().notNull(),
   updatedAt: timestamp("updated_at").defaultNow().notNull(),
-});
+}, (table) => ({
+  grnPoIdx: index("goods_receipts_po_id_idx").on(table.poId),
+}));
 
 // Goods Receipt Items table
 export const goodsReceiptItems = pgTable("goods_receipt_items", {
@@ -500,7 +517,9 @@ export const goodsReceiptItems = pgTable("goods_receipt_items", {
   receivedQuantity: integer("received_quantity").notNull(),
   unitPrice: decimal("unit_price", { precision: 10, scale: 2 }).notNull(),
   createdAt: timestamp("created_at").defaultNow().notNull(),
-});
+}, (table) => ({
+  grnItemsReceiptIdx: index("goods_receipt_items_receipt_id_idx").on(table.receiptId),
+}));
 
 // Stock Movements table for tracking all stock changes
 export const stockMovements = pgTable("stock_movements", {
