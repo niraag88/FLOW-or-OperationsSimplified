@@ -249,8 +249,6 @@ function SalesPaymentsSection({ invoices, companySettings, canExport }) {
     invoice_number: r._ref,
     customer: r._customer,
     invoice_date: fmtDate(r._date),
-    currency: r._currency,
-    amount_orig: fmt(r._origAmount),
     amount_aed: `AED ${fmt(r._aed)}`,
     payment_status: r._paymentStatus === "paid" ? "Paid" : "Outstanding",
     payment_received_date: fmtDate(r._paymentDate),
@@ -278,8 +276,6 @@ function SalesPaymentsSection({ invoices, companySettings, canExport }) {
                 invoice_number: "Invoice #",
                 customer: "Customer",
                 invoice_date: "Invoice Date",
-                currency: "Currency",
-                amount_orig: "Amount (Orig Currency)",
                 amount_aed: "Amount (AED)",
                 payment_status: "Payment Status",
                 payment_received_date: "Payment Received Date",
@@ -297,8 +293,6 @@ function SalesPaymentsSection({ invoices, companySettings, canExport }) {
               <TableHead className="font-semibold">Invoice #</TableHead>
               <TableHead className="font-semibold">Customer</TableHead>
               <TableHead className="font-semibold">Invoice Date</TableHead>
-              <TableHead className="font-semibold">Currency</TableHead>
-              <TableHead className="font-semibold text-right">Amount (Orig)</TableHead>
               <TableHead className="font-semibold text-right">Amount (AED)</TableHead>
               <TableHead className="font-semibold">Payment Status</TableHead>
               <TableHead className="font-semibold">Received Date</TableHead>
@@ -308,7 +302,7 @@ function SalesPaymentsSection({ invoices, companySettings, canExport }) {
           <TableBody>
             {filtered.length === 0 ? (
               <TableRow>
-                <TableCell colSpan={9} className="text-center py-10 text-gray-400">
+                <TableCell colSpan={7} className="text-center py-10 text-gray-400">
                   No invoices match the current filters
                 </TableCell>
               </TableRow>
@@ -318,10 +312,6 @@ function SalesPaymentsSection({ invoices, companySettings, canExport }) {
                   <TableCell className="font-medium text-blue-700">{r._ref}</TableCell>
                   <TableCell>{r._customer}</TableCell>
                   <TableCell className="text-gray-600">{fmtDate(r._date)}</TableCell>
-                  <TableCell>
-                    <Badge variant="outline" className="text-xs">{r._currency}</Badge>
-                  </TableCell>
-                  <TableCell className="text-right font-medium">{r._currency} {fmt(r._origAmount)}</TableCell>
                   <TableCell className="text-right font-medium">AED {fmt(r._aed)}</TableCell>
                   <TableCell><PaymentStatusBadge status={r._paymentStatus} /></TableCell>
                   <TableCell className="text-gray-600">{fmtDate(r._paymentDate)}</TableCell>
@@ -431,7 +421,7 @@ function PurchasesPaymentsSection({ purchaseOrders, suppliers, companySettings, 
                 supplier: "Supplier",
                 order_date: "Order Date",
                 currency: "Currency",
-                amount_orig: "Amount (Orig Currency)",
+                amount_orig: "Amount (Original Currency)",
                 amount_aed: "Amount (AED)",
                 payment_status: "Payment Status",
                 payment_made_date: "Payment Made Date",
@@ -450,7 +440,7 @@ function PurchasesPaymentsSection({ purchaseOrders, suppliers, companySettings, 
               <TableHead className="font-semibold">Supplier</TableHead>
               <TableHead className="font-semibold">Order Date</TableHead>
               <TableHead className="font-semibold">Currency</TableHead>
-              <TableHead className="font-semibold text-right">Amount (Orig)</TableHead>
+              <TableHead className="font-semibold text-right">Amount (Original)</TableHead>
               <TableHead className="font-semibold text-right">Amount (AED)</TableHead>
               <TableHead className="font-semibold">Payment Status</TableHead>
               <TableHead className="font-semibold">Payment Date</TableHead>
