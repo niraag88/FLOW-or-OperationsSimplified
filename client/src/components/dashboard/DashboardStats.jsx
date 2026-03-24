@@ -77,8 +77,16 @@ export default function DashboardStats({ data }) {
     }
   ].map(s => ({ ...s, ...computeChange(s.items) }));
 
-  const invoicePayment = data.summary?.invoicePayment || { outstanding: 0, paid: 0 };
-  const poPayment = data.summary?.poPayment || { outstanding: 0, paid: 0 };
+  const invoicePayment = (() => {
+    const invoices = data.invoices || [];
+    const paid = invoices.filter(i => (i.paymentStatus || i.payment_status) === 'paid').length;
+    return { paid, outstanding: invoices.length - paid };
+  })();
+  const poPayment = (() => {
+    const pos = data.purchaseOrders || [];
+    const paid = pos.filter(p => (p.paymentStatus || p.payment_status) === 'paid').length;
+    return { paid, outstanding: pos.length - paid };
+  })();
 
   return (
     <div className="space-y-4">
