@@ -243,6 +243,7 @@ export class BusinessStorage {
       paymentStatus: purchaseOrders.paymentStatus,
       paymentMadeDate: purchaseOrders.paymentMadeDate,
       paymentRemarks: purchaseOrders.paymentRemarks,
+      supplierScanKey: purchaseOrders.supplierScanKey,
       supplierName: suppliers.name,
       brandName: suppliers.name,
       lineItems: sql<number>`coalesce(${itemsAgg.lineItems}, 0)`.as('lineItems'),

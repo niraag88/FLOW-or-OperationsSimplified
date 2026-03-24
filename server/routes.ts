@@ -1911,6 +1911,44 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  // PATCH /api/purchase-orders/:id/scan-key - Link supplier invoice attachment
+  app.patch('/api/purchase-orders/:id/scan-key', requireAuth(['Admin', 'Manager', 'Staff']), async (req: AuthenticatedRequest, res) => {
+    try {
+      const id = parseInt(req.params.id);
+      const { scanKey } = req.body;
+      if (!scanKey || typeof scanKey !== 'string') {
+        return res.status(400).json({ error: 'scanKey is required' });
+      }
+      const [updated] = await db
+        .update(purchaseOrders)
+        .set({ supplierScanKey: scanKey, updatedAt: new Date() })
+        .where(eq(purchaseOrders.id, id))
+        .returning();
+      if (!updated) return res.status(404).json({ error: 'Purchase order not found' });
+      res.json(updated);
+    } catch (error) {
+      console.error('Error saving PO scan key:', error);
+      res.status(500).json({ error: 'Failed to save file' });
+    }
+  });
+
+  // DELETE /api/purchase-orders/:id/scan-key - Remove supplier invoice attachment
+  app.delete('/api/purchase-orders/:id/scan-key', requireAuth(['Admin', 'Manager', 'Staff']), async (req: AuthenticatedRequest, res) => {
+    try {
+      const id = parseInt(req.params.id);
+      const [updated] = await db
+        .update(purchaseOrders)
+        .set({ supplierScanKey: null, updatedAt: new Date() })
+        .where(eq(purchaseOrders.id, id))
+        .returning();
+      if (!updated) return res.status(404).json({ error: 'Purchase order not found' });
+      res.json(updated);
+    } catch (error) {
+      console.error('Error removing PO scan key:', error);
+      res.status(500).json({ error: 'Failed to remove file' });
+    }
+  });
+
   // PATCH /api/purchase-orders/:id/payment - Update payment status
   app.patch('/api/purchase-orders/:id/payment', requireAuth(['Admin', 'Manager', 'Staff']), async (req: AuthenticatedRequest, res) => {
     try {

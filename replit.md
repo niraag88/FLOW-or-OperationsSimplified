@@ -2,6 +2,16 @@
 
 This is a full-stack web application built with a React frontend and Express.js backend, designed as FLOW - a UAE business operations platform (AED currency, 5% VAT). The application features a modern UI built with shadcn/ui components and Tailwind CSS, with PostgreSQL database integration using Drizzle ORM.
 
+## Schema Changes (Task #83)
+- **purchase_orders** table: Added `supplier_scan_key` (text) column via direct SQL. Schema updated in `shared/schema.ts` with `supplierScanKey` field. `getPurchaseOrders()` in `server/businessStorage.ts` now includes this field in explicit SELECT.
+- **API routes**: Added `PATCH /api/purchase-orders/:id/scan-key` and `DELETE /api/purchase-orders/:id/scan-key` routes for attaching/removing supplier invoice documents.
+- **POActionsDropdown.jsx**: Added "Attach Supplier Invoice", "View Supplier Invoice", "Remove Supplier Invoice" actions. Upload uses `UploadFileDialog` with `maxSizeMB=2` (2 MB limit).
+- **UploadFileDialog.jsx**: Parameterized `maxSizeMB` prop (default 25). Previously hardcoded to 25MB.
+- **POList.jsx**: PO Number column now shows blue paperclip icon when supplier invoice is attached, and amber triangle icon when closed PO has short delivery (received < ordered). Uses `Tooltip` for both icons.
+- **POForm.jsx**: When viewing a closed PO, a "Delivery Reconciliation" panel appears below totals showing Ordered / Received / Difference amounts per item. Panel is green for full delivery, amber for short delivery. Items now include `receivedQuantity` when loaded.
+- **MarkPOPaidDialog.jsx**: Fetches PO items on open and shows a reconciliation summary (ordered vs reconciled payable amount) when the PO has GRN receipts. Shows "Short Delivery" warning when applicable.
+- **GoodsReceiptsTab.jsx**: "Partial" badge (amber with ⚠ icon) now appears in the Received column for closed POs where received < ordered in both the render helper and the inline closed POs table.
+
 ## Schema Changes (Task #49)
 - **products** table: Added `cost_price_currency` (text, default 'GBP') column via direct SQL. Schema updated in `shared/schema.ts` with `costPriceCurrency` field. `insertProductSchema` includes `costPriceCurrency`. `getProducts()` and `getProductById()` in `server/businessStorage.ts` include this field.
 - **AddProduct.jsx** and **EditProduct.jsx**: Currency selector for purchase price now supports AED/GBP/USD/INR (all `SUPPORTED_CURRENCIES`). `costPriceCurrency` is saved to DB and loaded back when editing. Profitability check only runs when both prices share the same currency.

@@ -8,19 +8,22 @@ import {
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
 import { Button } from "@/components/ui/button";
-import { MoreHorizontal, Edit2, Download, Trash2, Eye, CheckCircle, RotateCcw } from "lucide-react";
+import { MoreHorizontal, Edit2, Download, Trash2, Eye, CheckCircle, RotateCcw, Upload, Paperclip, X } from "lucide-react";
 import { useToast } from "@/components/ui/use-toast";
-import { exportToXLSX, exportPurchaseOrderToPDF } from "../utils/export";
+import { exportToXLSX } from "../utils/export";
 import { format } from 'date-fns';
 import { PurchaseOrder } from "@/api/entities";
 import { User } from "@/api/entities";
 import SimpleConfirmDialog from "../common/SimpleConfirmDialog";
 import MarkPOPaidDialog from "./MarkPOPaidDialog";
+import UploadFileDialog from "../common/UploadFileDialog";
 
 export default function POActionsDropdown({ po, canEdit, onEdit, onRefresh }) {
   const { toast } = useToast();
   const [showDeleteDialog, setShowDeleteDialog] = useState(false);
   const [showMarkPaidDialog, setShowMarkPaidDialog] = useState(false);
+  const [showUploadDialog, setShowUploadDialog] = useState(false);
+  const [showRemoveFileDialog, setShowRemoveFileDialog] = useState(false);
   const [currentUser, setCurrentUser] = useState(null);
 
   React.useEffect(() => {
@@ -49,7 +52,7 @@ export default function POActionsDropdown({ po, canEdit, onEdit, onRefresh }) {
         'PO Number': po.poNumber,
         'Order Date': format(new Date(po.orderDate), 'yyyy-MM-dd'),
         'Expected Delivery': po.expectedDelivery ? format(new Date(po.expectedDelivery), 'yyyy-MM-dd') : '',
-        'Currency': 'GBP',
+        'Currency': po.currency || 'GBP',
         'Status': po.status
       });
 
@@ -81,7 +84,7 @@ export default function POActionsDropdown({ po, canEdit, onEdit, onRefresh }) {
         'Product Code': '',
         'Description': '',
         'Quantity': '',
-        'Unit Price': 'TOTAL (GBP):',
+        'Unit Price': `TOTAL (${po.currency || 'GBP'}):`,
         'Line Total': parseFloat(po.totalAmount || 0).toFixed(2)
       });
       
@@ -136,7 +139,69 @@ export default function POActionsDropdown({ po, canEdit, onEdit, onRefresh }) {
     }
   };
 
+  const handleUploadSuccess = async (storageKey) => {
+    try {
+      const res = await fetch(`/api/purchase-orders/${po.id}/scan-key`, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ scanKey: storageKey }),
+        credentials: 'include',
+      });
+      if (!res.ok) {
+        const data = await res.json().catch(() => ({}));
+        throw new Error(data.error || 'Failed to link file to purchase order');
+      }
+      onRefresh();
+    } catch (error) {
+      console.error('Error saving scan key:', error);
+      toast({
+        title: 'Warning',
+        description: 'File uploaded but failed to link it to the purchase order.',
+        variant: 'destructive'
+      });
+    }
+  };
+
+  const handleViewFile = async () => {
+    const scanKey = po.supplierScanKey;
+    if (!scanKey) return;
+    try {
+      const res = await fetch(`/api/storage/signed-get?key=${encodeURIComponent(scanKey)}`, {
+        credentials: 'include',
+      });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error || 'Failed to get download link');
+      window.open(data.url, '_blank');
+    } catch (error) {
+      console.error('Error viewing file:', error);
+      toast({
+        title: 'Error',
+        description: 'Could not retrieve the file. Please try again.',
+        variant: 'destructive'
+      });
+    }
+  };
+
+  const handleRemoveFile = async () => {
+    try {
+      const res = await fetch(`/api/purchase-orders/${po.id}/scan-key`, {
+        method: 'DELETE',
+        credentials: 'include',
+      });
+      if (!res.ok) {
+        const data = await res.json().catch(() => ({}));
+        throw new Error(data.error || 'Failed to remove file');
+      }
+      toast({ title: 'File Removed', description: 'The supplier invoice has been removed.' });
+      onRefresh();
+    } catch (error) {
+      console.error('Error removing file:', error);
+      toast({ title: 'Error', description: 'Could not remove the file. Please try again.', variant: 'destructive' });
+    }
+  };
+
   const poNumber = po.poNumber || po.po_number || `po-${po.id}`;
+  const hasSupplierScanKey = !!po.supplierScanKey;
 
   return (
     <>
@@ -174,6 +239,26 @@ export default function POActionsDropdown({ po, canEdit, onEdit, onRefresh }) {
             </DropdownMenuItem>
           )}
           <DropdownMenuSeparator />
+          <DropdownMenuItem onClick={() => setShowUploadDialog(true)}>
+            <Upload className="w-4 h-4 mr-2" />
+            Attach Supplier Invoice
+          </DropdownMenuItem>
+          {hasSupplierScanKey && (
+            <>
+              <DropdownMenuItem onClick={handleViewFile}>
+                <Paperclip className="w-4 h-4 mr-2" />
+                View Supplier Invoice
+              </DropdownMenuItem>
+              <DropdownMenuItem
+                onClick={() => setShowRemoveFileDialog(true)}
+                className="text-orange-600 focus:text-orange-600"
+              >
+                <X className="w-4 h-4 mr-2" />
+                Remove Supplier Invoice
+              </DropdownMenuItem>
+            </>
+          )}
+          <DropdownMenuSeparator />
           <DropdownMenuItem 
             onClick={() => setShowDeleteDialog(true)}
             className="text-red-600 focus:text-red-600"
@@ -198,6 +283,24 @@ export default function POActionsDropdown({ po, canEdit, onEdit, onRefresh }) {
         description={`Do you wish to confirm deleting Purchase Order "${poNumber}"? It will be moved to the recycle bin.`}
         confirmText="Yes, Delete"
         confirmVariant="destructive"
+      />
+      <SimpleConfirmDialog
+        open={showRemoveFileDialog}
+        onClose={() => setShowRemoveFileDialog(false)}
+        onConfirm={handleRemoveFile}
+        title="Remove Supplier Invoice"
+        description={`Remove the uploaded supplier invoice from PO "${poNumber}"? The file will be permanently deleted.`}
+        confirmText="Yes, Remove"
+        confirmVariant="destructive"
+      />
+      <UploadFileDialog
+        open={showUploadDialog}
+        onClose={() => setShowUploadDialog(false)}
+        onSuccess={handleUploadSuccess}
+        recordType="purchase-orders"
+        recordId={po.id}
+        documentNumber={poNumber}
+        maxSizeMB={2}
       />
     </>
   );

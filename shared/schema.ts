@@ -310,6 +310,7 @@ export const purchaseOrders = pgTable("purchase_orders", {
   currency: text("currency").default("GBP"),
   fxRateToAed: decimal("fx_rate_to_aed", { precision: 8, scale: 4 }).default("4.8500"),
   objectKey: text("object_key"), // Storage key for uploaded PDF
+  supplierScanKey: text("supplier_scan_key"), // Storage key for supplier's invoice document
   createdBy: varchar("created_by").references(() => users.id).notNull(),
   createdAt: timestamp("created_at").defaultNow().notNull(),
   updatedAt: timestamp("updated_at").defaultNow().notNull(),

@@ -5,7 +5,7 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import { ShoppingCart, CheckCircle2, Package, Truck, MoreHorizontal, XCircle, ChevronDown, ChevronRight, Eye, Download, Trash2, FileText, FileSpreadsheet } from "lucide-react";
+import { ShoppingCart, CheckCircle2, Package, Truck, MoreHorizontal, XCircle, ChevronDown, ChevronRight, Eye, Download, Trash2, FileText, FileSpreadsheet, AlertTriangle } from "lucide-react";
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -288,7 +288,17 @@ export default function GoodsReceiptsTab({
             <TableCell className="w-[110px]">AED {parseFloat(po.grandTotal || 0).toFixed(2)}</TableCell>
             <TableCell className="w-[90px]">{getLineItemsCount(po)}</TableCell>
             <TableCell className="w-[80px]">{getTotalOrderedQuantity(po)}</TableCell>
-            <TableCell className="w-[80px]">{getTotalReceivedQuantity(po)}</TableCell>
+            <TableCell className="w-[80px]">
+              <div className="flex items-center gap-1">
+                <span>{getTotalReceivedQuantity(po)}</span>
+                {isClosedSection && getTotalOrderedQuantity(po) > 0 && getTotalReceivedQuantity(po) < getTotalOrderedQuantity(po) && (
+                  <span className="inline-flex items-center gap-0.5 text-xs font-medium text-amber-700 bg-amber-50 border border-amber-200 rounded px-1 py-0.5">
+                    <AlertTriangle className="w-3 h-3" />
+                    Partial
+                  </span>
+                )}
+              </div>
+            </TableCell>
             <TableCell className="w-[90px]">
               <Badge 
                 variant="outline" 
@@ -865,7 +875,17 @@ export default function GoodsReceiptsTab({
                           <td className="p-2 align-middle" style={{width: '110px'}}>AED {parseFloat(po.grandTotal || 0).toFixed(2)}</td>
                           <td className="p-2 align-middle" style={{width: '90px'}}>{getLineItemsCount(po)}</td>
                           <td className="p-2 align-middle" style={{width: '80px'}}>{getTotalOrderedQuantity(po)}</td>
-                          <td className="p-2 align-middle" style={{width: '80px'}}>{getTotalReceivedQuantity(po)}</td>
+                          <td className="p-2 align-middle" style={{width: '80px'}}>
+                            <div className="flex items-center gap-1 flex-wrap">
+                              <span>{getTotalReceivedQuantity(po)}</span>
+                              {getTotalOrderedQuantity(po) > 0 && getTotalReceivedQuantity(po) < getTotalOrderedQuantity(po) && (
+                                <span className="inline-flex items-center gap-0.5 text-xs font-medium text-amber-700 bg-amber-50 border border-amber-200 rounded px-1 py-0.5">
+                                  <AlertTriangle className="w-3 h-3" />
+                                  Partial
+                                </span>
+                              )}
+                            </div>
+                          </td>
                           <td className="p-2 align-middle" style={{width: '90px'}}>
                             <Badge 
                               variant="outline" 

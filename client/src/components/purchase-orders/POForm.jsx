@@ -13,7 +13,7 @@ import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
-import { Plus, Trash2 } from "lucide-react";
+import { Plus, Trash2, PackageCheck, AlertTriangle } from "lucide-react";
 import { Supplier } from "@/api/entities";
 import { Product } from "@/api/entities";
 import { PurchaseOrder } from "@/api/entities";
@@ -116,6 +116,7 @@ export default function POForm({ open, onClose, editingPO, currentUser, onSucces
             productName: item.productName || "",
             size: item.size || "",
             quantity: item.quantity || 0,
+            receivedQuantity: item.receivedQuantity ?? 0,
             unitPrice: parseFloat(item.unitPrice) || 0,
             lineTotal: parseFloat(item.lineTotal) || 0
           }));
@@ -313,6 +314,14 @@ export default function POForm({ open, onClose, editingPO, currentUser, onSucces
   const fxRate = parseFloat(formData.fxRateToAed) || 4.85;
   const totalInCurrency = parseFloat(formData.totalAmount) || 0;
   const totalAed = currency === 'AED' ? totalInCurrency : totalInCurrency * fxRate;
+
+  // Reconciliation: only when editing a closed PO with items that have received quantities
+  const showReconciliation = editingPO && editingPO.status === 'closed' && formData.items.length > 0;
+  const reconciledTotal = formData.items.reduce((sum, item) => {
+    return sum + ((item.receivedQuantity ?? 0) * (parseFloat(item.unitPrice) || 0));
+  }, 0);
+  const reconciledAed = currency === 'AED' ? reconciledTotal : reconciledTotal * fxRate;
+  const isShortDelivery = reconciledTotal < totalInCurrency - 0.001;
 
   return (
     <Dialog open={open} onOpenChange={onClose}>
@@ -584,6 +593,72 @@ export default function POForm({ open, onClose, editingPO, currentUser, onSucces
               </div>
             </div>
           </div>
+
+          {/* Reconciliation panel — only shown for closed POs */}
+          {showReconciliation && (
+            <div className={`rounded-lg border p-4 space-y-3 ${isShortDelivery ? 'border-amber-200 bg-amber-50' : 'border-green-200 bg-green-50'}`}>
+              <div className="flex items-center gap-2">
+                {isShortDelivery ? (
+                  <AlertTriangle className="w-4 h-4 text-amber-600" />
+                ) : (
+                  <PackageCheck className="w-4 h-4 text-green-600" />
+                )}
+                <span className={`text-sm font-semibold ${isShortDelivery ? 'text-amber-800' : 'text-green-800'}`}>
+                  Delivery Reconciliation
+                </span>
+                {isShortDelivery && (
+                  <span className="ml-auto text-xs font-medium bg-amber-100 text-amber-800 border border-amber-300 rounded-full px-2 py-0.5">
+                    Short Delivery
+                  </span>
+                )}
+              </div>
+              <div className="grid grid-cols-3 gap-3 text-sm">
+                <div className="text-center p-2 bg-white rounded border">
+                  <p className="text-xs text-gray-500 mb-1">Ordered</p>
+                  <p className="font-semibold text-gray-900">{formatCurrency(totalInCurrency, currency)}</p>
+                  {currency !== 'AED' && <p className="text-xs text-gray-500">{formatCurrency(totalAed, 'AED')}</p>}
+                </div>
+                <div className="text-center p-2 bg-white rounded border">
+                  <p className="text-xs text-gray-500 mb-1">Received</p>
+                  <p className={`font-semibold ${isShortDelivery ? 'text-amber-700' : 'text-green-700'}`}>
+                    {formatCurrency(reconciledTotal, currency)}
+                  </p>
+                  {currency !== 'AED' && <p className="text-xs text-gray-500">{formatCurrency(reconciledAed, 'AED')}</p>}
+                </div>
+                <div className="text-center p-2 bg-white rounded border">
+                  <p className="text-xs text-gray-500 mb-1">Difference</p>
+                  <p className={`font-semibold ${isShortDelivery ? 'text-red-600' : 'text-green-700'}`}>
+                    {isShortDelivery ? '-' : ''}{formatCurrency(Math.abs(totalInCurrency - reconciledTotal), currency)}
+                  </p>
+                  {currency !== 'AED' && (
+                    <p className="text-xs text-gray-500">{isShortDelivery ? '-' : ''}{formatCurrency(Math.abs(totalAed - reconciledAed), 'AED')}</p>
+                  )}
+                </div>
+              </div>
+              {formData.items.some(i => (i.receivedQuantity ?? 0) > 0) && (
+                <div className="text-xs text-gray-600 border-t pt-2">
+                  <div className="grid grid-cols-4 gap-1 font-medium text-gray-500 mb-1">
+                    <span>Product</span>
+                    <span className="text-right">Ordered</span>
+                    <span className="text-right">Received</span>
+                    <span className="text-right">Payable</span>
+                  </div>
+                  {formData.items.map((item, i) => {
+                    const payable = (item.receivedQuantity ?? 0) * (parseFloat(item.unitPrice) || 0);
+                    const isItemShort = (item.receivedQuantity ?? 0) < item.quantity;
+                    return (
+                      <div key={i} className="grid grid-cols-4 gap-1 py-0.5">
+                        <span className="truncate">{item.productName || item.productSku}</span>
+                        <span className="text-right">{item.quantity}</span>
+                        <span className={`text-right font-medium ${isItemShort ? 'text-amber-700' : ''}`}>{item.receivedQuantity ?? 0}</span>
+                        <span className="text-right">{formatCurrency(payable, currency)}</span>
+                      </div>
+                    );
+                  })}
+                </div>
+              )}
+            </div>
+          )}
 
           {/* Notes */}
           <div className="space-y-2">

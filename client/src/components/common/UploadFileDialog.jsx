@@ -17,8 +17,6 @@ const ALLOWED_TYPES = {
   'image/png': { ext: 'png', label: 'PNG' },
 };
 
-const MAX_SIZE_BYTES = 25 * 1024 * 1024;
-
 function getFileExtension(mimeType) {
   return ALLOWED_TYPES[mimeType]?.ext || 'pdf';
 }
@@ -30,12 +28,14 @@ function buildStorageKey(recordType, documentNumber, file) {
   return `${recordType}/${year}/${safeName}-attachment.${ext}`;
 }
 
-export default function UploadFileDialog({ open, onClose, onSuccess, recordType, recordId, documentNumber }) {
+export default function UploadFileDialog({ open, onClose, onSuccess, recordType, recordId, documentNumber, maxSizeMB = 25 }) {
   const { toast } = useToast();
   const [selectedFile, setSelectedFile] = useState(null);
   const [uploading, setUploading] = useState(false);
   const [error, setError] = useState('');
   const inputRef = useRef(null);
+
+  const maxSizeBytes = maxSizeMB * 1024 * 1024;
 
   const handleFileChange = (e) => {
     const file = e.target.files?.[0];
@@ -47,8 +47,8 @@ export default function UploadFileDialog({ open, onClose, onSuccess, recordType,
       setSelectedFile(null);
       return;
     }
-    if (file.size > MAX_SIZE_BYTES) {
-      setError('File must be 25 MB or smaller.');
+    if (file.size > maxSizeBytes) {
+      setError(`File must be ${maxSizeMB} MB or smaller.`);
       setSelectedFile(null);
       return;
     }
@@ -125,7 +125,7 @@ export default function UploadFileDialog({ open, onClose, onSuccess, recordType,
           >
             <Upload className="w-8 h-8 mx-auto mb-2 text-gray-400" />
             <p className="text-sm text-gray-600">Click to select a file</p>
-            <p className="text-xs text-gray-400 mt-1">PDF, JPG, PNG — max 25 MB</p>
+            <p className="text-xs text-gray-400 mt-1">PDF, JPG, PNG — max {maxSizeMB} MB</p>
             <input
               ref={inputRef}
               type="file"

@@ -3,7 +3,7 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
-import { ShoppingCart, Info, Pencil } from "lucide-react";
+import { ShoppingCart, Info, Pencil, Paperclip, AlertTriangle } from "lucide-react";
 import { Skeleton } from "@/components/ui/skeleton";
 import { formatDate } from "@/utils/dateUtils";
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
@@ -36,6 +36,13 @@ export default function POList({ purchaseOrders, totalCount, loading, canEdit, c
     if (currency === 'AED') return amount;
     const rate = parseFloat(po.fxRateToAed) || 4.85;
     return amount * rate;
+  };
+
+  const isShortDelivered = (po) => {
+    if (po.status !== 'closed') return false;
+    const ordered = Number(po.orderedQty) || 0;
+    const received = Number(po.receivedQty) || 0;
+    return ordered > 0 && received < ordered;
   };
 
   const handleReceiveGoods = (po) => {
@@ -118,7 +125,31 @@ export default function POList({ purchaseOrders, totalCount, loading, canEdit, c
 
                   return (
                     <TableRow key={po.id} className="hover:bg-gray-50">
-                      <TableCell className="font-medium">{po.poNumber}</TableCell>
+                      <TableCell className="font-medium">
+                        <div className="flex items-center gap-1.5">
+                          <span>{po.poNumber}</span>
+                          {po.supplierScanKey && (
+                            <Tooltip>
+                              <TooltipTrigger asChild>
+                                <Paperclip className="w-3.5 h-3.5 text-blue-500 shrink-0" />
+                              </TooltipTrigger>
+                              <TooltipContent side="top">
+                                <p className="text-xs">Supplier invoice attached</p>
+                              </TooltipContent>
+                            </Tooltip>
+                          )}
+                          {isShortDelivered(po) && (
+                            <Tooltip>
+                              <TooltipTrigger asChild>
+                                <AlertTriangle className="w-3.5 h-3.5 text-amber-500 shrink-0" />
+                              </TooltipTrigger>
+                              <TooltipContent side="top">
+                                <p className="text-xs">Short delivery: {po.receivedQty}/{po.orderedQty} units received</p>
+                              </TooltipContent>
+                            </Tooltip>
+                          )}
+                        </div>
+                      </TableCell>
                       <TableCell>{getBrandName(po)}</TableCell>
                       <TableCell>{formatDate(po.orderDate)}</TableCell>
                       <TableCell>{formatCurrency(po.totalAmount || 0, currency)}</TableCell>
