@@ -1954,6 +1954,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
         id: deliveryOrderItems.id,
         productId: deliveryOrderItems.productId,
         brandId: deliveryOrderItems.brandId,
+        brandName: brands.name,
         productCode: deliveryOrderItems.productCode,
         description: deliveryOrderItems.description,
         productName: products.name,
@@ -1964,6 +1965,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
         lineTotal: deliveryOrderItems.lineTotal,
       }).from(deliveryOrderItems)
         .leftJoin(products, eq(products.id, deliveryOrderItems.productId))
+        .leftJoin(brands, eq(brands.id, deliveryOrderItems.brandId))
         .where(eq(deliveryOrderItems.doId, id));
 
       // All numeric fields returned as actual numbers to avoid string/number mismatch in forms
@@ -2001,6 +2003,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
           description: item.description || item.productName || '',
           size: item.productSize || '',
           brand_id: item.brandId,
+          brand_name: item.brandName || '',
           quantity: Number(item.quantity),
           unit_price: parseFloat(item.unitPrice) || 0,
           line_total: parseFloat(item.lineTotal) || 0,

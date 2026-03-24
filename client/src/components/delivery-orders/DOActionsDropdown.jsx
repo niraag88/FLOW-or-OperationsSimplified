@@ -40,10 +40,15 @@ export default function DOActionsDropdown({ doOrder, canEdit, onEdit, onRefresh 
 
   const handleExportXLSX = async () => {
     try {
-      await exportDeliveryOrderToXLSX(doOrder);
+      const response = await fetch(`/api/delivery-orders/${doOrder.id}`, { credentials: 'include' });
+      if (!response.ok) {
+        throw new Error('Failed to fetch delivery order details for export');
+      }
+      const fullDO = await response.json();
+      await exportDeliveryOrderToXLSX(fullDO);
       toast({
         title: 'Export Successful',
-        description: `Delivery Order ${doOrder.do_number} exported to Excel.`
+        description: `Delivery Order ${fullDO.do_number || doOrder.do_number} exported to Excel.`
       });
     } catch (error) {
       console.error('XLSX export error:', error);
