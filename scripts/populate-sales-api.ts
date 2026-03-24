@@ -429,14 +429,17 @@ async function reassignConvertedStatuses(
 
 // ─── 3. Direct invoices ───────────────────────────────────────────────────────
 
+// Valid invoice statuses (Task #73 fix): draft | submitted | delivered ONLY
+// Mapping from old invalid statuses: sent→submitted, paid→delivered, overdue→submitted
+//
 // Exact status pool sized to DIRECT_TARGET (300). No drafts.
 // Converted invoices provide: Draft=50, Submitted=25, Delivered=25
 // Direct invoices provide:    Submitted=175, Delivered=125
 // Grand total: Draft=50, Submitted=200, Delivered=150 = 400 ✓
 const INVOICE_STATUS_POOL: string[] = (() => {
   const pool = [
-    ...Array(175).fill('submitted'),
-    ...Array(125).fill('delivered'),
+    ...Array(175).fill('submitted'),  // previously 'sent' + 'overdue'
+    ...Array(125).fill('delivered'),  // previously 'paid'
   ];
   // Fisher-Yates shuffle for stable random ordering
   for (let i = pool.length - 1; i > 0; i--) {
