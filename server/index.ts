@@ -6,7 +6,9 @@ import { setupVite, serveStatic, log } from "./vite";
 import { pool } from "./db";
 
 const app = express();
-app.use(helmet());
+app.use(helmet({
+  contentSecurityPolicy: process.env.NODE_ENV === 'production',
+}));
 app.use(express.json());
 app.use(express.urlencoded({ extended: false }));
 
