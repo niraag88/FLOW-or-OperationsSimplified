@@ -6,7 +6,7 @@ import { Input } from "@/components/ui/input";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Plus, Search } from "lucide-react";
-import { PurchaseOrder, Product } from "@/api/entities";
+import { PurchaseOrder } from "@/api/entities";
 import POList from "../components/purchase-orders/POList";
 import POForm from "../components/purchase-orders/POForm";
 import GoodsReceiptsTab from "../components/purchase-orders/GoodsReceiptsTab"; // Changed import
@@ -18,7 +18,6 @@ export default function PurchaseOrders() {
   const [purchaseOrders, setPurchaseOrders] = useState([]);
   const [allPOs, setAllPOs] = useState([]);
   const [goodsReceipts, setGoodsReceipts] = useState([]);
-  const [products, setProducts] = useState([]); // Added products state
   const [loading, setLoading] = useState(true);
   const [searchTerm, setSearchTerm] = useState("");
   const [activeTab, setActiveTab] = useState("purchase-orders");
@@ -31,6 +30,7 @@ export default function PurchaseOrders() {
   });
   const [refreshTrigger, setRefreshTrigger] = useState(0);
   const [financialYears, setFinancialYears] = useState([]);
+  const [financialYearsLoaded, setFinancialYearsLoaded] = useState(false);
   const hasFetchedPOsRef = useRef(false);
 
   // Pagination state
@@ -40,19 +40,13 @@ export default function PurchaseOrders() {
   const [debouncedSearch, setDebouncedSearch] = useState("");
 
   useEffect(() => {
-    const loadSupporting = async () => {
-      try {
-        const [productsData, booksData] = await Promise.all([
-          Product.list(),
-          fetch('/api/books', { credentials: 'include' }).then(r => r.ok ? r.json() : []).catch(() => []),
-        ]);
-        setProducts(productsData);
-        setFinancialYears(booksData);
-      } catch (error) {
-        console.error("Error loading supporting data:", error);
-      }
-    };
-    loadSupporting();
+    fetch('/api/books', { credentials: 'include' })
+      .then(r => r.ok ? r.json() : [])
+      .catch(() => [])
+      .then(data => {
+        setFinancialYears(data);
+        setFinancialYearsLoaded(true);
+      });
   }, []);
 
   const fetchGoodsReceipts = () => {
@@ -103,6 +97,7 @@ export default function PurchaseOrders() {
   }, [searchTerm]);
 
   useEffect(() => {
+    if (!financialYearsLoaded) return;
     const params = new URLSearchParams();
     const isAll = itemsPerPage === 9999;
     if (!isAll) {
@@ -137,7 +132,7 @@ export default function PurchaseOrders() {
       })
       .catch(err => console.error('Error loading purchase orders:', err))
       .finally(() => setLoading(false));
-  }, [currentPage, itemsPerPage, debouncedSearch, filters, financialYears, refreshTrigger]);
+  }, [financialYearsLoaded, currentPage, itemsPerPage, debouncedSearch, filters, financialYears, refreshTrigger]);
 
   const handleRefresh = () => {
     setRefreshTrigger(prev => prev + 1);
@@ -412,7 +407,6 @@ export default function PurchaseOrders() {
         <TabsContent value="goods-receipts" className="mt-6">
           <GoodsReceiptsTab 
             purchaseOrders={allPOs}
-            products={products}
             goodsReceipts={goodsReceipts}
             loading={loading}
             canEdit={canEdit}

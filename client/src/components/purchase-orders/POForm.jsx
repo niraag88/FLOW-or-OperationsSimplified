@@ -135,29 +135,11 @@ export default function POForm({ open, onClose, editingPO, currentUser, onSucces
 
   const generatePONumber = async () => {
     try {
-      const response = await fetch('/api/purchase-orders');
-      const existingPOs = await response.json();
-      
-      const currentYear = new Date().getFullYear();
-      const currentYearPOs = existingPOs.filter(po => 
-        po.poNumber && po.poNumber.startsWith(`PO-${currentYear}`)
-      );
-      
-      let nextNumber = 1;
-      if (currentYearPOs.length > 0) {
-        const sequenceNumbers = currentYearPOs.map(po => {
-          const match = po.poNumber.match(/PO-\d{4}-(\d{3})/);
-          return match ? parseInt(match[1]) : 0;
-        });
-        nextNumber = Math.max(...sequenceNumbers) + 1;
-      }
-      
-      const poNumber = `PO-${currentYear}-${nextNumber.toString().padStart(3, '0')}`;
-      setFormData(prev => ({ ...prev, poNumber }));
+      const response = await fetch('/api/purchase-orders/next-number', { credentials: 'include' });
+      const { nextNumber } = await response.json();
+      setFormData(prev => ({ ...prev, poNumber: nextNumber }));
     } catch (error) {
       console.error("Error generating PO number:", error);
-      const poNumber = `PO-${new Date().getFullYear()}-001`;
-      setFormData(prev => ({ ...prev, poNumber }));
     }
   };
 

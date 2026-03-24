@@ -2604,6 +2604,9 @@ export async function registerRoutes(app: Express): Promise<Server> {
         receivedDate: goodsReceipts.receivedDate,
         status: goodsReceipts.status,
         notes: goodsReceipts.notes,
+        scanKey1: goodsReceipts.scanKey1,
+        scanKey2: goodsReceipts.scanKey2,
+        scanKey3: goodsReceipts.scanKey3,
         createdAt: goodsReceipts.createdAt,
         poNumber: purchaseOrders.poNumber,
         supplierName: suppliers.name,
@@ -2648,6 +2651,64 @@ export async function registerRoutes(app: Express): Promise<Server> {
     } catch (error) {
       console.error('Error fetching goods receipts:', error);
       res.status(500).json({ error: 'Failed to fetch goods receipts' });
+    }
+  });
+
+  // PATCH /api/goods-receipts/:id/scan-key - Attach a document to a GRN slot (1, 2, or 3)
+  app.patch('/api/goods-receipts/:id/scan-key', requireAuth(['Admin', 'Manager', 'Staff']), async (req: AuthenticatedRequest, res) => {
+    try {
+      const id = parseInt(req.params.id);
+      const { scanKey, slot } = req.body;
+      if (!scanKey || typeof scanKey !== 'string') {
+        return res.status(400).json({ error: 'scanKey is required' });
+      }
+      const slotNum = parseInt(slot) || 1;
+      if (![1, 2, 3].includes(slotNum)) {
+        return res.status(400).json({ error: 'slot must be 1, 2, or 3' });
+      }
+      const colName = `scanKey${slotNum}` as 'scanKey1' | 'scanKey2' | 'scanKey3';
+      const [updated] = await db
+        .update(goodsReceipts)
+        .set({ [colName]: scanKey, updatedAt: new Date() })
+        .where(eq(goodsReceipts.id, id))
+        .returning();
+      if (!updated) return res.status(404).json({ error: 'Goods receipt not found' });
+      res.json(updated);
+    } catch (error) {
+      console.error('Error saving GRN scan key:', error);
+      res.status(500).json({ error: 'Failed to save document' });
+    }
+  });
+
+  // DELETE /api/goods-receipts/:id/scan-key/:slot - Remove a document from a GRN slot
+  app.delete('/api/goods-receipts/:id/scan-key/:slot', requireAuth(['Admin', 'Manager', 'Staff']), async (req: AuthenticatedRequest, res) => {
+    try {
+      const id = parseInt(req.params.id);
+      const slotNum = parseInt(req.params.slot);
+      if (![1, 2, 3].includes(slotNum)) {
+        return res.status(400).json({ error: 'slot must be 1, 2, or 3' });
+      }
+      const colName = `scanKey${slotNum}` as 'scanKey1' | 'scanKey2' | 'scanKey3';
+      const [current] = await db.select().from(goodsReceipts).where(eq(goodsReceipts.id, id));
+      if (!current) return res.status(404).json({ error: 'Goods receipt not found' });
+      const existingKey = current[colName];
+      if (existingKey) {
+        try {
+          await objectStorageClient.delete(existingKey);
+          await db.delete(storageObjects).where(eq(storageObjects.key, existingKey));
+        } catch (delErr) {
+          console.warn('Could not delete object from storage:', delErr);
+        }
+      }
+      const [updated] = await db
+        .update(goodsReceipts)
+        .set({ [colName]: null, updatedAt: new Date() })
+        .where(eq(goodsReceipts.id, id))
+        .returning();
+      res.json(updated);
+    } catch (error) {
+      console.error('Error removing GRN scan key:', error);
+      res.status(500).json({ error: 'Failed to remove document' });
     }
   });
 
@@ -3094,15 +3155,15 @@ export async function registerRoutes(app: Express): Promise<Server> {
         return res.status(400).json({ error: 'Only PDF, JPG, and PNG files are allowed' });
       }
 
-      // Validate file size — 2MB for purchase-order supplier invoices, 25MB elsewhere
-      const isPOUpload = storageKey.startsWith('purchase-orders/');
-      const maxSizeBytes = isPOUpload ? 2 * 1024 * 1024 : 25 * 1024 * 1024;
+      // Validate file size — 2MB for purchase-order and goods-receipts uploads, 25MB elsewhere
+      const isSmallUpload = storageKey.startsWith('purchase-orders/') || storageKey.startsWith('goods-receipts/');
+      const maxSizeBytes = isSmallUpload ? 2 * 1024 * 1024 : 25 * 1024 * 1024;
       if (fileSize > maxSizeBytes) {
-        return res.status(400).json({ error: `File size exceeds ${isPOUpload ? '2MB' : '25MB'} limit` });
+        return res.status(400).json({ error: `File size exceeds ${isSmallUpload ? '2MB' : '25MB'} limit` });
       }
 
       // Validate storage key format (allow pdf, jpg, jpeg, png extensions)
-      if (!storageKey.match(/^(invoices|delivery|purchase-orders)\/\d{4}\/[^\/]+\.(pdf|jpg|jpeg|png)$/)) {
+      if (!storageKey.match(/^(invoices|delivery|purchase-orders|goods-receipts)\/\d{4}\/[^\/]+\.(pdf|jpg|jpeg|png)$/)) {
         return res.status(400).json({ error: 'Invalid storage key format' });
       }
 

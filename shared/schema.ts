@@ -501,6 +501,9 @@ export const goodsReceipts = pgTable("goods_receipts", {
   receivedDate: timestamp("received_date").defaultNow().notNull(),
   status: text("status").notNull().default("pending"), // pending, confirmed, cancelled
   notes: text("notes"),
+  scanKey1: text("scan_key_1"),
+  scanKey2: text("scan_key_2"),
+  scanKey3: text("scan_key_3"),
   createdBy: varchar("created_by").references(() => users.id).notNull(),
   createdAt: timestamp("created_at").defaultNow().notNull(),
   updatedAt: timestamp("updated_at").defaultNow().notNull(),

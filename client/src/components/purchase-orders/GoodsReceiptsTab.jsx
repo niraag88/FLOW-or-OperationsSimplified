@@ -6,7 +6,8 @@ import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
-import { ShoppingCart, CheckCircle2, Package, Truck, MoreHorizontal, XCircle, ChevronDown, ChevronRight, Eye, Download, Trash2, FileText, FileSpreadsheet, AlertTriangle } from "lucide-react";
+import { ShoppingCart, CheckCircle2, Package, Truck, MoreHorizontal, XCircle, ChevronDown, ChevronRight, Eye, Download, Trash2, FileText, FileSpreadsheet, AlertTriangle, Paperclip, X } from "lucide-react";
+import UploadFileDialog from "../common/UploadFileDialog";
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -35,7 +36,6 @@ import { User } from "@/api/entities";
 
 export default function GoodsReceiptsTab({ 
   purchaseOrders, 
-  products, 
   goodsReceipts, 
   loading, 
   canEdit, 
@@ -56,11 +56,102 @@ export default function GoodsReceiptsTab({
   // State is now managed by parent component for context-aware export
   const [showDeleteDialog, setShowDeleteDialog] = useState(false);
   const [deletingPO, setDeletingPO] = useState(null);
+  // GRN document attachment state
+  const [pendingDocs, setPendingDocs] = useState([null, null, null]);
+  const [attachGrnState, setAttachGrnState] = useState(null); // { grnId, slot, receiptNumber }
   const { toast } = useToast();
 
 
-  const getProductInfo = (productId) => {
-    return products.find(p => p.id === productId) || {};
+  const ALLOWED_TYPES = ['application/pdf', 'image/jpeg', 'image/jpg', 'image/png'];
+  const MAX_DOC_SIZE = 2 * 1024 * 1024;
+
+  const updatePendingDoc = (idx, file) => {
+    setPendingDocs(prev => {
+      const arr = [...prev];
+      arr[idx] = file;
+      return arr;
+    });
+  };
+
+  const handlePendingDocSelect = (idx, e) => {
+    const file = e.target.files?.[0];
+    e.target.value = '';
+    if (!file) return;
+    if (!ALLOWED_TYPES.includes(file.type)) {
+      toast({ title: 'Invalid file', description: 'Only PDF, JPG, PNG allowed.', variant: 'destructive' });
+      return;
+    }
+    if (file.size > MAX_DOC_SIZE) {
+      toast({ title: 'File too large', description: 'Max 2 MB per document.', variant: 'destructive' });
+      return;
+    }
+    updatePendingDoc(idx, file);
+  };
+
+  const uploadGrnDocToStorage = async (grnId, slot, file) => {
+    const extMap = { 'application/pdf': 'pdf', 'image/png': 'png', 'image/jpeg': 'jpg', 'image/jpg': 'jpg' };
+    const ext = extMap[file.type] || 'pdf';
+    const storageKey = `goods-receipts/${new Date().getFullYear()}/${grnId}-doc${slot}.${ext}`;
+    const formData = new FormData();
+    formData.append('file', file);
+    const uploadResp = await fetch('/api/storage/upload-scan', {
+      method: 'POST',
+      headers: {
+        'x-storage-key': storageKey,
+        'x-content-type': file.type,
+        'x-file-size': String(file.size),
+      },
+      body: formData,
+      credentials: 'include',
+    });
+    if (!uploadResp.ok) {
+      const err = await uploadResp.json();
+      throw new Error(err.error || 'Upload failed');
+    }
+    await fetch(`/api/goods-receipts/${grnId}/scan-key`, {
+      method: 'PATCH',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ scanKey: storageKey, slot }),
+      credentials: 'include',
+    });
+    return storageKey;
+  };
+
+  const handleGrnAttachSuccess = async (scanKey) => {
+    if (!attachGrnState) return;
+    await fetch(`/api/goods-receipts/${attachGrnState.grnId}/scan-key`, {
+      method: 'PATCH',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ scanKey, slot: attachGrnState.slot }),
+      credentials: 'include',
+    });
+    setAttachGrnState(null);
+    if (onRefresh) onRefresh();
+  };
+
+  const handleRemoveGrnDoc = async (grnId, slot) => {
+    try {
+      const resp = await fetch(`/api/goods-receipts/${grnId}/scan-key/${slot}`, {
+        method: 'DELETE',
+        credentials: 'include',
+      });
+      if (!resp.ok) throw new Error('Failed to remove');
+      toast({ title: 'Document removed' });
+      if (onRefresh) onRefresh();
+    } catch (e) {
+      toast({ title: 'Error', description: 'Could not remove the document.', variant: 'destructive' });
+    }
+  };
+
+  const handleViewGrnDoc = async (scanKey) => {
+    try {
+      const res = await fetch(`/api/storage/signed-get?key=${encodeURIComponent(scanKey)}`, { credentials: 'include' });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error || 'Failed to get link');
+      window.open(data.url, '_blank');
+    } catch (e) {
+      toast({ title: 'Error', description: 'Could not retrieve the document.', variant: 'destructive' });
+    }
   };
 
   const getStatusColor = (status) => {
@@ -445,6 +536,22 @@ export default function GoodsReceiptsTab({
       }
 
       const result = await response.json();
+
+      // Upload any pending documents (non-fatal)
+      const docsSelected = pendingDocs.some(f => f !== null);
+      if (docsSelected && result.id) {
+        for (let i = 0; i < 3; i++) {
+          const file = pendingDocs[i];
+          if (file) {
+            try {
+              await uploadGrnDocToStorage(result.id, i + 1, file);
+            } catch (docErr) {
+              console.error(`Failed to upload GRN doc slot ${i + 1}:`, docErr);
+            }
+          }
+        }
+      }
+      setPendingDocs([null, null, null]);
 
       toast({
         title: "Goods received successfully",
@@ -969,7 +1076,7 @@ export default function GoodsReceiptsTab({
                                   <td className="p-1.5 align-middle text-gray-500" style={{width: '130px'}}>
                                     {grn.receivedDate ? format(new Date(grn.receivedDate), 'dd/MM/yy') : '-'}
                                   </td>
-                                  <td className="p-1.5 align-middle text-gray-400 italic" colSpan={9}>
+                                  <td className="p-1.5 align-middle text-gray-400 italic" colSpan={7}>
                                     {grn.isPartial ? (
                                       <span className="inline-flex items-center gap-0.5 text-amber-700 bg-amber-100 border border-amber-200 rounded px-1.5 py-0.5 font-medium not-italic">
                                         <AlertTriangle className="w-3 h-3" />
@@ -980,6 +1087,78 @@ export default function GoodsReceiptsTab({
                                         <CheckCircle2 className="w-3 h-3" />
                                         Full delivery
                                       </span>
+                                    )}
+                                  </td>
+                                  <td className="p-1.5 align-middle" style={{width: '80px'}}>
+                                    <div className="flex gap-1 items-center">
+                                      {[grn.scanKey1, grn.scanKey2, grn.scanKey3].map((key, ki) => key ? (
+                                        <Tooltip key={ki}>
+                                          <TooltipTrigger asChild>
+                                            <button
+                                              type="button"
+                                              onClick={() => handleViewGrnDoc(key)}
+                                              className="text-blue-600 hover:text-blue-800 transition-colors"
+                                            >
+                                              <Paperclip className="w-3.5 h-3.5" />
+                                            </button>
+                                          </TooltipTrigger>
+                                          <TooltipContent>View document {ki + 1}</TooltipContent>
+                                        </Tooltip>
+                                      ) : null)}
+                                    </div>
+                                  </td>
+                                  <td className="p-1.5 align-middle" style={{width: '80px'}}>
+                                    {canEdit && (
+                                      <DropdownMenu>
+                                        <DropdownMenuTrigger asChild>
+                                          <Button variant="ghost" size="sm" className="h-6 w-6 p-0">
+                                            <MoreHorizontal className="w-3 h-3" />
+                                          </Button>
+                                        </DropdownMenuTrigger>
+                                        <DropdownMenuContent align="end">
+                                          {/* Attach: show for each empty slot */}
+                                          {!grn.scanKey1 && (
+                                            <DropdownMenuItem onClick={() => setAttachGrnState({ grnId: grn.id, slot: 1, receiptNumber: grn.receiptNumber })}>
+                                              <Paperclip className="w-3.5 h-3.5 mr-2 text-blue-600" />
+                                              Attach Document
+                                            </DropdownMenuItem>
+                                          )}
+                                          {grn.scanKey1 && !grn.scanKey2 && (
+                                            <DropdownMenuItem onClick={() => setAttachGrnState({ grnId: grn.id, slot: 2, receiptNumber: grn.receiptNumber })}>
+                                              <Paperclip className="w-3.5 h-3.5 mr-2 text-blue-600" />
+                                              Attach 2nd Document
+                                            </DropdownMenuItem>
+                                          )}
+                                          {grn.scanKey2 && !grn.scanKey3 && (
+                                            <DropdownMenuItem onClick={() => setAttachGrnState({ grnId: grn.id, slot: 3, receiptNumber: grn.receiptNumber })}>
+                                              <Paperclip className="w-3.5 h-3.5 mr-2 text-blue-600" />
+                                              Attach 3rd Document
+                                            </DropdownMenuItem>
+                                          )}
+                                          {/* Remove: show for each filled slot */}
+                                          {(grn.scanKey1 || grn.scanKey2 || grn.scanKey3) && (
+                                            <DropdownMenuSeparator />
+                                          )}
+                                          {grn.scanKey1 && (
+                                            <DropdownMenuItem className="text-red-600" onClick={() => handleRemoveGrnDoc(grn.id, 1)}>
+                                              <X className="w-3.5 h-3.5 mr-2" />
+                                              Remove Doc 1
+                                            </DropdownMenuItem>
+                                          )}
+                                          {grn.scanKey2 && (
+                                            <DropdownMenuItem className="text-red-600" onClick={() => handleRemoveGrnDoc(grn.id, 2)}>
+                                              <X className="w-3.5 h-3.5 mr-2" />
+                                              Remove Doc 2
+                                            </DropdownMenuItem>
+                                          )}
+                                          {grn.scanKey3 && (
+                                            <DropdownMenuItem className="text-red-600" onClick={() => handleRemoveGrnDoc(grn.id, 3)}>
+                                              <X className="w-3.5 h-3.5 mr-2" />
+                                              Remove Doc 3
+                                            </DropdownMenuItem>
+                                          )}
+                                        </DropdownMenuContent>
+                                      </DropdownMenu>
                                     )}
                                   </td>
                                 </tr>
@@ -1060,6 +1239,7 @@ export default function GoodsReceiptsTab({
         setSelectedPOForReceive(null);
         setReceiveQuantities({});
         setReceiveNotes('');
+        setPendingDocs([null, null, null]);
       }}>
         <DialogContent className="max-w-4xl max-h-[80vh] overflow-y-auto">
           <DialogHeader>
@@ -1133,6 +1313,37 @@ export default function GoodsReceiptsTab({
                 rows={3}
               />
             </div>
+
+            <div className="space-y-2 border-t pt-3">
+              <Label>Attach Delivery Documents (optional)</Label>
+              <p className="text-xs text-gray-500">Up to 3 documents — PDF, JPG, PNG, max 2 MB each. Attached automatically after saving.</p>
+              <div className="flex gap-2 flex-wrap">
+                {[0, 1, 2].map(idx => (
+                  <div key={idx} className="flex-1 min-w-[160px]">
+                    {pendingDocs[idx] ? (
+                      <div className="flex items-center gap-2 p-2 bg-blue-50 border border-blue-200 rounded text-xs">
+                        <FileText className="w-4 h-4 text-blue-600 flex-shrink-0" />
+                        <span className="flex-1 truncate text-blue-800">{pendingDocs[idx].name}</span>
+                        <button type="button" onClick={() => updatePendingDoc(idx, null)} className="text-gray-400 hover:text-red-500">
+                          <X className="w-3.5 h-3.5" />
+                        </button>
+                      </div>
+                    ) : (
+                      <label className="flex items-center gap-2 p-2 border border-dashed border-gray-300 rounded text-xs cursor-pointer hover:border-blue-400 hover:bg-blue-50 text-gray-500 transition-colors">
+                        <Paperclip className="w-3.5 h-3.5 flex-shrink-0" />
+                        <span>Doc {idx + 1}</span>
+                        <input
+                          type="file"
+                          accept=".pdf,.jpg,.jpeg,.png"
+                          className="hidden"
+                          onChange={(e) => handlePendingDocSelect(idx, e)}
+                        />
+                      </label>
+                    )}
+                  </div>
+                ))}
+              </div>
+            </div>
           </div>
 
           <DialogFooter className="flex gap-2">
@@ -1140,6 +1351,7 @@ export default function GoodsReceiptsTab({
               setSelectedPOForReceive(null);
               setReceiveQuantities({});
               setReceiveNotes('');
+              setPendingDocs([null, null, null]);
             }}>
               Cancel
             </Button>
@@ -1200,6 +1412,19 @@ export default function GoodsReceiptsTab({
         confirmText="Yes, Close PO"
         variant="destructive"
       />
+
+      {/* GRN Document Attachment Dialog */}
+      {attachGrnState && (
+        <UploadFileDialog
+          open={!!attachGrnState}
+          onClose={() => setAttachGrnState(null)}
+          onSuccess={handleGrnAttachSuccess}
+          recordType="goods-receipts"
+          recordId={attachGrnState.grnId}
+          documentNumber={`${attachGrnState.receiptNumber}-doc${attachGrnState.slot}`}
+          maxSizeMB={2}
+        />
+      )}
     </>
   );
 }
