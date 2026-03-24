@@ -43,7 +43,7 @@ export default function PurchaseOrders() {
       try {
         const [productsData, booksData] = await Promise.all([
           Product.list(),
-          fetch('/api/books').then(r => r.json()).catch(() => []),
+          fetch('/api/books', { credentials: 'include' }).then(r => r.ok ? r.json() : []).catch(() => []),
         ]);
         setProducts(productsData);
         setFinancialYears(booksData);

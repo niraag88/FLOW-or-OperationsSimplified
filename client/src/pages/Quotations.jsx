@@ -45,7 +45,7 @@ export default function Quotations() {
           Customer.list().catch(() => []),
           Product.list().catch(() => []),
           Brand.list().catch(() => []),
-          fetch('/api/books').then(r => r.json()).catch(() => []),
+          fetch('/api/books', { credentials: 'include' }).then(r => r.ok ? r.json() : []).catch(() => []),
         ]);
         setCustomers(customersData.filter(c => c.is_active !== false));
         setProducts(productsData);
