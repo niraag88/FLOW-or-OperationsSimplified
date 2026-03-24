@@ -1,70 +1,36 @@
-import React, { useState, useEffect } from "react";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { Badge } from "@/components/ui/badge";
-import { Button } from "@/components/ui/button";
-import { 
-  TrendingUp, 
-  Package, 
-  ShoppingCart, 
-  Truck, 
-  FileText,
-  AlertTriangle,
-  DollarSign,
-  Users
-} from "lucide-react";
-import { Product } from "@/api/entities";
-import { PurchaseOrder } from "@/api/entities";
-import { DeliveryOrder } from "@/api/entities";
-import { Invoice } from "@/api/entities";
-import { Customer } from "@/api/entities";
-import { Supplier } from "@/api/entities";
+import { useQueries } from "@tanstack/react-query";
+import { Card, CardHeader } from "@/components/ui/card";
 import DashboardStats from "../components/dashboard/DashboardStats";
 import RecentActivity from "../components/dashboard/RecentActivity";
 import LowStockAlert from "../components/dashboard/LowStockAlert";
 import QuickActions from "../components/dashboard/QuickActions";
 
+const DASHBOARD_QUERIES = [
+  { queryKey: ["/api/products"] },
+  { queryKey: ["/api/purchase-orders"] },
+  { queryKey: ["/api/delivery-orders"] },
+  { queryKey: ["/api/invoices"] },
+  { queryKey: ["/api/customers"] },
+  { queryKey: ["/api/suppliers"] },
+];
+
+function extractArray(result) {
+  if (!result) return [];
+  if (Array.isArray(result)) return result;
+  return result?.data ?? [];
+}
+
 export default function Dashboard() {
-  const [data, setData] = useState({
-    products: [],
-    purchaseOrders: [],
-    deliveryOrders: [],
-    invoices: [],
-    customers: [],
-    suppliers: []
-  });
-  const [loading, setLoading] = useState(true);
+  const results = useQueries({ queries: DASHBOARD_QUERIES });
 
-  useEffect(() => {
-    loadDashboardData();
-  }, []);
+  const isLoading = results.some((r) => r.isLoading);
 
-  const loadDashboardData = async () => {
-    try {
-      const results = await Promise.allSettled([
-        Product.list('-updated_date'),
-        PurchaseOrder.list('-updated_date'),
-        DeliveryOrder.list('-updated_date'),
-        Invoice.list('-updated_date'),
-        Customer.list('-updated_date'),
-        Supplier.list('-updated_date')
-      ]);
+  const [products, purchaseOrders, deliveryOrders, invoices, customers, suppliers] =
+    results.map((r) => extractArray(r.data));
 
-      const [products, purchaseOrders, deliveryOrders, invoices, customers, suppliers] =
-        results.map(r => {
-          if (r.status !== 'fulfilled') return [];
-          const v = r.value;
-          return Array.isArray(v) ? v : (v?.data ?? []);
-        });
+  const data = { products, purchaseOrders, deliveryOrders, invoices, customers, suppliers };
 
-      setData({ products, purchaseOrders, deliveryOrders, invoices, customers, suppliers });
-    } catch (error) {
-      console.error("Error loading dashboard data:", error);
-    } finally {
-      setLoading(false);
-    }
-  };
-
-  if (loading) {
+  if (isLoading) {
     return (
       <div className="space-y-8">
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
