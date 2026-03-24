@@ -676,7 +676,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   // User Management (Admin only)
   
   // GET /api/users - List all users (Admin only)
-  app.get('/api/users', requireRole('Admin'), async (req: AuthenticatedRequest, res) => {
+  app.get('/api/users', requireAuth(['Admin', 'Manager']), async (req: AuthenticatedRequest, res) => {
     try {
       const allUsers = await db.select({
         id: users.id,
@@ -894,7 +894,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  app.post('/api/brands', requireAuth(['Admin', 'Manager']), async (req: AuthenticatedRequest, res) => {
+  app.post('/api/brands', requireAuth(), async (req: AuthenticatedRequest, res) => {
     try {
       const validatedData = insertBrandSchema.parse(req.body);
       const brand = await businessStorage.createBrand(validatedData);
@@ -906,7 +906,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  app.put('/api/brands/:id', requireAuth(['Admin', 'Manager']), async (req: AuthenticatedRequest, res) => {
+  app.put('/api/brands/:id', requireAuth(), async (req: AuthenticatedRequest, res) => {
     try {
       const brandId = parseInt(req.params.id);
       const validatedData = insertBrandSchema.partial().parse(req.body);
@@ -919,7 +919,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  app.delete('/api/brands/:id', requireRole('Admin'), async (req: AuthenticatedRequest, res) => {
+  app.delete('/api/brands/:id', requireAuth(['Admin', 'Manager']), async (req: AuthenticatedRequest, res) => {
     try {
       const brandId = parseInt(req.params.id);
       const deletedBrand = await businessStorage.deleteBrand(brandId);
@@ -942,7 +942,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  app.post('/api/suppliers', requireAuth(['Admin', 'Manager']), async (req: AuthenticatedRequest, res) => {
+  app.post('/api/suppliers', requireAuth(), async (req: AuthenticatedRequest, res) => {
     try {
       const validatedData = insertSupplierSchema.parse(req.body);
       const supplier = await businessStorage.createSupplier(validatedData);
@@ -954,7 +954,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  app.put('/api/suppliers/:id', requireAuth(['Admin', 'Manager']), async (req: AuthenticatedRequest, res) => {
+  app.put('/api/suppliers/:id', requireAuth(), async (req: AuthenticatedRequest, res) => {
     try {
       const supplierId = parseInt(req.params.id);
       const validatedData = insertSupplierSchema.partial().parse(req.body);
@@ -967,7 +967,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  app.delete('/api/suppliers/:id', requireRole('Admin'), async (req: AuthenticatedRequest, res) => {
+  app.delete('/api/suppliers/:id', requireAuth(['Admin', 'Manager']), async (req: AuthenticatedRequest, res) => {
     try {
       const supplierId = parseInt(req.params.id);
       const deletedSupplier = await businessStorage.deleteSupplier(supplierId);
@@ -993,7 +993,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  app.post('/api/customers', requireAuth(['Admin', 'Manager']), async (req: AuthenticatedRequest, res) => {
+  app.post('/api/customers', requireAuth(), async (req: AuthenticatedRequest, res) => {
     try {
       const validatedData = insertCustomerSchema.parse(req.body);
       const customer = await businessStorage.createCustomer(validatedData);
@@ -1005,7 +1005,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  app.put('/api/customers/:id', requireAuth(['Admin', 'Manager']), async (req: AuthenticatedRequest, res) => {
+  app.put('/api/customers/:id', requireAuth(), async (req: AuthenticatedRequest, res) => {
     try {
       const customerId = parseInt(req.params.id);
       const validatedData = insertCustomerSchema.partial().parse(req.body);
@@ -1015,6 +1015,20 @@ export async function registerRoutes(app: Express): Promise<Server> {
     } catch (error) {
       console.error('Error updating customer:', error);
       res.status(500).json({ error: 'Failed to update customer' });
+    }
+  });
+
+  app.delete('/api/customers/:id', requireAuth(), async (req: AuthenticatedRequest, res) => {
+    try {
+      const customerId = parseInt(req.params.id);
+      const [customerToDelete] = await db.select().from(customers).where(eq(customers.id, customerId));
+      if (!customerToDelete) return res.status(404).json({ error: 'Customer not found' });
+      await db.delete(customers).where(eq(customers.id, customerId));
+      writeAuditLog({ actor: req.user!.id, actorName: req.user?.username || String(req.user!.id), targetId: String(customerId), targetType: 'customer', action: 'DELETE', details: `Customer '${customerToDelete.name}' deleted` });
+      res.json({ success: true });
+    } catch (error) {
+      console.error('Error deleting customer:', error);
+      res.status(500).json({ error: 'Failed to delete customer' });
     }
   });
 
@@ -1077,7 +1091,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  app.post('/api/products', requireAuth(['Admin', 'Manager']), async (req: AuthenticatedRequest, res) => {
+  app.post('/api/products', requireAuth(), async (req: AuthenticatedRequest, res) => {
     try {
       const validatedData = insertProductSchema.parse(req.body);
       const product = await businessStorage.createProduct(validatedData);
@@ -1089,7 +1103,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  app.put('/api/products/:id', requireAuth(['Admin', 'Manager']), async (req: AuthenticatedRequest, res) => {
+  app.put('/api/products/:id', requireAuth(), async (req: AuthenticatedRequest, res) => {
     try {
       const productId = parseInt(req.params.id);
       const validatedData = insertProductSchema.partial().parse(req.body);
@@ -1102,7 +1116,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  app.delete('/api/products/:id', requireAuth(['Admin', 'Manager']), async (req: AuthenticatedRequest, res) => {
+  app.delete('/api/products/:id', requireAuth(), async (req: AuthenticatedRequest, res) => {
     try {
       const productId = parseInt(req.params.id);
       // Load full product data for recycle bin snapshot
@@ -1149,7 +1163,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   });
 
   // Stock adjustment endpoint
-  app.post('/api/products/:id/adjust-stock', requireAuth(['Admin', 'Manager']), async (req: AuthenticatedRequest, res) => {
+  app.post('/api/products/:id/adjust-stock', requireAuth(), async (req: AuthenticatedRequest, res) => {
     try {
       const productId = parseInt(req.params.id);
       if (isNaN(productId)) {
@@ -1617,7 +1631,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   });
 
   // POST /api/invoices/from-quotation - Create invoice from quotation
-  app.post('/api/invoices/from-quotation', requireAuth(['Admin', 'Manager']), async (req: AuthenticatedRequest, res) => {
+  app.post('/api/invoices/from-quotation', requireAuth(), async (req: AuthenticatedRequest, res) => {
     try {
       const { quotationId } = req.body;
 
@@ -1725,7 +1739,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   });
 
   // PUT /api/invoices/:id - Update existing invoice
-  app.put('/api/invoices/:id', requireAuth(['Admin', 'Manager']), async (req: AuthenticatedRequest, res) => {
+  app.put('/api/invoices/:id', requireAuth(), async (req: AuthenticatedRequest, res) => {
     try {
       const id = parseInt(req.params.id);
       const body = req.body;
@@ -1968,7 +1982,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   });
 
   // POST /api/delivery-orders - Create new delivery order
-  app.post('/api/delivery-orders', requireAuth(['Admin', 'Manager']), async (req: AuthenticatedRequest, res) => {
+  app.post('/api/delivery-orders', requireAuth(), async (req: AuthenticatedRequest, res) => {
     try {
       const nextNumber = await businessStorage.generateDoNumber();
       const body = req.body;
@@ -2030,7 +2044,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   });
 
   // PUT /api/delivery-orders/:id - Update existing delivery order
-  app.put('/api/delivery-orders/:id', requireAuth(['Admin', 'Manager']), async (req: AuthenticatedRequest, res) => {
+  app.put('/api/delivery-orders/:id', requireAuth(), async (req: AuthenticatedRequest, res) => {
     try {
       const id = parseInt(req.params.id);
       const body = req.body;
@@ -2335,7 +2349,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  app.post('/api/stock-counts', requireAuth(['Admin', 'Manager']), async (req: AuthenticatedRequest, res) => {
+  app.post('/api/stock-counts', requireAuth(), async (req: AuthenticatedRequest, res) => {
     try {
       if (!req.user) {
         return res.status(401).json({ error: 'Authentication required' });
@@ -2390,7 +2404,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  app.delete('/api/stock-counts/:id', requireAuth(['Admin', 'Manager']), async (req: AuthenticatedRequest, res) => {
+  app.delete('/api/stock-counts/:id', requireAuth(), async (req: AuthenticatedRequest, res) => {
     try {
       const stockCountId = parseInt(req.params.id);
       
@@ -2560,7 +2574,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   });
 
   // Process invoice sale and deduct stock automatically
-  app.post('/api/invoices/:id/process-sale', requireAuth(['Admin', 'Manager']), async (req: AuthenticatedRequest, res) => {
+  app.post('/api/invoices/:id/process-sale', requireAuth(), async (req: AuthenticatedRequest, res) => {
     try {
       const invoiceId = parseInt(req.params.id);
       
@@ -2735,7 +2749,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  app.put('/api/company-settings', requireRole('Admin'), async (req: AuthenticatedRequest, res) => {
+  app.put('/api/company-settings', requireAuth(['Admin', 'Manager']), async (req: AuthenticatedRequest, res) => {
     try {
       const settings = await businessStorage.updateCompanySettings({
         ...req.body,
@@ -3312,7 +3326,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   });
 
   // POST /api/recycle-bin/:id/restore — restore a document to its original table
-  app.post('/api/recycle-bin/:id/restore', requireAuth(['Admin', 'Manager']), async (req: AuthenticatedRequest, res) => {
+  app.post('/api/recycle-bin/:id/restore', requireAuth(), async (req: AuthenticatedRequest, res) => {
     try {
       const id = parseInt(req.params.id);
       const [item] = await db.select().from(recycleBin).where(eq(recycleBin.id, id));
@@ -3405,7 +3419,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   // ── Document delete routes (send to Recycle Bin first) ────────────────────
 
   // DELETE /api/invoices/:id
-  app.delete('/api/invoices/:id', requireAuth(['Admin']), async (req: AuthenticatedRequest, res) => {
+  app.delete('/api/invoices/:id', requireAuth(), async (req: AuthenticatedRequest, res) => {
     try {
       const { id } = req.params;
       const userId = req.user?.id || 'unknown';
@@ -3456,7 +3470,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   });
 
   // DELETE /api/delivery-orders/:id
-  app.delete('/api/delivery-orders/:id', requireAuth(['Admin']), async (req: AuthenticatedRequest, res) => {
+  app.delete('/api/delivery-orders/:id', requireAuth(), async (req: AuthenticatedRequest, res) => {
     try {
       const { id } = req.params;
       const userId = req.user?.id || 'unknown';

@@ -15,7 +15,8 @@ import {
   DialogTitle,
 } from "@/components/ui/dialog";
 import { Plus, Edit2, Trash2, Building2, ExternalLink } from "lucide-react";
-import { Brand, RecycleBin, AuditLog, User } from "@/api/entities";
+import { Brand, RecycleBin, AuditLog } from "@/api/entities";
+import { useAuth } from "@/hooks/useAuth";
 import { logAuditAction } from "../utils/auditLogger";
 import { useToast } from "@/components/ui/use-toast";
 import SimpleConfirmDialog from "../common/SimpleConfirmDialog";
@@ -36,25 +37,15 @@ export default function BrandManagement() {
   const [showForm, setShowForm] = useState(false);
   const [editingBrand, setEditingBrand] = useState(null);
   const [formData, setFormData] = useState(initialFormData);
-  const [currentUser, setCurrentUser] = useState(null);
   const { toast } = useToast();
   const [dialogOpen, setDialogOpen] = useState(false);
   const [brandToDelete, setBrandToDelete] = useState(null);
+  const { user: currentUser } = useAuth();
+  const canDelete = ['Admin', 'Manager'].includes(currentUser?.role);
 
   useEffect(() => {
     loadBrands();
-    loadCurrentUser();
   }, []);
-
-  const loadCurrentUser = async () => {
-    try {
-      const user = await User.me();
-      setCurrentUser(user);
-    } catch (error) {
-      console.error("Error loading current user:", error);
-      setCurrentUser({ role: 'Admin', email: 'user@example.com' });
-    }
-  };
 
   const loadBrands = async () => {
     setLoading(true);
@@ -284,14 +275,16 @@ export default function BrandManagement() {
                             >
                               <Edit2 className="w-3 h-3" />
                             </Button>
-                            <Button 
-                              size="sm" 
-                              variant="ghost" 
-                              className="text-red-500 hover:text-red-600"
-                              onClick={() => handleDeleteClick(brand)}
-                            >
-                              <Trash2 className="w-3 h-3" />
-                            </Button>
+                            {canDelete && (
+                              <Button 
+                                size="sm" 
+                                variant="ghost" 
+                                className="text-red-500 hover:text-red-600"
+                                onClick={() => handleDeleteClick(brand)}
+                              >
+                                <Trash2 className="w-3 h-3" />
+                              </Button>
+                            )}
                           </div>
                         </TableCell>
                       </TableRow>
@@ -323,14 +316,16 @@ export default function BrandManagement() {
                           <Button size="sm" variant="ghost" onClick={() => handleEdit(brand)}>
                             <Edit2 className="w-3 h-3" />
                           </Button>
-                          <Button 
-                            size="sm" 
-                            variant="ghost" 
-                            className="text-red-500"
-                            onClick={() => handleDeleteClick(brand)}
-                          >
-                            <Trash2 className="w-3 h-3" />
-                          </Button>
+                          {canDelete && (
+                            <Button 
+                              size="sm" 
+                              variant="ghost" 
+                              className="text-red-500"
+                              onClick={() => handleDeleteClick(brand)}
+                            >
+                              <Trash2 className="w-3 h-3" />
+                            </Button>
+                          )}
                         </div>
                       </div>
                       

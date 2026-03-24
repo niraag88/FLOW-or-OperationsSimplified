@@ -123,9 +123,9 @@ export default function Quotations() {
     setEditingQuotation(null);
   };
 
-  const canEdit = true;
-  const canOverride = true;
   const { user: currentUser } = useAuth();
+  const canEdit = ['Admin', 'Manager'].includes(currentUser?.role);
+  const canOverride = true;
 
   const visibleQuotations = quotations;
 

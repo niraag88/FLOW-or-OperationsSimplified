@@ -114,7 +114,7 @@ function PagesContent() {
         </ProtectedRoute>
       } />
       <Route path="/UserManagement" element={
-        <ProtectedRoute requiredRoles={['Admin']}>
+        <ProtectedRoute requiredRoles={['Admin', 'Manager']}>
           <Layout currentPageName="User Management"><UserManagement /></Layout>
         </ProtectedRoute>
       } />

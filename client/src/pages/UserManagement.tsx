@@ -88,11 +88,11 @@ export default function UserManagement() {
     );
   }
 
-  // Fetch users (Admin only)
+  // Fetch users (Admin + Manager)
   const { data: usersData, isLoading } = useQuery<{ users: User[] }>({
     queryKey: ['/api/users'],
     refetchOnWindowFocus: false,
-    enabled: isAdmin,
+    enabled: canViewLogs,
   });
 
   // Create user mutation

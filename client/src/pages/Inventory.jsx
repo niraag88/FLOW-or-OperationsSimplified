@@ -2,6 +2,7 @@
 import React, { useState, useEffect } from "react";
 import { Link } from "react-router-dom";
 import { createPageUrl } from "@/utils";
+import { useAuth } from "@/hooks/useAuth";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -88,9 +89,9 @@ export default function Inventory() {
     });
   };
 
+  const { user: currentUser } = useAuth();
   const canEdit = true;
   const canDelete = true;
-  const currentUser = { role: 'Admin', email: 'admin@opsuite.com' };
 
   const filteredProducts = products.filter(product => {
     const matchesSearch = product.sku?.toLowerCase().includes(searchTerm.toLowerCase()) ||

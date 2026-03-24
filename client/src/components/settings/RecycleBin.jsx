@@ -21,9 +21,9 @@ import {
   Trash // Added Trash icon for Clear All button
 } from 'lucide-react';
 import { useToast } from '@/components/ui/use-toast';
+import { useAuth } from '@/hooks/useAuth';
 import { format } from 'date-fns';
 import { RecycleBin } from '@/api/entities';
-import { User } from '@/api/entities';
 import SimpleConfirmDialog from '../common/SimpleConfirmDialog';
 
 export default function RecycleBinComponent() {
@@ -33,28 +33,17 @@ export default function RecycleBinComponent() {
   const [activeTab, setActiveTab] = useState('all');
   const [showRestoreDialog, setShowRestoreDialog] = useState(false);
   const [showPermanentDeleteDialog, setShowPermanentDeleteDialog] = useState(false);
-  const [showBulkDeleteDialog, setShowBulkDeleteDialog] = useState(false); // New state for bulk delete dialog
-  const [showClearAllDialog, setShowClearAllDialog] = useState(false); // New state for clear all dialog
+  const [showBulkDeleteDialog, setShowBulkDeleteDialog] = useState(false);
+  const [showClearAllDialog, setShowClearAllDialog] = useState(false);
   const [selectedItem, setSelectedItem] = useState(null);
-  const [selectedItems, setSelectedItems] = useState(new Set()); // New state to manage selected items for bulk actions
-  const [currentUser, setCurrentUser] = useState(null);
+  const [selectedItems, setSelectedItems] = useState(new Set());
   const { toast } = useToast();
+  const { user: currentUser } = useAuth();
+  const canPermanentlyDelete = ['Admin', 'Manager'].includes(currentUser?.role);
 
   useEffect(() => {
     loadDeletedItems();
-    loadCurrentUser();
   }, []);
-
-  const loadCurrentUser = async () => {
-    try {
-      const user = await User.me();
-      setCurrentUser(user);
-    } catch (error) {
-      console.error('Error loading current user:', error);
-      // Fallback for development if User.me() fails
-      setCurrentUser({ role: 'Admin', email: 'admin@example.com' });
-    }
-  };
 
   const loadDeletedItems = async () => {
     setLoading(true);
@@ -238,10 +227,10 @@ export default function RecycleBinComponent() {
           </p>
         </div>
 
-        {/* Bulk Actions */}
-        {deletedItems.length > 0 && (
+        {/* Bulk Actions — permanent delete only for Admin/Manager */}
+        {deletedItems.length > 0 && canPermanentlyDelete && (
           <div className="flex items-center gap-2">
-            {selectedItems.size > 0 && ( // Show "Delete Selected" only if at least one item is selected
+            {selectedItems.size > 0 && (
               <Button
                 variant="outline"
                 onClick={() => setShowBulkDeleteDialog(true)}
@@ -379,18 +368,20 @@ export default function RecycleBinComponent() {
                               Restore
                             </Button>
                           )}
-                          <Button
-                            size="sm"
-                            variant="outline"
-                            onClick={() => {
-                              setSelectedItem(item);
-                              setShowPermanentDeleteDialog(true);
-                            }}
-                            className="text-red-600 border-red-200 hover:bg-red-50"
-                          >
-                            <Trash2 className="w-3 h-3 mr-1" />
-                            Delete Forever
-                          </Button>
+                          {canPermanentlyDelete && (
+                            <Button
+                              size="sm"
+                              variant="outline"
+                              onClick={() => {
+                                setSelectedItem(item);
+                                setShowPermanentDeleteDialog(true);
+                              }}
+                              className="text-red-600 border-red-200 hover:bg-red-50"
+                            >
+                              <Trash2 className="w-3 h-3 mr-1" />
+                              Delete Forever
+                            </Button>
+                          )}
                         </div>
                       </TableCell>
                     </TableRow>
