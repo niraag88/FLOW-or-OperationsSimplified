@@ -289,6 +289,8 @@ async function convertQuotations(
       const inv = data as Invoice;
       // Tag the converted invoice with SEED_TAG so the rebalance step only touches seed-owned records
       const taggedNotes = `${SEED_TAG} Converted from Quotation ${q.quoteNumber}`;
+      // Generate a reference from quotation number (e.g. QUO-181 → REF-181)
+      const quoteRef = q.quoteNumber.replace(/^QUO-?/, 'REF-');
       await apiFetch(`/api/invoices/${inv.id}`, 'PUT', cookie, {
         customer_id:  inv.customerId,
         status:       'draft',
@@ -296,6 +298,7 @@ async function convertQuotations(
         tax_amount:   inv.vatAmount ?? '0',
         invoice_date: inv.invoiceDate,
         currency:     inv.currency ?? 'AED',
+        reference:    quoteRef,
         notes:        taggedNotes,
       });
       converted.push({
@@ -483,11 +486,16 @@ async function seedDirectInvoices(
     const invoiceDate = randomDate(yearIdx);
     const items       = buildItems(products, rand(2, 6));
     const { vatAmount, grandTotal } = calcTotals(items);
+    // Generate a meaningful reference: first 3 uppercase letters of customer name + year + index
+    const custInitials = customer.name.replace(/[^A-Za-z ]/g, '').substring(0, 3).toUpperCase();
+    const invYear      = invoiceDate.getFullYear();
+    const reference    = `${custInitials}-${invYear}-${String(i + 1).padStart(3, '0')}`;
 
     const { status: http, data } = await apiPost('/api/invoices', {
       customer_id:    customer.id,
       status,
       invoice_date:   isoDate(invoiceDate),
+      reference,
       notes:          `${SEED_TAG} Invoice #${i + 1} — ${status}`,
       tax_amount:     vatAmount,
       total_amount:   grandTotal,
