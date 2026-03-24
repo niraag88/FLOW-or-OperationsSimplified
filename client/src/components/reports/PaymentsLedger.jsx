@@ -214,13 +214,16 @@ function SalesPaymentsSection({ invoices, companySettings, canExport }) {
 
   const enriched = useMemo(() => {
     return invoices.map((inv) => {
-      const amount = parseFloat(inv.total_amount || inv.totalAmount || inv.amount || 0);
+      const origAmount = parseFloat(inv.total_amount || inv.totalAmount || inv.amount || 0);
+      const currency = (inv.currency || "AED").toUpperCase();
+      const rate = getRateToAed(currency, companySettings);
+      const aed = currency === "AED" ? origAmount : origAmount * rate;
       const ps = (inv.paymentStatus || inv.payment_status || "outstanding").toLowerCase();
       return {
         ...inv,
-        _origAmount: amount,
-        _currency: "AED",
-        _aed: amount,
+        _origAmount: origAmount,
+        _currency: currency,
+        _aed: aed,
         _paymentStatus: ps,
         _ref: inv.invoice_number || inv.invoiceNumber || "",
         _customer: inv.customer_name || inv.customerName || "",
@@ -229,7 +232,7 @@ function SalesPaymentsSection({ invoices, companySettings, canExport }) {
         _remarks: inv.paymentRemarks || inv.payment_remarks || "",
       };
     });
-  }, [invoices]);
+  }, [invoices, companySettings]);
 
   const filtered = useMemo(() => {
     return enriched.filter((r) => {
@@ -248,6 +251,8 @@ function SalesPaymentsSection({ invoices, companySettings, canExport }) {
     invoice_number: r._ref,
     customer: r._customer,
     invoice_date: fmtDate(r._date),
+    currency: r._currency,
+    amount_orig: fmt(r._origAmount),
     amount_aed: `AED ${fmt(r._aed)}`,
     payment_status: r._paymentStatus === "paid" ? "Paid" : "Outstanding",
     payment_received_date: fmtDate(r._paymentDate),
@@ -257,7 +262,7 @@ function SalesPaymentsSection({ invoices, companySettings, canExport }) {
   return (
     <>
       <SummaryTiles records={filtered} label="Invoices" />
-      <div className="flex items-center justify-between mb-2">
+      <div className="flex items-start justify-between gap-3 mb-5">
         <LedgerFilters
           paymentFilter={paymentFilter} setPaymentFilter={setPaymentFilter}
           dateFrom={dateFrom} setDateFrom={setDateFrom}
@@ -266,7 +271,7 @@ function SalesPaymentsSection({ invoices, companySettings, canExport }) {
           searchPlaceholder="Search by invoice # or customer…"
         />
         {canExport && (
-          <div className="ml-3 shrink-0">
+          <div className="shrink-0 pt-0.5">
             <ExportDropdown
               data={exportData}
               type="Sales Payments Ledger"
@@ -275,6 +280,8 @@ function SalesPaymentsSection({ invoices, companySettings, canExport }) {
                 invoice_number: "Invoice #",
                 customer: "Customer",
                 invoice_date: "Invoice Date",
+                currency: "Currency",
+                amount_orig: "Amount (Orig Currency)",
                 amount_aed: "Amount (AED)",
                 payment_status: "Payment Status",
                 payment_received_date: "Payment Received Date",
@@ -292,6 +299,8 @@ function SalesPaymentsSection({ invoices, companySettings, canExport }) {
               <TableHead className="font-semibold">Invoice #</TableHead>
               <TableHead className="font-semibold">Customer</TableHead>
               <TableHead className="font-semibold">Invoice Date</TableHead>
+              <TableHead className="font-semibold">Currency</TableHead>
+              <TableHead className="font-semibold text-right">Amount (Orig)</TableHead>
               <TableHead className="font-semibold text-right">Amount (AED)</TableHead>
               <TableHead className="font-semibold">Payment Status</TableHead>
               <TableHead className="font-semibold">Received Date</TableHead>
@@ -301,7 +310,7 @@ function SalesPaymentsSection({ invoices, companySettings, canExport }) {
           <TableBody>
             {filtered.length === 0 ? (
               <TableRow>
-                <TableCell colSpan={7} className="text-center py-10 text-gray-400">
+                <TableCell colSpan={9} className="text-center py-10 text-gray-400">
                   No invoices match the current filters
                 </TableCell>
               </TableRow>
@@ -311,6 +320,10 @@ function SalesPaymentsSection({ invoices, companySettings, canExport }) {
                   <TableCell className="font-medium text-blue-700">{r._ref}</TableCell>
                   <TableCell>{r._customer}</TableCell>
                   <TableCell className="text-gray-600">{fmtDate(r._date)}</TableCell>
+                  <TableCell>
+                    <Badge variant="outline" className="text-xs">{r._currency}</Badge>
+                  </TableCell>
+                  <TableCell className="text-right font-medium">{r._currency} {fmt(r._origAmount)}</TableCell>
                   <TableCell className="text-right font-medium">AED {fmt(r._aed)}</TableCell>
                   <TableCell><PaymentStatusBadge status={r._paymentStatus} /></TableCell>
                   <TableCell className="text-gray-600">{fmtDate(r._paymentDate)}</TableCell>
@@ -394,7 +407,7 @@ function PurchasesPaymentsSection({ purchaseOrders, suppliers, companySettings, 
   return (
     <>
       <SummaryTiles records={filtered} label="Purchase Orders" />
-      <div className="flex items-center justify-between mb-2">
+      <div className="flex items-start justify-between gap-3 mb-5">
         <LedgerFilters
           paymentFilter={paymentFilter} setPaymentFilter={setPaymentFilter}
           dateFrom={dateFrom} setDateFrom={setDateFrom}
@@ -403,7 +416,7 @@ function PurchasesPaymentsSection({ purchaseOrders, suppliers, companySettings, 
           searchPlaceholder="Search by PO # or supplier…"
         />
         {canExport && (
-          <div className="ml-3 shrink-0">
+          <div className="shrink-0 pt-0.5">
             <ExportDropdown
               data={exportData}
               type="Purchases Payments Ledger"
