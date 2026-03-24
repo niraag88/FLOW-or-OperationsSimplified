@@ -17,7 +17,7 @@ This is a full-stack web application built with a React frontend and Express.js 
 - **Suppliers**: 80 suppliers (UK, India, USA, France, Germany, Australia, Italy, UAE-based)
 - **Brands**: 31 brands
 - **Users**: 15 users (1 Admin, 5 Managers, 9 Staff); password = Pass@1234
-- **Purchase Orders**: 300 records [SEED-55 tagged]; **Quotations**: 300 [SEED-56 tagged: Draft=50, Sent=100, Converted=100, Expired=50]; **Invoices**: 400 [SEED-56: Draft=49, Submitted=201, Delivered=150 — 100 converted from quotations + 300 direct; statuses fixed Task #73]; **Delivery Orders**: 300 [SEED-56 tagged]
+- **Purchase Orders**: 300 records [SEED-55 tagged]; **Quotations**: 300 [SEED-56 tagged: Draft=50, Sent=100, Converted=100, Expired=50]; **Invoices**: 400 [SEED-56: Draft=50, Submitted=200, Delivered=150 — 100 converted from quotations + 300 direct; statuses+references fixed Task #73]; **Delivery Orders**: 300 [SEED-56 tagged]
 - **Valid invoice statuses**: `draft` | `submitted` | `delivered` (sent/paid/overdue are NOT valid)
 - **Financial Years**: 2025 (Closed), 2026 (Open), 2027 (Open)
 - **Company**: Aroma Essence Trading LLC, PO prefix "PO", DO prefix "DO"
