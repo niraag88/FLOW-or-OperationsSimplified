@@ -1,5 +1,5 @@
 
-import React, { useState, useEffect } from "react";
+import React, { useState, useEffect, useRef } from "react";
 import { useAuth } from "@/hooks/useAuth";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -31,6 +31,7 @@ export default function PurchaseOrders() {
   });
   const [refreshTrigger, setRefreshTrigger] = useState(0);
   const [financialYears, setFinancialYears] = useState([]);
+  const hasFetchedPOsRef = useRef(false);
 
   // Pagination state
   const [currentPage, setCurrentPage] = useState(1);
@@ -79,7 +80,8 @@ export default function PurchaseOrders() {
   // On first goods-receipts tab open: fetch submitted+closed POs (lazy, once) and GRNs
   useEffect(() => {
     if (activeTab !== 'goods-receipts') return;
-    if (allPOs.length === 0) {
+    if (!hasFetchedPOsRef.current) {
+      hasFetchedPOsRef.current = true;
       fetchAllPOsForGRNTab();
     }
     fetchGoodsReceipts();
