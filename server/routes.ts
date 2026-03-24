@@ -26,19 +26,13 @@ const pool = new Pool({
   connectionString: process.env.DATABASE_URL
 });
 
-// In-memory store for signed URL tokens (in production, use Redis or similar)
-const signedTokens = new Map<string, { key: string; expires: number; type: 'upload' | 'download'; contentType?: string; fileSize?: number; checksum?: string }>();
-
-// Cleanup expired tokens every hour
-setInterval(() => {
-  const now = Date.now();
-  const tokensToDelete: string[] = [];
-  signedTokens.forEach((data, token) => {
-    if (data.expires < now) {
-      tokensToDelete.push(token);
-    }
-  });
-  tokensToDelete.forEach(token => signedTokens.delete(token));
+// Cleanup expired signed tokens from DB every hour
+setInterval(async () => {
+  try {
+    await pool.query('DELETE FROM signed_tokens WHERE expires < $1', [Date.now()]);
+  } catch (err) {
+    console.error('Failed to clean up expired signed tokens:', err);
+  }
 }, 60 * 60 * 1000);
 
 // PDF generation helper functions
@@ -2830,15 +2824,11 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const token = crypto.randomBytes(32).toString('hex');
       const expires = Date.now() + (10 * 60 * 1000); // 10 minutes
 
-      // Store token with metadata including validation info
-      signedTokens.set(token, {
-        key: key,
-        expires: expires,
-        type: 'upload',
-        contentType: contentType,
-        fileSize: fileSize,
-        checksum: checksum
-      });
+      // Store token with metadata in DB so it survives restarts
+      await pool.query(
+        'INSERT INTO signed_tokens (token, key, expires, type, content_type, file_size, checksum) VALUES ($1, $2, $3, $4, $5, $6, $7)',
+        [token, key, expires, 'upload', contentType ?? null, fileSize ?? null, checksum ?? null]
+      );
 
       // Return upload URL that points to our proxy endpoint
       const uploadUrl = `/api/storage/upload/${token}`;
@@ -2862,7 +2852,19 @@ export async function registerRoutes(app: Express): Promise<Server> {
   app.put('/api/storage/upload/:token', upload.single('file'), async (req, res) => {
     try {
       const { token } = req.params;
-      const tokenData = signedTokens.get(token);
+      const tokenResult = await pool.query(
+        'SELECT * FROM signed_tokens WHERE token = $1',
+        [token]
+      );
+      const row = tokenResult.rows[0];
+      const tokenData = row ? {
+        key: row.key as string,
+        expires: Number(row.expires),
+        type: row.type as 'upload' | 'download',
+        contentType: row.content_type as string | undefined,
+        fileSize: row.file_size as number | undefined,
+        checksum: row.checksum as string | undefined,
+      } : null;
 
       if (!tokenData || tokenData.expires < Date.now() || tokenData.type !== 'upload') {
         return res.status(401).json({ error: 'Invalid or expired upload token' });
@@ -2882,7 +2884,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       
       // Validate file size against token
       if (tokenData.fileSize && fileData.length !== tokenData.fileSize) {
-        signedTokens.delete(token);
+        await pool.query('DELETE FROM signed_tokens WHERE token = $1', [token]);
         return res.status(400).json({ error: 'File size mismatch' });
       }
       
@@ -2891,7 +2893,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
         const crypto = require('crypto');
         const hash = crypto.createHash('md5').update(fileData).digest('hex');
         if (hash !== tokenData.checksum) {
-          signedTokens.delete(token);
+          await pool.query('DELETE FROM signed_tokens WHERE token = $1', [token]);
           return res.status(400).json({ error: 'Checksum mismatch' });
         }
       }
@@ -2900,7 +2902,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       if (tokenData.contentType === 'application/pdf') {
         const pdfValidation = validatePdfMagicBytes(fileData);
         if (!pdfValidation.valid) {
-          signedTokens.delete(token);
+          await pool.query('DELETE FROM signed_tokens WHERE token = $1', [token]);
           return res.status(400).json({ error: pdfValidation.error });
         }
       }
@@ -2912,8 +2914,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
         throw new Error(`Object storage upload failed: ${result.error?.message || 'unknown error'}`);
       }
 
-      // Clean up token
-      signedTokens.delete(token);
+      // Clean up token (upload tokens are single-use)
+      await pool.query('DELETE FROM signed_tokens WHERE token = $1', [token]);
 
       // Track uploaded file size for accurate total-size reporting (non-fatal — upload already succeeded)
       try {
@@ -3024,12 +3026,11 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const token = crypto.randomBytes(32).toString('hex');
       const expires = Date.now() + (60 * 60 * 1000); // 1 hour
 
-      // Store token with metadata
-      signedTokens.set(token, {
-        key: key as string,
-        expires: expires,
-        type: 'download'
-      });
+      // Store token in DB so it survives restarts
+      await pool.query(
+        'INSERT INTO signed_tokens (token, key, expires, type, content_type, file_size, checksum) VALUES ($1, $2, $3, $4, $5, $6, $7)',
+        [token, key as string, expires, 'download', null, null, null]
+      );
 
       const downloadUrl = `/api/storage/download/${token}`;
       res.json({ url: downloadUrl });
@@ -3044,7 +3045,16 @@ export async function registerRoutes(app: Express): Promise<Server> {
   app.get('/api/storage/download/:token', async (req, res) => {
     try {
       const { token } = req.params;
-      const tokenData = signedTokens.get(token);
+      const tokenResult = await pool.query(
+        'SELECT * FROM signed_tokens WHERE token = $1',
+        [token]
+      );
+      const dlRow = tokenResult.rows[0];
+      const tokenData = dlRow ? {
+        key: dlRow.key as string,
+        expires: Number(dlRow.expires),
+        type: dlRow.type as 'upload' | 'download',
+      } : null;
 
       if (!tokenData || tokenData.expires < Date.now() || tokenData.type !== 'download') {
         return res.status(401).json({ error: 'Invalid or expired download token' });

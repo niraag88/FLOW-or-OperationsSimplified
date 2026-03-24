@@ -408,6 +408,19 @@ export const companySettings = pgTable("company_settings", {
   criticalAtPercent: integer("critical_at_percent").default(90),
 });
 
+// Signed URL tokens — persisted to DB so they survive restarts and work across instances
+export const signedTokens = pgTable("signed_tokens", {
+  token: text("token").primaryKey(),
+  key: text("key").notNull(),
+  expires: bigint("expires", { mode: "number" }).notNull(),
+  type: text("type").notNull().$type<'upload' | 'download'>(),
+  contentType: text("content_type"),
+  fileSize: integer("file_size"),
+  checksum: text("checksum"),
+});
+
+export type SignedToken = typeof signedTokens.$inferSelect;
+
 // Storage objects tracking table — records file sizes at upload time
 // because the object storage list() API does not return size information.
 export const storageObjects = pgTable("storage_objects", {

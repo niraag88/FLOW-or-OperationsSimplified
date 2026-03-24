@@ -53,6 +53,23 @@ app.use((req, res, next) => {
     console.error('Startup migration failed (storage_objects):', err);
   }
 
+  // Create signed_tokens table if it doesn't exist (persists tokens across restarts)
+  try {
+    await pool.query(`
+      CREATE TABLE IF NOT EXISTS signed_tokens (
+        token TEXT PRIMARY KEY,
+        key TEXT NOT NULL,
+        expires BIGINT NOT NULL,
+        type TEXT NOT NULL,
+        content_type TEXT,
+        file_size INTEGER,
+        checksum TEXT
+      )
+    `);
+  } catch (err) {
+    console.error('Startup migration failed (signed_tokens):', err);
+  }
+
   // Initialize admin user if needed
   await initializeAdminUser();
   
