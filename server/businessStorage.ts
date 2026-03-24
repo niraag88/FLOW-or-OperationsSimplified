@@ -217,7 +217,8 @@ export class BusinessStorage {
 
     const receivedAgg = db.select({
       poId: goodsReceipts.poId,
-      receivedQty: sql<number>`sum(${goodsReceiptItems.receivedQuantity})`.as('receivedQty')
+      receivedQty: sql<number>`sum(${goodsReceiptItems.receivedQuantity})`.as('receivedQty'),
+      reconciledAmount: sql<string>`sum(${goodsReceiptItems.receivedQuantity} * ${goodsReceiptItems.unitPrice})`.as('reconciledAmount')
     }).from(goodsReceiptItems)
       .innerJoin(goodsReceipts, eq(goodsReceiptItems.receiptId, goodsReceipts.id))
       .groupBy(goodsReceipts.poId)
@@ -248,7 +249,8 @@ export class BusinessStorage {
       brandName: suppliers.name,
       lineItems: sql<number>`coalesce(${itemsAgg.lineItems}, 0)`.as('lineItems'),
       orderedQty: sql<number>`coalesce(${itemsAgg.orderedQty}, 0)`.as('orderedQty'),
-      receivedQty: sql<number>`coalesce(${receivedAgg.receivedQty}, 0)`.as('receivedQty')
+      receivedQty: sql<number>`coalesce(${receivedAgg.receivedQty}, 0)`.as('receivedQty'),
+      reconciledAmount: sql<string>`${receivedAgg.reconciledAmount}`.as('reconciledAmount')
     }).from(purchaseOrders)
       .leftJoin(suppliers, eq(purchaseOrders.supplierId, suppliers.id))
       .leftJoin(itemsAgg, eq(itemsAgg.poId, purchaseOrders.id))

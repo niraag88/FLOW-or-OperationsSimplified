@@ -45,12 +45,16 @@ export default function POList({ purchaseOrders, totalCount, loading, canEdit, c
     return ordered > 0 && received < ordered;
   };
 
+  // Uses server-computed reconciledAmount (sum of received_qty × unit_price per GRN item).
+  // Returns 0 when GRNs have 0 received; returns null only when no GRN data at all.
   const getReconciledAmount = (po) => {
-    const ordered = Number(po.orderedQty) || 0;
-    const received = Number(po.receivedQty) || 0;
-    if (ordered === 0) return null;
-    const total = parseFloat(po.totalAmount) || 0;
-    return (total * received) / ordered;
+    if (po.reconciledAmount === null || po.reconciledAmount === undefined) {
+      // If short delivery but no GRN items exist yet, treat reconciled as 0
+      if (isShortDelivered(po)) return 0;
+      return null;
+    }
+    const val = parseFloat(po.reconciledAmount);
+    return Number.isFinite(val) ? val : null;
   };
 
   const handleReceiveGoods = (po) => {
@@ -164,9 +168,9 @@ export default function POList({ purchaseOrders, totalCount, loading, canEdit, c
                         <div>
                           <span>{formatCurrency(po.totalAmount || 0, currency)}</span>
                           {isShortDelivered(po) && getReconciledAmount(po) !== null && (
-                            <div className="text-xs text-amber-700 font-medium mt-0.5">
-                              Reconciled: {formatCurrency(getReconciledAmount(po), currency)}
-                            </div>
+                            <span className="inline-flex items-center gap-0.5 text-xs font-medium text-amber-700 bg-amber-50 border border-amber-200 rounded px-1.5 py-0.5 mt-0.5">
+                              Reconciled: {formatCurrency(getReconciledAmount(po), currency)} of {formatCurrency(po.totalAmount || 0, currency)}
+                            </span>
                           )}
                         </div>
                       </TableCell>

@@ -5,6 +5,7 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
+import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
 import { ShoppingCart, CheckCircle2, Package, Truck, MoreHorizontal, XCircle, ChevronDown, ChevronRight, Eye, Download, Trash2, FileText, FileSpreadsheet, AlertTriangle } from "lucide-react";
 import {
   DropdownMenu,
@@ -292,10 +293,17 @@ export default function GoodsReceiptsTab({
               <div className="flex items-center gap-1">
                 <span>{getTotalReceivedQuantity(po)}</span>
                 {isClosedSection && getTotalOrderedQuantity(po) > 0 && getTotalReceivedQuantity(po) < getTotalOrderedQuantity(po) && (
-                  <span className="inline-flex items-center gap-0.5 text-xs font-medium text-amber-700 bg-amber-50 border border-amber-200 rounded px-1 py-0.5">
-                    <AlertTriangle className="w-3 h-3" />
-                    Partial
-                  </span>
+                  <Tooltip>
+                    <TooltipTrigger asChild>
+                      <span className="inline-flex items-center gap-0.5 text-xs font-medium text-amber-700 bg-amber-50 border border-amber-200 rounded px-1 py-0.5 cursor-default">
+                        <AlertTriangle className="w-3 h-3" />
+                        Partial
+                      </span>
+                    </TooltipTrigger>
+                    <TooltipContent side="top">
+                      <p className="text-xs">Received quantity is less than ordered</p>
+                    </TooltipContent>
+                  </Tooltip>
                 )}
               </div>
             </TableCell>
@@ -861,68 +869,107 @@ export default function GoodsReceiptsTab({
                       </tr>
                     </thead>
                     <tbody>
-                      {closedPOs.map((po) => (
-                        <tr key={po.id} className="border-b transition-colors hover:bg-muted/50">
-                          <td className="p-2 align-middle font-medium" style={{width: '120px'}}>{po.poNumber}</td>
-                          <td className="p-2 align-middle" style={{width: '140px'}}>{po.brandName || 'Unknown Brand'}</td>
-                          <td className="p-2 align-middle" style={{width: '100px'}}>
-                            {po.orderDate && !isNaN(new Date(po.orderDate)) ? 
-                              format(new Date(po.orderDate), 'dd/MM/yy') : 
-                              '-'
-                            }
-                          </td>
-                          <td className="p-2 align-middle" style={{width: '110px'}}>{po.currency || 'GBP'} {parseFloat(po.totalAmount || 0).toFixed(2)}</td>
-                          <td className="p-2 align-middle" style={{width: '110px'}}>AED {parseFloat(po.grandTotal || 0).toFixed(2)}</td>
-                          <td className="p-2 align-middle" style={{width: '90px'}}>{getLineItemsCount(po)}</td>
-                          <td className="p-2 align-middle" style={{width: '80px'}}>{getTotalOrderedQuantity(po)}</td>
-                          <td className="p-2 align-middle" style={{width: '80px'}}>
-                            <div className="flex items-center gap-1 flex-wrap">
-                              <span>{getTotalReceivedQuantity(po)}</span>
-                              {getTotalOrderedQuantity(po) > 0 && getTotalReceivedQuantity(po) < getTotalOrderedQuantity(po) && (
-                                <span className="inline-flex items-center gap-0.5 text-xs font-medium text-amber-700 bg-amber-50 border border-amber-200 rounded px-1 py-0.5">
-                                  <AlertTriangle className="w-3 h-3" />
-                                  Partial
-                                </span>
-                              )}
-                            </div>
-                          </td>
-                          <td className="p-2 align-middle" style={{width: '90px'}}>
-                            <Badge 
-                              variant="outline" 
-                              className="border-green-300 text-green-800 bg-green-50"
-                            >
-                              {po.status?.toUpperCase()}
-                            </Badge>
-                          </td>
-                          <td className="p-2 align-middle" style={{width: '90px'}}>
-                            <DropdownMenu>
-                              <DropdownMenuTrigger asChild>
-                                <Button variant="ghost" size="sm" className="h-8 w-8 p-0">
-                                  <MoreHorizontal className="h-4 w-4" />
-                                </Button>
-                              </DropdownMenuTrigger>
-                              <DropdownMenuContent align="end">
-                                <DropdownMenuItem onClick={() => handleViewAndPrint(po)}>
-                                  <Eye className="w-4 h-4 mr-2" />
-                                  View & Print
-                                </DropdownMenuItem>
-                                <DropdownMenuItem onClick={() => handleExportToXLSX(po)}>
-                                  <Download className="w-4 h-4 mr-2" />
-                                  Export to XLSX
-                                </DropdownMenuItem>
-                                <DropdownMenuSeparator />
-                                <DropdownMenuItem 
-                                  onClick={() => handleDeletePO(po)}
-                                  className="text-red-600 focus:text-red-600"
+                      {closedPOs.map((po) => {
+                        const poGRNs = (goodsReceipts || []).filter(grn => (grn.poId ?? grn.purchase_order_id) === po.id);
+                        return (
+                          <>
+                            <tr key={po.id} className="border-b transition-colors hover:bg-muted/50">
+                              <td className="p-2 align-middle font-medium" style={{width: '120px'}}>{po.poNumber}</td>
+                              <td className="p-2 align-middle" style={{width: '140px'}}>{po.brandName || 'Unknown Brand'}</td>
+                              <td className="p-2 align-middle" style={{width: '100px'}}>
+                                {po.orderDate && !isNaN(new Date(po.orderDate)) ? 
+                                  format(new Date(po.orderDate), 'dd/MM/yy') : 
+                                  '-'
+                                }
+                              </td>
+                              <td className="p-2 align-middle" style={{width: '110px'}}>{po.currency || 'GBP'} {parseFloat(po.totalAmount || 0).toFixed(2)}</td>
+                              <td className="p-2 align-middle" style={{width: '110px'}}>AED {parseFloat(po.grandTotal || 0).toFixed(2)}</td>
+                              <td className="p-2 align-middle" style={{width: '90px'}}>{getLineItemsCount(po)}</td>
+                              <td className="p-2 align-middle" style={{width: '80px'}}>{getTotalOrderedQuantity(po)}</td>
+                              <td className="p-2 align-middle" style={{width: '80px'}}>
+                                <div className="flex items-center gap-1 flex-wrap">
+                                  <span>{getTotalReceivedQuantity(po)}</span>
+                                  {getTotalOrderedQuantity(po) > 0 && getTotalReceivedQuantity(po) < getTotalOrderedQuantity(po) && (
+                                    <Tooltip>
+                                      <TooltipTrigger asChild>
+                                        <span className="inline-flex items-center gap-0.5 text-xs font-medium text-amber-700 bg-amber-50 border border-amber-200 rounded px-1 py-0.5 cursor-default">
+                                          <AlertTriangle className="w-3 h-3" />
+                                          Partial
+                                        </span>
+                                      </TooltipTrigger>
+                                      <TooltipContent side="top">
+                                        <p className="text-xs">Received quantity is less than ordered</p>
+                                      </TooltipContent>
+                                    </Tooltip>
+                                  )}
+                                </div>
+                              </td>
+                              <td className="p-2 align-middle" style={{width: '90px'}}>
+                                <Badge 
+                                  variant="outline" 
+                                  className="border-green-300 text-green-800 bg-green-50"
                                 >
-                                  <Trash2 className="w-4 h-4 mr-2" />
-                                  Delete
-                                </DropdownMenuItem>
-                              </DropdownMenuContent>
-                            </DropdownMenu>
-                          </td>
-                        </tr>
-                      ))}
+                                  {po.status?.toUpperCase()}
+                                </Badge>
+                              </td>
+                              <td className="p-2 align-middle" style={{width: '90px'}}>
+                                <DropdownMenu>
+                                  <DropdownMenuTrigger asChild>
+                                    <Button variant="ghost" size="sm" className="h-8 w-8 p-0">
+                                      <MoreHorizontal className="h-4 w-4" />
+                                    </Button>
+                                  </DropdownMenuTrigger>
+                                  <DropdownMenuContent align="end">
+                                    <DropdownMenuItem onClick={() => handleViewAndPrint(po)}>
+                                      <Eye className="w-4 h-4 mr-2" />
+                                      View & Print
+                                    </DropdownMenuItem>
+                                    <DropdownMenuItem onClick={() => handleExportToXLSX(po)}>
+                                      <Download className="w-4 h-4 mr-2" />
+                                      Export to XLSX
+                                    </DropdownMenuItem>
+                                    <DropdownMenuSeparator />
+                                    <DropdownMenuItem 
+                                      onClick={() => handleDeletePO(po)}
+                                      className="text-red-600 focus:text-red-600"
+                                    >
+                                      <Trash2 className="w-4 h-4 mr-2" />
+                                      Delete
+                                    </DropdownMenuItem>
+                                  </DropdownMenuContent>
+                                </DropdownMenu>
+                              </td>
+                            </tr>
+                            {poGRNs.length > 0 && poGRNs.map(grn => (
+                              <tr key={`grn-${grn.id}`} className="bg-gray-50 border-b text-xs text-gray-600">
+                                <td className="pl-6 py-1 align-middle" style={{width: '120px', paddingRight: '8px'}}>
+                                  <span className="font-mono">{grn.receiptNumber}</span>
+                                </td>
+                                <td className="p-1 align-middle" style={{width: '140px'}}>
+                                  {grn.receivedDate ? format(new Date(grn.receivedDate), 'dd/MM/yy') : '-'}
+                                </td>
+                                <td className="p-1 align-middle" colSpan={5} style={{color: '#666'}}></td>
+                                <td className="p-1 align-middle" style={{width: '80px'}}>
+                                  {grn.isPartial && (
+                                    <Tooltip>
+                                      <TooltipTrigger asChild>
+                                        <span className="inline-flex items-center gap-0.5 text-xs font-medium text-amber-700 bg-amber-50 border border-amber-200 rounded px-1 py-0.5 cursor-default">
+                                          <AlertTriangle className="w-3 h-3" />
+                                          Partial
+                                        </span>
+                                      </TooltipTrigger>
+                                      <TooltipContent side="top">
+                                        <p className="text-xs">Received quantity is less than ordered</p>
+                                      </TooltipContent>
+                                    </Tooltip>
+                                  )}
+                                </td>
+                                <td className="p-1 align-middle" colSpan={2}></td>
+                              </tr>
+                            ))}
+                          </>
+                        );
+                      })}
                     </tbody>
                   </table>
                 </div>

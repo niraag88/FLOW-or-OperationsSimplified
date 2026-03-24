@@ -22,7 +22,7 @@ export function computeReconciliation(items) {
   }, 0);
 
   const reconciledTotal = items.reduce((sum, item) => {
-    return sum + (Number(item.receivedQuantity) ?? 0) * (parseFloat(item.unitPrice) || 0);
+    return sum + (Number(item.receivedQuantity) || 0) * (parseFloat(item.unitPrice) || 0);
   }, 0);
 
   const difference = orderedTotal - reconciledTotal;
