@@ -203,6 +203,30 @@ export default function POPrintView() {
           )}
         </div>
 
+        {/* Payment Confirmation Section */}
+        {poData.paymentStatus === 'paid' && (
+          <div className="print-remarks-section" style={{marginTop: '16px', padding: '12px 16px', background: '#f0fdf4', border: '1px solid #bbf7d0', borderRadius: '6px'}}>
+            <div style={{display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '8px'}}>
+              <span style={{fontSize: '11px', fontWeight: '700', color: '#166534', textTransform: 'uppercase', letterSpacing: '0.05em'}}>Payment Confirmed</span>
+              <span style={{display: 'inline-block', padding: '1px 8px', background: '#16a34a', color: '#fff', borderRadius: '4px', fontSize: '10px', fontWeight: '600'}}>PAID</span>
+            </div>
+            <div style={{display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '8px', fontSize: '11px', color: '#166534'}}>
+              {poData.paymentMadeDate && (
+                <div>
+                  <span style={{fontWeight: '600'}}>Payment Date: </span>
+                  <span>{formatDate(poData.paymentMadeDate)}</span>
+                </div>
+              )}
+              {poData.paymentRemarks && (
+                <div>
+                  <span style={{fontWeight: '600'}}>Remarks: </span>
+                  <span>{poData.paymentRemarks}</span>
+                </div>
+              )}
+            </div>
+          </div>
+        )}
+
         {/* Footer */}
         <div className="print-footer">
           <div className="page-number">Page 1/1</div>

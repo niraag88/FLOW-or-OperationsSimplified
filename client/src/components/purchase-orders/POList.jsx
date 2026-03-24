@@ -13,6 +13,7 @@ import {
   DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
+import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
 import ReceiveGoodsDialog from "./ReceiveGoodsDialog";
 import POActionsDropdown from "./POActionsDropdown";
 import { formatCurrency } from "@/utils/currency";
@@ -122,9 +123,29 @@ export default function POList({ purchaseOrders, totalCount, loading, canEdit, c
                       <TableCell>
                         {(() => {
                           const ps = po.paymentStatus || po.payment_status || 'outstanding';
-                          return ps === 'paid'
-                            ? <Badge className="bg-green-100 text-green-800 border border-green-200">PAID</Badge>
-                            : <Badge className="bg-amber-100 text-amber-800 border border-amber-200">OUTSTANDING</Badge>;
+                          const paidDate = po.paymentMadeDate || po.payment_made_date;
+                          const remarks = po.paymentRemarks || po.payment_remarks;
+                          if (ps === 'paid') {
+                            const badge = (
+                              <div className="flex flex-col gap-0.5">
+                                <Badge className="bg-green-100 text-green-800 border border-green-200 w-fit">PAID</Badge>
+                                {paidDate && <span className="text-xs text-gray-500">{formatDate(paidDate)}</span>}
+                              </div>
+                            );
+                            if (remarks) {
+                              return (
+                                <Tooltip>
+                                  <TooltipTrigger asChild>{badge}</TooltipTrigger>
+                                  <TooltipContent side="top" className="max-w-xs">
+                                    <p className="text-xs font-medium mb-1">Payment Remarks</p>
+                                    <p className="text-xs">{remarks}</p>
+                                  </TooltipContent>
+                                </Tooltip>
+                              );
+                            }
+                            return badge;
+                          }
+                          return <Badge className="bg-amber-100 text-amber-800 border border-amber-200">OUTSTANDING</Badge>;
                         })()}
                       </TableCell>
                       <TableCell>
