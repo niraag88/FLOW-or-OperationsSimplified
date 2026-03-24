@@ -9,8 +9,7 @@ import {
 import { Button } from "@/components/ui/button";
 import { MoreHorizontal, Edit2, Trash2 } from "lucide-react";
 import { useToast } from "@/components/ui/use-toast";
-import { Customer, RecycleBin, AuditLog } from "@/api/entities";
-import { logAuditAction } from "../utils/auditLogger";
+import { Customer } from "@/api/entities";
 import SimpleConfirmDialog from "../common/SimpleConfirmDialog";
 
 export default function CustomerActionsDropdown({ customer, onEdit, onRefresh }) {
@@ -19,34 +18,6 @@ export default function CustomerActionsDropdown({ customer, onEdit, onRefresh })
 
   const handleDelete = async () => {
     try {
-      // Move to recycle bin
-      await RecycleBin.create({
-        document_type: 'Customer',
-        document_id: customer.id,
-        document_number: customer.name,
-        document_data: customer,
-        deleted_by: 'admin@example.com',
-        deleted_date: new Date().toISOString(),
-        reason: 'Deleted from UI',
-        original_status: customer.isActive ? 'Active' : 'Inactive',
-        can_restore: true
-      });
-
-      // Log the deletion
-      await AuditLog.create({
-        entity_type: 'Customer',
-        entity_id: customer.id,
-        action: 'deleted',
-        user_email: 'admin@example.com',
-        changes: { 
-          customer_name: customer.name,
-          deletion_reason: 'Deleted from UI',
-          moved_to_recycle_bin: true
-        },
-        timestamp: new Date().toISOString()
-      });
-
-      // Delete from main table
       await Customer.delete(customer.id);
 
       toast({

@@ -15,7 +15,7 @@ import {
   DialogTitle,
 } from "@/components/ui/dialog";
 import { Plus, Edit2, Trash2, Building2, ExternalLink } from "lucide-react";
-import { Brand, RecycleBin, AuditLog } from "@/api/entities";
+import { Brand } from "@/api/entities";
 import { useAuth } from "@/hooks/useAuth";
 import { logAuditAction } from "../utils/auditLogger";
 import { useToast } from "@/components/ui/use-toast";
@@ -41,7 +41,7 @@ export default function BrandManagement() {
   const [dialogOpen, setDialogOpen] = useState(false);
   const [brandToDelete, setBrandToDelete] = useState(null);
   const { user: currentUser } = useAuth();
-  const canDelete = ['Admin', 'Manager'].includes(currentUser?.role);
+  const canDelete = ['Admin', 'Manager', 'Staff'].includes(currentUser?.role);
 
   useEffect(() => {
     loadBrands();
@@ -151,34 +151,7 @@ export default function BrandManagement() {
     if (!brandToDelete) return;
     
     try {
-      // Move to recycle bin
-      await RecycleBin.create({
-        document_type: 'Brand',
-        document_id: brandToDelete.id,
-        document_number: brandToDelete.name,
-        document_data: brandToDelete,
-        deleted_by: currentUser?.email || 'unknown',
-        deleted_date: new Date().toISOString(),
-        reason: 'Deleted from UI',
-        original_status: brandToDelete.isActive ? 'Active' : 'Inactive',
-        can_restore: true
-      });
-
-      // Log the deletion
-      await AuditLog.create({
-        entity_type: 'Brand',
-        entity_id: brandToDelete.id,
-        action: 'deleted',
-        user_email: currentUser?.email || 'unknown',
-        changes: { 
-          brand_name: brandToDelete.name,
-          deletion_reason: 'Deleted from UI',
-          moved_to_recycle_bin: true
-        },
-        timestamp: new Date().toISOString()
-      });
-
-      // Delete from main table
+      // Backend handles recycle bin entry + deletion atomically
       await Brand.delete(brandToDelete.id);
       
       toast({

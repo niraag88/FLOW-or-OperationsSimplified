@@ -919,11 +919,24 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  app.delete('/api/brands/:id', requireAuth(['Admin', 'Manager']), async (req: AuthenticatedRequest, res) => {
+  app.delete('/api/brands/:id', requireAuth(), async (req: AuthenticatedRequest, res) => {
     try {
       const brandId = parseInt(req.params.id);
-      const deletedBrand = await businessStorage.deleteBrand(brandId);
-      writeAuditLog({ actor: req.user!.id, actorName: req.user?.username || String(req.user!.id), targetId: String(brandId), targetType: 'brand', action: 'DELETE', details: `Brand '${deletedBrand?.name || brandId}' deleted` });
+      const [brandToDelete] = await db.select().from(brands).where(eq(brands.id, brandId));
+      if (!brandToDelete) return res.status(404).json({ error: 'Brand not found' });
+      await db.insert(recycleBin).values({
+        documentType: 'Brand',
+        documentId: String(brandId),
+        documentNumber: brandToDelete.name,
+        documentData: JSON.stringify({ header: brandToDelete, items: [] }),
+        deletedBy: req.user?.username || 'unknown',
+        deletedDate: new Date(),
+        reason: 'Deleted from UI',
+        originalStatus: brandToDelete.isActive ? 'Active' : 'Inactive',
+        canRestore: true,
+      });
+      await businessStorage.deleteBrand(brandId);
+      writeAuditLog({ actor: req.user!.id, actorName: req.user?.username || String(req.user!.id), targetId: String(brandId), targetType: 'brand', action: 'DELETE', details: `Brand '${brandToDelete.name}' moved to recycle bin` });
       res.json({ success: true });
     } catch (error) {
       console.error('Error deleting brand:', error);
@@ -967,14 +980,24 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  app.delete('/api/suppliers/:id', requireAuth(['Admin', 'Manager']), async (req: AuthenticatedRequest, res) => {
+  app.delete('/api/suppliers/:id', requireAuth(), async (req: AuthenticatedRequest, res) => {
     try {
       const supplierId = parseInt(req.params.id);
-      const deletedSupplier = await businessStorage.deleteSupplier(supplierId);
-      if (!deletedSupplier) {
-        return res.status(404).json({ error: 'Supplier not found' });
-      }
-      writeAuditLog({ actor: req.user!.id, actorName: req.user?.username || String(req.user!.id), targetId: String(supplierId), targetType: 'supplier', action: 'DELETE', details: `Supplier '${deletedSupplier.name}' deleted` });
+      const [supplierToDelete] = await db.select().from(suppliers).where(eq(suppliers.id, supplierId));
+      if (!supplierToDelete) return res.status(404).json({ error: 'Supplier not found' });
+      await db.insert(recycleBin).values({
+        documentType: 'Supplier',
+        documentId: String(supplierId),
+        documentNumber: supplierToDelete.name,
+        documentData: JSON.stringify({ header: supplierToDelete, items: [] }),
+        deletedBy: req.user?.username || 'unknown',
+        deletedDate: new Date(),
+        reason: 'Deleted from UI',
+        originalStatus: supplierToDelete.isActive ? 'Active' : 'Inactive',
+        canRestore: true,
+      });
+      await businessStorage.deleteSupplier(supplierId);
+      writeAuditLog({ actor: req.user!.id, actorName: req.user?.username || String(req.user!.id), targetId: String(supplierId), targetType: 'supplier', action: 'DELETE', details: `Supplier '${supplierToDelete.name}' moved to recycle bin` });
       res.json({ success: true });
     } catch (error) {
       console.error('Error deleting supplier:', error);
@@ -1023,8 +1046,19 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const customerId = parseInt(req.params.id);
       const [customerToDelete] = await db.select().from(customers).where(eq(customers.id, customerId));
       if (!customerToDelete) return res.status(404).json({ error: 'Customer not found' });
+      await db.insert(recycleBin).values({
+        documentType: 'Customer',
+        documentId: String(customerId),
+        documentNumber: customerToDelete.name,
+        documentData: JSON.stringify({ header: customerToDelete, items: [] }),
+        deletedBy: req.user?.username || 'unknown',
+        deletedDate: new Date(),
+        reason: 'Deleted from UI',
+        originalStatus: customerToDelete.isActive ? 'Active' : 'Inactive',
+        canRestore: true,
+      });
       await db.delete(customers).where(eq(customers.id, customerId));
-      writeAuditLog({ actor: req.user!.id, actorName: req.user?.username || String(req.user!.id), targetId: String(customerId), targetType: 'customer', action: 'DELETE', details: `Customer '${customerToDelete.name}' deleted` });
+      writeAuditLog({ actor: req.user!.id, actorName: req.user?.username || String(req.user!.id), targetId: String(customerId), targetType: 'customer', action: 'DELETE', details: `Customer '${customerToDelete.name}' moved to recycle bin` });
       res.json({ success: true });
     } catch (error) {
       console.error('Error deleting customer:', error);
@@ -3337,7 +3371,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
       const { header, items: lineItems = [] } = JSON.parse(item.documentData);
 
-      if (!['Invoice', 'DeliveryOrder', 'Quotation', 'PurchaseOrder', 'Product'].includes(item.documentType)) {
+      if (!['Invoice', 'DeliveryOrder', 'Quotation', 'PurchaseOrder', 'Product', 'Brand', 'Supplier', 'Customer'].includes(item.documentType)) {
         return res.status(400).json({ error: `Unknown document type: ${item.documentType}` });
       }
 
@@ -3396,6 +3430,15 @@ export async function registerRoutes(app: Express): Promise<Server> {
             ...productData,
             isActive: true,
           });
+        } else if (item.documentType === 'Brand') {
+          const { id: _id, createdAt: _ca, ...brandData } = header;
+          await tx.insert(brands).values({ ...brandData });
+        } else if (item.documentType === 'Supplier') {
+          const { id: _id, createdAt: _ca, ...supplierData } = header;
+          await tx.insert(suppliers).values({ ...supplierData });
+        } else if (item.documentType === 'Customer') {
+          const { id: _id, createdAt: _ca, ...customerData } = header;
+          await tx.insert(customers).values({ ...customerData });
         }
         // Remove from recycle bin atomically with the restore
         await tx.delete(recycleBin).where(eq(recycleBin.id, id));
