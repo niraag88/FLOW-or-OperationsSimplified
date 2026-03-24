@@ -73,29 +73,14 @@ function PagesContent() {
           <Layout currentPageName="Inventory"><Inventory /></Layout>
         </ProtectedRoute>
       } />
-      <Route path="/PurchaseOrders" element={
-        <ProtectedRoute requiredRoles={['Admin', 'Manager']}>
-          <Layout currentPageName="Purchase Orders"><PurchaseOrders /></Layout>
-        </ProtectedRoute>
-      } />
       <Route path="/purchase-orders" element={
         <ProtectedRoute requiredRoles={['Admin', 'Manager']}>
           <Layout currentPageName="Purchase Orders"><PurchaseOrders /></Layout>
         </ProtectedRoute>
       } />
-      <Route path="/DeliveryOrders" element={
-        <ProtectedRoute>
-          <Layout currentPageName="Delivery Orders"><DeliveryOrders /></Layout>
-        </ProtectedRoute>
-      } />
       <Route path="/delivery-orders" element={
         <ProtectedRoute>
           <Layout currentPageName="Delivery Orders"><DeliveryOrders /></Layout>
-        </ProtectedRoute>
-      } />
-      <Route path="/Invoices" element={
-        <ProtectedRoute>
-          <Layout currentPageName="Invoices"><Invoices /></Layout>
         </ProtectedRoute>
       } />
       <Route path="/invoices" element={
