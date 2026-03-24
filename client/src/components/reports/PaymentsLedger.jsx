@@ -8,7 +8,6 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@
 import { ChevronDown, ChevronRight, CreditCard, TrendingUp, TrendingDown, Search } from "lucide-react";
 import ExportDropdown from "../common/ExportDropdown";
 import { getRateToAed } from "@/utils/currency";
-import { format } from "date-fns";
 
 const fmt = (v) => new Intl.NumberFormat("en-US", { minimumFractionDigits: 2, maximumFractionDigits: 2 }).format(v);
 
@@ -20,14 +19,6 @@ function fmtDate(val) {
     return d.toLocaleDateString("en-GB");
   } catch {
     return "—";
-  }
-}
-
-function fmtMonthLabel(month) {
-  try {
-    return format(new Date(month + "-01"), "MMM yyyy");
-  } catch {
-    return month;
   }
 }
 
@@ -235,10 +226,17 @@ function SalesPaymentsSection({ invoices, companySettings, canExport }) {
   }, [invoices, companySettings]);
 
   const filtered = useMemo(() => {
+    const fromTs = dateFrom ? new Date(dateFrom).getTime() : null;
+    const toTs = dateTo ? new Date(dateTo + "T23:59:59").getTime() : null;
     return enriched.filter((r) => {
       if (paymentFilter !== "all" && r._paymentStatus !== paymentFilter) return false;
-      if (dateFrom && r._date && r._date < dateFrom) return false;
-      if (dateTo && r._date && r._date > dateTo) return false;
+      if (r._date && (fromTs || toTs)) {
+        const ts = new Date(r._date).getTime();
+        if (!isNaN(ts)) {
+          if (fromTs && ts < fromTs) return false;
+          if (toTs && ts > toTs) return false;
+        }
+      }
       if (search) {
         const q = search.toLowerCase();
         if (!r._ref.toLowerCase().includes(q) && !r._customer.toLowerCase().includes(q)) return false;
@@ -380,10 +378,17 @@ function PurchasesPaymentsSection({ purchaseOrders, suppliers, companySettings, 
   }, [purchaseOrders, suppliers, companySettings]);
 
   const filtered = useMemo(() => {
+    const fromTs = dateFrom ? new Date(dateFrom).getTime() : null;
+    const toTs = dateTo ? new Date(dateTo + "T23:59:59").getTime() : null;
     return enriched.filter((r) => {
       if (paymentFilter !== "all" && r._paymentStatus !== paymentFilter) return false;
-      if (dateFrom && r._date && r._date < dateFrom) return false;
-      if (dateTo && r._date && r._date > dateTo) return false;
+      if (r._date && (fromTs || toTs)) {
+        const ts = new Date(r._date).getTime();
+        if (!isNaN(ts)) {
+          if (fromTs && ts < fromTs) return false;
+          if (toTs && ts > toTs) return false;
+        }
+      }
       if (search) {
         const q = search.toLowerCase();
         if (!r._ref.toLowerCase().includes(q) && !r._supplier.toLowerCase().includes(q)) return false;
