@@ -1,0 +1,29 @@
+High
+
+1. Your error middleware still rethrows after sending the response.
+In server/index.ts, the error handler sends res.status(...).json(...) and then immediately does throw err;. In practice, that can turn a handled request error into a process-level crash or unstable behavior, depending on how Node/Replit/hosting handles uncaught exceptions. This is the main thing I would still treat as important before relying on the app daily.
+
+2. Signed upload/download tokens are still stored in memory.
+server/routes.ts still uses an in-memory Map for signed tokens, and the code comment itself says “in production, use Redis or similar.” That means tokens can disappear on restart, and this is not safe for multi-instance hosting later. For your current small internal use, it may be acceptable temporarily, but it is still a real operational weakness.
+
+Medium
+
+3. I still do not see standard security middleware like Helmet or explicit CORS handling in the main server files I checked.
+For an internal same-origin app, this may not bite immediately, but if you publish it on a public domain, I would want headers hardening and a clear origin policy. I searched server/routes.ts and server/index.ts and did not find Helmet or CORS middleware there.
+
+4. Route duplication is still present in the frontend.
+You still have duplicate case-variant routes like /DeliveryOrders and /delivery-orders, and /Invoices and /invoices. That is not a launch blocker, but it makes navigation behavior and future cleanup messier than necessary.
+
+5. server/routes.ts is still very large.
+It is now about 3,736 LOC / 170 KB, which means future changes carry more accidental-risk than they should. This is not “broken,” but it is still a maintenance flag. businessStorage.ts is also substantial at 914 LOC / 38.8 KB.
+
+6. Your production install may be heavier than needed.
+I can see @playwright/test under dependencies rather than only devDependencies, and puppeteer is also installed as a runtime dependency. If those are not needed in production, they will increase install/build size and can make deployments slower or heavier than necessary.
+
+7. Uploads use memory storage.
+The upload flow still uses multer.memoryStorage(), and your validation allows PDFs up to 25 MB. For your real-world usage this is probably fine, but on a small instance it means a few large simultaneous uploads could spike memory.
+
+Low
+
+8. Repo hygiene could still be cleaner.
+At the repo root I can see .canvas/assets, attached_assets, and test-results checked in alongside the app. That is not an app-breakage issue, but it makes the repo heavier and less clean than a production codebase ideally should be.
