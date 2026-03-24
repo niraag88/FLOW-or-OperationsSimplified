@@ -266,7 +266,10 @@ export default function PurchaseOrders() {
                 const rate = parseFloat(row?.fxRateToAed || 4.85);
                 const aed = cur === 'AED' ? amt : amt * rate;
                 return `AED ${aed.toFixed(2)}`;
-              }}
+              }},
+              paymentStatus: { label: 'Payment Status', transform: (val) => val ? val.charAt(0).toUpperCase() + val.slice(1) : 'Outstanding' },
+              paymentMadeDate: { label: 'Payment Date', transform: (val) => val ? new Date(val).toLocaleDateString('en-GB') : '' },
+              paymentRemarks: { label: 'Payment Remarks', transform: (val) => val || '' }
             } : goodsReceiptsColumns}
             isLoading={loading}
           />

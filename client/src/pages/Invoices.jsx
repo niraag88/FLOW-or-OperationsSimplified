@@ -415,7 +415,10 @@ export default function Invoices() {
               status: { label: 'Status', transform: (val) => val ? val.toUpperCase() : '' },
               vatAmount: { label: 'VAT (AED)', transform: (val, item) => `AED ${parseFloat(val || 0).toFixed(2)}` },
               amount: { label: 'Total (AED)', transform: (val) => `AED ${parseFloat(val || 0).toFixed(2)}` },
-              currency: 'Currency'
+              currency: 'Currency',
+              paymentStatus: { label: 'Payment Status', transform: (val) => val ? val.charAt(0).toUpperCase() + val.slice(1) : 'Outstanding' },
+              paymentReceivedDate: { label: 'Payment Date', transform: (val) => val ? new Date(val).toLocaleDateString('en-GB') : '' },
+              paymentRemarks: { label: 'Payment Remarks', transform: (val) => val || '' }
             }}
             isLoading={loading}
           />

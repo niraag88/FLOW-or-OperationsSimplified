@@ -3,28 +3,23 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
-import { ShoppingCart } from "lucide-react";
+import { ShoppingCart, Info, Pencil } from "lucide-react";
 import { Skeleton } from "@/components/ui/skeleton";
 import { formatDate } from "@/utils/dateUtils";
-import { 
-  DropdownMenu,
-  DropdownMenuContent,
-  DropdownMenuItem,
-  DropdownMenuSeparator,
-  DropdownMenuTrigger,
-} from "@/components/ui/dropdown-menu";
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
+import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import ReceiveGoodsDialog from "./ReceiveGoodsDialog";
+import MarkPOPaidDialog from "./MarkPOPaidDialog";
 import POActionsDropdown from "./POActionsDropdown";
 import { formatCurrency } from "@/utils/currency";
 
 export default function POList({ purchaseOrders, totalCount, loading, canEdit, currentUser, onEdit, onRefresh }) {
   const [showReceiveDialog, setShowReceiveDialog] = useState(false);
   const [selectedPO, setSelectedPO] = useState(null);
+  const [showEditPaymentDialog, setShowEditPaymentDialog] = useState(false);
+  const [editPaymentPO, setEditPaymentPO] = useState(null);
 
-  const getBrandName = (po) => {
-    return po.supplierName || 'Unknown Supplier';
-  };
+  const getBrandName = (po) => po.supplierName || 'Unknown Supplier';
 
   const getStatusColor = (status) => {
     switch (status?.toLowerCase()) {
@@ -48,8 +43,18 @@ export default function POList({ purchaseOrders, totalCount, loading, canEdit, c
     setShowReceiveDialog(true);
   };
 
-  const canReceiveGoods = (po) => {
-    return canEdit && (po.status === 'issued' || po.status === 'received');
+  const handleEditPayment = (po) => {
+    setEditPaymentPO(po);
+    setShowEditPaymentDialog(true);
+  };
+
+  const formatPaymentDate = (dateVal) => {
+    if (!dateVal) return null;
+    try {
+      return new Date(dateVal).toLocaleDateString('en-GB', { day: '2-digit', month: 'short', year: 'numeric' });
+    } catch {
+      return null;
+    }
   };
 
   if (loading) {
@@ -106,6 +111,11 @@ export default function POList({ purchaseOrders, totalCount, loading, canEdit, c
                 {purchaseOrders.map((po) => {
                   const currency = po.currency || 'GBP';
                   const aedTotal = getAedEquivalent(po);
+                  const ps = po.paymentStatus || po.payment_status || 'outstanding';
+                  const paidDate = po.paymentMadeDate || po.payment_made_date;
+                  const remarks = po.paymentRemarks || po.payment_remarks;
+                  const formattedDate = formatPaymentDate(paidDate);
+
                   return (
                     <TableRow key={po.id} className="hover:bg-gray-50">
                       <TableCell className="font-medium">{po.poNumber}</TableCell>
@@ -121,35 +131,66 @@ export default function POList({ purchaseOrders, totalCount, loading, canEdit, c
                         </Badge>
                       </TableCell>
                       <TableCell>
-                        {(() => {
-                          const ps = po.paymentStatus || po.payment_status || 'outstanding';
-                          const paidDate = po.paymentMadeDate || po.payment_made_date;
-                          const remarks = po.paymentRemarks || po.payment_remarks;
-                          if (ps === 'paid') {
-                            const badge = (
-                              <div className="flex flex-col gap-0.5">
-                                <Badge className="bg-green-100 text-green-800 border border-green-200 w-fit">PAID</Badge>
-                                {paidDate && <span className="text-xs text-gray-500">{formatDate(paidDate)}</span>}
-                              </div>
-                            );
-                            if (remarks) {
-                              return (
-                                <Tooltip>
-                                  <TooltipTrigger asChild>{badge}</TooltipTrigger>
-                                  <TooltipContent side="top" className="max-w-xs">
-                                    <p className="text-xs font-medium mb-1">Payment Remarks</p>
-                                    <p className="text-xs">{remarks}</p>
-                                  </TooltipContent>
-                                </Tooltip>
-                              );
-                            }
-                            return badge;
-                          }
-                          return <Badge className="bg-amber-100 text-amber-800 border border-amber-200">OUTSTANDING</Badge>;
-                        })()}
+                        {ps === 'paid' ? (
+                          <div className="flex items-center gap-1.5">
+                            <Popover>
+                              <PopoverTrigger asChild>
+                                <button className="flex items-center gap-1.5 hover:opacity-75 transition-opacity cursor-pointer">
+                                  <Badge className="bg-green-100 text-green-800 border border-green-200">PAID</Badge>
+                                  {formattedDate && (
+                                    <span className="text-xs text-gray-600 whitespace-nowrap">{formattedDate}</span>
+                                  )}
+                                </button>
+                              </PopoverTrigger>
+                              <PopoverContent className="w-64 p-3" align="start">
+                                <p className="text-sm font-semibold text-gray-900 mb-2">Payment Details</p>
+                                <div className="space-y-1.5 text-xs text-gray-700 mb-3">
+                                  {formattedDate && (
+                                    <div className="flex gap-1">
+                                      <span className="font-medium w-16 shrink-0">Date:</span>
+                                      <span>{formattedDate}</span>
+                                    </div>
+                                  )}
+                                  {remarks && (
+                                    <div className="flex gap-1">
+                                      <span className="font-medium w-16 shrink-0">Remarks:</span>
+                                      <span className="break-words">{remarks}</span>
+                                    </div>
+                                  )}
+                                  {!formattedDate && !remarks && (
+                                    <span className="text-gray-400 italic">No details recorded</span>
+                                  )}
+                                </div>
+                                {canEdit && (
+                                  <Button
+                                    size="sm"
+                                    variant="outline"
+                                    className="w-full text-xs h-7"
+                                    onClick={() => handleEditPayment(po)}
+                                  >
+                                    <Pencil className="w-3 h-3 mr-1" />
+                                    Edit Payment Details
+                                  </Button>
+                                )}
+                              </PopoverContent>
+                            </Popover>
+                            {remarks && (
+                              <Tooltip>
+                                <TooltipTrigger asChild>
+                                  <Info className="w-3.5 h-3.5 text-gray-400 cursor-help shrink-0" />
+                                </TooltipTrigger>
+                                <TooltipContent side="top" className="max-w-xs">
+                                  <p className="text-xs">{remarks}</p>
+                                </TooltipContent>
+                              </Tooltip>
+                            )}
+                          </div>
+                        ) : (
+                          <Badge className="bg-amber-100 text-amber-800 border border-amber-200">OUTSTANDING</Badge>
+                        )}
                       </TableCell>
                       <TableCell>
-                        <POActionsDropdown 
+                        <POActionsDropdown
                           po={po}
                           canEdit={canEdit}
                           onEdit={onEdit}
@@ -182,6 +223,19 @@ export default function POList({ purchaseOrders, totalCount, loading, canEdit, c
             onRefresh();
           }}
           currentUser={currentUser}
+        />
+      )}
+
+      {showEditPaymentDialog && editPaymentPO && (
+        <MarkPOPaidDialog
+          open={showEditPaymentDialog}
+          onClose={() => { setShowEditPaymentDialog(false); setEditPaymentPO(null); }}
+          po={editPaymentPO}
+          onSuccess={() => {
+            setShowEditPaymentDialog(false);
+            setEditPaymentPO(null);
+            onRefresh();
+          }}
         />
       )}
     </>
