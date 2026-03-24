@@ -52,7 +52,7 @@ const navigationItems = [
       },
       {
         title: "Purchase Orders",
-        url: createPageUrl("PurchaseOrders"),
+        url: createPageUrl("Purchase Orders"),
         icon: ShoppingCart,
       },
       {
@@ -79,7 +79,7 @@ const navigationItems = [
       },
       {
         title: "Delivery Orders",
-        url: createPageUrl("DeliveryOrders"),
+        url: createPageUrl("Delivery Orders"),
         icon: Truck,
       }
     ]

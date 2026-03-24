@@ -16,7 +16,7 @@ export default function QuickActions() {
     {
       title: "New Purchase Order",
       icon: ShoppingCart,
-      href: createPageUrl("PurchaseOrders"),
+      href: createPageUrl("Purchase Orders"),
       color: "bg-emerald-500 hover:bg-emerald-600"
     },
     {
@@ -34,7 +34,7 @@ export default function QuickActions() {
     {
       title: "New Delivery Order",
       icon: Truck,
-      href: createPageUrl("DeliveryOrders"),
+      href: createPageUrl("Delivery Orders"),
       color: "bg-amber-500 hover:bg-amber-600"
     }
   ];
