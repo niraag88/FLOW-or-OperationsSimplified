@@ -1,0 +1,119 @@
+I need you to add a SIMPLE payment tracking feature to my existing business operations app.
+
+IMPORTANT:
+- Do not redesign or rewrite unrelated parts of the app.
+- Do not break existing invoice, PO, reports, print, or PDF functionality.
+- Keep the current UI style and architecture.
+- Make the smallest clean changes necessary.
+- Before making changes, first inspect the existing schema, routes, reports, and UI so the implementation fits the current codebase.
+
+FUNCTIONAL REQUIREMENT
+
+1) INVOICES
+Invoices need payment tracking so we can see:
+- which invoices are still outstanding
+- which invoices have been paid by customers
+
+For invoices, add:
+- paymentStatus: "outstanding" or "paid"
+- paymentReceivedDate: nullable date
+- paymentRemarks: nullable text
+
+Behavior:
+- All existing invoices should default to "outstanding"
+- User must be able to mark an invoice as paid
+- When marking as paid, user should be able to enter:
+  - payment received date
+  - remarks (example: bank transfer, cash received, cheque, etc.)
+- User should also be able to revert a paid invoice back to outstanding if needed
+- If reverted to outstanding, clear or handle the paid date and remarks logically
+
+2) PURCHASE ORDERS
+POs need payment tracking for supplier payments so we can see:
+- which POs are still to be paid
+- which POs have already been paid to suppliers
+
+For purchase orders, add:
+- paymentStatus: "outstanding" or "paid"
+- paymentMadeDate: nullable date
+- paymentRemarks: nullable text
+
+Behavior:
+- All existing POs should default to "outstanding"
+- User must be able to mark a PO as paid
+- When marking as paid, user should be able to enter:
+  - payment made date
+  - remarks (example: bank transfer, cash, remittance, etc.)
+- User should also be able to revert a paid PO back to outstanding if needed
+
+3) UI REQUIREMENTS
+Add this feature cleanly in the existing invoice and purchase order screens.
+
+For both invoices and POs:
+- show payment status clearly in list/table view
+- add filters for:
+  - all
+  - outstanding
+  - paid
+- show payment status in detail/view page if such page exists
+- add a simple action/button such as:
+  - Mark as Paid
+  - Mark as Outstanding / Undo Paid
+- use modal/dialog or safe inline form to capture payment date and remarks
+- do not clutter the UI
+
+4) REPORTS
+Update reports so payment status is visible and usable.
+
+Invoices reports should show:
+- paid invoices
+- outstanding invoices
+- ability to filter by payment status
+- totals/counts where appropriate
+
+PO reports should show:
+- paid POs
+- outstanding POs
+- ability to filter by payment status
+- totals/counts where appropriate
+
+If there is a financial summary/report dashboard, include simple counts and values for:
+- outstanding invoices
+- paid invoices
+- outstanding POs
+- paid POs
+
+Only do this if it fits naturally into the current reports structure.
+
+5) DATABASE / BACKEND
+- Add the necessary schema changes cleanly
+- Create/update migrations safely
+- Update types/interfaces/validation
+- Update backend routes/controllers/storage logic
+- Ensure status updates are saved properly
+- Keep naming clear and consistent
+
+6) SAFE IMPLEMENTATION RULES
+- Keep v1 simple: only "outstanding" and "paid"
+- Do NOT add partial payments, split payments, payment allocations, or accounting complexity
+- Do NOT change the meaning of invoice totals or PO totals
+- Do NOT affect printing/PDF generation unless needed to display payment status
+- Do NOT break existing search, filters, or CRUD behavior
+
+7) TESTING
+After implementation:
+- check that old records load correctly
+- check new invoices and POs default to outstanding
+- check mark as paid works
+- check revert to outstanding works
+- check filters work
+- check reports reflect payment status
+- check no existing functionality is broken
+
+8) DELIVERABLE
+Please:
+- implement the feature
+- explain which files were changed
+- explain any migration/schema changes
+- mention any assumptions made
+- keep everything production-safe and minimal
