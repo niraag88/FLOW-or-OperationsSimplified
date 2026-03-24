@@ -17,7 +17,7 @@ import { User } from "@/api/entities";
 import SimpleConfirmDialog from "../common/SimpleConfirmDialog";
 
 
-export default function QuotationActionsDropdown({ quotation, canEdit, onEdit, onRefresh }) {
+export default function QuotationActionsDropdown({ quotation, canEdit, canCreate, onEdit, onRefresh }) {
   const { toast } = useToast();
   const [showDeleteDialog, setShowDeleteDialog] = useState(false);
   const [currentUser, setCurrentUser] = useState(null);

@@ -46,6 +46,12 @@ export default function QuotationList({ quotations, totalCount, loading, canEdit
     return !['accepted', 'rejected', 'invoiced'].includes(quotation.status);
   };
 
+  const canEditActions = (quotation) => {
+    if (!canEdit) return false;
+    if (canOverride) return true;
+    return !['accepted', 'rejected', 'invoiced'].includes(quotation.status);
+  };
+
   if (loading) {
     return (
       <Card className="border-0 shadow-lg">
@@ -121,7 +127,8 @@ export default function QuotationList({ quotations, totalCount, loading, canEdit
                     <TableCell>
                       <QuotationActionsDropdown 
                         quotation={quotation}
-                        canEdit={canPerformActions(quotation)}
+                        canEdit={canEditActions(quotation)}
+                        canCreate={canPerformActions(quotation)}
                         canOverride={canOverride}
                         onEdit={onEdit}
                         onRefresh={onRefresh}
