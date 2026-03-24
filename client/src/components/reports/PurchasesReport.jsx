@@ -89,7 +89,7 @@ export default function PurchasesReport({ purchaseOrders, suppliers, companySett
   return (
     <div className="space-y-6">
       {/* Summary Cards */}
-      <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
+      <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
         <Card className="p-4">
           <div className="text-center">
             <p className="text-2xl font-bold text-blue-600">{totals.totalOrders}</p>
@@ -100,20 +100,6 @@ export default function PurchasesReport({ purchaseOrders, suppliers, companySett
           <div className="text-center">
             <p className="text-2xl font-bold text-purple-600">AED {fmt(totals.totalAED)}</p>
             <p className="text-sm text-gray-600">Total Value (AED)</p>
-          </div>
-        </Card>
-        <Card className="p-4">
-          <div className="text-center">
-            <p className="text-2xl font-bold text-amber-600">{totals.outstandingOrders}</p>
-            <p className="text-sm text-gray-600">Outstanding POs</p>
-            <p className="text-xs text-amber-600 font-medium mt-1">AED {fmt(totals.outstandingAED)}</p>
-          </div>
-        </Card>
-        <Card className="p-4">
-          <div className="text-center">
-            <p className="text-2xl font-bold text-green-600">{totals.paidOrders}</p>
-            <p className="text-sm text-gray-600">Paid POs</p>
-            <p className="text-xs text-green-600 font-medium mt-1">AED {fmt(totals.paidAED)}</p>
           </div>
         </Card>
       </div>

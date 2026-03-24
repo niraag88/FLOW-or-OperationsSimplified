@@ -7,7 +7,8 @@ import {
   FileText,
   Package,
   ShoppingCart,
-  BarChart3
+  BarChart3,
+  Wallet
 } from "lucide-react";
 
 // Import Report Components
@@ -15,6 +16,7 @@ import PoGrnReport from "../components/reports/PoGrnReport";
 import SalesAgedInvoicesReport from "../components/reports/SalesAgedInvoicesReport";
 import PurchasesReport from "../components/reports/PurchasesReport";
 import VATReportTab from "../components/reports/VATReportTab";
+import PaymentsLedger from "../components/reports/PaymentsLedger";
 
 function normalizeTaxTreatment(raw) {
   if (!raw) return 'StandardRated';
@@ -139,7 +141,7 @@ export default function Reports() {
       </div>
 
       <Tabs defaultValue="po_vs_grn" className="w-full">
-        <TabsList className="grid w-full max-w-3xl grid-cols-4">
+        <TabsList className="grid w-full max-w-4xl grid-cols-5">
           <TabsTrigger value="po_vs_grn">
             <ShoppingCart className="w-4 h-4 mr-2" />
             PO vs GRN
@@ -155,6 +157,10 @@ export default function Reports() {
           <TabsTrigger value="vat_report">
             <FileText className="w-4 h-4 mr-2" />
             VAT Report
+          </TabsTrigger>
+          <TabsTrigger value="payments">
+            <Wallet className="w-4 h-4 mr-2" />
+            Payments
           </TabsTrigger>
         </TabsList>
         <TabsContent value="po_vs_grn" className="mt-6">
@@ -189,6 +195,15 @@ export default function Reports() {
             companySettings={data.companySettings}
             currentUser={currentUser}
             loading={loading}
+          />
+        </TabsContent>
+        <TabsContent value="payments" className="mt-6">
+          <PaymentsLedger
+            invoices={data.invoices}
+            purchaseOrders={data.purchaseOrders}
+            suppliers={data.suppliers}
+            companySettings={data.companySettings}
+            canExport={!!currentUser}
           />
         </TabsContent>
       </Tabs>
