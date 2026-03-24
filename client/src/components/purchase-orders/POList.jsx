@@ -169,7 +169,7 @@ export default function POList({ purchaseOrders, totalCount, loading, canEdit, c
                           <span>{formatCurrency(po.totalAmount || 0, currency)}</span>
                           {isShortDelivered(po) && getReconciledAmount(po) !== null && (
                             <div className="mt-1 flex items-center gap-0.5 text-xs font-semibold text-amber-900 bg-amber-100 border border-amber-400 rounded px-1.5 py-0.5 w-fit whitespace-nowrap">
-                              Reconciled payable: {formatCurrency(getReconciledAmount(po), currency)}
+                              Reconciled payable: {formatCurrency(getReconciledAmount(po), currency)} of {formatCurrency(po.totalAmount || 0, currency)}
                             </div>
                           )}
                         </div>
