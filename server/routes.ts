@@ -1890,6 +1890,9 @@ export async function registerRoutes(app: Express): Promise<Server> {
       if (!paymentStatus || !['outstanding', 'paid'].includes(paymentStatus)) {
         return res.status(400).json({ error: 'paymentStatus must be "outstanding" or "paid"' });
       }
+      if (paymentStatus === 'paid' && !paymentReceivedDate) {
+        return res.status(400).json({ error: 'paymentReceivedDate is required when marking as paid' });
+      }
       const updateData: Record<string, any> = { paymentStatus };
       if (paymentStatus === 'paid') {
         updateData.paymentReceivedDate = paymentReceivedDate || null;
@@ -1915,6 +1918,9 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const { paymentStatus, paymentMadeDate, paymentRemarks } = req.body;
       if (!paymentStatus || !['outstanding', 'paid'].includes(paymentStatus)) {
         return res.status(400).json({ error: 'paymentStatus must be "outstanding" or "paid"' });
+      }
+      if (paymentStatus === 'paid' && !paymentMadeDate) {
+        return res.status(400).json({ error: 'paymentMadeDate is required when marking as paid' });
       }
       const updateData: Record<string, any> = { paymentStatus, updatedAt: new Date() };
       if (paymentStatus === 'paid') {

@@ -789,7 +789,9 @@ export class BusinessStorage {
         invoicesData,
         customersData,
         suppliersData,
-        settingsData
+        settingsData,
+        invoicePaymentStats,
+        poPaymentStats
       ] = await Promise.all([
         this.getProducts(),
         this.getStockCounts(),
@@ -799,8 +801,36 @@ export class BusinessStorage {
         Promise.resolve([]),
         this.getCustomers(),
         this.getSuppliers(),
-        this.getCompanySettings()
+        this.getCompanySettings(),
+        // Invoice payment status counts
+        db.select({
+          paymentStatus: invoices.paymentStatus,
+          count: sql<number>`count(*)::integer`,
+        }).from(invoices).groupBy(invoices.paymentStatus),
+        // PO payment status counts
+        db.select({
+          paymentStatus: purchaseOrders.paymentStatus,
+          count: sql<number>`count(*)::integer`,
+        }).from(purchaseOrders).groupBy(purchaseOrders.paymentStatus),
       ]);
+
+      const invoicePaymentSummary = {
+        outstanding: 0,
+        paid: 0,
+      };
+      for (const row of invoicePaymentStats) {
+        const ps = row.paymentStatus || 'outstanding';
+        invoicePaymentSummary[ps as 'outstanding' | 'paid'] = row.count;
+      }
+
+      const poPaymentSummary = {
+        outstanding: 0,
+        paid: 0,
+      };
+      for (const row of poPaymentStats) {
+        const ps = row.paymentStatus || 'outstanding';
+        poPaymentSummary[ps as 'outstanding' | 'paid'] = row.count;
+      }
 
       return {
         products: productsData,
@@ -818,6 +848,8 @@ export class BusinessStorage {
           totalCustomers: customersData.length,
           totalPurchaseOrders: posData.length,
           totalGoodsReceipts: grnsData.length,
+          invoicePayment: invoicePaymentSummary,
+          poPayment: poPaymentSummary,
           lastUpdated: new Date().toISOString()
         }
       };

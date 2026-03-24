@@ -73,18 +73,23 @@ export default function PurchasesReport({ purchaseOrders, suppliers, companySett
     const amount = Number(po.totalAmount || po.total_amount || 0);
     const currency = po.currency || 'GBP';
     const rate = getFxRate(po);
-    if (currency === 'AED') {
-      acc.totalAED += amount;
+    const amountAed = currency === 'AED' ? amount : amount * rate;
+    acc.totalAED += amountAed;
+    const ps = po.paymentStatus || po.payment_status || 'outstanding';
+    if (ps === 'paid') {
+      acc.paidOrders += 1;
+      acc.paidAED += amountAed;
     } else {
-      acc.totalAED += amount * rate;
+      acc.outstandingOrders += 1;
+      acc.outstandingAED += amountAed;
     }
     return acc;
-  }, { totalOrders: 0, totalAED: 0 });
+  }, { totalOrders: 0, totalAED: 0, paidOrders: 0, paidAED: 0, outstandingOrders: 0, outstandingAED: 0 });
 
   return (
     <div className="space-y-6">
       {/* Summary Cards */}
-      <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+      <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
         <Card className="p-4">
           <div className="text-center">
             <p className="text-2xl font-bold text-blue-600">{totals.totalOrders}</p>
@@ -95,6 +100,20 @@ export default function PurchasesReport({ purchaseOrders, suppliers, companySett
           <div className="text-center">
             <p className="text-2xl font-bold text-purple-600">AED {fmt(totals.totalAED)}</p>
             <p className="text-sm text-gray-600">Total Value (AED)</p>
+          </div>
+        </Card>
+        <Card className="p-4">
+          <div className="text-center">
+            <p className="text-2xl font-bold text-amber-600">{totals.outstandingOrders}</p>
+            <p className="text-sm text-gray-600">Outstanding POs</p>
+            <p className="text-xs text-amber-600 font-medium mt-1">AED {fmt(totals.outstandingAED)}</p>
+          </div>
+        </Card>
+        <Card className="p-4">
+          <div className="text-center">
+            <p className="text-2xl font-bold text-green-600">{totals.paidOrders}</p>
+            <p className="text-sm text-gray-600">Paid POs</p>
+            <p className="text-xs text-green-600 font-medium mt-1">AED {fmt(totals.paidAED)}</p>
           </div>
         </Card>
       </div>
