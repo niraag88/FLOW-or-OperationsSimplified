@@ -19,6 +19,7 @@ import { Product } from "@/api/entities";
 import { PurchaseOrder } from "@/api/entities";
 import { formatDate } from "@/utils/dateUtils";
 import { getRateToAed, formatCurrency, SUPPORTED_CURRENCIES } from "@/utils/currency";
+import { computeReconciliation } from "@/utils/poReconciliation";
 
 export default function POForm({ open, onClose, editingPO, currentUser, onSuccess }) {
   const [loading, setLoading] = useState(false);
@@ -315,13 +316,12 @@ export default function POForm({ open, onClose, editingPO, currentUser, onSucces
   const totalInCurrency = parseFloat(formData.totalAmount) || 0;
   const totalAed = currency === 'AED' ? totalInCurrency : totalInCurrency * fxRate;
 
-  // Reconciliation: only when editing a closed PO with items that have received quantities
-  const showReconciliation = editingPO && editingPO.status === 'closed' && formData.items.length > 0;
-  const reconciledTotal = formData.items.reduce((sum, item) => {
-    return sum + ((item.receivedQuantity ?? 0) * (parseFloat(item.unitPrice) || 0));
-  }, 0);
+  // Reconciliation: show when editing a PO that has at least one item with received quantities (GRNs exist)
+  const recon = computeReconciliation(formData.items);
+  const showReconciliation = editingPO && formData.items.length > 0 && recon.hasGRNData;
+  const reconciledTotal = recon.reconciledTotal;
   const reconciledAed = currency === 'AED' ? reconciledTotal : reconciledTotal * fxRate;
-  const isShortDelivery = reconciledTotal < totalInCurrency - 0.001;
+  const isShortDelivery = recon.isShortDelivery;
 
   return (
     <Dialog open={open} onOpenChange={onClose}>

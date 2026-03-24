@@ -8,7 +8,7 @@ import { invoices, deliveryOrders, auditLog, users, recycleBin, type InsertAudit
 import { insertBrandSchema, insertSupplierSchema, insertCustomerSchema, insertProductSchema, insertPurchaseOrderSchema, insertQuotationSchema, insertInvoiceSchema, insertDeliveryOrderSchema, stockCounts, stockCountItems, goodsReceipts, goodsReceiptItems, stockMovements, products, purchaseOrders, purchaseOrderItems, invoiceLineItems, deliveryOrderItems, suppliers, brands, quotations, quotationItems, customers, companySettings, financialYears, insertFinancialYearSchema, storageObjects } from "@shared/schema";
 import * as XLSX from 'xlsx';
 import { db } from "./db";
-import { eq, desc, sum, inArray } from "drizzle-orm";
+import { eq, desc, sum, inArray, sql } from "drizzle-orm";
 import pkg from 'pg';
 import crypto from 'crypto';
 import multer from 'multer';
@@ -2607,6 +2607,13 @@ export async function registerRoutes(app: Express): Promise<Server> {
         createdAt: goodsReceipts.createdAt,
         poNumber: purchaseOrders.poNumber,
         supplierName: suppliers.name,
+        // isPartial: true when any line item was short delivered
+        isPartial: sql<boolean>`EXISTS (
+          SELECT 1 FROM goods_receipt_items gri
+          WHERE gri.receipt_id = ${goodsReceipts.id}
+            AND gri.ordered_quantity > 0
+            AND gri.received_quantity < gri.ordered_quantity
+        )`.as('isPartial'),
       }).from(goodsReceipts)
         .leftJoin(purchaseOrders, eq(purchaseOrders.id, goodsReceipts.poId))
         .leftJoin(suppliers, eq(suppliers.id, goodsReceipts.supplierId))

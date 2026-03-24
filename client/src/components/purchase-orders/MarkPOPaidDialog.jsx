@@ -13,13 +13,14 @@ import { Textarea } from "@/components/ui/textarea";
 import { CheckCircle, Pencil, AlertTriangle } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import { formatCurrency } from "@/utils/currency";
+import { computeReconciliation } from "@/utils/poReconciliation";
 
 export default function MarkPOPaidDialog({ open, onClose, po, onSuccess }) {
   const { toast } = useToast();
   const [loading, setLoading] = useState(false);
   const [paymentMadeDate, setPaymentMadeDate] = useState("");
   const [paymentRemarks, setPaymentRemarks] = useState("");
-  const [reconciledTotal, setReconciledTotal] = useState(null);
+  const [poItems, setPoItems] = useState([]);
 
   const isEditing = !!(po?.paymentMadeDate || po?.payment_made_date);
 
@@ -36,26 +37,18 @@ export default function MarkPOPaidDialog({ open, onClose, po, onSuccess }) {
         setPaymentMadeDate(new Date().toISOString().split('T')[0]);
       }
       setPaymentRemarks(po.paymentRemarks || po.payment_remarks || "");
-      fetchReconciledTotal(po.id);
+      fetchPOItems(po.id);
     }
   }, [open, po]);
 
-  const fetchReconciledTotal = async (poId) => {
+  const fetchPOItems = async (poId) => {
     try {
       const res = await fetch(`/api/purchase-orders/${poId}/items`, { credentials: 'include' });
-      if (!res.ok) return;
+      if (!res.ok) { setPoItems([]); return; }
       const items = await res.json();
-      const hasReceived = items.some(i => (i.receivedQuantity ?? 0) > 0);
-      if (!hasReceived) {
-        setReconciledTotal(null);
-        return;
-      }
-      const total = items.reduce((sum, item) => {
-        return sum + ((item.receivedQuantity ?? 0) * (parseFloat(item.unitPrice) || 0));
-      }, 0);
-      setReconciledTotal(total);
+      setPoItems(items);
     } catch {
-      setReconciledTotal(null);
+      setPoItems([]);
     }
   };
 
@@ -97,10 +90,12 @@ export default function MarkPOPaidDialog({ open, onClose, po, onSuccess }) {
   const currency = po.currency || 'GBP';
   const fxRate = parseFloat(po.fxRateToAed) || 4.85;
   const orderedTotal = parseFloat(po.totalAmount) || 0;
+  const recon = computeReconciliation(poItems);
+  const reconciledTotal = recon.hasGRNData ? recon.reconciledTotal : null;
   const reconciledAed = reconciledTotal !== null
     ? (currency === 'AED' ? reconciledTotal : reconciledTotal * fxRate)
     : null;
-  const isShortDelivery = reconciledTotal !== null && reconciledTotal < orderedTotal - 0.001;
+  const isShortDelivery = recon.isShortDelivery;
 
   return (
     <Dialog open={open} onOpenChange={onClose}>

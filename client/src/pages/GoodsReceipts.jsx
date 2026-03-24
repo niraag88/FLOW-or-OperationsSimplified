@@ -7,7 +7,7 @@ import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { PackageCheck, Plus, Search, Save, TrendingUp } from "lucide-react";
+import { PackageCheck, Plus, Search, Save, TrendingUp, AlertTriangle } from "lucide-react";
 import { useToast } from "@/components/ui/use-toast";
 import { format } from "date-fns";
 
@@ -330,12 +330,20 @@ export default function GoodsReceipts() {
                       {format(new Date(receipt.receivedDate), 'MMM dd, yyyy')}
                     </TableCell>
                     <TableCell>
-                      <Badge 
-                        variant={receipt.status === 'confirmed' ? 'default' : 'secondary'}
-                        className={receipt.status === 'confirmed' ? 'bg-green-100 text-green-800' : ''}
-                      >
-                        {receipt.status}
-                      </Badge>
+                      <div className="flex items-center gap-1.5 flex-wrap">
+                        <Badge 
+                          variant={receipt.status === 'confirmed' ? 'default' : 'secondary'}
+                          className={receipt.status === 'confirmed' ? 'bg-green-100 text-green-800' : ''}
+                        >
+                          {receipt.status}
+                        </Badge>
+                        {receipt.isPartial && (
+                          <span className="inline-flex items-center gap-0.5 text-xs font-medium text-amber-700 bg-amber-50 border border-amber-200 rounded px-1 py-0.5">
+                            <AlertTriangle className="w-3 h-3" />
+                            Partial
+                          </span>
+                        )}
+                      </div>
                     </TableCell>
                     <TableCell className="text-sm text-gray-600">
                       {receipt.notes || '-'}

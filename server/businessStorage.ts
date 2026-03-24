@@ -263,7 +263,28 @@ export class BusinessStorage {
   }
 
   async getPurchaseOrderById(id: number) {
-    const [po] = await db.select().from(purchaseOrders).where(eq(purchaseOrders.id, id));
+    const [po] = await db.select({
+      id: purchaseOrders.id,
+      poNumber: purchaseOrders.poNumber,
+      supplierId: purchaseOrders.supplierId,
+      status: purchaseOrders.status,
+      orderDate: purchaseOrders.orderDate,
+      expectedDelivery: purchaseOrders.expectedDelivery,
+      totalAmount: purchaseOrders.totalAmount,
+      vatAmount: purchaseOrders.vatAmount,
+      grandTotal: purchaseOrders.grandTotal,
+      notes: purchaseOrders.notes,
+      currency: purchaseOrders.currency,
+      fxRateToAed: purchaseOrders.fxRateToAed,
+      objectKey: purchaseOrders.objectKey,
+      supplierScanKey: purchaseOrders.supplierScanKey,
+      createdBy: purchaseOrders.createdBy,
+      createdAt: purchaseOrders.createdAt,
+      updatedAt: purchaseOrders.updatedAt,
+      paymentStatus: purchaseOrders.paymentStatus,
+      paymentMadeDate: purchaseOrders.paymentMadeDate,
+      paymentRemarks: purchaseOrders.paymentRemarks,
+    }).from(purchaseOrders).where(eq(purchaseOrders.id, id));
     return po;
   }
 

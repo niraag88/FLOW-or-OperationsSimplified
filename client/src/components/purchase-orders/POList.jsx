@@ -45,6 +45,14 @@ export default function POList({ purchaseOrders, totalCount, loading, canEdit, c
     return ordered > 0 && received < ordered;
   };
 
+  const getReconciledAmount = (po) => {
+    const ordered = Number(po.orderedQty) || 0;
+    const received = Number(po.receivedQty) || 0;
+    if (ordered === 0) return null;
+    const total = parseFloat(po.totalAmount) || 0;
+    return (total * received) / ordered;
+  };
+
   const handleReceiveGoods = (po) => {
     setSelectedPO(po);
     setShowReceiveDialog(true);
@@ -152,7 +160,16 @@ export default function POList({ purchaseOrders, totalCount, loading, canEdit, c
                       </TableCell>
                       <TableCell>{getBrandName(po)}</TableCell>
                       <TableCell>{formatDate(po.orderDate)}</TableCell>
-                      <TableCell>{formatCurrency(po.totalAmount || 0, currency)}</TableCell>
+                      <TableCell>
+                        <div>
+                          <span>{formatCurrency(po.totalAmount || 0, currency)}</span>
+                          {isShortDelivered(po) && getReconciledAmount(po) !== null && (
+                            <div className="text-xs text-amber-700 font-medium mt-0.5">
+                              Reconciled: {formatCurrency(getReconciledAmount(po), currency)}
+                            </div>
+                          )}
+                        </div>
+                      </TableCell>
                       <TableCell className="text-gray-600">
                         {formatCurrency(aedTotal, 'AED')}
                       </TableCell>
