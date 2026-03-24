@@ -8,7 +8,7 @@ import { Skeleton } from "@/components/ui/skeleton";
 import { format, isValid, parseISO } from "date-fns";
 import QuotationActionsDropdown from "./QuotationActionsDropdown";
 
-export default function QuotationList({ quotations, totalCount, loading, canEdit, canOverride, currentUser, onEdit, onRefresh }) {
+export default function QuotationList({ quotations, totalCount, loading, canEdit, canCreate, canOverride, currentUser, onEdit, onRefresh }) {
   const getCustomerName = (quotation) => {
     return quotation.customerName || quotation.customer_name || 'Unknown Customer';
   };
@@ -41,7 +41,7 @@ export default function QuotationList({ quotations, totalCount, loading, canEdit
   };
 
   const canPerformActions = (quotation) => {
-    if (!canEdit) return false;
+    if (!canCreate) return false;
     if (canOverride) return true;
     return !['accepted', 'rejected', 'invoiced'].includes(quotation.status);
   };

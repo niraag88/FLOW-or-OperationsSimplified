@@ -124,6 +124,7 @@ export default function Quotations() {
   };
 
   const { user: currentUser } = useAuth();
+  const canCreate = ['Admin', 'Manager', 'Staff'].includes(currentUser?.role);
   const canEdit = ['Admin', 'Manager'].includes(currentUser?.role);
   const canOverride = true;
 
@@ -184,7 +185,7 @@ export default function Quotations() {
             isLoading={loading}
           />
           
-          {canEdit && (
+          {canCreate && (
             <Button 
               onClick={handleNewQuotation}
               className="bg-sky-600 hover:bg-sky-700"
@@ -223,6 +224,7 @@ export default function Quotations() {
         quotations={visibleQuotations}
         totalCount={totalCount}
         loading={loading}
+        canCreate={canCreate}
         canEdit={canEdit}
         canOverride={canOverride}
         currentUser={currentUser}
