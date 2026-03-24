@@ -1571,11 +1571,12 @@ export async function registerRoutes(app: Express): Promise<Server> {
         return res.status(404).json({ error: 'Invoice not found' });
       }
 
-      // Get line items with product details
+      // Get line items with product and brand details
       const lineItems = await db.select({
         id: invoiceLineItems.id,
         productId: invoiceLineItems.productId,
         brandId: invoiceLineItems.brandId,
+        brandName: brands.name,
         productCode: invoiceLineItems.productCode,
         description: invoiceLineItems.description,
         productName: products.name,
@@ -1586,6 +1587,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
         lineTotal: invoiceLineItems.lineTotal,
       }).from(invoiceLineItems)
         .leftJoin(products, eq(products.id, invoiceLineItems.productId))
+        .leftJoin(brands, eq(brands.id, invoiceLineItems.brandId))
         .where(eq(invoiceLineItems.invoiceId, id));
 
       const totalAmount = parseFloat(invoice.amount) || 0;
@@ -1645,6 +1647,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
           description: item.description || item.productName || '',
           size: item.productSize || '',
           brand_id: item.brandId,
+          brand_name: item.brandName || '',
           quantity: Number(item.quantity),
           unit_price: parseFloat(item.unitPrice) || 0,
           line_total: parseFloat(item.lineTotal) || 0,

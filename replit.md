@@ -11,13 +11,14 @@ This is a full-stack web application built with a React frontend and Express.js 
 ## Schema Changes (Task #46)
 - **purchase_orders** table: Added `currency` (text, default 'GBP') and `fxRateToAed` (decimal 10,4, default 4.8500) columns via direct SQL (`ALTER TABLE purchase_orders ADD COLUMN IF NOT EXISTS ...`). All 307+ existing POs default to GBP/4.85. Schema updated in `shared/schema.ts`. `getPurchaseOrders()` in `server/businessStorage.ts` now includes these fields in its explicit SELECT and joins `suppliers` table (not `brands`) for `supplierName`.
 
-## Current Database State (as of Task #56)
+## Current Database State (as of Task #73)
 - **Products**: 600 active products across all 12 categories (Essential Oils, Carrier Oils, Bath Salts, Body Butters, Massage Blends, Diffuser Blends, Roll-ons, Balms & Salves, Hydrosols, Supplements, Electronics, Stationery)
 - **Customers**: 191 customers (hotels, spas, retail chains, corporate, export clients across UAE, Oman, Kuwait, KSA, Jordan, Qatar, Egypt and internationally); script in `scripts/populate-customers-api.ts`
 - **Suppliers**: 80 suppliers (UK, India, USA, France, Germany, Australia, Italy, UAE-based)
 - **Brands**: 31 brands
 - **Users**: 15 users (1 Admin, 5 Managers, 9 Staff); password = Pass@1234
-- **Purchase Orders**: 300 records [SEED-55 tagged]; **Quotations**: 300 [SEED-56 tagged: Draft=50, Sent=100, Converted=100, Expired=50]; **Invoices**: 400 [SEED-56: Draft=50, Sent=150, Paid=150, Overdue=50 — 100 converted from quotations + 300 direct]; **Delivery Orders**: 300 [SEED-56 tagged]
+- **Purchase Orders**: 300 records [SEED-55 tagged]; **Quotations**: 300 [SEED-56 tagged: Draft=50, Sent=100, Converted=100, Expired=50]; **Invoices**: 400 [SEED-56: Draft=49, Submitted=201, Delivered=150 — 100 converted from quotations + 300 direct; statuses fixed Task #73]; **Delivery Orders**: 300 [SEED-56 tagged]
+- **Valid invoice statuses**: `draft` | `submitted` | `delivered` (sent/paid/overdue are NOT valid)
 - **Financial Years**: 2025 (Closed), 2026 (Open), 2027 (Open)
 - **Company**: Aroma Essence Trading LLC, PO prefix "PO", DO prefix "DO"
 - **Admin credentials**: Stored securely in ADMIN_PASSWORD env var — NEVER change the admin username or password
@@ -26,7 +27,7 @@ This is a full-stack web application built with a React frontend and Express.js 
 - `scripts/seed-foundation.ts` — 15 users, 31 brands, 80 suppliers, 600 products
 - `scripts/seed-purchasing.ts` — financial years, company settings, 300 POs, 100+ GRNs
 - `scripts/populate-customers-api.ts` — 180 customers via REST API (idempotent by name)
-- `scripts/populate-sales-api.ts` — 300 quotations, 400 invoices (100 converted + 300 direct; Draft=50, Sent=150, Paid=150, Overdue=50), 300 DOs [SEED-56 tagged for idempotency; API-only, no pg pool or execSync]
+- `scripts/populate-sales-api.ts` — 300 quotations, 400 invoices (100 converted + 300 direct; Draft=50, Submitted=200, Delivered=150), 300 DOs [SEED-56 tagged for idempotency; API-only, no pg pool or execSync]
 
 ## Bug Fixes (Task #45)
 - Fixed: Product deletion failed because `POST /api/recycle-bin` endpoint was missing — added in `server/routes.ts`

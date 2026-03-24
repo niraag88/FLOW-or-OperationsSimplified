@@ -7,14 +7,16 @@
  *   - 300 Quotations  (Draft=50, Sent=100, Accepted=100, Expired=50)
  *   - Converts Accepted quotations via POST /api/invoices/from-quotation
  *     → Updates exactly CONVERT_DRAFT_TARGET (50) converted invoices to remain draft,
- *       promotes remainder to Sent/Paid/Overdue via PUT /api/invoices/:id
- *   - 300 Direct Invoices (Sent=130, Paid=125, Overdue=45) — no draft
+ *       promotes remainder to Submitted/Delivered via PUT /api/invoices/:id
+ *   - 300 Direct Invoices (Submitted=175, Delivered=125) — no draft
  *   - 300 Delivery Orders  (~150 linked to invoices, ~150 standalone)
  *
  * Target totals (assuming 100 converted invoices in DB):
- *   Converted: Draft=50, Sent=20, Paid=25, Overdue=5
- *   Direct:    Sent=130, Paid=125, Overdue=45
- *   Grand total: Draft=50, Sent=150, Paid=150, Overdue=50 = 400 ✓
+ *   Converted: Draft=50, Submitted=25, Delivered=25
+ *   Direct:    Submitted=175, Delivered=125
+ *   Grand total: Draft=50, Submitted=200, Delivered=150 = 400 ✓
+ *
+ * Valid invoice statuses: draft | submitted | delivered
  *
  * Schema prerequisite: invoices.payment_method column.
  *   Applied separately via: psql "$DATABASE_URL" -f scripts/migrate-task56-invoice-payment-method.sql
@@ -319,20 +321,20 @@ async function convertQuotations(
 // ─── 2b. Reassign statuses on converted invoices to achieve exact totals ───────
 // Split: CONVERT_TARGET=100 converted + DIRECT_TARGET=300 direct = 400 total invoices
 // Converted invoices start as 'draft'. We reassign a subset to exact non-draft counts:
-//   Converted: Draft=50 | Sent=20 | Paid=25 | Overdue=5  (total = 100)
-//   Direct:    Sent=130 | Paid=125 | Overdue=45           (total = 300)
-//   Grand total: Draft=50, Sent=150, Paid=150, Overdue=50 = 400 ✓
+//   Converted: Draft=50 | Submitted=25 | Delivered=25  (total = 100)
+//   Direct:    Submitted=175 | Delivered=125            (total = 300)
+//   Grand total: Draft=50, Submitted=200, Delivered=150 = 400 ✓
 // Only invoices tagged with SEED_TAG are touched (protects any non-seed converted invoices).
 
 const CONVERT_DRAFT_TARGET = 50;  // leave exactly this many converted invoices as draft
-const CONVERT_NON_DRAFT_TARGETS = { sent: 20, paid: 25, overdue: 5 } as const;
-// Verify: 50 + 20 + 25 + 5 = 100 = CONVERT_TARGET ✓
+const CONVERT_NON_DRAFT_TARGETS = { submitted: 25, delivered: 25 } as const;
+// Verify: 50 + 25 + 25 = 100 = CONVERT_TARGET ✓
 
 async function reassignConvertedStatuses(
   cookie: string,
   converted: Invoice[],
 ): Promise<void> {
-  console.log('\n── Reassign converted invoice statuses (target: Sent=20, Paid=25, Overdue=5) ───');
+  console.log('\n── Reassign converted invoice statuses (target: Submitted=25, Delivered=25) ───');
 
   // If conversion was skipped (empty array), fetch from API instead
   let candidates = converted;
@@ -342,30 +344,26 @@ async function reassignConvertedStatuses(
   }
 
   // Count current non-draft status distribution
-  const currentSent    = candidates.filter(inv => inv.status === 'sent').length;
-  const currentPaid    = candidates.filter(inv => inv.status === 'paid').length;
-  const currentOverdue = candidates.filter(inv => inv.status === 'overdue').length;
-  const currentDraft   = candidates.filter(inv => inv.status === 'draft').length;
-  console.log(`  Current: Draft=${currentDraft}, Sent=${currentSent}, Paid=${currentPaid}, Overdue=${currentOverdue}`);
+  const currentSubmitted = candidates.filter(inv => inv.status === 'submitted').length;
+  const currentDelivered = candidates.filter(inv => inv.status === 'delivered').length;
+  const currentDraft     = candidates.filter(inv => inv.status === 'draft').length;
+  console.log(`  Current: Draft=${currentDraft}, Submitted=${currentSubmitted}, Delivered=${currentDelivered}`);
 
   // Compute exactly how many MORE of each non-draft status are needed
   // Also handle case where a status exceeds target (revert excess back to draft)
-  const needSent    = Math.max(0, CONVERT_NON_DRAFT_TARGETS.sent    - currentSent);
-  const needPaid    = Math.max(0, CONVERT_NON_DRAFT_TARGETS.paid    - currentPaid);
-  const needOverdue = Math.max(0, CONVERT_NON_DRAFT_TARGETS.overdue - currentOverdue);
-  const excessSent    = Math.max(0, currentSent    - CONVERT_NON_DRAFT_TARGETS.sent);
-  const excessPaid    = Math.max(0, currentPaid    - CONVERT_NON_DRAFT_TARGETS.paid);
-  const excessOverdue = Math.max(0, currentOverdue - CONVERT_NON_DRAFT_TARGETS.overdue);
-  const totalNeeded   = needSent + needPaid + needOverdue;
-  const totalExcess   = excessSent + excessPaid + excessOverdue;
-  console.log(`  Need: +${totalNeeded} updates (Sent+${needSent}, Paid+${needPaid}, Overdue+${needOverdue}); Excess (revert to draft): Sent-${excessSent}, Paid-${excessPaid}, Overdue-${excessOverdue}`);
+  const needSubmitted    = Math.max(0, CONVERT_NON_DRAFT_TARGETS.submitted - currentSubmitted);
+  const needDelivered    = Math.max(0, CONVERT_NON_DRAFT_TARGETS.delivered - currentDelivered);
+  const excessSubmitted  = Math.max(0, currentSubmitted - CONVERT_NON_DRAFT_TARGETS.submitted);
+  const excessDelivered  = Math.max(0, currentDelivered - CONVERT_NON_DRAFT_TARGETS.delivered);
+  const totalNeeded      = needSubmitted + needDelivered;
+  const totalExcess      = excessSubmitted + excessDelivered;
+  console.log(`  Need: +${totalNeeded} updates (Submitted+${needSubmitted}, Delivered+${needDelivered}); Excess (revert to draft): Submitted-${excessSubmitted}, Delivered-${excessDelivered}`);
 
   // Revert excess statuses back to draft
   if (totalExcess > 0) {
     const toRevert: Invoice[] = [
-      ...candidates.filter(inv => inv.status === 'sent').slice(0, excessSent),
-      ...candidates.filter(inv => inv.status === 'paid').slice(0, excessPaid),
-      ...candidates.filter(inv => inv.status === 'overdue').slice(0, excessOverdue),
+      ...candidates.filter(inv => inv.status === 'submitted').slice(0, excessSubmitted),
+      ...candidates.filter(inv => inv.status === 'delivered').slice(0, excessDelivered),
     ];
     let reverted = 0;
     for (const inv of toRevert) {
@@ -392,9 +390,8 @@ async function reassignConvertedStatuses(
 
   // Build exact update list
   const updates: string[] = [
-    ...Array(needSent).fill('sent'),
-    ...Array(needPaid).fill('paid'),
-    ...Array(needOverdue).fill('overdue'),
+    ...Array(needSubmitted).fill('submitted'),
+    ...Array(needDelivered).fill('delivered'),
   ];
 
   // Re-fetch draft candidates after potential reversions
@@ -406,7 +403,7 @@ async function reassignConvertedStatuses(
   for (let i = 0; i < toUpdate.length; i++) {
     const inv = toUpdate[i];
     const newStatus = updates[i];
-    const pm = newStatus === 'paid' ? pick(PAYMENT_METHODS) : undefined;
+    const pm = newStatus === 'delivered' ? pick(PAYMENT_METHODS) : undefined;
 
     const { status: http } = await apiFetch(`/api/invoices/${inv.id}`, 'PUT', cookie, {
       customer_id:    inv.customerId,
@@ -430,14 +427,13 @@ async function reassignConvertedStatuses(
 // ─── 3. Direct invoices ───────────────────────────────────────────────────────
 
 // Exact status pool sized to DIRECT_TARGET (300). No drafts.
-// Converted invoices provide: Draft=50, Sent=20, Paid=25, Overdue=5
-// Direct invoices provide:            Sent=130, Paid=125, Overdue=45
-// Grand total: Draft=50, Sent=150, Paid=150, Overdue=50 = 400 ✓
+// Converted invoices provide: Draft=50, Submitted=25, Delivered=25
+// Direct invoices provide:    Submitted=175, Delivered=125
+// Grand total: Draft=50, Submitted=200, Delivered=150 = 400 ✓
 const INVOICE_STATUS_POOL: string[] = (() => {
   const pool = [
-    ...Array(130).fill('sent'),
-    ...Array(125).fill('paid'),
-    ...Array(45).fill('overdue'),
+    ...Array(175).fill('submitted'),
+    ...Array(125).fill('delivered'),
   ];
   // Fisher-Yates shuffle for stable random ordering
   for (let i = pool.length - 1; i > 0; i--) {
@@ -456,9 +452,9 @@ async function seedDirectInvoices(
 
   const existing = await fetchSeedInvoices(cookie);
 
-  // Validate existing batch: correct count, no drafts, paid invoices have payment_method
+  // Validate existing batch: correct count, no drafts, delivered invoices have payment_method
   const hasDrafts = existing.some(inv => inv.status === 'draft');
-  const missingPaymentMethod = existing.some(inv => inv.status === 'paid' && !inv.paymentMethod);
+  const missingPaymentMethod = existing.some(inv => inv.status === 'delivered' && !inv.paymentMethod);
   const wrongCount = existing.length !== DIRECT_TARGET;
 
   if (!wrongCount && !hasDrafts && !missingPaymentMethod) {
@@ -470,7 +466,7 @@ async function seedDirectInvoices(
     const reasons: string[] = [];
     if (wrongCount) reasons.push(`wrong count (${existing.length} ≠ ${DIRECT_TARGET})`);
     if (hasDrafts) reasons.push('has drafts');
-    if (missingPaymentMethod) reasons.push('paid invoices missing payment_method');
+    if (missingPaymentMethod) reasons.push('delivered invoices missing payment_method');
     console.log(`  → Clearing ${existing.length} existing seeded invoices (${reasons.join(', ')})...`);
     for (const inv of existing) {
       await apiDelete(`/api/invoices/${inv.id}`, cookie);
@@ -496,7 +492,7 @@ async function seedDirectInvoices(
       tax_amount:     vatAmount,
       total_amount:   grandTotal,
       currency:       'AED',
-      payment_method: status === 'paid' ? pick(PAYMENT_METHODS) : undefined,
+      payment_method: status === 'delivered' ? pick(PAYMENT_METHODS) : undefined,
       items: items.map(it => ({
         product_id:   it.product_id,
         product_code: it.product_code,
@@ -685,26 +681,24 @@ async function verify(cookie: string): Promise<void> {
     invByStatus[s] = (invByStatus[s] ?? 0) + 1;
   });
   console.log(`  Invoice status distribution (direct ${DIRECT_TARGET}):`, JSON.stringify(invByStatus));
-  // Direct invoices: no drafts; all should be sent/paid/overdue
+  // Direct invoices: no drafts; all should be submitted/delivered
   const directHasDraft = (invByStatus['draft'] ?? 0) > 0;
   if (directHasDraft) { console.error('  ✗ Direct invoices must not contain drafts'); pass = false; }
 
-  // Payment method: paid invoices must have payment_method set
-  const paidInvWithMethod = seedInvoices.filter(inv => inv.status === 'paid' && inv.paymentMethod);
-  const pmOk = paidInvWithMethod.length > 0;
-  console.log(`  Paid invoices with payment_method:   ${paidInvWithMethod.length} ${pmOk ? '✓' : '✗ (paid invoices missing payment_method)'}`);
+  // Payment method: delivered invoices must have payment_method set
+  const deliveredInvWithMethod = seedInvoices.filter(inv => inv.status === 'delivered' && inv.paymentMethod);
+  const pmOk = deliveredInvWithMethod.length > 0;
+  console.log(`  Delivered invoices with payment_method: ${deliveredInvWithMethod.length} ${pmOk ? '✓' : '✗ (delivered invoices missing payment_method)'}`);
   if (!pmOk) pass = false;
 
   // Verify exact distribution: direct pool has precise counts, no drafts
-  const expectedSent    = INVOICE_STATUS_POOL.filter(s => s === 'sent').length;
-  const expectedPaid    = INVOICE_STATUS_POOL.filter(s => s === 'paid').length;
-  const expectedOverdue = INVOICE_STATUS_POOL.filter(s => s === 'overdue').length;
-  const directDistOk = (invByStatus['sent'] ?? 0) === expectedSent &&
-                       (invByStatus['paid'] ?? 0) === expectedPaid &&
-                       (invByStatus['overdue'] ?? 0) === expectedOverdue;
-  console.log(`  Expected direct distribution: sent=${expectedSent} paid=${expectedPaid} overdue=${expectedOverdue} (draft=0) ${directDistOk ? '✓' : '✗'}`);
+  const expectedSubmitted = INVOICE_STATUS_POOL.filter(s => s === 'submitted').length;
+  const expectedDelivered = INVOICE_STATUS_POOL.filter(s => s === 'delivered').length;
+  const directDistOk = (invByStatus['submitted'] ?? 0) === expectedSubmitted &&
+                       (invByStatus['delivered'] ?? 0) === expectedDelivered;
+  console.log(`  Expected direct distribution: submitted=${expectedSubmitted} delivered=${expectedDelivered} (draft=0) ${directDistOk ? '✓' : '✗'}`);
   if (!directDistOk) pass = false;
-  console.log(`  Grand total targets: Draft=50, Sent=150, Paid=150, Overdue=50 (converted provides Draft=50, Sent=20, Paid=25, Overdue=5)`);
+  console.log(`  Grand total targets: Draft=50, Submitted=200, Delivered=150 (converted provides Draft=50, Submitted=25, Delivered=25)`);
 
   // Converted quotations check
   const convertedCount = seedQuotes.filter(q => q.status === 'Converted').length;
@@ -747,10 +741,10 @@ async function main(): Promise<void> {
   const convertedInvoices = await convertQuotations(cookie, quotations);
   console.log(`  Converted invoice IDs collected: ${convertedInvoices.length}`);
 
-  // Step 2b: Update 30 converted invoices from draft → sent/paid/overdue
+  // Step 2b: Update converted invoices from draft → submitted/delivered
   await reassignConvertedStatuses(cookie, convertedInvoices);
 
-  // Step 3: Direct invoices (Sent=140, Paid=135, Overdue=45; no draft)
+  // Step 3: Direct invoices (Submitted=175, Delivered=125; no draft)
   const directInvoices = await seedDirectInvoices(cookie, customers, products);
 
   // Step 4: Delivery orders

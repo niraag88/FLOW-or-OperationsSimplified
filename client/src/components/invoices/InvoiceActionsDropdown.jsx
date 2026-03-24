@@ -46,10 +46,16 @@ export default function InvoiceActionsDropdown({ invoice, canEdit, onEdit, onRef
 
   const handleExportXLSX = async () => {
     try {
-      await exportInvoiceToXLSX(invoice);
+      const response = await fetch(`/api/invoices/${invoice.id}`, { credentials: 'include' });
+      if (!response.ok) {
+        throw new Error('Failed to fetch invoice details for export');
+      }
+      const fullInvoice = await response.json();
+      await exportInvoiceToXLSX(fullInvoice);
+      const invoiceNum = fullInvoice.invoice_number || invoiceNumber;
       toast({
         title: 'Export Successful',
-        description: `Invoice ${invoice.invoice_number} exported to Excel.`
+        description: `Invoice ${invoiceNum} exported to Excel.`
       });
     } catch (error) {
       console.error('XLSX export error:', error);
