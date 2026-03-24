@@ -1,34 +1,50 @@
-import { useQueries } from "@tanstack/react-query";
+import { useQuery } from "@tanstack/react-query";
 import { Card, CardHeader } from "@/components/ui/card";
 import DashboardStats from "../components/dashboard/DashboardStats";
 import RecentActivity from "../components/dashboard/RecentActivity";
 import LowStockAlert from "../components/dashboard/LowStockAlert";
 import QuickActions from "../components/dashboard/QuickActions";
 
-const DASHBOARD_QUERIES = [
-  { queryKey: ["/api/products"] },
-  { queryKey: ["/api/purchase-orders"] },
-  { queryKey: ["/api/delivery-orders"] },
-  { queryKey: ["/api/invoices"] },
-  { queryKey: ["/api/customers"] },
-  { queryKey: ["/api/suppliers"] },
-];
+const STALE_5MIN = 5 * 60 * 1000;
 
-function extractArray(result) {
-  if (!result) return [];
-  if (Array.isArray(result)) return result;
-  return result?.data ?? [];
+function extractArray(value) {
+  if (!value) return [];
+  if (Array.isArray(value)) return value;
+  return value?.data ?? [];
 }
 
 export default function Dashboard() {
-  const results = useQueries({ queries: DASHBOARD_QUERIES });
+  // Primary dashboard query — fetches products, POs, customers, suppliers,
+  // goodsReceipts, companySettings and pre-calculated payment summary in one call
+  const { data: dashboardData, isLoading: dashLoading } = useQuery({
+    queryKey: ["/api/dashboard"],
+    staleTime: STALE_5MIN,
+  });
 
-  const isLoading = results.some((r) => r.isLoading);
+  // Invoices fetched separately — /api/dashboard returns invoices: []
+  // DashboardStats requires the real array to compute payment counts
+  const { data: invoicesRaw, isLoading: invoicesLoading } = useQuery({
+    queryKey: ["/api/invoices"],
+    staleTime: STALE_5MIN,
+  });
 
-  const [products, purchaseOrders, deliveryOrders, invoices, customers, suppliers] =
-    results.map((r) => extractArray(r.data));
+  // Delivery orders fetched separately — not included in /api/dashboard
+  const { data: deliveryOrdersRaw, isLoading: dosLoading } = useQuery({
+    queryKey: ["/api/delivery-orders"],
+    staleTime: STALE_5MIN,
+  });
 
-  const data = { products, purchaseOrders, deliveryOrders, invoices, customers, suppliers };
+  const isLoading = dashLoading || invoicesLoading || dosLoading;
+
+  const data = {
+    products:       extractArray(dashboardData?.products),
+    purchaseOrders: extractArray(dashboardData?.purchaseOrders),
+    deliveryOrders: extractArray(deliveryOrdersRaw),
+    invoices:       extractArray(invoicesRaw),
+    customers:      extractArray(dashboardData?.customers),
+    suppliers:      extractArray(dashboardData?.suppliers),
+    summary:        dashboardData?.summary ?? null,
+  };
 
   if (isLoading) {
     return (
