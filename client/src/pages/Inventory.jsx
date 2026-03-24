@@ -90,8 +90,8 @@ export default function Inventory() {
   };
 
   const { user: currentUser } = useAuth();
-  const canEdit = true;
-  const canDelete = true;
+  const canEdit = ['Admin', 'Manager', 'Staff'].includes(currentUser?.role);
+  const canDelete = ['Admin', 'Manager', 'Staff'].includes(currentUser?.role);
 
   const filteredProducts = products.filter(product => {
     const matchesSearch = product.sku?.toLowerCase().includes(searchTerm.toLowerCase()) ||

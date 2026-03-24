@@ -332,22 +332,19 @@ export default function UserManagement() {
         )}
       </div>
 
-      <Tabs defaultValue={isAdmin ? 'users' : 'logs'}>
+      <Tabs defaultValue="users">
         <TabsList>
-          {isAdmin && (
-            <TabsTrigger value="users" className="flex items-center gap-2">
-              <Users className="h-4 w-4" />
-              Users
-            </TabsTrigger>
-          )}
+          <TabsTrigger value="users" className="flex items-center gap-2">
+            <Users className="h-4 w-4" />
+            Users
+          </TabsTrigger>
           <TabsTrigger value="logs" className="flex items-center gap-2">
             <ClipboardList className="h-4 w-4" />
             Audit Logs
           </TabsTrigger>
         </TabsList>
 
-        {isAdmin && (
-          <TabsContent value="users" className="space-y-6 mt-4">
+        <TabsContent value="users" className="space-y-6 mt-4">
             {/* Statistics Cards */}
             <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
               <Card>
@@ -446,27 +443,29 @@ export default function UserManagement() {
                             {u.lastLogin ? new Date(u.lastLogin).toLocaleDateString() : 'Never'}
                           </TableCell>
                           <TableCell>
-                            <div className="flex items-center gap-2">
-                              <Button
-                                variant="outline"
-                                size="sm"
-                                onClick={() => { setEditingUser(u); setEditPassword(''); }}
-                                data-testid={`button-edit-${u.username}`}
-                              >
-                                <Edit className="h-3 w-3" />
-                              </Button>
-                              {u.id !== user?.id && (
+                            {isAdmin && (
+                              <div className="flex items-center gap-2">
                                 <Button
                                   variant="outline"
                                   size="sm"
-                                  onClick={() => handleDeleteUser(u.id, u.username)}
-                                  disabled={deleteUserMutation.isPending}
-                                  data-testid={`button-delete-${u.username}`}
+                                  onClick={() => { setEditingUser(u); setEditPassword(''); }}
+                                  data-testid={`button-edit-${u.username}`}
                                 >
-                                  <Trash2 className="h-3 w-3" />
+                                  <Edit className="h-3 w-3" />
                                 </Button>
-                              )}
-                            </div>
+                                {u.id !== user?.id && (
+                                  <Button
+                                    variant="outline"
+                                    size="sm"
+                                    onClick={() => handleDeleteUser(u.id, u.username)}
+                                    disabled={deleteUserMutation.isPending}
+                                    data-testid={`button-delete-${u.username}`}
+                                  >
+                                    <Trash2 className="h-3 w-3" />
+                                  </Button>
+                                )}
+                              </div>
+                            )}
                           </TableCell>
                         </TableRow>
                       ))}
@@ -476,7 +475,6 @@ export default function UserManagement() {
               </CardContent>
             </Card>
           </TabsContent>
-        )}
 
         <TabsContent value="logs" className="mt-4">
           <Card>

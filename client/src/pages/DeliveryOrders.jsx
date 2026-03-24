@@ -201,7 +201,7 @@ export default function DeliveryOrders() {
     setShowDOForm(true);
   };
 
-  const canEdit = true;
+  const canEdit = ['Admin', 'Manager', 'Staff'].includes(currentUser?.role);
 
   const visibleDOs = deliveryOrders;
 

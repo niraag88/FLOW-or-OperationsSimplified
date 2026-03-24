@@ -154,8 +154,8 @@ export default function PurchaseOrders() {
     setEditingPO(null);
   };
 
-  const canEdit = true;
   const { user: currentUser } = useAuth();
+  const canEdit = ['Admin', 'Manager'].includes(currentUser?.role);
 
   const visiblePOs = purchaseOrders;
 

@@ -357,8 +357,7 @@ export default function Invoices() {
     }
   };
 
-  // Remove permission restrictions
-  const canEdit = true;
+  const canEdit = ['Admin', 'Manager', 'Staff'].includes(currentUser?.role);
   const canOverride = true;
 
   const visibleInvoices = invoices;
