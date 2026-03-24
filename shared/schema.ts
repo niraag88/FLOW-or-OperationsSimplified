@@ -65,6 +65,9 @@ export const invoices = pgTable("invoices", {
   scanKey: text("scan_key"),
   createdAt: timestamp("created_at").defaultNow().notNull(),
   legalHold: boolean("legal_hold").default(false).notNull(),
+  paymentStatus: text("payment_status").notNull().default("outstanding"),
+  paymentReceivedDate: date("payment_received_date"),
+  paymentRemarks: text("payment_remarks"),
 }, (table) => ({
   invoicesStatusCustomerIdx: index("invoices_status_customer_idx").on(table.status, table.customerId),
 }));
@@ -127,6 +130,9 @@ export const insertInvoiceSchema = createInsertSchema(invoices).pick({
   notes: z.string().optional(),
   currency: z.string().optional(),
   paymentMethod: z.string().optional(),
+  paymentStatus: z.enum(['outstanding', 'paid']).optional(),
+  paymentReceivedDate: z.string().nullable().optional(),
+  paymentRemarks: z.string().nullable().optional(),
 });
 
 export type InsertInvoice = z.infer<typeof insertInvoiceSchema>;
@@ -299,6 +305,9 @@ export const purchaseOrders = pgTable("purchase_orders", {
   createdBy: varchar("created_by").references(() => users.id).notNull(),
   createdAt: timestamp("created_at").defaultNow().notNull(),
   updatedAt: timestamp("updated_at").defaultNow().notNull(),
+  paymentStatus: text("payment_status").notNull().default("outstanding"),
+  paymentMadeDate: date("payment_made_date"),
+  paymentRemarks: text("payment_remarks"),
 }, (table) => ({
   poStatusIdx: index("purchase_orders_status_idx").on(table.status),
 }));
@@ -593,6 +602,10 @@ export const insertPurchaseOrderSchema = createInsertSchema(purchaseOrders).pick
   fxRateToAed: true,
   objectKey: true,
   createdBy: true,
+}).extend({
+  paymentStatus: z.enum(['outstanding', 'paid']).optional(),
+  paymentMadeDate: z.string().nullable().optional(),
+  paymentRemarks: z.string().nullable().optional(),
 });
 
 export const insertQuotationSchema = createInsertSchema(quotations).pick({

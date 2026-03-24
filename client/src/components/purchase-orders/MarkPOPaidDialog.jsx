@@ -13,31 +13,31 @@ import { Textarea } from "@/components/ui/textarea";
 import { CheckCircle } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 
-export default function MarkPaidDialog({ open, onClose, invoice, onSuccess }) {
+export default function MarkPOPaidDialog({ open, onClose, po, onSuccess }) {
   const { toast } = useToast();
   const [loading, setLoading] = useState(false);
-  const [paymentReceivedDate, setPaymentReceivedDate] = useState(new Date().toISOString().split('T')[0]);
+  const [paymentMadeDate, setPaymentMadeDate] = useState(new Date().toISOString().split('T')[0]);
   const [paymentRemarks, setPaymentRemarks] = useState("");
 
   useEffect(() => {
     if (open) {
-      setPaymentReceivedDate(new Date().toISOString().split('T')[0]);
+      setPaymentMadeDate(new Date().toISOString().split('T')[0]);
       setPaymentRemarks("");
     }
   }, [open]);
 
   const handleSubmit = async (e) => {
     e.preventDefault();
-    if (!invoice) return;
+    if (!po) return;
     setLoading(true);
     try {
-      const res = await fetch(`/api/invoices/${invoice.id}/payment`, {
+      const res = await fetch(`/api/purchase-orders/${po.id}/payment`, {
         method: 'PATCH',
         headers: { 'Content-Type': 'application/json' },
         credentials: 'include',
         body: JSON.stringify({
           paymentStatus: 'paid',
-          paymentReceivedDate: paymentReceivedDate || null,
+          paymentMadeDate: paymentMadeDate || null,
           paymentRemarks: paymentRemarks || null,
         }),
       });
@@ -45,18 +45,18 @@ export default function MarkPaidDialog({ open, onClose, invoice, onSuccess }) {
         const data = await res.json().catch(() => ({}));
         throw new Error(data.error || 'Failed to update payment status');
       }
-      toast({ title: 'Payment Recorded', description: `Invoice ${invoice.invoiceNumber || invoice.invoice_number} marked as paid.` });
+      toast({ title: 'Payment Recorded', description: `PO ${po.poNumber || po.po_number} marked as paid.` });
       onSuccess();
       onClose();
     } catch (error) {
-      console.error("Error marking invoice as paid:", error);
+      console.error("Error marking PO as paid:", error);
       toast({ title: 'Error', description: error.message || 'Failed to record payment.', variant: 'destructive' });
     } finally {
       setLoading(false);
     }
   };
 
-  if (!invoice) return null;
+  if (!po) return null;
 
   return (
     <Dialog open={open} onOpenChange={onClose}>
@@ -67,29 +67,29 @@ export default function MarkPaidDialog({ open, onClose, invoice, onSuccess }) {
             Mark as Paid
           </DialogTitle>
           <DialogDescription>
-            Record payment for invoice {invoice.invoiceNumber || invoice.invoice_number}
+            Record payment for purchase order {po.poNumber || po.po_number}
           </DialogDescription>
         </DialogHeader>
 
         <form onSubmit={handleSubmit} className="space-y-4">
           <div className="space-y-2">
-            <Label htmlFor="payment_received_date">Payment Received Date *</Label>
+            <Label htmlFor="payment_made_date">Payment Made Date *</Label>
             <Input
-              id="payment_received_date"
+              id="payment_made_date"
               type="date"
-              value={paymentReceivedDate}
-              onChange={(e) => setPaymentReceivedDate(e.target.value)}
+              value={paymentMadeDate}
+              onChange={(e) => setPaymentMadeDate(e.target.value)}
               required
             />
           </div>
 
           <div className="space-y-2">
-            <Label htmlFor="payment_remarks">Remarks <span className="text-gray-400 text-xs">(optional)</span></Label>
+            <Label htmlFor="po_payment_remarks">Remarks <span className="text-gray-400 text-xs">(optional)</span></Label>
             <Textarea
-              id="payment_remarks"
+              id="po_payment_remarks"
               value={paymentRemarks}
               onChange={(e) => setPaymentRemarks(e.target.value)}
-              placeholder="e.g. bank transfer, cheque, cash received..."
+              placeholder="e.g. bank transfer, cheque, wire payment..."
               rows={3}
             />
           </div>
@@ -100,7 +100,7 @@ export default function MarkPaidDialog({ open, onClose, invoice, onSuccess }) {
             </Button>
             <Button
               type="submit"
-              disabled={loading || !paymentReceivedDate}
+              disabled={loading || !paymentMadeDate}
               className="bg-green-600 hover:bg-green-700"
             >
               {loading ? "Saving..." : "Mark as Paid"}

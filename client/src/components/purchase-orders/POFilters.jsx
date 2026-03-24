@@ -39,15 +39,16 @@ export default function POFilters({ filters, onFiltersChange, onFilterChange }) 
   const clearFilters = () => {
     onFiltersChange({
       status: "all",
-      supplier: "all", // This filter field name remains 'supplier' as per outline, but now holds brand IDs
-      dateRange: "all"
+      supplier: "all",
+      dateRange: "all",
+      paymentStatus: "all"
     });
     setCustomStartDate(null);
     setCustomEndDate(null);
     if (onFilterChange) onFilterChange();
   };
 
-  const hasActiveFilters = filters.status !== "all" || filters.supplier !== "all" || filters.dateRange !== "all";
+  const hasActiveFilters = filters.status !== "all" || filters.supplier !== "all" || filters.dateRange !== "all" || (filters.paymentStatus && filters.paymentStatus !== "all");
 
   const handleDateRangeChange = (value) => {
     if (value !== 'custom') {
@@ -90,6 +91,17 @@ export default function POFilters({ filters, onFiltersChange, onFilterChange }) 
           <SelectItem value="draft">Draft</SelectItem>
           <SelectItem value="submitted">Submitted</SelectItem>
           <SelectItem value="closed">Closed</SelectItem>
+        </SelectContent>
+      </Select>
+
+      <Select value={filters.paymentStatus || 'all'} onValueChange={(value) => handleFilterChange('paymentStatus', value)}>
+        <SelectTrigger className="w-44">
+          <SelectValue placeholder="All Payments" />
+        </SelectTrigger>
+        <SelectContent>
+          <SelectItem value="all">All Payments</SelectItem>
+          <SelectItem value="outstanding">Outstanding</SelectItem>
+          <SelectItem value="paid">Paid</SelectItem>
         </SelectContent>
       </Select>
 

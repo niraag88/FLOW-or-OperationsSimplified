@@ -34,6 +34,7 @@ export default function Invoices() {
   const [selectedCustomers, setSelectedCustomers] = useState([]);
   const [selectedTaxTreatments, setSelectedTaxTreatments] = useState([]);
   const [dateRange, setDateRange] = useState("all");
+  const [paymentStatusFilter, setPaymentStatusFilter] = useState('all');
   const [showCreateFromExistingDialog, setShowCreateFromExistingDialog] = useState(false);
   const [refreshTrigger, setRefreshTrigger] = useState(0);
   const [financialYears, setFinancialYears] = useState([]);
@@ -87,6 +88,7 @@ export default function Invoices() {
     if (selectedStatuses.length) params.set('status', selectedStatuses.join(','));
     if (selectedCustomers.length) params.set('customerId', selectedCustomers.join(','));
     if (selectedTaxTreatments.length) params.set('taxTreatment', selectedTaxTreatments.join(','));
+    if (paymentStatusFilter && paymentStatusFilter !== 'all') params.set('paymentStatus', paymentStatusFilter);
     const today = new Date();
     const toStr = (d) => d.toISOString().split('T')[0];
     if (dateRange && dateRange !== 'all') {
@@ -110,7 +112,7 @@ export default function Invoices() {
       })
       .catch(err => console.error('Error loading invoices:', err))
       .finally(() => setLoading(false));
-  }, [currentPage, itemsPerPage, debouncedSearch, selectedStatuses, selectedCustomers, selectedTaxTreatments, dateRange, financialYears, refreshTrigger]);
+  }, [currentPage, itemsPerPage, debouncedSearch, selectedStatuses, selectedCustomers, selectedTaxTreatments, dateRange, financialYears, refreshTrigger, paymentStatusFilter]);
 
   // Use preloaded customers for better performance
   const availableCustomers = React.useMemo(() => {
@@ -463,6 +465,8 @@ export default function Invoices() {
           setDateRange={setDateRange}
           resetPagination={resetPagination}
           customers={availableCustomers}
+          paymentStatusFilter={paymentStatusFilter}
+          setPaymentStatusFilter={setPaymentStatusFilter}
         />
       </div>
 

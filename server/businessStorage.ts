@@ -169,7 +169,7 @@ export class BusinessStorage {
   // Purchase Order operations
   async getPurchaseOrders(params?: {
     page?: number; pageSize?: number; search?: string;
-    status?: string; supplierId?: string; dateFrom?: string; dateTo?: string; excludeYears?: string;
+    status?: string; supplierId?: string; dateFrom?: string; dateTo?: string; excludeYears?: string; paymentStatus?: string;
   }): Promise<any> {
     const { page, pageSize, search, status, supplierId, dateFrom, dateTo, excludeYears } = params || {};
 
@@ -194,6 +194,9 @@ export class BusinessStorage {
         const [start, end] = range.split(',');
         if (start && end) conditions.push(sql`NOT (${purchaseOrders.orderDate}::date >= ${start}::date AND ${purchaseOrders.orderDate}::date <= ${end}::date)`);
       }
+    }
+    if (params?.paymentStatus && params.paymentStatus !== 'all') {
+      conditions.push(eq(purchaseOrders.paymentStatus, params.paymentStatus));
     }
     const whereCondition = conditions.length > 0 ? and(...conditions) : undefined;
 
@@ -237,6 +240,9 @@ export class BusinessStorage {
       createdBy: purchaseOrders.createdBy,
       createdAt: purchaseOrders.createdAt,
       updatedAt: purchaseOrders.updatedAt,
+      paymentStatus: purchaseOrders.paymentStatus,
+      paymentMadeDate: purchaseOrders.paymentMadeDate,
+      paymentRemarks: purchaseOrders.paymentRemarks,
       supplierName: suppliers.name,
       brandName: suppliers.name,
       lineItems: sql<number>`coalesce(${itemsAgg.lineItems}, 0)`.as('lineItems'),
@@ -903,7 +909,7 @@ export class BusinessStorage {
   async getInvoices(params?: {
     page?: number; pageSize?: number; search?: string;
     status?: string; customerId?: string; dateFrom?: string; dateTo?: string;
-    taxTreatment?: string; excludeYears?: string;
+    taxTreatment?: string; excludeYears?: string; paymentStatus?: string;
   }): Promise<any> {
     const { page, pageSize, search, status, customerId, dateFrom, dateTo, excludeYears } = params || {};
 
@@ -933,6 +939,9 @@ export class BusinessStorage {
       const treatments = params.taxTreatment.split(',').filter(Boolean);
       if (treatments.length === 1) conditions.push(eq(invoices.taxTreatment, treatments[0]));
       else if (treatments.length > 1) conditions.push(inArray(invoices.taxTreatment, treatments));
+    }
+    if (params?.paymentStatus && params.paymentStatus !== 'all') {
+      conditions.push(eq(invoices.paymentStatus, params.paymentStatus));
     }
     const whereCondition = conditions.length > 0 ? and(...conditions) : undefined;
 

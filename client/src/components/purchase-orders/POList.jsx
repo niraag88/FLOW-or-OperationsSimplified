@@ -97,6 +97,7 @@ export default function POList({ purchaseOrders, totalCount, loading, canEdit, c
                   <TableHead>Total</TableHead>
                   <TableHead>Total (AED)</TableHead>
                   <TableHead>Status</TableHead>
+                  <TableHead>Payment</TableHead>
                   <TableHead>Actions</TableHead>
                 </TableRow>
               </TableHeader>
@@ -117,6 +118,14 @@ export default function POList({ purchaseOrders, totalCount, loading, canEdit, c
                         <Badge className={`${getStatusColor(po.status)} border`}>
                           {po.status?.replace(/_/g, ' ').toUpperCase()}
                         </Badge>
+                      </TableCell>
+                      <TableCell>
+                        {(() => {
+                          const ps = po.paymentStatus || po.payment_status || 'outstanding';
+                          return ps === 'paid'
+                            ? <Badge className="bg-green-100 text-green-800 border border-green-200">PAID</Badge>
+                            : <Badge className="bg-amber-100 text-amber-800 border border-amber-200">OUTSTANDING</Badge>;
+                        })()}
                       </TableCell>
                       <TableCell>
                         <POActionsDropdown 

@@ -28,8 +28,9 @@ export default function SalesAgedInvoicesReport({ invoices, customers, canExport
       .filter(inv => inv.status !== 'cancelled')
       .forEach(inv => {
         const totalAmount = Number(inv.total_amount || inv.totalAmount || inv.amount || 0);
-        const paidAmount = Number(inv.paidAmount || inv.paid_amount || 0);
-        const outstanding = totalAmount - paidAmount;
+        const isPaid = (inv.paymentStatus || inv.payment_status) === 'paid';
+        if (isPaid) return;
+        const outstanding = totalAmount;
         if (outstanding <= 0) return;
 
         const dateValue = inv.invoice_date || inv.invoiceDate;
@@ -58,9 +59,10 @@ export default function SalesAgedInvoicesReport({ invoices, customers, canExport
       if (!dateValue) return;
       const month = format(new Date(dateValue), 'yyyy-MM');
       if (!sales[month]) sales[month] = { total: 0, paid: 0 };
-      sales[month].total += Number(inv.total_amount || inv.totalAmount || inv.amount || 0);
-      const paidAmount = Number(inv.paidAmount || inv.paid_amount || 0);
-      if (paidAmount > 0) sales[month].paid += paidAmount;
+      const total = Number(inv.total_amount || inv.totalAmount || inv.amount || 0);
+      sales[month].total += total;
+      const isPaid = (inv.paymentStatus || inv.payment_status) === 'paid';
+      if (isPaid) sales[month].paid += total;
     });
     return Object.entries(sales).sort(([a], [b]) => b.localeCompare(a)).slice(0, 12);
   }, [submittedInvoices]);

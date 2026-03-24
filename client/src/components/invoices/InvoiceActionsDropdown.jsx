@@ -8,7 +8,7 @@ import {
   DropdownMenuSeparator,
 } from "@/components/ui/dropdown-menu";
 import { Button } from "@/components/ui/button";
-import { MoreHorizontal, Edit2, Download, Trash2, Eye, Upload, Paperclip, X } from "lucide-react";
+import { MoreHorizontal, Edit2, Download, Trash2, Eye, Upload, Paperclip, X, CheckCircle, RotateCcw } from "lucide-react";
 import { useToast } from "@/components/ui/use-toast";
 import { exportInvoiceToXLSX } from "../utils/export";
 import { format } from 'date-fns';
@@ -151,6 +151,22 @@ export default function InvoiceActionsDropdown({ invoice, canEdit, onEdit, onRef
     }
   };
 
+  const handleMarkOutstanding = async () => {
+    try {
+      const res = await fetch(`/api/invoices/${invoice.id}/payment`, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        credentials: 'include',
+        body: JSON.stringify({ paymentStatus: 'outstanding' }),
+      });
+      if (!res.ok) throw new Error('Failed to update payment status');
+      toast({ title: 'Updated', description: `Invoice ${invoiceNumber} marked as outstanding.` });
+      onRefresh();
+    } catch (error) {
+      toast({ title: 'Error', description: error.message, variant: 'destructive' });
+    }
+  };
+
   const hasScanKey = !!(invoice.scanKey || invoice.scan_key);
   const invoiceNumber = invoice.invoiceNumber || invoice.invoice_number || `inv-${invoice.id}`;
 
@@ -177,6 +193,18 @@ export default function InvoiceActionsDropdown({ invoice, canEdit, onEdit, onRef
             <Download className="w-4 h-4 mr-2" />
             Export to XLSX
           </DropdownMenuItem>
+          <DropdownMenuSeparator />
+          {invoice.paymentStatus !== 'paid' && invoice.payment_status !== 'paid' ? (
+            <DropdownMenuItem onClick={() => setShowMarkPaidDialog(true)} className="text-green-700 focus:text-green-700">
+              <CheckCircle className="w-4 h-4 mr-2" />
+              Mark as Paid
+            </DropdownMenuItem>
+          ) : (
+            <DropdownMenuItem onClick={handleMarkOutstanding} className="text-amber-700 focus:text-amber-700">
+              <RotateCcw className="w-4 h-4 mr-2" />
+              Mark as Outstanding
+            </DropdownMenuItem>
+          )}
           <DropdownMenuSeparator />
           <DropdownMenuItem onClick={() => setShowUploadDialog(true)}>
             <Upload className="w-4 h-4 mr-2" />

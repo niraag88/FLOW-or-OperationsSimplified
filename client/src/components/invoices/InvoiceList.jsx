@@ -99,6 +99,7 @@ export default function InvoiceList({ invoices, totalCount, loading, canEdit, ca
                   <TableHead>VAT</TableHead>
                   <TableHead>Total</TableHead>
                   <TableHead>Status</TableHead>
+                  <TableHead>Payment</TableHead>
                   <TableHead>Actions</TableHead>
                 </TableRow>
               </TableHeader>
@@ -138,6 +139,14 @@ export default function InvoiceList({ invoices, totalCount, loading, canEdit, ca
                         <Badge className={`${getStatusColor(invoice.status)} border`}>
                           {invoice.status?.toUpperCase()}
                         </Badge>
+                      </TableCell>
+                      <TableCell>
+                        {(() => {
+                          const ps = invoice.paymentStatus || invoice.payment_status || 'outstanding';
+                          return ps === 'paid'
+                            ? <Badge className="bg-green-100 text-green-800 border border-green-200">PAID</Badge>
+                            : <Badge className="bg-amber-100 text-amber-800 border border-amber-200">OUTSTANDING</Badge>;
+                        })()}
                       </TableCell>
                       <TableCell>
                         <InvoiceActionsDropdown 

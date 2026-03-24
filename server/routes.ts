@@ -1291,7 +1291,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   // Purchase Order management routes
   app.get('/api/purchase-orders', requireAuth(['Admin', 'Manager']), async (req: AuthenticatedRequest, res) => {
     try {
-      const { page, pageSize, search, status, supplierId, dateFrom, dateTo, excludeYears } = req.query as Record<string, string>;
+      const { page, pageSize, search, status, supplierId, dateFrom, dateTo, excludeYears, paymentStatus } = req.query as Record<string, string>;
       const result = await businessStorage.getPurchaseOrders({
         page: page ? parseInt(page) : undefined,
         pageSize: pageSize ? parseInt(pageSize) : undefined,
@@ -1301,6 +1301,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
         dateFrom: dateFrom || undefined,
         dateTo: dateTo || undefined,
         excludeYears: excludeYears || undefined,
+        paymentStatus: paymentStatus || undefined,
       });
       res.json(result);
     } catch (error) {
@@ -1504,7 +1505,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   // GET /api/invoices
   app.get('/api/invoices', requireAuth(), async (req: AuthenticatedRequest, res) => {
     try {
-      const { page, pageSize, search, status, customerId, dateFrom, dateTo, taxTreatment, excludeYears } = req.query as Record<string, string>;
+      const { page, pageSize, search, status, customerId, dateFrom, dateTo, taxTreatment, excludeYears, paymentStatus } = req.query as Record<string, string>;
       const result = await businessStorage.getInvoices({
         page: page ? parseInt(page) : undefined,
         pageSize: pageSize ? parseInt(pageSize) : undefined,
@@ -1515,6 +1516,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
         dateTo: dateTo || undefined,
         taxTreatment: taxTreatment || undefined,
         excludeYears: excludeYears || undefined,
+        paymentStatus: paymentStatus || undefined,
       });
       res.json(result);
     } catch (error) {
@@ -1557,6 +1559,9 @@ export async function registerRoutes(app: Express): Promise<Server> {
         objectKey: invoices.objectKey,
         scanKey: invoices.scanKey,
         paymentMethod: invoices.paymentMethod,
+        paymentStatus: invoices.paymentStatus,
+        paymentReceivedDate: invoices.paymentReceivedDate,
+        paymentRemarks: invoices.paymentRemarks,
         customerContactPerson: customers.contactPerson,
         customerEmail: customers.email,
         customerPhone: customers.phone,
@@ -1874,6 +1879,58 @@ export async function registerRoutes(app: Express): Promise<Server> {
     } catch (error) {
       console.error('Error removing invoice scan key:', error);
       res.status(500).json({ error: 'Failed to remove file' });
+    }
+  });
+
+  // PATCH /api/invoices/:id/payment - Update payment status
+  app.patch('/api/invoices/:id/payment', requireAuth(['Admin', 'Manager', 'Staff']), async (req: AuthenticatedRequest, res) => {
+    try {
+      const id = parseInt(req.params.id);
+      const { paymentStatus, paymentReceivedDate, paymentRemarks } = req.body;
+      if (!paymentStatus || !['outstanding', 'paid'].includes(paymentStatus)) {
+        return res.status(400).json({ error: 'paymentStatus must be "outstanding" or "paid"' });
+      }
+      const updateData: Record<string, any> = { paymentStatus };
+      if (paymentStatus === 'paid') {
+        updateData.paymentReceivedDate = paymentReceivedDate || null;
+        updateData.paymentRemarks = paymentRemarks || null;
+      } else {
+        updateData.paymentReceivedDate = null;
+        updateData.paymentRemarks = null;
+      }
+      const [updated] = await db.update(invoices).set(updateData).where(eq(invoices.id, id)).returning();
+      if (!updated) return res.status(404).json({ error: 'Invoice not found' });
+      writeAuditLog({ actor: req.user!.id, actorName: req.user?.username || String(req.user!.id), targetId: String(id), targetType: 'invoice', action: 'UPDATE', details: `Payment status set to ${paymentStatus} on Invoice #${updated.invoiceNumber}` });
+      res.json(updated);
+    } catch (error) {
+      console.error('Error updating invoice payment status:', error);
+      res.status(500).json({ error: 'Failed to update payment status' });
+    }
+  });
+
+  // PATCH /api/purchase-orders/:id/payment - Update payment status
+  app.patch('/api/purchase-orders/:id/payment', requireAuth(['Admin', 'Manager', 'Staff']), async (req: AuthenticatedRequest, res) => {
+    try {
+      const id = parseInt(req.params.id);
+      const { paymentStatus, paymentMadeDate, paymentRemarks } = req.body;
+      if (!paymentStatus || !['outstanding', 'paid'].includes(paymentStatus)) {
+        return res.status(400).json({ error: 'paymentStatus must be "outstanding" or "paid"' });
+      }
+      const updateData: Record<string, any> = { paymentStatus, updatedAt: new Date() };
+      if (paymentStatus === 'paid') {
+        updateData.paymentMadeDate = paymentMadeDate || null;
+        updateData.paymentRemarks = paymentRemarks || null;
+      } else {
+        updateData.paymentMadeDate = null;
+        updateData.paymentRemarks = null;
+      }
+      const [updated] = await db.update(purchaseOrders).set(updateData).where(eq(purchaseOrders.id, id)).returning();
+      if (!updated) return res.status(404).json({ error: 'Purchase order not found' });
+      writeAuditLog({ actor: req.user!.id, actorName: req.user?.username || String(req.user!.id), targetId: String(id), targetType: 'purchase_order', action: 'UPDATE', details: `Payment status set to ${paymentStatus} on PO #${updated.poNumber}` });
+      res.json(updated);
+    } catch (error) {
+      console.error('Error updating PO payment status:', error);
+      res.status(500).json({ error: 'Failed to update payment status' });
     }
   });
 

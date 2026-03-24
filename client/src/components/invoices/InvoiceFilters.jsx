@@ -9,7 +9,7 @@ import { Badge } from "@/components/ui/badge";
 import { format } from "date-fns";
 import { cn } from "@/lib/utils";
 
-export default function InvoiceFilters({ selectedStatuses, setSelectedStatuses, selectedCustomers, setSelectedCustomers, selectedTaxTreatments, setSelectedTaxTreatments, dateRange, setDateRange, resetPagination, customers = [] }) {
+export default function InvoiceFilters({ selectedStatuses, setSelectedStatuses, selectedCustomers, setSelectedCustomers, selectedTaxTreatments, setSelectedTaxTreatments, dateRange, setDateRange, resetPagination, customers = [], paymentStatusFilter, setPaymentStatusFilter }) {
   const [dateRangeOpen, setDateRangeOpen] = useState(false);
   const [customStartDate, setCustomStartDate] = useState(null);
   const [customEndDate, setCustomEndDate] = useState(null);
@@ -21,11 +21,13 @@ export default function InvoiceFilters({ selectedStatuses, setSelectedStatuses, 
     setDateRange("all");
     setCustomStartDate(null);
     setCustomEndDate(null);
+    if (setPaymentStatusFilter) setPaymentStatusFilter('all');
     resetPagination();
   };
 
   const hasActiveFilters = selectedStatuses.length > 0 || selectedCustomers.length > 0 || 
-                          selectedTaxTreatments.length > 0 || dateRange !== "all";
+                          selectedTaxTreatments.length > 0 || dateRange !== "all" ||
+                          (paymentStatusFilter && paymentStatusFilter !== 'all');
 
   // Get unique values
   const uniqueStatuses = ['draft', 'submitted'];
@@ -102,6 +104,26 @@ export default function InvoiceFilters({ selectedStatuses, setSelectedStatuses, 
             </div>
           </PopoverContent>
         </Popover>
+
+        {/* Payment Status Filter */}
+        {setPaymentStatusFilter && (
+          <Select
+            value={paymentStatusFilter || 'all'}
+            onValueChange={(value) => {
+              setPaymentStatusFilter(value);
+              resetPagination();
+            }}
+          >
+            <SelectTrigger className="w-44">
+              <SelectValue placeholder="All Payments" />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="all">All Payments</SelectItem>
+              <SelectItem value="outstanding">Outstanding</SelectItem>
+              <SelectItem value="paid">Paid</SelectItem>
+            </SelectContent>
+          </Select>
+        )}
 
         {/* Customer Filter */}
         <Popover>
