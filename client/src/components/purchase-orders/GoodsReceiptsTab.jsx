@@ -1,5 +1,5 @@
 
-import React, { useState } from "react";
+import React, { useState, useCallback } from "react";
 import { Card, CardContent, CardHeader, CardTitle, CardFooter } from "@/components/ui/card";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Badge } from "@/components/ui/badge";
@@ -56,12 +56,39 @@ export default function GoodsReceiptsTab({
   // State is now managed by parent component for context-aware export
   const [showDeleteDialog, setShowDeleteDialog] = useState(false);
   const [deletingPO, setDeletingPO] = useState(null);
+  const [expandedPOIds, setExpandedPOIds] = useState(new Set());
+  const [poItemsCache, setPoItemsCache] = useState({});
+  const [loadingPOItemIds, setLoadingPOItemIds] = useState(new Set());
   const { toast } = useToast();
 
 
   const getProductInfo = (productId) => {
     return products.find(p => p.id === productId) || {};
   };
+
+  const togglePOExpansion = useCallback(async (po) => {
+    const id = po.id;
+    const isExpanded = expandedPOIds.has(id);
+    if (isExpanded) {
+      setExpandedPOIds(prev => { const n = new Set(prev); n.delete(id); return n; });
+      return;
+    }
+    // Expand: load items if not cached
+    setExpandedPOIds(prev => { const n = new Set(prev); n.add(id); return n; });
+    if (poItemsCache[id]) return;
+    setLoadingPOItemIds(prev => { const n = new Set(prev); n.add(id); return n; });
+    try {
+      const resp = await fetch(`/api/purchase-orders/${id}/items`);
+      if (resp.ok) {
+        const items = await resp.json();
+        setPoItemsCache(prev => ({ ...prev, [id]: items }));
+      }
+    } catch (e) {
+      console.error('Failed to load PO items:', e);
+    } finally {
+      setLoadingPOItemIds(prev => { const n = new Set(prev); n.delete(id); return n; });
+    }
+  }, [expandedPOIds, poItemsCache]);
 
   const getStatusColor = (status) => {
     switch (status?.toLowerCase()) {
@@ -856,27 +883,45 @@ export default function GoodsReceiptsTab({
                   <table className="w-full text-sm" style={{tableLayout: 'fixed'}}>
                     <thead>
                       <tr className="border-b bg-muted/50">
-                        <th className="h-10 px-2 text-left align-middle font-medium text-muted-foreground" style={{width: '120px'}}>PO Number</th>
-                        <th className="h-10 px-2 text-left align-middle font-medium text-muted-foreground" style={{width: '140px'}}>Brand</th>
-                        <th className="h-10 px-2 text-left align-middle font-medium text-muted-foreground" style={{width: '100px'}}>Order Date</th>
+                        <th className="h-10 px-2 text-left align-middle font-medium text-muted-foreground" style={{width: '130px'}}>PO Number</th>
+                        <th className="h-10 px-2 text-left align-middle font-medium text-muted-foreground" style={{width: '130px'}}>Brand</th>
+                        <th className="h-10 px-2 text-left align-middle font-medium text-muted-foreground" style={{width: '90px'}}>Order Date</th>
                         <th className="h-10 px-2 text-left align-middle font-medium text-muted-foreground" style={{width: '110px'}}>Total</th>
                         <th className="h-10 px-2 text-left align-middle font-medium text-muted-foreground" style={{width: '110px'}}>Total (AED)</th>
-                        <th className="h-10 px-2 text-left align-middle font-medium text-muted-foreground" style={{width: '90px'}}>Line Items</th>
-                        <th className="h-10 px-2 text-left align-middle font-medium text-muted-foreground" style={{width: '80px'}}>Ordered</th>
-                        <th className="h-10 px-2 text-left align-middle font-medium text-muted-foreground" style={{width: '80px'}}>Received</th>
-                        <th className="h-10 px-2 text-left align-middle font-medium text-muted-foreground" style={{width: '90px'}}>Status</th>
-                        <th className="h-10 px-2 text-left align-middle font-medium text-muted-foreground" style={{width: '90px'}}>Actions</th>
+                        <th className="h-10 px-2 text-left align-middle font-medium text-muted-foreground" style={{width: '70px'}}>Lines</th>
+                        <th className="h-10 px-2 text-left align-middle font-medium text-muted-foreground" style={{width: '70px'}}>Ordered</th>
+                        <th className="h-10 px-2 text-left align-middle font-medium text-muted-foreground" style={{width: '70px'}}>Received</th>
+                        <th className="h-10 px-2 text-left align-middle font-medium text-muted-foreground" style={{width: '90px'}}>Delivery</th>
+                        <th className="h-10 px-2 text-left align-middle font-medium text-muted-foreground" style={{width: '80px'}}>Status</th>
+                        <th className="h-10 px-2 text-left align-middle font-medium text-muted-foreground" style={{width: '80px'}}>Actions</th>
                       </tr>
                     </thead>
                     <tbody>
                       {closedPOs.map((po) => {
                         const poGRNs = (goodsReceipts || []).filter(grn => (grn.poId ?? grn.purchase_order_id) === po.id);
+                        const ordQty = getTotalOrderedQuantity(po);
+                        const recQty = getTotalReceivedQuantity(po);
+                        const isPartial = ordQty > 0 && recQty < ordQty;
+                        const isExpanded = expandedPOIds.has(po.id);
+                        const isLoadingItems = loadingPOItemIds.has(po.id);
+                        const cachedItems = poItemsCache[po.id];
                         return (
-                          <>
-                            <tr key={po.id} className="border-b transition-colors hover:bg-muted/50">
-                              <td className="p-2 align-middle font-medium" style={{width: '120px'}}>{po.poNumber}</td>
-                              <td className="p-2 align-middle" style={{width: '140px'}}>{po.brandName || 'Unknown Brand'}</td>
-                              <td className="p-2 align-middle" style={{width: '100px'}}>
+                          <React.Fragment key={po.id}>
+                            <tr className="border-b transition-colors hover:bg-muted/50">
+                              <td className="p-2 align-middle font-medium" style={{width: '130px'}}>
+                                <div className="flex items-center gap-1">
+                                  <button
+                                    onClick={() => togglePOExpansion(po)}
+                                    className="text-gray-400 hover:text-gray-700 flex-shrink-0"
+                                    title={isExpanded ? "Hide line items" : "Show line items"}
+                                  >
+                                    {isExpanded ? <ChevronDown className="w-4 h-4" /> : <ChevronRight className="w-4 h-4" />}
+                                  </button>
+                                  <span>{po.poNumber}</span>
+                                </div>
+                              </td>
+                              <td className="p-2 align-middle" style={{width: '130px'}}>{po.brandName || 'Unknown Brand'}</td>
+                              <td className="p-2 align-middle" style={{width: '90px'}}>
                                 {po.orderDate && !isNaN(new Date(po.orderDate)) ? 
                                   format(new Date(po.orderDate), 'dd/MM/yy') : 
                                   '-'
@@ -884,27 +929,32 @@ export default function GoodsReceiptsTab({
                               </td>
                               <td className="p-2 align-middle" style={{width: '110px'}}>{po.currency || 'GBP'} {parseFloat(po.totalAmount || 0).toFixed(2)}</td>
                               <td className="p-2 align-middle" style={{width: '110px'}}>AED {parseFloat(po.grandTotal || 0).toFixed(2)}</td>
-                              <td className="p-2 align-middle" style={{width: '90px'}}>{getLineItemsCount(po)}</td>
-                              <td className="p-2 align-middle" style={{width: '80px'}}>{getTotalOrderedQuantity(po)}</td>
-                              <td className="p-2 align-middle" style={{width: '80px'}}>
-                                <div className="flex items-center gap-1 flex-wrap">
-                                  <span>{getTotalReceivedQuantity(po)}</span>
-                                  {getTotalOrderedQuantity(po) > 0 && getTotalReceivedQuantity(po) < getTotalOrderedQuantity(po) && (
+                              <td className="p-2 align-middle" style={{width: '70px'}}>{getLineItemsCount(po)}</td>
+                              <td className="p-2 align-middle" style={{width: '70px'}}>{ordQty}</td>
+                              <td className="p-2 align-middle" style={{width: '70px'}}>{recQty}</td>
+                              <td className="p-2 align-middle" style={{width: '90px'}}>
+                                {ordQty > 0 && (
+                                  isPartial ? (
                                     <Tooltip>
                                       <TooltipTrigger asChild>
-                                        <span className="inline-flex items-center gap-0.5 text-xs font-medium text-amber-700 bg-amber-50 border border-amber-200 rounded px-1 py-0.5 cursor-default">
+                                        <span className="inline-flex items-center gap-0.5 text-xs font-semibold text-amber-800 bg-amber-100 border border-amber-300 rounded px-1.5 py-0.5 cursor-default">
                                           <AlertTriangle className="w-3 h-3" />
                                           Partial
                                         </span>
                                       </TooltipTrigger>
                                       <TooltipContent side="top">
-                                        <p className="text-xs">Received quantity is less than ordered</p>
+                                        <p className="text-xs">{recQty} of {ordQty} units received</p>
                                       </TooltipContent>
                                     </Tooltip>
-                                  )}
-                                </div>
+                                  ) : (
+                                    <span className="inline-flex items-center gap-0.5 text-xs font-semibold text-green-800 bg-green-100 border border-green-300 rounded px-1.5 py-0.5">
+                                      <CheckCircle2 className="w-3 h-3" />
+                                      Complete
+                                    </span>
+                                  )
+                                )}
                               </td>
-                              <td className="p-2 align-middle" style={{width: '90px'}}>
+                              <td className="p-2 align-middle" style={{width: '80px'}}>
                                 <Badge 
                                   variant="outline" 
                                   className="border-green-300 text-green-800 bg-green-50"
@@ -912,7 +962,7 @@ export default function GoodsReceiptsTab({
                                   {po.status?.toUpperCase()}
                                 </Badge>
                               </td>
-                              <td className="p-2 align-middle" style={{width: '90px'}}>
+                              <td className="p-2 align-middle" style={{width: '80px'}}>
                                 <DropdownMenu>
                                   <DropdownMenuTrigger asChild>
                                     <Button variant="ghost" size="sm" className="h-8 w-8 p-0">
@@ -941,33 +991,66 @@ export default function GoodsReceiptsTab({
                               </td>
                             </tr>
                             {poGRNs.length > 0 && poGRNs.map(grn => (
-                              <tr key={`grn-${grn.id}`} className="bg-gray-50 border-b text-xs text-gray-600">
-                                <td className="pl-6 py-1 align-middle" style={{width: '120px', paddingRight: '8px'}}>
-                                  <span className="font-mono">{grn.receiptNumber}</span>
+                              <tr key={`grn-${grn.id}`} className="bg-blue-50/40 border-b text-xs text-gray-600">
+                                <td className="pl-8 py-1.5 align-middle" style={{width: '130px', paddingRight: '8px'}}>
+                                  <span className="font-mono text-blue-700">{grn.receiptNumber}</span>
                                 </td>
-                                <td className="p-1 align-middle" style={{width: '140px'}}>
+                                <td className="p-1.5 align-middle text-gray-500" style={{width: '130px'}}>
                                   {grn.receivedDate ? format(new Date(grn.receivedDate), 'dd/MM/yy') : '-'}
                                 </td>
-                                <td className="p-1 align-middle" colSpan={5} style={{color: '#666'}}></td>
-                                <td className="p-1 align-middle" style={{width: '80px'}}>
-                                  {grn.isPartial && (
-                                    <Tooltip>
-                                      <TooltipTrigger asChild>
-                                        <span className="inline-flex items-center gap-0.5 text-xs font-medium text-amber-700 bg-amber-50 border border-amber-200 rounded px-1 py-0.5 cursor-default">
-                                          <AlertTriangle className="w-3 h-3" />
-                                          Partial
-                                        </span>
-                                      </TooltipTrigger>
-                                      <TooltipContent side="top">
-                                        <p className="text-xs">Received quantity is less than ordered</p>
-                                      </TooltipContent>
-                                    </Tooltip>
-                                  )}
-                                </td>
-                                <td className="p-1 align-middle" colSpan={2}></td>
+                                <td className="p-1.5 align-middle text-gray-400 italic" colSpan={9}>GRN received</td>
                               </tr>
                             ))}
-                          </>
+                            {isExpanded && (
+                              <tr className="bg-slate-50 border-b">
+                                <td colSpan={11} className="p-0">
+                                  {isLoadingItems ? (
+                                    <div className="px-8 py-3 text-xs text-gray-500">Loading line items...</div>
+                                  ) : cachedItems && cachedItems.length > 0 ? (
+                                    <div className="mx-6 my-2 border rounded overflow-hidden">
+                                      <table className="w-full text-xs">
+                                        <thead>
+                                          <tr className="bg-slate-100 border-b">
+                                            <th className="px-3 py-2 text-left font-medium text-gray-600">Product</th>
+                                            <th className="px-3 py-2 text-right font-medium text-gray-600">Ordered</th>
+                                            <th className="px-3 py-2 text-right font-medium text-gray-600">Received</th>
+                                            <th className="px-3 py-2 text-right font-medium text-gray-600">Unit Price</th>
+                                            <th className="px-3 py-2 text-right font-medium text-gray-600">Received Value</th>
+                                            <th className="px-3 py-2 text-center font-medium text-gray-600">Note</th>
+                                          </tr>
+                                        </thead>
+                                        <tbody>
+                                          {cachedItems.map((item, idx) => {
+                                            const recVal = (parseFloat(item.receivedQuantity || 0) * parseFloat(item.unitPrice || 0)).toFixed(2);
+                                            const short = (item.receivedQuantity ?? 0) < item.quantity;
+                                            return (
+                                              <tr key={idx} className={`border-b ${short ? 'bg-amber-50/50' : ''}`}>
+                                                <td className="px-3 py-1.5 text-gray-800">{item.productName || item.name || 'Unknown'}</td>
+                                                <td className="px-3 py-1.5 text-right text-gray-700">{item.quantity}</td>
+                                                <td className="px-3 py-1.5 text-right text-gray-700">{item.receivedQuantity ?? 0}</td>
+                                                <td className="px-3 py-1.5 text-right text-gray-700">{po.currency || 'GBP'} {parseFloat(item.unitPrice || 0).toFixed(2)}</td>
+                                                <td className="px-3 py-1.5 text-right text-gray-700">{po.currency || 'GBP'} {recVal}</td>
+                                                <td className="px-3 py-1.5 text-center">
+                                                  {short && (
+                                                    <span className="inline-flex items-center gap-0.5 text-amber-700 bg-amber-100 border border-amber-200 rounded px-1 py-0.5 font-medium">
+                                                      <AlertTriangle className="w-2.5 h-2.5" />
+                                                      Short
+                                                    </span>
+                                                  )}
+                                                </td>
+                                              </tr>
+                                            );
+                                          })}
+                                        </tbody>
+                                      </table>
+                                    </div>
+                                  ) : (
+                                    <div className="px-8 py-3 text-xs text-gray-400 italic">No line items found</div>
+                                  )}
+                                </td>
+                              </tr>
+                            )}
+                          </React.Fragment>
                         );
                       })}
                     </tbody>

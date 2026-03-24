@@ -69,25 +69,26 @@ export default function PurchaseOrders() {
       .catch(() => {});
   };
 
-  // On first goods-receipts tab open: fetch both allPOs (lazy, once) and GRNs
+  const fetchAllPOsForGRNTab = () => {
+    fetch('/api/purchase-orders?status=submitted,closed', { credentials: 'include' })
+      .then(r => r.json())
+      .then(result => setAllPOs(Array.isArray(result) ? result : (result.data || [])))
+      .catch(() => {});
+  };
+
+  // On first goods-receipts tab open: fetch submitted+closed POs (lazy, once) and GRNs
   useEffect(() => {
     if (activeTab !== 'goods-receipts') return;
     if (allPOs.length === 0) {
-      fetch('/api/purchase-orders', { credentials: 'include' })
-        .then(r => r.json())
-        .then(result => setAllPOs(Array.isArray(result) ? result : (result.data || [])))
-        .catch(() => {});
+      fetchAllPOsForGRNTab();
     }
     fetchGoodsReceipts();
   }, [activeTab]);
 
-  // On refresh: re-fetch allPOs and GRNs if currently on goods-receipts tab
+  // On refresh: re-fetch submitted+closed POs and GRNs if currently on goods-receipts tab
   useEffect(() => {
     if (refreshTrigger === 0 || activeTab !== 'goods-receipts') return;
-    fetch('/api/purchase-orders', { credentials: 'include' })
-      .then(r => r.json())
-      .then(result => setAllPOs(Array.isArray(result) ? result : (result.data || [])))
-      .catch(() => {});
+    fetchAllPOsForGRNTab();
     fetchGoodsReceipts();
   }, [refreshTrigger]);
 

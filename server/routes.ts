@@ -3075,7 +3075,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       }
 
       // Validate storage key format (allow pdf, jpg, jpeg, png extensions)
-      if (!storageKey.match(/^(invoices|delivery)\/\d{4}\/[^\/]+\.(pdf|jpg|jpeg|png)$/)) {
+      if (!storageKey.match(/^(invoices|delivery|purchase-orders)\/\d{4}\/[^\/]+\.(pdf|jpg|jpeg|png)$/)) {
         return res.status(400).json({ error: 'Invalid storage key format' });
       }
 
