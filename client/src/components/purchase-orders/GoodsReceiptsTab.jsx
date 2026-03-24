@@ -1,5 +1,5 @@
 
-import React, { useState, useCallback, useEffect, useRef } from "react";
+import React, { useState, useCallback } from "react";
 import { Card, CardContent, CardHeader, CardTitle, CardFooter } from "@/components/ui/card";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Badge } from "@/components/ui/badge";
@@ -56,73 +56,12 @@ export default function GoodsReceiptsTab({
   // State is now managed by parent component for context-aware export
   const [showDeleteDialog, setShowDeleteDialog] = useState(false);
   const [deletingPO, setDeletingPO] = useState(null);
-  const [expandedPOIds, setExpandedPOIds] = useState(new Set());
-  const [poItemsCache, setPoItemsCache] = useState({});
-  const [loadingPOItemIds, setLoadingPOItemIds] = useState(new Set());
-  const autoExpandedRef = useRef(false);
   const { toast } = useToast();
-
-  // Auto-expand closed POs that have GRNs when the Closed section is first opened
-  useEffect(() => {
-    if (!showClosedReceipts) return;
-    if (autoExpandedRef.current) return;
-    const grNPoIds = new Set((goodsReceipts || []).map(grn => grn.poId ?? grn.purchase_order_id));
-    const closedWithGRNs = (purchaseOrders || []).filter(po => po.status === 'closed' && grNPoIds.has(po.id));
-    if (closedWithGRNs.length === 0) return;
-    autoExpandedRef.current = true;
-    setExpandedPOIds(new Set(closedWithGRNs.map(po => po.id)));
-    // Batch-fetch items in groups of 5
-    const batchFetch = async () => {
-      const batchSize = 5;
-      for (let i = 0; i < closedWithGRNs.length; i += batchSize) {
-        const batch = closedWithGRNs.slice(i, i + batchSize);
-        batch.forEach(po => setLoadingPOItemIds(prev => { const n = new Set(prev); n.add(po.id); return n; }));
-        await Promise.all(batch.map(async (po) => {
-          try {
-            const resp = await fetch(`/api/purchase-orders/${po.id}/items`);
-            if (resp.ok) {
-              const items = await resp.json();
-              setPoItemsCache(prev => ({ ...prev, [po.id]: items }));
-            }
-          } catch (e) {
-            console.error('Failed to load PO items for', po.poNumber, e);
-          } finally {
-            setLoadingPOItemIds(prev => { const n = new Set(prev); n.delete(po.id); return n; });
-          }
-        }));
-      }
-    };
-    batchFetch();
-  }, [showClosedReceipts, purchaseOrders, goodsReceipts]);
 
 
   const getProductInfo = (productId) => {
     return products.find(p => p.id === productId) || {};
   };
-
-  const togglePOExpansion = useCallback(async (po) => {
-    const id = po.id;
-    const isExpanded = expandedPOIds.has(id);
-    if (isExpanded) {
-      setExpandedPOIds(prev => { const n = new Set(prev); n.delete(id); return n; });
-      return;
-    }
-    // Expand: load items if not cached
-    setExpandedPOIds(prev => { const n = new Set(prev); n.add(id); return n; });
-    if (poItemsCache[id]) return;
-    setLoadingPOItemIds(prev => { const n = new Set(prev); n.add(id); return n; });
-    try {
-      const resp = await fetch(`/api/purchase-orders/${id}/items`);
-      if (resp.ok) {
-        const items = await resp.json();
-        setPoItemsCache(prev => ({ ...prev, [id]: items }));
-      }
-    } catch (e) {
-      console.error('Failed to load PO items:', e);
-    } finally {
-      setLoadingPOItemIds(prev => { const n = new Set(prev); n.delete(id); return n; });
-    }
-  }, [expandedPOIds, poItemsCache]);
 
   const getStatusColor = (status) => {
     switch (status?.toLowerCase()) {
@@ -945,23 +884,11 @@ export default function GoodsReceiptsTab({
                         const ordQty = getTotalOrderedQuantity(po);
                         const recQty = getTotalReceivedQuantity(po);
                         const isPartial = ordQty > 0 && recQty < ordQty;
-                        const isExpanded = expandedPOIds.has(po.id);
-                        const isLoadingItems = loadingPOItemIds.has(po.id);
-                        const cachedItems = poItemsCache[po.id];
                         return (
                           <React.Fragment key={po.id}>
                             <tr className="border-b transition-colors hover:bg-muted/50">
                               <td className="p-2 align-middle font-medium" style={{width: '130px'}}>
-                                <div className="flex items-center gap-1">
-                                  <button
-                                    onClick={() => togglePOExpansion(po)}
-                                    className="text-gray-400 hover:text-gray-700 flex-shrink-0"
-                                    title={isExpanded ? "Hide line items" : "Show line items"}
-                                  >
-                                    {isExpanded ? <ChevronDown className="w-4 h-4" /> : <ChevronRight className="w-4 h-4" />}
-                                  </button>
-                                  <span>{po.poNumber}</span>
-                                </div>
+                                <span>{po.poNumber}</span>
                               </td>
                               <td className="p-2 align-middle" style={{width: '130px'}}>{po.brandName || 'Unknown Brand'}</td>
                               <td className="p-2 align-middle" style={{width: '90px'}}>
@@ -1034,65 +961,73 @@ export default function GoodsReceiptsTab({
                               </td>
                             </tr>
                             {poGRNs.length > 0 && poGRNs.map(grn => (
-                              <tr key={`grn-${grn.id}`} className="bg-blue-50/40 border-b text-xs text-gray-600">
-                                <td className="pl-8 py-1.5 align-middle" style={{width: '130px', paddingRight: '8px'}}>
-                                  <span className="font-mono text-blue-700">{grn.receiptNumber}</span>
-                                </td>
-                                <td className="p-1.5 align-middle text-gray-500" style={{width: '130px'}}>
-                                  {grn.receivedDate ? format(new Date(grn.receivedDate), 'dd/MM/yy') : '-'}
-                                </td>
-                                <td className="p-1.5 align-middle text-gray-400 italic" colSpan={9}>GRN received</td>
-                              </tr>
+                              <React.Fragment key={`grn-${grn.id}`}>
+                                <tr className="bg-blue-50/40 border-b text-xs text-gray-600">
+                                  <td className="pl-6 py-1.5 align-middle" style={{width: '130px', paddingRight: '8px'}}>
+                                    <span className="font-mono text-blue-700">{grn.receiptNumber}</span>
+                                  </td>
+                                  <td className="p-1.5 align-middle text-gray-500" style={{width: '130px'}}>
+                                    {grn.receivedDate ? format(new Date(grn.receivedDate), 'dd/MM/yy') : '-'}
+                                  </td>
+                                  <td className="p-1.5 align-middle text-gray-400 italic" colSpan={9}>
+                                    {grn.isPartial ? (
+                                      <span className="inline-flex items-center gap-0.5 text-amber-700 bg-amber-100 border border-amber-200 rounded px-1.5 py-0.5 font-medium not-italic">
+                                        <AlertTriangle className="w-3 h-3" />
+                                        Short delivery
+                                      </span>
+                                    ) : (
+                                      <span className="inline-flex items-center gap-0.5 text-green-700 not-italic">
+                                        <CheckCircle2 className="w-3 h-3" />
+                                        Full delivery
+                                      </span>
+                                    )}
+                                  </td>
+                                </tr>
+                                {grn.items && grn.items.length > 0 && (
+                                  <tr className="bg-slate-50/60 border-b">
+                                    <td colSpan={11} className="p-0">
+                                      <div className="mx-6 my-1.5 border rounded overflow-hidden">
+                                        <table className="w-full text-xs">
+                                          <thead>
+                                            <tr className="bg-slate-100 border-b">
+                                              <th className="px-3 py-1.5 text-left font-medium text-gray-600">Product</th>
+                                              <th className="px-3 py-1.5 text-right font-medium text-gray-600">Ordered</th>
+                                              <th className="px-3 py-1.5 text-right font-medium text-gray-600">Received</th>
+                                              <th className="px-3 py-1.5 text-right font-medium text-gray-600">Unit Price</th>
+                                              <th className="px-3 py-1.5 text-right font-medium text-gray-600">Received Value</th>
+                                              <th className="px-3 py-1.5 text-center font-medium text-gray-600">Note</th>
+                                            </tr>
+                                          </thead>
+                                          <tbody>
+                                            {grn.items.map((item, idx) => {
+                                              const recVal = (parseFloat(item.receivedQuantity || 0) * parseFloat(item.unitPrice || 0)).toFixed(2);
+                                              const short = (item.receivedQuantity ?? 0) < (item.orderedQuantity ?? 0);
+                                              return (
+                                                <tr key={idx} className={`border-b ${short ? 'bg-amber-50/40' : ''}`}>
+                                                  <td className="px-3 py-1 text-gray-800">{item.productName || 'Unknown'}</td>
+                                                  <td className="px-3 py-1 text-right text-gray-700">{item.orderedQuantity ?? 0}</td>
+                                                  <td className="px-3 py-1 text-right text-gray-700">{item.receivedQuantity ?? 0}</td>
+                                                  <td className="px-3 py-1 text-right text-gray-700">{po.currency || 'GBP'} {parseFloat(item.unitPrice || 0).toFixed(2)}</td>
+                                                  <td className="px-3 py-1 text-right text-gray-700">{po.currency || 'GBP'} {recVal}</td>
+                                                  <td className="px-3 py-1 text-center">
+                                                    {short && (
+                                                      <span className="inline-flex items-center gap-0.5 text-amber-700 bg-amber-100 border border-amber-200 rounded px-1 py-0.5 font-medium">
+                                                        <AlertTriangle className="w-2.5 h-2.5" />
+                                                        Short
+                                                      </span>
+                                                    )}
+                                                  </td>
+                                                </tr>
+                                              );
+                                            })}
+                                          </tbody>
+                                        </table>
+                                      </div>
+                                    </td>
+                                  </tr>
+                                )}
+                              </React.Fragment>
                             ))}
-                            {isExpanded && (
-                              <tr className="bg-slate-50 border-b">
-                                <td colSpan={11} className="p-0">
-                                  {isLoadingItems ? (
-                                    <div className="px-8 py-3 text-xs text-gray-500">Loading line items...</div>
-                                  ) : cachedItems && cachedItems.length > 0 ? (
-                                    <div className="mx-6 my-2 border rounded overflow-hidden">
-                                      <table className="w-full text-xs">
-                                        <thead>
-                                          <tr className="bg-slate-100 border-b">
-                                            <th className="px-3 py-2 text-left font-medium text-gray-600">Product</th>
-                                            <th className="px-3 py-2 text-right font-medium text-gray-600">Ordered</th>
-                                            <th className="px-3 py-2 text-right font-medium text-gray-600">Received</th>
-                                            <th className="px-3 py-2 text-right font-medium text-gray-600">Unit Price</th>
-                                            <th className="px-3 py-2 text-right font-medium text-gray-600">Received Value</th>
-                                            <th className="px-3 py-2 text-center font-medium text-gray-600">Note</th>
-                                          </tr>
-                                        </thead>
-                                        <tbody>
-                                          {cachedItems.map((item, idx) => {
-                                            const recVal = (parseFloat(item.receivedQuantity || 0) * parseFloat(item.unitPrice || 0)).toFixed(2);
-                                            const short = (item.receivedQuantity ?? 0) < item.quantity;
-                                            return (
-                                              <tr key={idx} className={`border-b ${short ? 'bg-amber-50/50' : ''}`}>
-                                                <td className="px-3 py-1.5 text-gray-800">{item.productName || item.name || 'Unknown'}</td>
-                                                <td className="px-3 py-1.5 text-right text-gray-700">{item.quantity}</td>
-                                                <td className="px-3 py-1.5 text-right text-gray-700">{item.receivedQuantity ?? 0}</td>
-                                                <td className="px-3 py-1.5 text-right text-gray-700">{po.currency || 'GBP'} {parseFloat(item.unitPrice || 0).toFixed(2)}</td>
-                                                <td className="px-3 py-1.5 text-right text-gray-700">{po.currency || 'GBP'} {recVal}</td>
-                                                <td className="px-3 py-1.5 text-center">
-                                                  {short && (
-                                                    <span className="inline-flex items-center gap-0.5 text-amber-700 bg-amber-100 border border-amber-200 rounded px-1 py-0.5 font-medium">
-                                                      <AlertTriangle className="w-2.5 h-2.5" />
-                                                      Short
-                                                    </span>
-                                                  )}
-                                                </td>
-                                              </tr>
-                                            );
-                                          })}
-                                        </tbody>
-                                      </table>
-                                    </div>
-                                  ) : (
-                                    <div className="px-8 py-3 text-xs text-gray-400 italic">No line items found</div>
-                                  )}
-                                </td>
-                              </tr>
-                            )}
                           </React.Fragment>
                         );
                       })}

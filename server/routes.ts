@@ -2618,8 +2618,33 @@ export async function registerRoutes(app: Express): Promise<Server> {
         .leftJoin(purchaseOrders, eq(purchaseOrders.id, goodsReceipts.poId))
         .leftJoin(suppliers, eq(suppliers.id, goodsReceipts.supplierId))
         .orderBy(desc(goodsReceipts.createdAt));
-      
-      res.json(receipts);
+
+      // Single bulk query for all GRN items (avoids N+1 per-receipt calls)
+      const allItems = await db.select({
+        receiptId: goodsReceiptItems.receiptId,
+        id: goodsReceiptItems.id,
+        productId: goodsReceiptItems.productId,
+        productName: products.name,
+        orderedQuantity: goodsReceiptItems.orderedQuantity,
+        receivedQuantity: goodsReceiptItems.receivedQuantity,
+        unitPrice: goodsReceiptItems.unitPrice,
+      }).from(goodsReceiptItems)
+        .leftJoin(products, eq(products.id, goodsReceiptItems.productId));
+
+      // Group items by receiptId
+      const itemsByReceipt: Record<number, typeof allItems> = {};
+      for (const item of allItems) {
+        if (!itemsByReceipt[item.receiptId]) itemsByReceipt[item.receiptId] = [];
+        itemsByReceipt[item.receiptId].push(item);
+      }
+
+      // Merge items into receipts
+      const receiptsWithItems = receipts.map(r => ({
+        ...r,
+        items: itemsByReceipt[r.id] ?? [],
+      }));
+
+      res.json(receiptsWithItems);
     } catch (error) {
       console.error('Error fetching goods receipts:', error);
       res.status(500).json({ error: 'Failed to fetch goods receipts' });
@@ -3069,9 +3094,11 @@ export async function registerRoutes(app: Express): Promise<Server> {
         return res.status(400).json({ error: 'Only PDF, JPG, and PNG files are allowed' });
       }
 
-      // Validate file size (25MB max)
-      if (fileSize > 25 * 1024 * 1024) {
-        return res.status(400).json({ error: 'File size exceeds 25MB limit' });
+      // Validate file size — 2MB for purchase-order supplier invoices, 25MB elsewhere
+      const isPOUpload = storageKey.startsWith('purchase-orders/');
+      const maxSizeBytes = isPOUpload ? 2 * 1024 * 1024 : 25 * 1024 * 1024;
+      if (fileSize > maxSizeBytes) {
+        return res.status(400).json({ error: `File size exceeds ${isPOUpload ? '2MB' : '25MB'} limit` });
       }
 
       // Validate storage key format (allow pdf, jpg, jpeg, png extensions)
