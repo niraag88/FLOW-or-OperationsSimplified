@@ -2853,8 +2853,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
     try {
       const { token } = req.params;
       const tokenResult = await pool.query(
-        'SELECT * FROM signed_tokens WHERE token = $1',
-        [token]
+        'SELECT * FROM signed_tokens WHERE token = $1 AND expires > $2',
+        [token, Date.now()]
       );
       const row = tokenResult.rows[0];
       const tokenData = row ? {
@@ -2866,7 +2866,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
         checksum: row.checksum as string | undefined,
       } : null;
 
-      if (!tokenData || tokenData.expires < Date.now() || tokenData.type !== 'upload') {
+      if (!tokenData || tokenData.type !== 'upload') {
         return res.status(401).json({ error: 'Invalid or expired upload token' });
       }
 
@@ -3046,8 +3046,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
     try {
       const { token } = req.params;
       const tokenResult = await pool.query(
-        'SELECT * FROM signed_tokens WHERE token = $1',
-        [token]
+        'SELECT * FROM signed_tokens WHERE token = $1 AND expires > $2',
+        [token, Date.now()]
       );
       const dlRow = tokenResult.rows[0];
       const tokenData = dlRow ? {
@@ -3056,7 +3056,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
         type: dlRow.type as 'upload' | 'download',
       } : null;
 
-      if (!tokenData || tokenData.expires < Date.now() || tokenData.type !== 'download') {
+      if (!tokenData || tokenData.type !== 'download') {
         return res.status(401).json({ error: 'Invalid or expired download token' });
       }
 
