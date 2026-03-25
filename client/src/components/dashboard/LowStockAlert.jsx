@@ -3,13 +3,13 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { AlertTriangle, PackageCheck } from 'lucide-react';
 import { Link } from 'react-router-dom';
 import { createPageUrl } from '@/utils';
+import { isLowStock } from '@/utils/stockUtils';
 
 export default function LowStockAlert({ products, lowStockThreshold = 6 }) {
   const threshold = parseInt(lowStockThreshold) || 6;
-  const allLowStock = (products || []).filter(p => {
-    const qty = p.stockQuantity || 0;
-    return qty <= threshold;
-  });
+  // Uses the canonical isLowStock helper — excludes out-of-stock (qty === 0),
+  // which is a separate category.  Matches Inventory page classification.
+  const allLowStock = (products || []).filter(p => isLowStock(p.stockQuantity, threshold));
   const lowStockProducts = allLowStock.slice(0, 5);
 
   return (

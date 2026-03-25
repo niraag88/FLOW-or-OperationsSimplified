@@ -130,15 +130,20 @@ export default function Invoices() {
   const handleInvoiceSaveSuccess = async () => {
     handleRefresh();
     if (sourceQuotationId) {
+      const quotationId = sourceQuotationId;
+      setSourceQuotationId(null);
       try {
-        await fetch(`/api/quotations/${sourceQuotationId}/convert`, {
+        const res = await fetch(`/api/quotations/${quotationId}/convert`, {
           method: 'PATCH',
           credentials: 'include',
         });
+        if (!res.ok) {
+          const body = await res.json().catch(() => ({}));
+          console.warn(`Could not mark quotation #${quotationId} as converted (HTTP ${res.status}):`, body?.error || body);
+        }
       } catch (err) {
-        console.warn('Could not update source quotation status:', err);
+        console.warn(`Could not mark quotation #${quotationId} as converted (network error):`, err);
       }
-      setSourceQuotationId(null);
     }
   };
 
