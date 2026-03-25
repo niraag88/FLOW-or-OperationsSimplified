@@ -13,13 +13,15 @@ import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
-import { Plus, Trash2, PackageCheck, AlertTriangle } from "lucide-react";
+import { Plus, Trash2, PackageCheck, AlertTriangle, Paperclip, FileText, ExternalLink } from "lucide-react";
 import { Supplier } from "@/api/entities";
 import { Product } from "@/api/entities";
 import { PurchaseOrder } from "@/api/entities";
 import { formatDate } from "@/utils/dateUtils";
 import { getRateToAed, formatCurrency, SUPPORTED_CURRENCIES } from "@/utils/currency";
 import { computeReconciliation } from "@/utils/poReconciliation";
+import { useToast } from "@/hooks/use-toast";
+import { format } from "date-fns";
 
 export default function POForm({ open, onClose, editingPO, currentUser, onSuccess }) {
   const [loading, setLoading] = useState(false);
@@ -27,6 +29,9 @@ export default function POForm({ open, onClose, editingPO, currentUser, onSucces
   const [products, setProducts] = useState([]);
   const [companySettings, setCompanySettings] = useState(null);
   const [currencyExplicitlySet, setCurrencyExplicitlySet] = useState(false);
+  const [grnDocs, setGrnDocs] = useState([]);
+  const [loadingGrnDocs, setLoadingGrnDocs] = useState(false);
+  const { toast } = useToast();
   
   const [formData, setFormData] = useState({
     poNumber: "",
@@ -44,8 +49,39 @@ export default function POForm({ open, onClose, editingPO, currentUser, onSucces
   useEffect(() => {
     if (open) {
       loadInitialData();
+      if (editingPO?.id) {
+        loadGrnDocs(editingPO.id);
+      } else {
+        setGrnDocs([]);
+      }
     }
-  }, [open, editingPO]);
+  }, [open, editingPO?.id]);
+
+  const loadGrnDocs = async (poId) => {
+    setLoadingGrnDocs(true);
+    try {
+      const res = await fetch(`/api/goods-receipts?poId=${poId}`, { credentials: 'include' });
+      if (res.ok) {
+        const data = await res.json();
+        setGrnDocs(data);
+      }
+    } catch (e) {
+      // silently ignore
+    } finally {
+      setLoadingGrnDocs(false);
+    }
+  };
+
+  const handleViewDoc = async (scanKey) => {
+    try {
+      const res = await fetch(`/api/storage/signed-get?key=${encodeURIComponent(scanKey)}`, { credentials: 'include' });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error || 'Failed to get link');
+      window.open(data.url, '_blank');
+    } catch (e) {
+      toast({ title: 'Error', description: 'Could not retrieve the document.', variant: 'destructive' });
+    }
+  };
 
   const loadInitialData = async () => {
     try {
@@ -637,6 +673,109 @@ export default function POForm({ open, onClose, editingPO, currentUser, onSucces
                       </div>
                     );
                   })}
+                </div>
+              )}
+            </div>
+          )}
+
+          {/* Supplier Documents panel — only shown when viewing an existing PO */}
+          {editingPO && (
+            <div className="rounded-lg border border-blue-200 bg-blue-50/40 p-4 space-y-3">
+              <div className="flex items-center gap-2">
+                <Paperclip className="w-4 h-4 text-blue-600" />
+                <span className="text-sm font-semibold text-blue-800">Supplier Documents</span>
+                <span className="text-xs text-blue-600 ml-auto">Per-delivery invoices and supporting files</span>
+              </div>
+              {loadingGrnDocs ? (
+                <p className="text-xs text-gray-500">Loading documents...</p>
+              ) : (
+                <div className="space-y-2">
+                  {/* GRN-level supplier invoices (slot 1 per GRN) */}
+                  {grnDocs.filter(grn => grn.scanKey1).length > 0 ? (
+                    <div className="space-y-1.5">
+                      <p className="text-xs font-medium text-gray-600">Per-Delivery Invoices</p>
+                      {grnDocs.filter(grn => grn.scanKey1).map(grn => (
+                        <div key={grn.id} className="flex items-center gap-3 bg-white border border-blue-100 rounded px-3 py-2">
+                          <FileText className="w-4 h-4 text-green-600 flex-shrink-0" />
+                          <div className="flex-1 min-w-0">
+                            <p className="text-xs font-medium text-gray-800 truncate">{grn.receiptNumber}</p>
+                            <p className="text-xs text-gray-500">
+                              {grn.receivedDate ? format(new Date(grn.receivedDate), 'dd MMM yyyy') : '—'} · Supplier Invoice
+                            </p>
+                          </div>
+                          <Button
+                            type="button"
+                            variant="ghost"
+                            size="sm"
+                            className="h-7 px-2 text-blue-600 hover:text-blue-800"
+                            onClick={() => handleViewDoc(grn.scanKey1)}
+                          >
+                            <ExternalLink className="w-3.5 h-3.5 mr-1" />
+                            View
+                          </Button>
+                        </div>
+                      ))}
+                    </div>
+                  ) : (
+                    <p className="text-xs text-gray-500 italic">No per-delivery supplier invoices attached yet. Open a GRN in the Goods Receipts tab to attach one.</p>
+                  )}
+
+                  {/* PO-level consolidated invoice */}
+                  {editingPO.supplierScanKey && (
+                    <div className="pt-1.5 border-t border-blue-100">
+                      <p className="text-xs font-medium text-gray-600 mb-1.5">Consolidated Invoice</p>
+                      <div className="flex items-center gap-3 bg-white border border-blue-100 rounded px-3 py-2">
+                        <FileText className="w-4 h-4 text-blue-600 flex-shrink-0" />
+                        <div className="flex-1 min-w-0">
+                          <p className="text-xs font-medium text-gray-800 truncate">{editingPO.poNumber}</p>
+                          <p className="text-xs text-gray-500">PO-level consolidated invoice</p>
+                        </div>
+                        <Button
+                          type="button"
+                          variant="ghost"
+                          size="sm"
+                          className="h-7 px-2 text-blue-600 hover:text-blue-800"
+                          onClick={() => handleViewDoc(editingPO.supplierScanKey)}
+                        >
+                          <ExternalLink className="w-3.5 h-3.5 mr-1" />
+                          View
+                        </Button>
+                      </div>
+                    </div>
+                  )}
+
+                  {/* Supporting docs from GRNs (slots 2 & 3) */}
+                  {grnDocs.some(grn => grn.scanKey2 || grn.scanKey3) && (
+                    <div className="pt-1.5 border-t border-blue-100">
+                      <p className="text-xs font-medium text-gray-600 mb-1.5">Supporting Documents</p>
+                      {grnDocs.flatMap(grn =>
+                        [
+                          grn.scanKey2 && { key: grn.scanKey2, grn, slot: 2 },
+                          grn.scanKey3 && { key: grn.scanKey3, grn, slot: 3 },
+                        ].filter(Boolean)
+                      ).map(({ key, grn, slot }) => (
+                        <div key={`${grn.id}-${slot}`} className="flex items-center gap-3 bg-white border border-blue-100 rounded px-3 py-2 mb-1">
+                          <FileText className="w-4 h-4 text-gray-400 flex-shrink-0" />
+                          <div className="flex-1 min-w-0">
+                            <p className="text-xs font-medium text-gray-800 truncate">{grn.receiptNumber} — Doc {slot}</p>
+                            <p className="text-xs text-gray-500">
+                              {grn.receivedDate ? format(new Date(grn.receivedDate), 'dd MMM yyyy') : '—'}
+                            </p>
+                          </div>
+                          <Button
+                            type="button"
+                            variant="ghost"
+                            size="sm"
+                            className="h-7 px-2 text-blue-600 hover:text-blue-800"
+                            onClick={() => handleViewDoc(key)}
+                          >
+                            <ExternalLink className="w-3.5 h-3.5 mr-1" />
+                            View
+                          </Button>
+                        </div>
+                      ))}
+                    </div>
+                  )}
                 </div>
               )}
             </div>

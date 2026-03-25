@@ -2610,9 +2610,10 @@ export async function registerRoutes(app: Express): Promise<Server> {
     return { previousStock, newStock };
   }
 
-  // Get all goods receipts
+  // Get all goods receipts (optional ?poId=N filter)
   app.get('/api/goods-receipts', requireAuth(), async (req: AuthenticatedRequest, res) => {
     try {
+      const poIdFilter = req.query.poId ? parseInt(req.query.poId as string) : null;
       const receipts = await db.select({
         id: goodsReceipts.id,
         receiptNumber: goodsReceipts.receiptNumber,
@@ -2637,6 +2638,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       }).from(goodsReceipts)
         .leftJoin(purchaseOrders, eq(purchaseOrders.id, goodsReceipts.poId))
         .leftJoin(suppliers, eq(suppliers.id, goodsReceipts.supplierId))
+        .where(poIdFilter ? eq(goodsReceipts.poId, poIdFilter) : undefined)
         .orderBy(desc(goodsReceipts.createdAt));
 
       // Single bulk query for all GRN items (avoids N+1 per-receipt calls)

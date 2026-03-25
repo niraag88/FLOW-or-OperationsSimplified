@@ -225,20 +225,20 @@ export default function POActionsDropdown({ po, canEdit, onEdit, onRefresh, curr
           <DropdownMenuSeparator />
           <DropdownMenuItem onClick={() => setShowUploadDialog(true)}>
             <Upload className="w-4 h-4 mr-2" />
-            Attach Supplier Invoice
+            Attach Consolidated Invoice
           </DropdownMenuItem>
           {hasSupplierScanKey && (
             <>
               <DropdownMenuItem onClick={handleViewFile}>
                 <Paperclip className="w-4 h-4 mr-2" />
-                View Supplier Invoice
+                View Consolidated Invoice
               </DropdownMenuItem>
               <DropdownMenuItem
                 onClick={() => setShowRemoveFileDialog(true)}
                 className="text-orange-600 focus:text-orange-600"
               >
                 <X className="w-4 h-4 mr-2" />
-                Remove Supplier Invoice
+                Remove Consolidated Invoice
               </DropdownMenuItem>
             </>
           )}
@@ -272,8 +272,8 @@ export default function POActionsDropdown({ po, canEdit, onEdit, onRefresh, curr
         open={showRemoveFileDialog}
         onClose={() => setShowRemoveFileDialog(false)}
         onConfirm={handleRemoveFile}
-        title="Remove Supplier Invoice"
-        description={`Remove the uploaded supplier invoice from PO "${poNumber}"? The file will be permanently deleted.`}
+        title="Remove Consolidated Invoice"
+        description={`Remove the uploaded consolidated invoice from PO "${poNumber}"? The file will be permanently deleted.`}
         confirmText="Yes, Remove"
         confirmVariant="destructive"
       />

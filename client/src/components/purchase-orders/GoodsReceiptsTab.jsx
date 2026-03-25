@@ -1091,20 +1091,23 @@ export default function GoodsReceiptsTab({
                                   </td>
                                   <td className="p-1.5 align-middle" style={{width: '80px'}}>
                                     <div className="flex gap-1 items-center">
-                                      {[grn.scanKey1, grn.scanKey2, grn.scanKey3].map((key, ki) => key ? (
-                                        <Tooltip key={ki}>
-                                          <TooltipTrigger asChild>
-                                            <button
-                                              type="button"
-                                              onClick={() => handleViewGrnDoc(key)}
-                                              className="text-blue-600 hover:text-blue-800 transition-colors"
-                                            >
-                                              <Paperclip className="w-3.5 h-3.5" />
-                                            </button>
-                                          </TooltipTrigger>
-                                          <TooltipContent>View document {ki + 1}</TooltipContent>
-                                        </Tooltip>
-                                      ) : null)}
+                                      {[grn.scanKey1, grn.scanKey2, grn.scanKey3].map((key, ki) => {
+                                        const docLabel = ki === 0 ? 'View Supplier Invoice' : `View Supporting Doc ${ki + 1}`;
+                                        return key ? (
+                                          <Tooltip key={ki}>
+                                            <TooltipTrigger asChild>
+                                              <button
+                                                type="button"
+                                                onClick={() => handleViewGrnDoc(key)}
+                                                className={ki === 0 ? 'text-green-600 hover:text-green-800 transition-colors' : 'text-blue-600 hover:text-blue-800 transition-colors'}
+                                              >
+                                                <Paperclip className="w-3.5 h-3.5" />
+                                              </button>
+                                            </TooltipTrigger>
+                                            <TooltipContent>{docLabel}</TooltipContent>
+                                          </Tooltip>
+                                        ) : null;
+                                      })}
                                     </div>
                                   </td>
                                   <td className="p-1.5 align-middle" style={{width: '80px'}}>
@@ -1119,20 +1122,20 @@ export default function GoodsReceiptsTab({
                                           {/* Attach: show for each empty slot */}
                                           {!grn.scanKey1 && (
                                             <DropdownMenuItem onClick={() => setAttachGrnState({ grnId: grn.id, slot: 1, receiptNumber: grn.receiptNumber })}>
-                                              <Paperclip className="w-3.5 h-3.5 mr-2 text-blue-600" />
-                                              Attach Document
+                                              <Paperclip className="w-3.5 h-3.5 mr-2 text-green-600" />
+                                              Attach Supplier Invoice
                                             </DropdownMenuItem>
                                           )}
                                           {grn.scanKey1 && !grn.scanKey2 && (
                                             <DropdownMenuItem onClick={() => setAttachGrnState({ grnId: grn.id, slot: 2, receiptNumber: grn.receiptNumber })}>
                                               <Paperclip className="w-3.5 h-3.5 mr-2 text-blue-600" />
-                                              Attach 2nd Document
+                                              Attach Supporting Doc 2
                                             </DropdownMenuItem>
                                           )}
                                           {grn.scanKey2 && !grn.scanKey3 && (
                                             <DropdownMenuItem onClick={() => setAttachGrnState({ grnId: grn.id, slot: 3, receiptNumber: grn.receiptNumber })}>
                                               <Paperclip className="w-3.5 h-3.5 mr-2 text-blue-600" />
-                                              Attach 3rd Document
+                                              Attach Supporting Doc 3
                                             </DropdownMenuItem>
                                           )}
                                           {/* Remove: show for each filled slot */}
@@ -1142,19 +1145,19 @@ export default function GoodsReceiptsTab({
                                           {grn.scanKey1 && (
                                             <DropdownMenuItem className="text-red-600" onClick={() => handleRemoveGrnDoc(grn.id, 1)}>
                                               <X className="w-3.5 h-3.5 mr-2" />
-                                              Remove Doc 1
+                                              Remove Supplier Invoice
                                             </DropdownMenuItem>
                                           )}
                                           {grn.scanKey2 && (
                                             <DropdownMenuItem className="text-red-600" onClick={() => handleRemoveGrnDoc(grn.id, 2)}>
                                               <X className="w-3.5 h-3.5 mr-2" />
-                                              Remove Doc 2
+                                              Remove Supporting Doc 2
                                             </DropdownMenuItem>
                                           )}
                                           {grn.scanKey3 && (
                                             <DropdownMenuItem className="text-red-600" onClick={() => handleRemoveGrnDoc(grn.id, 3)}>
                                               <X className="w-3.5 h-3.5 mr-2" />
-                                              Remove Doc 3
+                                              Remove Supporting Doc 3
                                             </DropdownMenuItem>
                                           )}
                                         </DropdownMenuContent>
@@ -1316,32 +1319,35 @@ export default function GoodsReceiptsTab({
 
             <div className="space-y-2 border-t pt-3">
               <Label>Attach Delivery Documents (optional)</Label>
-              <p className="text-xs text-gray-500">Up to 3 documents — PDF, JPG, PNG, max 2 MB each. Attached automatically after saving.</p>
+              <p className="text-xs text-gray-500">Up to 3 documents — PDF, JPG, PNG, max 2 MB each. Slot 1 is the supplier invoice for this delivery. Attached automatically after saving.</p>
               <div className="flex gap-2 flex-wrap">
-                {[0, 1, 2].map(idx => (
-                  <div key={idx} className="flex-1 min-w-[160px]">
-                    {pendingDocs[idx] ? (
-                      <div className="flex items-center gap-2 p-2 bg-blue-50 border border-blue-200 rounded text-xs">
-                        <FileText className="w-4 h-4 text-blue-600 flex-shrink-0" />
-                        <span className="flex-1 truncate text-blue-800">{pendingDocs[idx].name}</span>
-                        <button type="button" onClick={() => updatePendingDoc(idx, null)} className="text-gray-400 hover:text-red-500">
-                          <X className="w-3.5 h-3.5" />
-                        </button>
-                      </div>
-                    ) : (
-                      <label className="flex items-center gap-2 p-2 border border-dashed border-gray-300 rounded text-xs cursor-pointer hover:border-blue-400 hover:bg-blue-50 text-gray-500 transition-colors">
-                        <Paperclip className="w-3.5 h-3.5 flex-shrink-0" />
-                        <span>Doc {idx + 1}</span>
-                        <input
-                          type="file"
-                          accept=".pdf,.jpg,.jpeg,.png"
-                          className="hidden"
-                          onChange={(e) => handlePendingDocSelect(idx, e)}
-                        />
-                      </label>
-                    )}
-                  </div>
-                ))}
+                {[0, 1, 2].map(idx => {
+                  const slotLabel = idx === 0 ? 'Supplier Invoice' : `Supporting Doc ${idx + 1}`;
+                  return (
+                    <div key={idx} className="flex-1 min-w-[160px]">
+                      {pendingDocs[idx] ? (
+                        <div className={`flex items-center gap-2 p-2 rounded text-xs border ${idx === 0 ? 'bg-green-50 border-green-200' : 'bg-blue-50 border-blue-200'}`}>
+                          <FileText className={`w-4 h-4 flex-shrink-0 ${idx === 0 ? 'text-green-600' : 'text-blue-600'}`} />
+                          <span className={`flex-1 truncate ${idx === 0 ? 'text-green-800' : 'text-blue-800'}`}>{pendingDocs[idx].name}</span>
+                          <button type="button" onClick={() => updatePendingDoc(idx, null)} className="text-gray-400 hover:text-red-500">
+                            <X className="w-3.5 h-3.5" />
+                          </button>
+                        </div>
+                      ) : (
+                        <label className={`flex items-center gap-2 p-2 border border-dashed rounded text-xs cursor-pointer transition-colors ${idx === 0 ? 'border-green-300 hover:border-green-500 hover:bg-green-50 text-green-700' : 'border-gray-300 hover:border-blue-400 hover:bg-blue-50 text-gray-500'}`}>
+                          <Paperclip className="w-3.5 h-3.5 flex-shrink-0" />
+                          <span>{slotLabel}</span>
+                          <input
+                            type="file"
+                            accept=".pdf,.jpg,.jpeg,.png"
+                            className="hidden"
+                            onChange={(e) => handlePendingDocSelect(idx, e)}
+                          />
+                        </label>
+                      )}
+                    </div>
+                  );
+                })}
               </div>
             </div>
           </div>
