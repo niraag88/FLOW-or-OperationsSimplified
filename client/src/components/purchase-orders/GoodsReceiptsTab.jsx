@@ -824,6 +824,20 @@ export default function GoodsReceiptsTab({
     delivery: { label: "Delivery", transform: deliveryTransform },
   };
 
+  // Combined column set for when both sections are visible: superset of open + closed columns
+  const combinedExportColumns = {
+    poNumber: "PO Number",
+    supplierName: { label: "Supplier", transform: (v, row) => v || row?.brandName || '' },
+    orderDate: { label: "Order Date", transform: dateTransform },
+    totalAmount: { label: "Total", transform: totalTransform },
+    grandTotal: { label: "Total (AED)", transform: aedTransform },
+    lineItems: { label: "Lines", transform: (_, row) => getLineItemsCount(row) },
+    orderedQty: { label: "Ordered", transform: (_, row) => getTotalOrderedQuantity(row) },
+    receivedQty: { label: "Received", transform: (_, row) => getTotalReceivedQuantity(row) },
+    status: { label: "Status", transform: (s) => s?.toUpperCase() || '' },
+    delivery: { label: "Delivery", transform: (_, row) => row.status === 'closed' ? deliveryTransform(null, row) : '' },
+  };
+
   // Context-aware export — wired to filtered lists
   const getContextAwareExportData = () => {
     const deliveryLabel = closedDelivery !== 'all'
@@ -833,23 +847,24 @@ export default function GoodsReceiptsTab({
     if (showOpenReceipts && !showClosedReceipts) {
       return {
         exportData: filteredOpenPOs,
-        exportType: `Open Goods Receipts${openFiltersActive ? ` (${filteredOpenPOs.length} of ${openPOs.length})` : ''}`,
+        exportType: `Open Goods Receipts (${filteredOpenPOs.length} items${openFiltersActive ? ` of ${openPOs.length}` : ''})`,
         itemCount: filteredOpenPOs.length,
         columns: openExportColumns,
       };
     } else if (!showOpenReceipts && showClosedReceipts) {
       return {
         exportData: filteredClosedPOs,
-        exportType: `Closed Goods Receipts${closedFiltersActive ? ` (${filteredClosedPOs.length} of ${closedPOs.length}${deliveryLabel})` : ''}`,
+        exportType: `Closed Goods Receipts (${filteredClosedPOs.length} items${closedFiltersActive ? ` of ${closedPOs.length}${deliveryLabel}` : ''})`,
         itemCount: filteredClosedPOs.length,
         columns: closedExportColumns,
       };
     } else {
+      const combined = [...filteredOpenPOs, ...filteredClosedPOs];
       return {
-        exportData: [...filteredOpenPOs, ...filteredClosedPOs],
-        exportType: "All Goods Receipts",
-        itemCount: filteredOpenPOs.length + filteredClosedPOs.length,
-        columns: openExportColumns,
+        exportData: combined,
+        exportType: `All Goods Receipts (${combined.length} items)`,
+        itemCount: combined.length,
+        columns: combinedExportColumns,
       };
     }
   };
