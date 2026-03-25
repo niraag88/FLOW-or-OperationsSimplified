@@ -390,6 +390,8 @@ async function seedPurchaseOrders(cookie: string): Promise<number[]> {
       items.push({ productId, quantity: qty, unitPrice: unitPrice.toFixed(2), lineTotal: lineTotal.toFixed(2) });
     }
 
+    const totalAmount = items.reduce((sum, it) => sum + parseFloat(it.lineTotal), 0).toFixed(2);
+
     const { status: httpStatus, data } = await apiPost('/api/purchase-orders', {
       supplierId,
       orderDate: dateInYear(year),
@@ -397,6 +399,7 @@ async function seedPurchaseOrders(cookie: string): Promise<number[]> {
       currency,
       fxRateToAed: fxRate.toFixed(4),
       notes: `${SEED_TAG} ${currency} purchase order — ${year}`,
+      totalAmount,
       items,
     }, cookie);
 

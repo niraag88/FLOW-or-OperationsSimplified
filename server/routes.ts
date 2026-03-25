@@ -1358,10 +1358,13 @@ export async function registerRoutes(app: Express): Promise<Server> {
       // Create the purchase order first
       const purchaseOrder = await businessStorage.createPurchaseOrder(validatedData);
       
-      // If there are line items, save them
+      // If there are line items, save them and compute the real total
+      let computedTotal = 0;
       if (req.body.items && Array.isArray(req.body.items) && req.body.items.length > 0) {
         for (const item of req.body.items) {
           if (item.productId && item.quantity > 0) {
+            const lineTotal = parseFloat(item.lineTotal) || 0;
+            computedTotal += lineTotal;
             await db.insert(purchaseOrderItems).values({
               poId: purchaseOrder.id,
               productId: parseInt(item.productId),
@@ -1373,6 +1376,11 @@ export async function registerRoutes(app: Express): Promise<Server> {
             });
           }
         }
+        // Always update total_amount from the actual inserted items
+        await db.update(purchaseOrders)
+          .set({ totalAmount: computedTotal.toFixed(2) })
+          .where(eq(purchaseOrders.id, purchaseOrder.id));
+        purchaseOrder.totalAmount = computedTotal.toFixed(2);
       }
       
       writeAuditLog({ actor: req.user!.id, actorName: req.user?.username || String(req.user!.id), targetId: String(purchaseOrder.id), targetType: 'purchase_order', action: 'CREATE', details: `PO #${purchaseOrder.poNumber} created` });
