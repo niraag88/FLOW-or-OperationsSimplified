@@ -6,6 +6,7 @@ import {
   DialogHeader,
   DialogTitle,
 } from "@/components/ui/dialog";
+import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Input } from "@/components/ui/input";
@@ -13,7 +14,7 @@ import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
-import { Plus, Trash2, PackageCheck, AlertTriangle, Paperclip, FileText, ExternalLink } from "lucide-react";
+import { Plus, Trash2, PackageCheck, AlertTriangle, Paperclip, FileText, ExternalLink, ChevronDown, ChevronRight } from "lucide-react";
 import { Supplier } from "@/api/entities";
 import { Product } from "@/api/entities";
 import { PurchaseOrder } from "@/api/entities";
@@ -31,6 +32,7 @@ export default function POForm({ open, onClose, editingPO, currentUser, onSucces
   const [currencyExplicitlySet, setCurrencyExplicitlySet] = useState(false);
   const [grnDocs, setGrnDocs] = useState([]);
   const [loadingGrnDocs, setLoadingGrnDocs] = useState(false);
+  const [supplierDocsOpen, setSupplierDocsOpen] = useState(true);
   const { toast } = useToast();
   
   const [formData, setFormData] = useState({
@@ -680,105 +682,124 @@ export default function POForm({ open, onClose, editingPO, currentUser, onSucces
 
           {/* Supplier Documents panel — only shown when viewing an existing PO */}
           {editingPO && (
-            <div className="rounded-lg border border-blue-200 bg-blue-50/40 p-4 space-y-3">
-              <div className="flex items-center gap-2">
-                <Paperclip className="w-4 h-4 text-blue-600" />
-                <span className="text-sm font-semibold text-blue-800">Supplier Documents</span>
-                <span className="text-xs text-blue-600 ml-auto">Per-delivery invoices and supporting files</span>
-              </div>
-              {loadingGrnDocs ? (
-                <p className="text-xs text-gray-500">Loading documents...</p>
-              ) : (
-                <div className="space-y-2">
-                  {/* GRN-level supplier invoices (slot 1 per GRN) */}
-                  {grnDocs.filter(grn => grn.scanKey1).length > 0 ? (
-                    <div className="space-y-1.5">
-                      <p className="text-xs font-medium text-gray-600">Per-Delivery Invoices</p>
-                      {grnDocs.filter(grn => grn.scanKey1).map(grn => (
-                        <div key={grn.id} className="flex items-center gap-3 bg-white border border-blue-100 rounded px-3 py-2">
-                          <FileText className="w-4 h-4 text-green-600 flex-shrink-0" />
-                          <div className="flex-1 min-w-0">
-                            <p className="text-xs font-medium text-gray-800 truncate">{grn.receiptNumber}</p>
-                            <p className="text-xs text-gray-500">
-                              {grn.receivedDate ? format(new Date(grn.receivedDate), 'dd MMM yyyy') : '—'} · Supplier Invoice
-                            </p>
-                          </div>
-                          <Button
-                            type="button"
-                            variant="ghost"
-                            size="sm"
-                            className="h-7 px-2 text-blue-600 hover:text-blue-800"
-                            onClick={() => handleViewDoc(grn.scanKey1)}
-                          >
-                            <ExternalLink className="w-3.5 h-3.5 mr-1" />
-                            View
-                          </Button>
-                        </div>
-                      ))}
-                    </div>
-                  ) : (
-                    <p className="text-xs text-gray-500 italic">No per-delivery supplier invoices attached yet. Open a GRN in the Goods Receipts tab to attach one.</p>
-                  )}
-
-                  {/* PO-level consolidated invoice */}
-                  {editingPO.supplierScanKey && (
-                    <div className="pt-1.5 border-t border-blue-100">
-                      <p className="text-xs font-medium text-gray-600 mb-1.5">Consolidated Invoice</p>
-                      <div className="flex items-center gap-3 bg-white border border-blue-100 rounded px-3 py-2">
-                        <FileText className="w-4 h-4 text-blue-600 flex-shrink-0" />
-                        <div className="flex-1 min-w-0">
-                          <p className="text-xs font-medium text-gray-800 truncate">{editingPO.poNumber}</p>
-                          <p className="text-xs text-gray-500">PO-level consolidated invoice</p>
-                        </div>
-                        <Button
-                          type="button"
-                          variant="ghost"
-                          size="sm"
-                          className="h-7 px-2 text-blue-600 hover:text-blue-800"
-                          onClick={() => handleViewDoc(editingPO.supplierScanKey)}
-                        >
-                          <ExternalLink className="w-3.5 h-3.5 mr-1" />
-                          View
-                        </Button>
-                      </div>
-                    </div>
-                  )}
-
-                  {/* Supporting docs from GRNs (slots 2 & 3) */}
-                  {grnDocs.some(grn => grn.scanKey2 || grn.scanKey3) && (
-                    <div className="pt-1.5 border-t border-blue-100">
-                      <p className="text-xs font-medium text-gray-600 mb-1.5">Supporting Documents</p>
-                      {grnDocs.flatMap(grn =>
+            <Collapsible open={supplierDocsOpen} onOpenChange={setSupplierDocsOpen}>
+              <div className="rounded-lg border border-blue-200 bg-blue-50/40">
+                <CollapsibleTrigger asChild>
+                  <button
+                    type="button"
+                    className="w-full flex items-center gap-2 px-4 py-3 text-left hover:bg-blue-100/40 transition-colors rounded-lg"
+                  >
+                    <Paperclip className="w-4 h-4 text-blue-600 flex-shrink-0" />
+                    <span className="text-sm font-semibold text-blue-800 flex-1">Supplier Documents</span>
+                    <span className="text-xs text-blue-500 mr-2">Per-delivery invoices &amp; supporting files</span>
+                    {supplierDocsOpen ? (
+                      <ChevronDown className="w-4 h-4 text-blue-500 flex-shrink-0" />
+                    ) : (
+                      <ChevronRight className="w-4 h-4 text-blue-500 flex-shrink-0" />
+                    )}
+                  </button>
+                </CollapsibleTrigger>
+                <CollapsibleContent>
+                  <div className="px-4 pb-4 space-y-2">
+                    {loadingGrnDocs ? (
+                      <p className="text-xs text-gray-500">Loading documents...</p>
+                    ) : (() => {
+                      const grnInvoices = grnDocs.filter(grn => grn.scanKey1);
+                      const hasGrnInvoices = grnInvoices.length > 0;
+                      const supportingDocs = grnDocs.flatMap(grn =>
                         [
                           grn.scanKey2 && { key: grn.scanKey2, grn, slot: 2 },
                           grn.scanKey3 && { key: grn.scanKey3, grn, slot: 3 },
                         ].filter(Boolean)
-                      ).map(({ key, grn, slot }) => (
-                        <div key={`${grn.id}-${slot}`} className="flex items-center gap-3 bg-white border border-blue-100 rounded px-3 py-2 mb-1">
-                          <FileText className="w-4 h-4 text-gray-400 flex-shrink-0" />
-                          <div className="flex-1 min-w-0">
-                            <p className="text-xs font-medium text-gray-800 truncate">{grn.receiptNumber} — Doc {slot}</p>
-                            <p className="text-xs text-gray-500">
-                              {grn.receivedDate ? format(new Date(grn.receivedDate), 'dd MMM yyyy') : '—'}
-                            </p>
-                          </div>
-                          <Button
-                            type="button"
-                            variant="ghost"
-                            size="sm"
-                            className="h-7 px-2 text-blue-600 hover:text-blue-800"
-                            onClick={() => handleViewDoc(key)}
-                          >
-                            <ExternalLink className="w-3.5 h-3.5 mr-1" />
-                            View
-                          </Button>
+                      );
+                      return (
+                        <div className="space-y-2">
+                          {/* GRN-level supplier invoices (slot 1 per GRN) */}
+                          {hasGrnInvoices ? (
+                            <div className="space-y-1.5">
+                              <p className="text-xs font-medium text-gray-600">Per-Delivery Invoices</p>
+                              {grnInvoices.map(grn => (
+                                <div key={grn.id} className="flex items-center gap-3 bg-white border border-blue-100 rounded px-3 py-2">
+                                  <FileText className="w-4 h-4 text-green-600 flex-shrink-0" />
+                                  <div className="flex-1 min-w-0">
+                                    <p className="text-xs font-medium text-gray-800 truncate">{grn.receiptNumber}</p>
+                                    <p className="text-xs text-gray-500">
+                                      {grn.receivedDate ? format(new Date(grn.receivedDate), 'dd MMM yyyy') : '—'} · Supplier Invoice
+                                    </p>
+                                  </div>
+                                  <Button
+                                    type="button"
+                                    variant="ghost"
+                                    size="sm"
+                                    className="h-7 px-2 text-blue-600 hover:text-blue-800"
+                                    onClick={() => handleViewDoc(grn.scanKey1)}
+                                  >
+                                    <ExternalLink className="w-3.5 h-3.5 mr-1" />
+                                    View
+                                  </Button>
+                                </div>
+                              ))}
+                            </div>
+                          ) : editingPO.supplierScanKey ? (
+                            /* Consolidated invoice shown as fallback when no per-delivery invoices exist */
+                            <div className="space-y-1.5">
+                              <p className="text-xs font-medium text-gray-600">Consolidated Invoice</p>
+                              <div className="flex items-center gap-3 bg-white border border-blue-100 rounded px-3 py-2">
+                                <FileText className="w-4 h-4 text-blue-600 flex-shrink-0" />
+                                <div className="flex-1 min-w-0">
+                                  <p className="text-xs font-medium text-gray-800 truncate">{editingPO.poNumber}</p>
+                                  <p className="text-xs text-gray-500">PO-level consolidated invoice</p>
+                                </div>
+                                <Button
+                                  type="button"
+                                  variant="ghost"
+                                  size="sm"
+                                  className="h-7 px-2 text-blue-600 hover:text-blue-800"
+                                  onClick={() => handleViewDoc(editingPO.supplierScanKey)}
+                                >
+                                  <ExternalLink className="w-3.5 h-3.5 mr-1" />
+                                  View
+                                </Button>
+                              </div>
+                            </div>
+                          ) : (
+                            <p className="text-xs text-gray-500 italic">No supplier invoices attached yet. Use the Goods Receipts tab to attach a per-delivery invoice, or use the ⋮ menu on the PO to attach a consolidated invoice.</p>
+                          )}
+
+                          {/* Supporting docs from GRNs (slots 2 & 3) */}
+                          {supportingDocs.length > 0 && (
+                            <div className="pt-1.5 border-t border-blue-100">
+                              <p className="text-xs font-medium text-gray-600 mb-1.5">Supporting Documents</p>
+                              {supportingDocs.map(({ key, grn, slot }) => (
+                                <div key={`${grn.id}-${slot}`} className="flex items-center gap-3 bg-white border border-blue-100 rounded px-3 py-2 mb-1">
+                                  <FileText className="w-4 h-4 text-gray-400 flex-shrink-0" />
+                                  <div className="flex-1 min-w-0">
+                                    <p className="text-xs font-medium text-gray-800 truncate">{grn.receiptNumber} — Supporting Doc {slot}</p>
+                                    <p className="text-xs text-gray-500">
+                                      {grn.receivedDate ? format(new Date(grn.receivedDate), 'dd MMM yyyy') : '—'}
+                                    </p>
+                                  </div>
+                                  <Button
+                                    type="button"
+                                    variant="ghost"
+                                    size="sm"
+                                    className="h-7 px-2 text-blue-600 hover:text-blue-800"
+                                    onClick={() => handleViewDoc(key)}
+                                  >
+                                    <ExternalLink className="w-3.5 h-3.5 mr-1" />
+                                    View
+                                  </Button>
+                                </div>
+                              ))}
+                            </div>
+                          )}
                         </div>
-                      ))}
-                    </div>
-                  )}
-                </div>
-              )}
-            </div>
+                      );
+                    })()}
+                  </div>
+                </CollapsibleContent>
+              </div>
+            </Collapsible>
           )}
 
           {/* Notes */}
