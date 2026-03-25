@@ -1,5 +1,5 @@
 
-import React, { useState, useEffect } from "react";
+import React, { useState } from "react";
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -13,7 +13,6 @@ import { useToast } from "@/components/ui/use-toast";
 import { exportInvoiceToXLSX } from "../utils/export";
 import { format } from 'date-fns';
 import { Invoice } from "@/api/entities";
-import { User } from "@/api/entities";
 import MarkPaidDialog from "./MarkPaidDialog";
 import SimpleConfirmDialog from "../common/SimpleConfirmDialog";
 import CreateInvoiceFromQuotationDialog from './CreateInvoiceFromQuotationDialog';
@@ -23,26 +22,11 @@ import UploadFileDialog from "../common/UploadFileDialog";
 export default function InvoiceActionsDropdown({ invoice, canEdit, onEdit, onRefresh }) {
   const { toast } = useToast();
   const [showDeleteDialog, setShowDeleteDialog] = useState(false);
-  const [currentUser, setCurrentUser] = useState(null);
   const [showMarkPaidDialog, setShowMarkPaidDialog] = useState(false);
   const [showCreateInvoiceFromQuotationDialog, setShowCreateInvoiceFromQuotationDialog] = useState(false);
   const [showCreateFromExistingDialog, setShowCreateFromExistingDialog] = useState(false);
   const [showUploadDialog, setShowUploadDialog] = useState(false);
   const [showRemoveFileDialog, setShowRemoveFileDialog] = useState(false);
-
-  useEffect(() => {
-    loadCurrentUser();
-  }, []);
-
-  const loadCurrentUser = async () => {
-    try {
-      const user = await User.me();
-      setCurrentUser(user);
-    } catch (error) {
-      console.error("Failed to load current user:", error);
-      setCurrentUser({ role: 'Admin', email: 'admin@example.com' });
-    }
-  };
 
   const handleExportXLSX = async () => {
     try {

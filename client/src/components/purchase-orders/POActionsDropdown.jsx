@@ -13,7 +13,6 @@ import { useToast } from "@/components/ui/use-toast";
 import { exportToXLSX } from "../utils/export";
 import { format } from 'date-fns';
 import { PurchaseOrder } from "@/api/entities";
-import { User } from "@/api/entities";
 import SimpleConfirmDialog from "../common/SimpleConfirmDialog";
 import MarkPOPaidDialog from "./MarkPOPaidDialog";
 import UploadFileDialog from "../common/UploadFileDialog";
@@ -24,21 +23,6 @@ export default function POActionsDropdown({ po, canEdit, onEdit, onRefresh }) {
   const [showMarkPaidDialog, setShowMarkPaidDialog] = useState(false);
   const [showUploadDialog, setShowUploadDialog] = useState(false);
   const [showRemoveFileDialog, setShowRemoveFileDialog] = useState(false);
-  const [currentUser, setCurrentUser] = useState(null);
-
-  React.useEffect(() => {
-    loadCurrentUser();
-  }, []);
-
-  const loadCurrentUser = async () => {
-    try {
-      const user = await User.me();
-      setCurrentUser(user);
-    } catch (error) {
-      console.error("Failed to load current user:", error);
-      setCurrentUser({ role: 'Admin', email: 'admin@example.com' });
-    }
-  };
 
   const handleExportXLSX = async () => {
     try {

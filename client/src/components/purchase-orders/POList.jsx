@@ -76,7 +76,9 @@ export default function POList({ purchaseOrders, totalCount, loading, canEdit, c
     }
   };
 
-  if (loading) {
+  const isInitialLoad = loading && (!purchaseOrders || purchaseOrders.length === 0);
+
+  if (isInitialLoad) {
     return (
       <Card className="border-0 shadow-lg">
         <CardHeader>
@@ -104,7 +106,7 @@ export default function POList({ purchaseOrders, totalCount, loading, canEdit, c
 
   return (
     <>
-      <Card className="border-0 shadow-lg">
+      <Card className={`border-0 shadow-lg transition-opacity duration-200 ${loading ? 'opacity-60' : 'opacity-100'}`}>
         <CardHeader>
           <CardTitle className="flex items-center gap-2">
             <ShoppingCart className="w-5 h-5" />

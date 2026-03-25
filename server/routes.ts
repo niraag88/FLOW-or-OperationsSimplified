@@ -1063,17 +1063,20 @@ export async function registerRoutes(app: Express): Promise<Server> {
   // Product management routes
   app.get('/api/products', requireAuth(), async (req: AuthenticatedRequest, res) => {
     try {
-      const products = await businessStorage.getProducts();
-      
-      // Handle filtering by query parameters
+      // SKU exact-match filter (used by PO form product lookup)
       if (req.query.sku) {
-        const filteredProducts = products.filter(product => 
-          product.sku === req.query.sku
-        );
-        return res.json(filteredProducts);
+        const all = await businessStorage.getProducts();
+        const arr = Array.isArray(all) ? all : (all as any).data ?? [];
+        return res.json(arr.filter((p: any) => p.sku === req.query.sku));
       }
-      
-      res.json(products);
+
+      const page = req.query.page ? parseInt(String(req.query.page)) : undefined;
+      const pageSize = req.query.pageSize ? parseInt(String(req.query.pageSize)) : undefined;
+      const search = req.query.search ? String(req.query.search) : undefined;
+      const category = req.query.category ? String(req.query.category) : undefined;
+
+      const result = await businessStorage.getProducts({ page, pageSize, search, category });
+      res.json(result);
     } catch (error) {
       console.error('Error fetching products:', error);
       res.status(500).json({ error: 'Failed to fetch products' });

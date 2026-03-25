@@ -1,5 +1,5 @@
 
-import React, { useState, useEffect } from "react";
+import React, { useState } from "react";
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -13,29 +13,12 @@ import { exportToCsv, exportQuotationToXLSX } from "../utils/export";
 import { format, isValid, parseISO } from 'date-fns';
 import { useToast } from "@/components/ui/use-toast";
 import { Quotation } from "@/api/entities";
-import { User } from "@/api/entities";
 import SimpleConfirmDialog from "../common/SimpleConfirmDialog";
 
 
 export default function QuotationActionsDropdown({ quotation, canEdit, canCreate, onEdit, onRefresh }) {
   const { toast } = useToast();
   const [showDeleteDialog, setShowDeleteDialog] = useState(false);
-  const [currentUser, setCurrentUser] = useState(null);
-
-  useEffect(() => {
-    loadCurrentUser();
-  }, []);
-
-  const loadCurrentUser = async () => {
-    try {
-      const user = await User.me();
-      setCurrentUser(user);
-    } catch (error) {
-      console.error("Failed to load current user:", error);
-      // Fallback for development/testing or if API fails
-      setCurrentUser({ role: 'Admin', email: 'admin@example.com' });
-    }
-  };
 
   const formatDate = (dateString) => {
     if (!dateString) return '';

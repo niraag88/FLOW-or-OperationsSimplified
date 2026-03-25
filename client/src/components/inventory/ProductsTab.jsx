@@ -101,7 +101,9 @@ export default function ProductsTab({
     }
   };
 
-  if (loading) {
+  const isInitialLoad = loading && (!products || products.length === 0);
+
+  if (isInitialLoad) {
     return (
       <Card className="border-0 shadow-lg">
         <CardHeader>
@@ -113,7 +115,7 @@ export default function ProductsTab({
         <CardContent>
           <div className="space-y-4">
             {[...Array(5)].map((_, i) => (
-              <div key={i} className="flex justify-between items-center p-4 border rounded-lg">
+              <div key={i} className="flex justify-between items-center p-4 border rounded-lg animate-pulse">
                 <div className="space-y-1">
                   <Skeleton className="h-4 w-32" />
                   <Skeleton className="h-3 w-48" />
@@ -133,7 +135,7 @@ export default function ProductsTab({
 
   return (
     <>
-      <Card className="border-0 shadow-lg">
+      <Card className={`border-0 shadow-lg transition-opacity duration-200 ${loading ? 'opacity-60' : 'opacity-100'}`}>
         <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
           <CardTitle className="flex items-center gap-2">
             <Package className="w-5 h-5" />

@@ -19,7 +19,6 @@ import {
 } from "@/components/ui/dialog";
 import { Plus, Save, X, AlertCircle, CheckCircle } from "lucide-react";
 import { Product } from "@/api/entities";
-import { User } from "@/api/entities";
 import { Brand } from "@/api/entities";
 import { useToast } from "@/components/ui/use-toast";
 import { logAuditAction } from "../utils/auditLogger";
@@ -35,13 +34,12 @@ const initialFormData = {
   sale_price_currency: "AED",
 };
 
-export default function QuickAddProduct({ onProductAdded, canAdd }) {
+export default function QuickAddProduct({ onProductAdded, canAdd, currentUser }) {
   const [open, setOpen] = useState(false);
   const [formData, setFormData] = useState(initialFormData);
   const [errors, setErrors] = useState({});
   const [codeStatus, setCodeStatus] = useState(null); // null, 'checking', 'valid', 'invalid', 'taken'
   const [loading, setLoading] = useState(false);
-  const [currentUser, setCurrentUser] = useState(null);
   const [brands, setBrands] = useState([]);
   const [isMobile, setIsMobile] = useState(false);
   const { toast } = useToast();
@@ -56,17 +54,6 @@ export default function QuickAddProduct({ onProductAdded, canAdd }) {
   }, []);
 
   useEffect(() => {
-    const fetchUser = async () => {
-      try {
-        const user = await User.me();
-        setCurrentUser(user);
-      } catch (e) {
-        console.error("Failed to fetch user", e);
-        // Set default admin user for development/testing if needed
-        // setCurrentUser({ role: 'Admin', email: 'user@example.com' });
-      }
-    };
-
     const loadBrands = async () => {
       try {
         const brandsData = await Brand.list('sort_order');
@@ -81,7 +68,6 @@ export default function QuickAddProduct({ onProductAdded, canAdd }) {
       }
     };
 
-    fetchUser();
     loadBrands();
   }, []);
 

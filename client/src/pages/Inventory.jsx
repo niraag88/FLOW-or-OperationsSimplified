@@ -43,21 +43,17 @@ export default function Inventory() {
   const loadData = async () => {
     setLoading(true);
     try {
-      // Load products first
-      const productsData = await Product.list('-updated_date');
+      const [productsData, stockCountsData] = await Promise.all([
+        Product.list('-updated_date'),
+        Promise.resolve()
+          .then(() => StockCount.list('-created_date'))
+          .catch(() => []),
+      ]);
       setProducts(productsData);
-      
-      // Load stock counts separately to avoid blocking products
-      try {
-        const stockCountsData = await StockCount.list('-created_date');
-        setStockCounts(stockCountsData);
-      } catch (stockError) {
-        console.error("Error loading stock counts:", stockError);
-        setStockCounts([]); // Set empty array if stock counts fail
-      }
+      setStockCounts(stockCountsData);
     } catch (error) {
       console.error("Error loading inventory data:", error);
-      setProducts([]); // Ensure products is set to empty array on error
+      setProducts([]);
     } finally {
       setLoading(false);
     }
@@ -163,6 +159,7 @@ export default function Inventory() {
               <QuickAddProduct 
                 onProductAdded={handleProductAdded}
                 canAdd={canEdit}
+                currentUser={currentUser}
               />
               
               <Button asChild variant="outline">

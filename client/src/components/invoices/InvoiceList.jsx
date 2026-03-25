@@ -68,7 +68,9 @@ export default function InvoiceList({ invoices, totalCount, loading, canEdit, ca
     setShowEditPaymentDialog(true);
   };
 
-  if (loading) {
+  const isInitialLoad = loading && (!invoices || invoices.length === 0);
+
+  if (isInitialLoad) {
     return (
       <Card className="border-0 shadow-lg">
         <CardHeader>
@@ -96,7 +98,7 @@ export default function InvoiceList({ invoices, totalCount, loading, canEdit, ca
 
   return (
     <>
-      <Card className="border-0 shadow-lg">
+      <Card className={`border-0 shadow-lg transition-opacity duration-200 ${loading ? 'opacity-60' : 'opacity-100'}`}>
         <CardHeader>
           <CardTitle className="flex items-center gap-2">
             <FileText className="w-5 h-5" />

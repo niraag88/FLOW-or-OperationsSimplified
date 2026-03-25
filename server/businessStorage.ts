@@ -94,8 +94,19 @@ export class BusinessStorage {
   }
 
   // Product operations
-  async getProducts() {
-    return await db.select({
+  async getProducts(params?: { page?: number; pageSize?: number; search?: string; category?: string }): Promise<any> {
+    const { page, pageSize, search, category } = params || {};
+
+    const conditions: any[] = [eq(products.isActive, true)];
+    if (search) {
+      conditions.push(sql`(${products.sku} ILIKE ${`%${search}%`} OR ${products.name} ILIKE ${`%${search}%`} OR coalesce(${products.description}, '') ILIKE ${`%${search}%`})`);
+    }
+    if (category) {
+      conditions.push(eq(products.category, category));
+    }
+    const whereCondition = conditions.length > 0 ? and(...conditions) : undefined;
+
+    const selectFields = {
       id: products.id,
       sku: products.sku,
       name: products.name,
@@ -115,9 +126,30 @@ export class BusinessStorage {
       createdAt: products.createdAt,
       updatedAt: products.updatedAt,
       brandName: brands.name,
-    }).from(products)
+    };
+
+    if (page && pageSize) {
+      const [{ count }] = await db
+        .select({ count: sql<number>`count(*)::integer` })
+        .from(products)
+        .leftJoin(brands, eq(products.brandId, brands.id))
+        .where(whereCondition);
+
+      const data = await db.select(selectFields)
+        .from(products)
+        .leftJoin(brands, eq(products.brandId, brands.id))
+        .where(whereCondition)
+        .orderBy(desc(products.createdAt))
+        .limit(pageSize)
+        .offset((page - 1) * pageSize);
+
+      return { data, total: Number(count) };
+    }
+
+    return await db.select(selectFields)
+      .from(products)
       .leftJoin(brands, eq(products.brandId, brands.id))
-      .where(eq(products.isActive, true))
+      .where(whereCondition)
       .orderBy(desc(products.createdAt));
   }
 
