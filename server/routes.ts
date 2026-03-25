@@ -3079,6 +3079,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
         productId: stockMovements.productId,
         productName: products.name,
         productSku: products.sku,
+        brandName: brands.name,
         movementType: stockMovements.movementType,
         referenceId: stockMovements.referenceId,
         referenceType: stockMovements.referenceType,
@@ -3091,6 +3092,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       })
       .from(stockMovements)
       .leftJoin(products, eq(stockMovements.productId, products.id))
+      .leftJoin(brands, eq(products.brandId, brands.id))
       .orderBy(desc(stockMovements.createdAt));
       
       res.json(movements);

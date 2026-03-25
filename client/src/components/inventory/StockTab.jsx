@@ -129,7 +129,7 @@ export default function StockTab({ products, loading, canEdit, currentUser, onRe
   // Get unique values for filters from server data
   const uniqueStockBrands = [...new Set(allProducts.map(p => p.brandName).filter(Boolean))].sort();
   const uniqueStockSizes = [...new Set(allProducts.map(p => p.size).filter(Boolean))].sort();
-  const uniqueMovementBrands = [...new Set(stockMovements.map(m => m.productName?.split(' ')[0]).filter(Boolean))].sort();
+  const uniqueMovementBrands = [...new Set(stockMovements.map(m => m.brandName).filter(Boolean))].sort();
   const uniqueMovementTypes = [...new Set(stockMovements.map(m => m.movementType).filter(Boolean))].sort();
 
   // Filter functions
@@ -221,18 +221,15 @@ export default function StockTab({ products, loading, canEdit, currentUser, onRe
       filtered = filtered.filter(movement => 
         (movement.productName || '').toLowerCase().includes(term) ||
         (movement.productSku || '').toLowerCase().includes(term) ||
+        (movement.brandName || '').toLowerCase().includes(term) ||
         (movement.movementType || '').toLowerCase().includes(term) ||
         (movement.notes || '').toLowerCase().includes(term)
       );
     }
 
-    // Brand filter (using product name)
+    // Brand filter (using actual brandName from API)
     if (selectedBrands.length > 0) {
-      filtered = filtered.filter(movement => 
-        selectedBrands.some(brand => 
-          (movement.productName || '').toLowerCase().includes(brand.toLowerCase())
-        )
-      );
+      filtered = filtered.filter(movement => selectedBrands.includes(movement.brandName));
     }
 
     // Movement type filter
@@ -245,7 +242,7 @@ export default function StockTab({ products, loading, canEdit, currentUser, onRe
       filtered = filtered.filter(movement => {
         const movementDate = new Date(movement.createdAt);
         const startDate = dateRange.start ? new Date(dateRange.start) : null;
-        const endDate = dateRange.end ? new Date(dateRange.end) : null;
+        const endDate = dateRange.end ? new Date(`${dateRange.end}T23:59:59`) : null;
         
         if (startDate && movementDate < startDate) return false;
         if (endDate && movementDate > endDate) return false;
@@ -258,7 +255,7 @@ export default function StockTab({ products, loading, canEdit, currentUser, onRe
 
   // Apply filters
   const filteredProducts = applyAdvancedStockFilters(
-    products, 
+    allProducts, 
     currentStockFilter, 
     selectedStockBrands, 
     selectedStockSizes, 
@@ -847,7 +844,7 @@ export default function StockTab({ products, loading, canEdit, currentUser, onRe
                         <TableCell>{product.brandName || '-'}</TableCell>
                         <TableCell>{product.sku}</TableCell>
                         <TableCell>{product.name}</TableCell>
-                        <TableCell>{product.description || '-'}</TableCell>
+                        <TableCell>{product.size || '-'}</TableCell>
                         <TableCell>
                           <Badge 
                             variant={status === 'out' ? 'destructive' : status === 'low' ? 'secondary' : 'default'}
@@ -991,7 +988,7 @@ export default function StockTab({ products, loading, canEdit, currentUser, onRe
                     <PopoverTrigger asChild>
                       <Button variant="outline" className="justify-between w-44">
                         {movementDateFilter.start || movementDateFilter.end ? 
-                          `${movementDateFilter.start || 'Start'} - ${movementDateFilter.end || 'End'}` : 
+                          `${movementDateFilter.start ? format(new Date(movementDateFilter.start), 'dd/MM/yyyy') : 'Start'} - ${movementDateFilter.end ? format(new Date(movementDateFilter.end), 'dd/MM/yyyy') : 'End'}` : 
                           "Date Range"
                         }
                         <ChevronDown className="ml-2 h-4 w-4" />
@@ -1095,6 +1092,7 @@ export default function StockTab({ products, loading, canEdit, currentUser, onRe
                   <TableHeader>
                     <TableRow>
                       <TableHead>Date</TableHead>
+                      <TableHead>Brand</TableHead>
                       <TableHead>Product</TableHead>
                       <TableHead>Type</TableHead>
                       <TableHead>Quantity</TableHead>
@@ -1107,8 +1105,9 @@ export default function StockTab({ products, loading, canEdit, currentUser, onRe
                     {paginatedMovements.data.map((movement) => (
                       <TableRow key={movement.id}>
                         <TableCell className="text-sm">
-                          {format(new Date(movement.createdAt), 'MMM dd, yyyy h:mm a')}
+                          {format(new Date(movement.createdAt), 'dd/MM/yyyy HH:mm')}
                         </TableCell>
+                        <TableCell>{movement.brandName || '-'}</TableCell>
                         <TableCell>
                           <div>
                             <p className="font-medium">{movement.productName}</p>
@@ -1332,7 +1331,7 @@ export default function StockTab({ products, loading, canEdit, currentUser, onRe
                         <TableCell>{product.brandName || '-'}</TableCell>
                         <TableCell>{product.sku}</TableCell>
                         <TableCell>{product.name}</TableCell>
-                        <TableCell>{product.description || '-'}</TableCell>
+                        <TableCell>{product.size || '-'}</TableCell>
                         <TableCell>
                           <Badge variant="secondary" className="text-amber-600">
                             {(product.stockQuantity || 0).toLocaleString()}
@@ -1541,7 +1540,7 @@ export default function StockTab({ products, loading, canEdit, currentUser, onRe
                         <TableCell>{product.brandName || '-'}</TableCell>
                         <TableCell>{product.sku}</TableCell>
                         <TableCell>{product.name}</TableCell>
-                        <TableCell>{product.description || '-'}</TableCell>
+                        <TableCell>{product.size || '-'}</TableCell>
                         <TableCell>
                           <Badge variant="destructive">
                             0
