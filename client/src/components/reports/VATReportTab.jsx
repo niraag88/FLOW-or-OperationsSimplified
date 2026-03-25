@@ -317,8 +317,8 @@ export default function VATReportTab({ invoices, customers, books, companySettin
         <CardHeader>
           <CardTitle className="flex items-center justify-between">
             <span>VAT Report Results ({filteredInvoices.length} invoices)</span>
-            {companySettings?.company_trn && (
-              <Badge variant="outline">TRN: {companySettings.company_trn}</Badge>
+            {(companySettings?.taxNumber || companySettings?.vatNumber || companySettings?.company_trn) && (
+              <Badge variant="outline">TRN: {companySettings.taxNumber || companySettings.vatNumber || companySettings.company_trn}</Badge>
             )}
           </CardTitle>
         </CardHeader>

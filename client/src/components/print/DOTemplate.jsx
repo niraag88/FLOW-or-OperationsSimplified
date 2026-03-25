@@ -66,23 +66,23 @@ export default function DOTemplate({ data, customer, settings }) {
           </div>
         </div>
         <div className="text-right">
-          {settings?.company_logo_url && (
+          {(settings?.logo || settings?.company_logo_url) && (
             <img 
-              src={settings.company_logo_url} 
+              src={settings.logo || settings.company_logo_url} 
               alt="Company Logo" 
               className="h-16 w-auto mb-4 ml-auto"
             />
           )}
-          {settings?.company_name && (
+          {(settings?.companyName || settings?.company_name) && (
             <div>
-              <h2 className="text-xl font-bold text-gray-800">{settings.company_name}</h2>
-              {settings.company_address && (
-                <p className="text-gray-600 mt-1">{settings.company_address}</p>
+              <h2 className="text-xl font-bold text-gray-800">{settings.companyName || settings.company_name}</h2>
+              {(settings.address || settings.company_address) && (
+                <p className="text-gray-600 mt-1">{settings.address || settings.company_address}</p>
               )}
               <div className="mt-2 text-sm text-gray-600">
-                {settings.company_phone && <p>Tel: {settings.company_phone}</p>}
-                {settings.company_email && <p>Email: {settings.company_email}</p>}
-                {settings.company_trn && <p>TRN: {settings.company_trn}</p>}
+                {(settings.phone || settings.company_phone) && <p>Tel: {settings.phone || settings.company_phone}</p>}
+                {(settings.email || settings.company_email) && <p>Email: {settings.email || settings.company_email}</p>}
+                {(settings.taxNumber || settings.vatNumber || settings.company_trn) && <p>TRN: {settings.taxNumber || settings.vatNumber || settings.company_trn}</p>}
               </div>
             </div>
           )}
@@ -94,8 +94,8 @@ export default function DOTemplate({ data, customer, settings }) {
         <div>
           <h3 className="text-sm font-semibold text-gray-500 uppercase mb-2">Deliver To</h3>
           <div className="text-gray-700">
-            <p className="font-semibold text-lg">{customer?.customer_name || 'Unknown Customer'}</p>
-            {customer?.contact_name && <p>Contact: {customer.contact_name}</p>}
+            <p className="font-semibold text-lg">{customer?.name || customer?.customer_name || 'Unknown Customer'}</p>
+            {(customer?.contactPerson || customer?.contact_name) && <p>Contact: {customer.contactPerson || customer.contact_name}</p>}
             {customer?.address && <p className="mt-1">{customer.address}</p>}
             {customer?.type && <p className="text-sm text-gray-600 mt-1">Type: {customer.type}</p>}
             {customer?.trn_number && <p className="text-sm text-gray-600">TRN: {customer.trn_number}</p>}
@@ -189,7 +189,7 @@ export default function DOTemplate({ data, customer, settings }) {
         <div className="grid grid-cols-2 gap-8">
           <div className="text-center">
             <div className="border-b border-gray-400 mb-2 pb-6"></div>
-            <p className="text-sm font-medium">For {settings?.company_name || 'Company'}</p>
+            <p className="text-sm font-medium">For {settings?.companyName || settings?.company_name || 'Company'}</p>
           </div>
           <div className="text-center">
             <div className="border-b border-gray-400 mb-2 pb-6"></div>

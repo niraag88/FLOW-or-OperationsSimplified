@@ -65,12 +65,10 @@ export default function ExportDropdown({
       }
       
       const exportData = getExportData(exportSource);
-      console.log('Export data prepared:', exportData);
       const timestamp = new Date().toISOString().split('T')[0];
       const exportFilename = `${filename}-${timestamp}`;
       
       if (format === 'xlsx') {
-        console.log('Exporting to XLSX...');
         exportToXLSX(exportData, exportFilename, type);
       } else if (format === 'pdf') {
         // Create a simple print view for PDF following inventory format

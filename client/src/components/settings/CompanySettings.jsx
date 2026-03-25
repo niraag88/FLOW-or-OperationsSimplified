@@ -22,7 +22,7 @@ export default function CompanySettingsComponent() {
     address: "", // Changed from company_address to match schema
     phone: "", // Changed from company_phone to match schema
     email: "", // Changed from company_email to match schema
-    vatNumber: "", // Changed from company_trn to match schema
+    taxNumber: "", // TRN (Tax Registration Number) stored in tax_number column
     defaultVatRate: 0.05, // Changed to camelCase to match schema
     currency: "AED", // Changed from default_currency to match schema
     fxGbpToAed: 4.85,
@@ -88,7 +88,7 @@ export default function CompanySettingsComponent() {
     }));
 
     // Validate TRN on change
-    if (field === 'company_trn') {
+    if (field === 'taxNumber') {
       if (value && !validateTRN(value)) {
         setTrnError("TRN must be exactly 15 digits");
       } else {
@@ -103,13 +103,10 @@ export default function CompanySettingsComponent() {
 
     try {
       setLoading(true);
-      console.log("Starting logo upload for file:", file.name);
       const result = await UploadFile({ file });
-      console.log("Upload result:", result);
       
       // Handle both possible response formats
       const fileUrl = result.file_url || result.url;
-      console.log("Extracted file_url:", fileUrl);
       
       if (!fileUrl) {
         throw new Error("No file URL returned from upload");
@@ -117,8 +114,6 @@ export default function CompanySettingsComponent() {
       
       handleInputChange('logo', fileUrl);
       setLogoKey(Date.now()); // Force image refresh
-      console.log("Updated settings.logo to:", fileUrl);
-      console.log("Current logoKey:", Date.now());
       toast({
         title: "Logo uploaded successfully",
         description: "Company logo has been updated."
@@ -137,7 +132,7 @@ export default function CompanySettingsComponent() {
 
   const handleSave = async () => {
     // Validate TRN before saving
-    if (settings.vatNumber && !validateTRN(settings.vatNumber)) {
+    if (settings.taxNumber && !validateTRN(settings.taxNumber)) {
       toast({
         title: "Validation Error",
         description: "Please enter a valid 15-digit TRN",
@@ -271,8 +266,8 @@ export default function CompanySettingsComponent() {
               <Label htmlFor="company_trn">Tax Registration Number (TRN)</Label>
               <Input
                 id="company_trn"
-                value={settings.vatNumber}
-                onChange={(e) => handleInputChange('vatNumber', e.target.value)}
+                value={settings.taxNumber}
+                onChange={(e) => handleInputChange('taxNumber', e.target.value)}
                 placeholder="100000000000000"
                 maxLength={15}
                 className={trnError ? "border-red-500 focus-visible:ring-red-500" : (!isEditMode ? "bg-gray-50" : "")}
@@ -364,12 +359,6 @@ export default function CompanySettingsComponent() {
                         className="w-full h-full object-contain rounded-lg"
                         onError={(e) => {
                           console.error("Error loading logo:", e);
-                          console.log("Failed logo URL:", settings.logo);
-                          console.log("Logo URL type:", typeof settings.logo);
-                          console.log("Logo URL length:", settings.logo?.length);
-                        }}
-                        onLoad={() => {
-                          console.log("Logo loaded successfully!");
                         }}
                       />
                       <div className="absolute -top-1 -right-1 w-3 h-3 bg-green-500 rounded-full border-2 border-white"></div>

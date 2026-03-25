@@ -32,8 +32,6 @@ export default function CreateInvoiceFromQuotationDialog({ open, onClose, onQuot
   const loadSubmittedQuotations = async () => {
     setLoading(true);
     try {
-      console.log("Loading submitted quotations for invoice creation");
-      
       // Load all submitted quotations with customer data
       const [quotationsData, customersData] = await Promise.all([
         Quotation.filter({ status: 'submitted' }, '-updated_date'),
@@ -54,7 +52,6 @@ export default function CreateInvoiceFromQuotationDialog({ open, onClose, onQuot
         }))
         .sort((a, b) => new Date(b.updated_date || b.updatedDate) - new Date(a.updated_date || a.updatedDate));
 
-      console.log("Loaded quotations with customer names:", enrichedQuotations.length, "items");
       setSubmittedQuotations(enrichedQuotations);
     } catch (error) {
       console.error("Error loading submitted quotations:", error);
@@ -86,7 +83,6 @@ export default function CreateInvoiceFromQuotationDialog({ open, onClose, onQuot
         throw new Error("Selected quotation not found");
       }
       
-      console.log("Selected quotation for invoice creation:", selectedQuotation);
       onQuotationSelected(selectedQuotation);
     } catch (error) {
       console.error("Error creating invoice from quotation:", error);

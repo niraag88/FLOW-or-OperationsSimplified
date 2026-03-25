@@ -94,9 +94,17 @@ export default function DOForm({ open, onClose, editingDO, currentUser, onSucces
             setFormData({ ...editingDO, items: editingDO.items || [] });
           }
         } else {
+          // New DO created from existing document — fetch real next DO number
           const customer = customersData.find(c => c.id === editingDO.customer_id);
           setSelectedCustomer(customer);
           setFormData({ ...editingDO, items: editingDO.items || [] });
+          // Overwrite the client-generated placeholder number with the real server sequence
+          fetch('/api/delivery-orders/next-number', { credentials: 'include' })
+            .then(r => r.json())
+            .then(({ nextNumber }) => {
+              setFormData(prev => ({ ...prev, do_number: nextNumber }));
+            })
+            .catch(err => console.error('Error fetching next DO number:', err));
         }
       } else {
         // Generate DO number for new DO - use timestamp as fallback

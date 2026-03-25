@@ -39,8 +39,6 @@ export default function CreateFromExistingDialog({ open, onClose, onDocumentSele
   const loadDocuments = async () => {
     setLoading(true);
     try {
-      console.log("Loading documents for Create from Existing dialog");
-      
       // Load all required data in parallel - fetch ALL documents and filter client-side
       const [allQuotationsData, deliveredDos, confirmedDos, customersData] = await Promise.all([
         Quotation.list('-updated_date'), // Fetch ALL quotations, don't rely on backend filtering
@@ -49,31 +47,22 @@ export default function CreateFromExistingDialog({ open, onClose, onDocumentSele
         Customer.list()
       ]);
 
-      console.log("Raw quotations loaded:", allQuotationsData.length, "total quotations");
-      console.log("Sample quotation statuses:", allQuotationsData.slice(0, 3).map(q => ({ id: q.id, status: q.status })));
-
       // Create customer lookup map
       const customerMap = {};
       customersData.forEach(customer => {
         customerMap[customer.id] = customer.customer_name || customer.name;
       });
-      
-      console.log("Customer map:", customerMap);
 
       // CLIENT-SIDE filtering for submitted quotations only
       const submittedQuotations = allQuotationsData.filter(quotation => {
         const status = (quotation.status || '').toLowerCase().trim();
-        console.log(`Quotation ${quotation.id}: status="${quotation.status}" -> filtered="${status}" -> include=${status === 'submitted'}`);
         return status === 'submitted';
       });
-
-      console.log("Filtered to submitted quotations:", submittedQuotations.length, "out of", allQuotationsData.length);
 
       // Enrich quotations with customer names and sort by newest first
       const quotationsWithCustomers = submittedQuotations
         .map(quotation => {
           const customerId = quotation.customer_id || quotation.customerId;
-          console.log("Quotation customer lookup - ID:", customerId, "Name:", customerMap[customerId]);
           return {
             ...quotation,
             customerName: customerMap[customerId] || 'Unknown Customer'
@@ -94,8 +83,6 @@ export default function CreateFromExistingDialog({ open, onClose, onDocumentSele
         })
         .sort((a, b) => new Date(b.updated_date || b.updatedDate) - new Date(a.updated_date || a.updatedDate));
 
-      console.log("Loaded documents:", quotationsWithCustomers.length, "quotations,", deliveryOrdersWithCustomers.length, "delivery orders");
-      
       setEnrichedQuotations(quotationsWithCustomers);
       setEnrichedDeliveryOrders(deliveryOrdersWithCustomers);
     } catch (error) {

@@ -123,7 +123,6 @@ export default function Invoices() {
   }, [customers]);
 
   const handleRefresh = () => {
-    console.log('🔄 handleRefresh called - triggering data reload');
     setRefreshTrigger(prev => prev + 1);
   };
 
@@ -138,10 +137,8 @@ export default function Invoices() {
       const response = await fetch(`/api/invoices/${invoice.id}`);
       if (response.ok) {
         const fullInvoice = await response.json();
-        console.log("✅ Full invoice data retrieved:", fullInvoice);
         setEditingInvoice(fullInvoice);
       } else {
-        console.warn("⚠️ Failed to fetch full invoice, using basic data");
         setEditingInvoice(invoice);
       }
       setShowInvoiceForm(true);
@@ -159,7 +156,6 @@ export default function Invoices() {
 
   // Robust document-to-invoice normalizer function
   const normalizeDocumentToInvoice = (document, documentType, dropdownData = {}) => {
-    console.log("🔄 Normalizing document:", documentType, document);
     
     const { availableCustomers = [], availableBrands = [], availableProducts = [] } = dropdownData;
     
@@ -254,10 +250,6 @@ export default function Invoices() {
           );
           if (foundBrand) {
             brandId = foundBrand.id;
-            console.log(`✅ Mapped brand "${brandName}" to ID ${brandId}`);
-          } else {
-            console.warn(`⚠️ Brand "${brandName}" not found in available brands:`, 
-              availableBrands.map(b => b.name));
           }
         }
         
@@ -292,35 +284,18 @@ export default function Invoices() {
       }));
     }
 
-    // Log the transformation for debugging
-    console.log("✅ Normalized invoice data:", {
-      customer_id: normalizedData.customer_id,
-      reference_date: normalizedData.reference_date,
-      subtotal: normalizedData.subtotal,
-      tax_amount: normalizedData.tax_amount,
-      total_amount: normalizedData.total_amount,
-      remarks: normalizedData.remarks,
-      items_count: normalizedData.items.length
-    });
-
     return normalizedData;
   };
 
   const handleDocumentSelect = async (document, documentType) => {
-    console.log("📄 Document selected for invoice creation:", documentType, document);
-    
     try {
       let fullDocument = document;
       
       // For quotations, fetch the complete data with line items
       if (documentType === 'quotation') {
-        console.log("🔍 Fetching full quotation with line items for ID:", document.id);
         const response = await fetch(`/api/quotations/${document.id}`);
         if (response.ok) {
           fullDocument = await response.json();
-          console.log("✅ Full quotation data retrieved:", fullDocument);
-        } else {
-          console.warn("⚠️ Failed to fetch full quotation, using basic data");
         }
       }
       
@@ -331,19 +306,12 @@ export default function Invoices() {
         Product.list().catch(() => [])
       ]);
       
-      console.log("🔍 Current dropdown data:", {
-        customers: currentCustomers.map(c => ({ id: c.id, name: c.name || c.customer_name })),
-        brands: currentBrands.map(b => ({ id: b.id, name: b.name }))
-      });
-      
       // Use the robust normalizer with full document data and validation
       const newInvoiceData = normalizeDocumentToInvoice(fullDocument, documentType, {
         availableCustomers: currentCustomers,
         availableBrands: currentBrands,
         availableProducts: currentProducts
       });
-      
-      console.log("🎯 Final invoice data being passed to form:", newInvoiceData);
       
       setEditingInvoice(newInvoiceData);
       setShowCreateFromExistingDialog(false);

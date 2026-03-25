@@ -66,22 +66,16 @@ export default function QuotationForm({ open, onClose, editingQuotation, current
       
       if (preloadedCustomers && preloadedProducts && preloadedBrands) {
         // Use preloaded data for better performance
-        console.time('⚡ Using Preloaded Data');
         customersData = preloadedCustomers;
         productsData = preloadedProducts;
         brandsData = preloadedBrands;
-        console.timeEnd('⚡ Using Preloaded Data');
-        console.log('✅ QuotationForm using preloaded data - significantly faster!');
       } else {
         // Fallback to API calls if preloaded data not available
-        console.time('📡 Fallback API Calls');
-        console.warn('⚠️ No preloaded data - falling back to API calls (slower)');
         [customersData, productsData, brandsData] = await Promise.all([
           Customer.list().catch(() => []),
           Product.list().catch(() => []),
           Brand.list().catch(() => [])
         ]);
-        console.timeEnd('📡 Fallback API Calls');
       }
 
       setCustomers(customersData.filter(c => c.is_active !== false));
@@ -89,7 +83,6 @@ export default function QuotationForm({ open, onClose, editingQuotation, current
       setBrands(brandsData.filter(b => b.isActive !== false));
 
       if (editingQuotation) {
-        console.log("⚡ Loading quotation for editing using passed data (like POForm)...");
         
         // 🟢 Use passed editingQuotation data immediately (like POForm does)
         const customer = customersData.find(c => c.id === editingQuotation.customerId);
@@ -125,12 +118,10 @@ export default function QuotationForm({ open, onClose, editingQuotation, current
         setFormData(prev => ({ ...prev, customer_id: editingQuotation.customerId?.toString() || "" }));
         
         // 🟢 Only fetch line items separately (like POForm does)
-        console.log("Fetching line items separately for performance...");
         try {
           const itemsResponse = await fetch(`/api/quotations/${editingQuotation.id}/items`, { cache: 'no-store' });
           if (itemsResponse.ok || itemsResponse.status === 304) {
             const items = await itemsResponse.json();
-            console.log("Line items loaded:", items.length, "items");
             
             const formattedItems = items.map(item => {
               // Look up product details to get brand information
@@ -335,10 +326,6 @@ export default function QuotationForm({ open, onClose, editingQuotation, current
   const handleSubmit = async (e) => {
     e.preventDefault();
     
-    console.log("Form submission started");
-    console.log("Current form data:", formData);
-    console.log("Editing quotation:", editingQuotation);
-    
     if (!formData.customer_id || !formData.quotation_number) {
       toast({
         title: "Validation Error",
@@ -386,13 +373,9 @@ export default function QuotationForm({ open, onClose, editingQuotation, current
         }))
       };
 
-      console.log("Prepared quotation data for submission:", quotationData);
-
       let result;
       if (editingQuotation && editingQuotation.id) {
-        console.log("Updating existing quotation with ID:", editingQuotation.id);
         result = await Quotation.update(editingQuotation.id, quotationData);
-        console.log("Update result:", result);
         
         toast({
           title: "Success",
@@ -400,9 +383,7 @@ export default function QuotationForm({ open, onClose, editingQuotation, current
           variant: "default",
         });
       } else {
-        console.log("Creating new quotation");
         result = await Quotation.create(quotationData);
-        console.log("Create result:", result);
         
         toast({
           title: "Success",

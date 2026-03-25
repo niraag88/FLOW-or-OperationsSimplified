@@ -72,9 +72,10 @@ export default function Reports() {
   const loadAllData = async () => {
     setLoading(true);
     try {
-      const [dashboardRes, invoicesRes] = await Promise.all([
+      const [dashboardRes, invoicesRes, booksRes] = await Promise.all([
         fetch('/api/dashboard', { credentials: 'include' }),
         fetch('/api/invoices', { credentials: 'include' }),
+        fetch('/api/books', { credentials: 'include' }),
       ]);
 
       if (!dashboardRes.ok) throw new Error('Failed to fetch dashboard data');
@@ -87,6 +88,8 @@ export default function Reports() {
         invoicesData = rawList.map(normalizeInvoice);
       }
 
+      const booksData = booksRes.ok ? await booksRes.json() : [];
+
       setData({
         products: dashboardData.products,
         lots: dashboardData.lots,
@@ -95,7 +98,7 @@ export default function Reports() {
         invoices: invoicesData,
         customers: dashboardData.customers,
         suppliers: dashboardData.suppliers,
-        books: [],
+        books: Array.isArray(booksData) ? booksData : [],
         companySettings: dashboardData.companySettings,
       });
     } catch (error) {

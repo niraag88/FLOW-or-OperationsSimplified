@@ -39,8 +39,6 @@ export default function CreateFromExistingDialog({ open, onClose, onDocumentSele
   const loadSubmittedDocuments = async () => {
     setLoading(true);
     try {
-      console.log("Loading submitted quotations and invoices for delivery order creation");
-      
       // Load all submitted quotations and invoices with customer data
       const [quotationsData, invoicesData, customersData] = await Promise.all([
         Quotation.filter({ status: 'submitted' }, '-updated_date'),
@@ -70,7 +68,6 @@ export default function CreateFromExistingDialog({ open, onClose, onDocumentSele
         }))
         .sort((a, b) => new Date(b.updated_date || b.updatedDate) - new Date(a.updated_date || a.updatedDate));
 
-      console.log("Loaded documents:", enrichedQuotations.length, "quotations,", enrichedInvoices.length, "invoices");
       setSubmittedQuotations(enrichedQuotations);
       setSubmittedInvoices(enrichedInvoices);
     } catch (error) {
@@ -122,7 +119,6 @@ export default function CreateFromExistingDialog({ open, onClose, onDocumentSele
       return;
     }
 
-    console.log("Selected document for delivery order creation:", documentType, selectedDocument);
     onDocumentSelected(selectedDocument, documentType);
   };
 
