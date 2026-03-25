@@ -755,7 +755,9 @@ export default function GoodsReceiptsTab({
             po.brandName?.toLowerCase().includes(q))) return false;
     }
     if (closedDelivery !== 'all') {
-      const isPartial = Number(po.orderedQty) > 0 && Number(po.receivedQty) < Number(po.orderedQty);
+      const ordQty = getTotalOrderedQuantity(po);
+      const recQty = getTotalReceivedQuantity(po);
+      const isPartial = ordQty > 0 && recQty < ordQty;
       if (closedDelivery === 'short' && !isPartial) return false;
       if (closedDelivery === 'complete' && isPartial) return false;
     }
