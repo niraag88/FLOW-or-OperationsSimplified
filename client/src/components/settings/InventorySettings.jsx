@@ -85,13 +85,9 @@ export default function InventorySettings() {
     setIsSaving(true);
     try {
       const threshold = parseInt(settings.lowStockThreshold) || 6;
-      const res = await apiRequest("PUT", "/api/company-settings", {
+      await apiRequest("PUT", "/api/company-settings", {
         lowStockThreshold: threshold,
       });
-      if (!res.ok) {
-        const body = await res.json().catch(() => ({}));
-        throw new Error(body?.error || `Server error ${res.status}`);
-      }
 
       // Invalidate caches so the dashboard and inventory page
       // immediately reflect the updated threshold without a page refresh.

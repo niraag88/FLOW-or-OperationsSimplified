@@ -1103,7 +1103,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
     try {
       let lowStockThreshold: number;
       if (req.query.threshold) {
-        lowStockThreshold = parseInt(String(req.query.threshold));
+        const parsed = parseInt(String(req.query.threshold), 10);
+        lowStockThreshold = Number.isFinite(parsed) && parsed > 0 ? parsed : 6;
       } else {
         const settings = await businessStorage.getCompanySettings();
         lowStockThreshold = settings?.lowStockThreshold ?? 6;
