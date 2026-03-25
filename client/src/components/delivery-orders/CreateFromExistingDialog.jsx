@@ -39,9 +39,9 @@ export default function CreateFromExistingDialog({ open, onClose, onDocumentSele
   const loadSubmittedDocuments = async () => {
     setLoading(true);
     try {
-      // Load all submitted quotations and invoices with customer data
+      // Load sent/accepted quotations and submitted invoices with customer data
       const [quotationsData, invoicesData, customersData] = await Promise.all([
-        Quotation.filter({ status: 'submitted' }, '-updated_date'),
+        Quotation.filter({ status: 'sent,accepted' }, '-updated_date'),
         Invoice.filter({ status: 'submitted' }, '-updated_date'),
         Customer.list()
       ]);

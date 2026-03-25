@@ -4,10 +4,13 @@ import { AlertTriangle, PackageCheck } from 'lucide-react';
 import { Link } from 'react-router-dom';
 import { createPageUrl } from '@/utils';
 
-export default function LowStockAlert({ products }) {
-  const lowStockProducts = (products || []).filter(p =>
-    p.minStockLevel > 0 && (p.stockQuantity || 0) < p.minStockLevel
-  ).slice(0, 5); // Show top 5 for brevity on dashboard
+export default function LowStockAlert({ products, lowStockThreshold = 6 }) {
+  const threshold = parseInt(lowStockThreshold) || 6;
+  const allLowStock = (products || []).filter(p => {
+    const qty = p.stockQuantity || 0;
+    return qty > 0 && qty <= threshold;
+  });
+  const lowStockProducts = allLowStock.slice(0, 5);
 
   return (
     <Card className="border-0 shadow-lg">
@@ -31,22 +34,22 @@ export default function LowStockAlert({ products }) {
                   </div>
                   <div className="text-right">
                     <p className="text-sm font-bold text-red-600">{product.stockQuantity || 0}</p>
-                    <p className="text-xs text-gray-500">min: {product.minStockLevel}</p>
+                    <p className="text-xs text-gray-500">threshold: {threshold}</p>
                   </div>
                 </div>
               </Link>
             ))}
-            {products.filter(p => p.minStockLevel > 0 && (p.stockQuantity || 0) < p.minStockLevel).length > 5 && (
-                 <Link to={createPageUrl('Reports')} className="text-sm text-blue-600 hover:underline text-center block pt-2">
-                    View all...
-                 </Link>
+            {allLowStock.length > 5 && (
+              <Link to={createPageUrl('Reports')} className="text-sm text-blue-600 hover:underline text-center block pt-2">
+                View all {allLowStock.length} low stock items...
+              </Link>
             )}
           </div>
         ) : (
           <div className="text-center py-4 text-gray-500">
             <PackageCheck className="w-10 h-10 mx-auto mb-2 text-emerald-500" />
             <p className="font-medium">All products are well-stocked</p>
-            <p className="text-sm">No items are below their reorder level.</p>
+            <p className="text-sm">No items are at or below the reorder level ({threshold} units).</p>
           </div>
         )}
       </CardContent>

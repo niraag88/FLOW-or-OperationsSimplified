@@ -53,10 +53,10 @@ export default function CreateFromExistingDialog({ open, onClose, onDocumentSele
         customerMap[customer.id] = customer.customer_name || customer.name;
       });
 
-      // CLIENT-SIDE filtering for submitted quotations only
+      // CLIENT-SIDE filtering: show quotations that can be invoiced (sent or accepted status)
       const submittedQuotations = allQuotationsData.filter(quotation => {
         const status = (quotation.status || '').toLowerCase().trim();
-        return status === 'submitted';
+        return status === 'sent' || status === 'accepted' || status === 'submitted';
       });
 
       // Enrich quotations with customer names and sort by newest first

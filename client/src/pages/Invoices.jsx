@@ -38,6 +38,7 @@ export default function Invoices() {
   const [showCreateFromExistingDialog, setShowCreateFromExistingDialog] = useState(false);
   const [refreshTrigger, setRefreshTrigger] = useState(0);
   const [financialYears, setFinancialYears] = useState([]);
+  const [sourceQuotationId, setSourceQuotationId] = useState(null);
 
   // Pagination state
   const [currentPage, setCurrentPage] = useState(1);
@@ -126,6 +127,23 @@ export default function Invoices() {
     setRefreshTrigger(prev => prev + 1);
   };
 
+  const handleInvoiceSaveSuccess = async () => {
+    handleRefresh();
+    if (sourceQuotationId) {
+      try {
+        await fetch(`/api/quotations/${sourceQuotationId}/status`, {
+          method: 'PATCH',
+          headers: { 'Content-Type': 'application/json' },
+          credentials: 'include',
+          body: JSON.stringify({ status: 'converted' }),
+        });
+      } catch (err) {
+        console.warn('Could not update source quotation status:', err);
+      }
+      setSourceQuotationId(null);
+    }
+  };
+
   const handleNewInvoice = () => {
     setEditingInvoice(null);
     setShowInvoiceForm(true);
@@ -152,6 +170,7 @@ export default function Invoices() {
   const handleCloseInvoiceForm = () => {
     setShowInvoiceForm(false);
     setEditingInvoice(null);
+    setSourceQuotationId(null);
   };
 
   // Robust document-to-invoice normalizer function
@@ -297,6 +316,8 @@ export default function Invoices() {
         if (response.ok) {
           fullDocument = await response.json();
         }
+        // Track source quotation so we can mark it 'converted' after save
+        setSourceQuotationId(document.id);
       }
       
       // Load current dropdown data for validation and mapping
@@ -542,7 +563,7 @@ export default function Invoices() {
         editingInvoice={editingInvoice}
         currentUser={currentUser}
         canOverride={canOverride}
-        onSuccess={handleRefresh}
+        onSuccess={handleInvoiceSaveSuccess}
       />
       
       {/* Create from Existing Dialog */}

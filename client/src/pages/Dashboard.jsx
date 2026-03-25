@@ -36,6 +36,8 @@ export default function Dashboard() {
 
   const isLoading = dashLoading || invoicesLoading || dosLoading;
 
+  const lowStockThreshold = parseInt(dashboardData?.companySettings?.lowStockThreshold) || 6;
+
   const data = {
     products:       extractArray(dashboardData?.products),
     purchaseOrders: extractArray(dashboardData?.purchaseOrders),
@@ -74,7 +76,7 @@ export default function Dashboard() {
           <QuickActions />
         </div>
         <div>
-          <LowStockAlert products={data.products} />
+          <LowStockAlert products={data.products} lowStockThreshold={lowStockThreshold} />
         </div>
       </div>
 

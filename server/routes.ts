@@ -2559,6 +2559,28 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  // PATCH quotation status — accessible to all authenticated users (e.g., Staff converting a quotation to an invoice)
+  app.patch('/api/quotations/:id/status', requireAuth(), async (req: AuthenticatedRequest, res) => {
+    try {
+      const id = parseInt(req.params.id);
+      const { status } = req.body;
+      if (!status || typeof status !== 'string') {
+        return res.status(400).json({ error: 'status is required' });
+      }
+      const ALLOWED = ['draft', 'sent', 'accepted', 'rejected', 'expired', 'converted'];
+      if (!ALLOWED.includes(status)) {
+        return res.status(400).json({ error: `status must be one of: ${ALLOWED.join(', ')}` });
+      }
+      const updatedQuote = await businessStorage.updateQuotation(id, { status });
+      if (!updatedQuote) return res.status(404).json({ error: 'Quotation not found' });
+      writeAuditLog({ actor: req.user!.id, actorName: req.user?.username || String(req.user!.id), targetId: String(id), targetType: 'quotation', action: 'UPDATE', details: `Quotation #${updatedQuote.quoteNumber} status changed to ${status}` });
+      res.json(updatedQuote);
+    } catch (error) {
+      console.error('Error updating quotation status:', error);
+      res.status(500).json({ error: 'Failed to update quotation status' });
+    }
+  });
+
   // Update quotation
   app.put('/api/quotations/:id', requireAuth(['Admin', 'Manager']), async (req: AuthenticatedRequest, res) => {
     try {

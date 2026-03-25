@@ -26,8 +26,8 @@ export default function QuotationFilters({ selectedStatuses, setSelectedStatuses
 
   const hasActiveFilters = selectedStatuses.length > 0 || selectedCustomers.length > 0 || dateRange !== "all";
 
-  // Get unique statuses
-  const uniqueStatuses = ['draft', 'submitted'];
+  // Get unique statuses matching actual quotation status values
+  const uniqueStatuses = ['draft', 'sent', 'accepted', 'rejected', 'expired', 'converted'];
 
   const handleDateRangeChange = (value) => {
     if (value !== 'custom') {

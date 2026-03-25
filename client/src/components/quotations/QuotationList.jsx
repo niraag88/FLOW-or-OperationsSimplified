@@ -26,7 +26,11 @@ export default function QuotationList({ quotations, totalCount, loading, canEdit
   const getStatusColor = (status) => {
     switch (status?.toLowerCase()) {
       case 'draft': return 'bg-gray-100 text-gray-800';
-      case 'submitted': return 'bg-blue-100 text-blue-800';
+      case 'sent': case 'submitted': return 'bg-blue-100 text-blue-800';
+      case 'accepted': return 'bg-emerald-100 text-emerald-800';
+      case 'converted': case 'invoiced': return 'bg-purple-100 text-purple-800';
+      case 'expired': return 'bg-orange-100 text-orange-800';
+      case 'rejected': return 'bg-red-100 text-red-800';
       default: return 'bg-gray-100 text-gray-800';
     }
   };
@@ -43,13 +47,13 @@ export default function QuotationList({ quotations, totalCount, loading, canEdit
   const canPerformActions = (quotation) => {
     if (!canCreate) return false;
     if (canOverride) return true;
-    return !['accepted', 'rejected', 'invoiced'].includes(quotation.status);
+    return !['accepted', 'rejected', 'invoiced', 'converted'].includes(quotation.status);
   };
 
   const canEditActions = (quotation) => {
     if (!canEdit) return false;
     if (canOverride) return true;
-    return !['accepted', 'rejected', 'invoiced'].includes(quotation.status);
+    return !['accepted', 'rejected', 'invoiced', 'converted'].includes(quotation.status);
   };
 
   const isInitialLoad = loading && (!quotations || quotations.length === 0);
