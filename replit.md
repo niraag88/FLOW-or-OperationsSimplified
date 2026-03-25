@@ -2,6 +2,12 @@
 
 This is a full-stack web application built with a React frontend and Express.js backend, designed as FLOW - a UAE business operations platform (AED currency, 5% VAT). The application features a modern UI built with shadcn/ui components and Tailwind CSS, with PostgreSQL database integration using Drizzle ORM.
 
+## Migration Infrastructure (Task #89)
+- **Versioned migrations adopted**: `migrations/0000_baseline.sql` created from full current schema. `drizzle.__drizzle_migrations` table seeded — baseline marked applied, live data untouched.
+- **New scripts**: `npm run db:generate` (create migration file), `npm run db:migrate` (apply). `db:push` kept for reference.
+- **Post-merge automation**: `scripts/post-merge.sh` registered — runs `npm install && npm run db:migrate` on every future task merge.
+- **Workflow for future schema changes**: Edit `shared/schema.ts` → `npm run db:generate` → commit the SQL file → `npm run db:migrate`.
+
 ## Schema Changes (Task #83)
 - **purchase_orders** table: Added `supplier_scan_key` (text) column via direct SQL. Schema updated in `shared/schema.ts` with `supplierScanKey` field. `getPurchaseOrders()` in `server/businessStorage.ts` now includes this field in explicit SELECT.
 - **API routes**: Added `PATCH /api/purchase-orders/:id/scan-key` and `DELETE /api/purchase-orders/:id/scan-key` routes for attaching/removing supplier invoice documents.
@@ -86,7 +92,15 @@ Preferred communication style: Simple, everyday language.
 ## Database Layer
 - **ORM**: Drizzle ORM with PostgreSQL dialect
 - **Schema Management**: Centralized schema definitions in `/shared/schema.ts`
-- **Migrations**: Drizzle Kit for database migrations stored in `/migrations`
+- **Migrations**: Versioned Drizzle migrations in `/migrations/` (Task #89). Workflow:
+  1. Edit `shared/schema.ts`
+  2. `npm run db:generate` — creates a new numbered SQL file in `migrations/`
+  3. Commit the SQL file alongside the code that depends on it
+  4. `npm run db:migrate` — applies unapplied migrations to the database
+- **Migration tracking**: Drizzle stores applied migrations in `drizzle.__drizzle_migrations` table
+- **Baseline**: `migrations/0000_baseline.sql` captures the full schema as of Task #89 — already marked applied; do NOT run it against the DB
+- **Post-merge automation**: `scripts/post-merge.sh` runs `npm install && npm run db:migrate` on every task merge, so schema changes are applied automatically
+- **Legacy note**: Past tasks (46, 49, 83) used direct `ALTER TABLE` SQL for columns because `db:push` hung. Now use `db:generate` + `db:migrate` instead.
 - **Connection**: Neon Database serverless PostgreSQL adapter
 - **Storage Interface**: Abstract storage interface with in-memory implementation for development
 
