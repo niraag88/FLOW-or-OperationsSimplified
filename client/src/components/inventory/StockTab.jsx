@@ -342,10 +342,13 @@ export default function StockTab({ products, loading, canEdit, currentUser, onRe
           {/* Items per page selector */}
           <div className="flex items-center gap-2">
             <span className="text-sm text-gray-700">Show:</span>
-            <Select value={itemsPerPage.toString()} onValueChange={(value) => {
-              setItemsPerPage(Number(value));
-              setPage(1);
-            }}>
+            <Select
+              value={itemsPerPage >= paginationData.totalItems ? "all" : itemsPerPage.toString()}
+              onValueChange={(value) => {
+                setItemsPerPage(value === "all" ? paginationData.totalItems : Number(value));
+                setPage(1);
+              }}
+            >
               <SelectTrigger className="w-20">
                 <SelectValue />
               </SelectTrigger>
@@ -353,7 +356,7 @@ export default function StockTab({ products, loading, canEdit, currentUser, onRe
                 <SelectItem value="20">20</SelectItem>
                 <SelectItem value="50">50</SelectItem>
                 <SelectItem value="100">100</SelectItem>
-                <SelectItem value={paginationData.totalItems.toString()}>All</SelectItem>
+                <SelectItem value="all">All</SelectItem>
               </SelectContent>
             </Select>
           </div>
