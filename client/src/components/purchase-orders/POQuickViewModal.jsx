@@ -254,6 +254,76 @@ export default function POQuickViewModal({ poId, open, onClose }) {
               </>
             )}
 
+            {/* ── Goods Receipts by Date (only if GRNs exist with item detail) ── */}
+            {recon?.hasGrns && detail.grns && detail.grns.some(g => g.items && g.items.length > 0) && (
+              <>
+                <Separator />
+                <Section title="Goods Receipts">
+                  <div className="space-y-3">
+                    {detail.grns.filter(g => g.items && g.items.length > 0).map((grn) => {
+                      const grnShort = grn.items.some(
+                        i => (parseFloat(i.receivedQuantity) || 0) < (parseFloat(i.orderedQuantity) || 0)
+                      );
+                      const grnTotal = grn.items.reduce(
+                        (s, i) => s + (parseFloat(i.receivedQuantity) || 0) * (parseFloat(i.unitPrice) || 0), 0
+                      );
+                      return (
+                        <div key={grn.id} className="rounded-md border overflow-hidden">
+                          <div className={`flex items-center justify-between px-3 py-2 ${grnShort ? "bg-amber-50 border-b border-amber-100" : "bg-green-50 border-b border-green-100"}`}>
+                            <div className="flex items-center gap-2">
+                              <Package className="w-3.5 h-3.5 text-gray-500" />
+                              <span className="text-sm font-semibold">{grn.receiptNumber || `GRN-${grn.id}`}</span>
+                              {grn.receivedDate && (
+                                <span className="text-xs text-gray-500">— {formatDate(grn.receivedDate)}</span>
+                              )}
+                            </div>
+                            <span className={`inline-flex items-center gap-1 text-xs font-semibold px-1.5 py-0.5 rounded border ${grnShort ? "text-amber-800 bg-amber-100 border-amber-200" : "text-green-800 bg-green-100 border-green-200"}`}>
+                              {grnShort ? <><AlertTriangle className="w-3 h-3" /> Short delivery</> : <><CheckCircle2 className="w-3 h-3" /> Full delivery</>}
+                            </span>
+                          </div>
+                          <Table>
+                            <TableHeader>
+                              <TableRow className="bg-gray-50">
+                                <TableHead>Product</TableHead>
+                                <TableHead className="text-right w-24">Qty Ordered</TableHead>
+                                <TableHead className="text-right w-24">Qty Received</TableHead>
+                                <TableHead className="text-right w-28">Unit Price</TableHead>
+                                <TableHead className="text-right w-28">Received Value</TableHead>
+                              </TableRow>
+                            </TableHeader>
+                            <TableBody>
+                              {grn.items.map((item, idx) => {
+                                const recQty = parseFloat(item.receivedQuantity) || 0;
+                                const ordQty = parseFloat(item.orderedQuantity) || 0;
+                                const price = parseFloat(item.unitPrice) || 0;
+                                const isItemShort = recQty < ordQty;
+                                return (
+                                  <TableRow key={idx} className={isItemShort ? "bg-amber-50/40" : ""}>
+                                    <TableCell>
+                                      <div className="font-medium text-sm">{item.productName || "—"}</div>
+                                      {item.productSku && <div className="text-xs text-gray-400">{item.productSku}</div>}
+                                    </TableCell>
+                                    <TableCell className="text-right text-sm text-gray-500">{ordQty}</TableCell>
+                                    <TableCell className={`text-right text-sm font-medium ${isItemShort ? "text-amber-700" : ""}`}>{recQty}</TableCell>
+                                    <TableCell className="text-right text-sm">{formatCurrency(price, currency)}</TableCell>
+                                    <TableCell className="text-right text-sm font-medium">{formatCurrency(recQty * price, currency)}</TableCell>
+                                  </TableRow>
+                                );
+                              })}
+                            </TableBody>
+                          </Table>
+                          <div className="flex justify-end px-4 py-2 bg-gray-50 border-t">
+                            <span className="text-xs font-semibold text-gray-600 mr-3">Receipt Total</span>
+                            <span className="text-xs font-bold">{formatCurrency(grnTotal, currency)}</span>
+                          </div>
+                        </div>
+                      );
+                    })}
+                  </div>
+                </Section>
+              </>
+            )}
+
             {/* ── Reconciliation (only if GRNs exist) ── */}
             {recon?.hasGrns && (
               <>

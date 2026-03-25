@@ -1527,10 +1527,14 @@ export async function registerRoutes(app: Express): Promise<Server> {
       if (grnIds.length > 0) {
         grnItems = await db.select({
           receiptId: goodsReceiptItems.receiptId,
+          productId: goodsReceiptItems.productId,
+          productName: products.name,
+          productSku: products.sku,
           orderedQuantity: goodsReceiptItems.orderedQuantity,
           receivedQuantity: goodsReceiptItems.receivedQuantity,
           unitPrice: goodsReceiptItems.unitPrice,
         }).from(goodsReceiptItems)
+          .leftJoin(products, eq(goodsReceiptItems.productId, products.id))
           .where(inArray(goodsReceiptItems.receiptId, grnIds));
       }
 
