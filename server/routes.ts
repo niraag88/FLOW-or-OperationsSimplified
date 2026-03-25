@@ -2111,6 +2111,10 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const [existing] = await db.select({ id: purchaseOrders.id, status: purchaseOrders.status, poNumber: purchaseOrders.poNumber })
         .from(purchaseOrders).where(eq(purchaseOrders.id, id));
       if (!existing) return res.status(404).json({ error: 'Purchase order not found' });
+      const validTransitions: Record<string, string> = { closed: 'submitted', submitted: 'closed' };
+      if (validTransitions[existing.status] !== status) {
+        return res.status(400).json({ error: `Cannot transition from '${existing.status}' to '${status}'` });
+      }
       const [updated] = await db.update(purchaseOrders)
         .set({ status, updatedAt: new Date() })
         .where(eq(purchaseOrders.id, id))
