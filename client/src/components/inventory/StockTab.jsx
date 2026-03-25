@@ -1068,7 +1068,7 @@ export default function StockTab({ products, loading, canEdit, currentUser, onRe
                     ))}
                     {(movementDateFilter.start || movementDateFilter.end) && (
                       <Badge variant="secondary" className="gap-1">
-                        Date: {movementDateFilter.start || 'Start'} - {movementDateFilter.end || 'End'}
+                        Date: {movementDateFilter.start ? format(new Date(movementDateFilter.start), 'dd/MM/yy') : 'Start'} - {movementDateFilter.end ? format(new Date(movementDateFilter.end), 'dd/MM/yy') : 'End'}
                         <X 
                           className="h-3 w-3 cursor-pointer" 
                           onClick={() => {
