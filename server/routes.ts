@@ -1439,6 +1439,18 @@ export async function registerRoutes(app: Express): Promise<Server> {
         await db.update(purchaseOrders)
           .set({ totalAmount: updatedComputedTotal.toFixed(2), grandTotal: updatedGrandTotal.toFixed(2) })
           .where(eq(purchaseOrders.id, poId));
+      } else if (req.body.fxRateToAed !== undefined || req.body.currency !== undefined) {
+        // No new items, but fxRateToAed or currency changed — recompute grandTotal from current totalAmount
+        const [currentPO] = await db.select().from(purchaseOrders).where(eq(purchaseOrders.id, poId));
+        if (currentPO) {
+          const currentTotal = parseFloat(String(currentPO.totalAmount)) || 0;
+          const newFxRate = parseFloat(String(req.body.fxRateToAed ?? currentPO.fxRateToAed)) || 4.85;
+          const newCurrency = req.body.currency ?? currentPO.currency ?? 'GBP';
+          const recomputedGrandTotal = newCurrency === 'AED' ? currentTotal : currentTotal * newFxRate;
+          await db.update(purchaseOrders)
+            .set({ grandTotal: recomputedGrandTotal.toFixed(2) })
+            .where(eq(purchaseOrders.id, poId));
+        }
       }
       
       writeAuditLog({ actor: req.user!.id, actorName: req.user?.username || String(req.user!.id), targetId: String(poId), targetType: 'purchase_order', action: 'UPDATE', details: `PO #${updatedPO.poNumber} updated (status: ${updatedPO.status})` });

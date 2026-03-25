@@ -8,5 +8,5 @@ export const getDerivedInvoiceStatus = (invoice) => {
     return 'paid';
   }
 
-  return invoice.status || 'submitted';
+  return 'submitted';
 };
