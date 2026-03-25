@@ -60,6 +60,8 @@ export default function CompanySettingsComponent() {
         setSettings(prev => ({
           ...prev,
           ...loadedSettings,
+          // If taxNumber is empty but vatNumber has a value, fall back to vatNumber for TRN display
+          taxNumber: loadedSettings.taxNumber || loadedSettings.vatNumber || prev.taxNumber || "",
           defaultVatRate: loadedSettings.defaultVatRate !== undefined ? loadedSettings.defaultVatRate : 0.05,
           fxGbpToAed: loadedSettings.fxGbpToAed !== undefined ? loadedSettings.fxGbpToAed : 4.85,
           fxUsdToAed: loadedSettings.fxUsdToAed !== undefined ? loadedSettings.fxUsdToAed : 3.6725,
