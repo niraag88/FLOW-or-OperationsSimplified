@@ -811,7 +811,7 @@ export default function GoodsReceiptsTab({
     status: { label: "Status", transform: (s) => s?.toUpperCase() || '' },
   };
 
-  // Closed section export columns (matches on-screen columns; no Status, adds Delivery)
+  // Closed section export columns (matches on-screen columns)
   const closedExportColumns = {
     poNumber: "PO Number",
     supplierName: { label: "Supplier", transform: (v, row) => v || row?.brandName || '' },
@@ -822,6 +822,7 @@ export default function GoodsReceiptsTab({
     orderedQty: { label: "Ordered", transform: (_, row) => getTotalOrderedQuantity(row) },
     receivedQty: { label: "Received", transform: (_, row) => getTotalReceivedQuantity(row) },
     delivery: { label: "Delivery", transform: deliveryTransform },
+    status: { label: "Status", transform: (s) => s?.toUpperCase() || '' },
   };
 
   // Combined column set for when both sections are visible: superset of open + closed columns
@@ -953,7 +954,7 @@ export default function GoodsReceiptsTab({
                 ) : filteredOpenPOs.length === 0 ? (
                   <div className="text-center py-6 text-gray-500 border-2 border-dashed border-gray-200 rounded-lg">
                     <p className="font-semibold">No results</p>
-                    <p className="text-sm">No open POs match your search.</p>
+                    <p className="text-sm">No open POs match your filters.</p>
                   </div>
                 ) : (
                   <div className="overflow-x-auto border rounded-lg">
