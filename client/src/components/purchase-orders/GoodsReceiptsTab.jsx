@@ -7,7 +7,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
-import { ShoppingCart, CheckCircle2, Package, Truck, MoreHorizontal, XCircle, ChevronDown, ChevronRight, Eye, Download, Trash2, FileText, FileSpreadsheet, AlertTriangle, Paperclip, X, RefreshCw, Search } from "lucide-react";
+import { ShoppingCart, CheckCircle2, Package, Truck, MoreHorizontal, XCircle, ChevronDown, ChevronRight, Eye, Download, Trash2, FileText, FileSpreadsheet, AlertTriangle, Paperclip, X, RefreshCw } from "lucide-react";
 import UploadFileDialog from "../common/UploadFileDialog";
 import POQuickViewModal from "./POQuickViewModal";
 import {
@@ -59,11 +59,15 @@ export default function GoodsReceiptsTab({
   const [showDeleteDialog, setShowDeleteDialog] = useState(false);
   const [deletingPO, setDeletingPO] = useState(null);
   const [quickViewPoId, setQuickViewPoId] = useState(null);
-  // Inline filter state for each section
-  const [openSearch, setOpenSearch] = useState('');
-  const [closedSearch, setClosedSearch] = useState('');
+  // Inline filter state — Open section
+  const [openSupplier, setOpenSupplier] = useState('all');
+  const [openDateFrom, setOpenDateFrom] = useState('');
+  const [openDateTo, setOpenDateTo] = useState('');
+  // Inline filter state — Closed section
+  const [closedSupplier, setClosedSupplier] = useState('all');
+  const [closedDateFrom, setClosedDateFrom] = useState('');
+  const [closedDateTo, setClosedDateTo] = useState('');
   const [closedDelivery, setClosedDelivery] = useState('all');
-  const [closedPayment, setClosedPayment] = useState('all');
   // GRN document attachment state
   const [pendingDocs, setPendingDocs] = useState([null, null, null]);
   const [attachGrnState, setAttachGrnState] = useState(null); // { grnId, slot, receiptNumber }
@@ -738,21 +742,38 @@ export default function GoodsReceiptsTab({
   const openPOs = purchaseOrders.filter(po => po.status === 'submitted');
   const closedPOs = purchaseOrders.filter(po => po.status === 'closed');
 
-  const filteredOpenPOs = openSearch.trim()
-    ? openPOs.filter(po => {
-        const q = openSearch.toLowerCase();
-        return po.poNumber?.toLowerCase().includes(q) ||
-               po.supplierName?.toLowerCase().includes(q) ||
-               po.brandName?.toLowerCase().includes(q);
-      })
-    : openPOs;
+  // Unique supplier/brand lists for dropdowns
+  const openSupplierOptions = Array.from(new Set(
+    openPOs.map(po => po.supplierName || po.brandName).filter(Boolean)
+  )).sort();
+  const closedSupplierOptions = Array.from(new Set(
+    closedPOs.map(po => po.supplierName || po.brandName).filter(Boolean)
+  )).sort();
+
+  const filteredOpenPOs = openPOs.filter(po => {
+    if (openSupplier !== 'all') {
+      const name = po.supplierName || po.brandName;
+      if (name !== openSupplier) return false;
+    }
+    if (openDateFrom) {
+      if (!po.orderDate || new Date(po.orderDate) < new Date(openDateFrom)) return false;
+    }
+    if (openDateTo) {
+      if (!po.orderDate || new Date(po.orderDate) > new Date(openDateTo)) return false;
+    }
+    return true;
+  });
 
   const filteredClosedPOs = closedPOs.filter(po => {
-    if (closedSearch.trim()) {
-      const q = closedSearch.toLowerCase();
-      if (!(po.poNumber?.toLowerCase().includes(q) ||
-            po.supplierName?.toLowerCase().includes(q) ||
-            po.brandName?.toLowerCase().includes(q))) return false;
+    if (closedSupplier !== 'all') {
+      const name = po.supplierName || po.brandName;
+      if (name !== closedSupplier) return false;
+    }
+    if (closedDateFrom) {
+      if (!po.orderDate || new Date(po.orderDate) < new Date(closedDateFrom)) return false;
+    }
+    if (closedDateTo) {
+      if (!po.orderDate || new Date(po.orderDate) > new Date(closedDateTo)) return false;
     }
     if (closedDelivery !== 'all') {
       const ordQty = getTotalOrderedQuantity(po);
@@ -761,69 +782,79 @@ export default function GoodsReceiptsTab({
       if (closedDelivery === 'short' && !isPartial) return false;
       if (closedDelivery === 'complete' && isPartial) return false;
     }
-    if (closedPayment !== 'all') {
-      if (closedPayment === 'paid' && po.paymentStatus !== 'paid') return false;
-      if (closedPayment === 'outstanding' && po.paymentStatus === 'paid') return false;
-    }
     return true;
   });
 
-  const openFiltersActive = !!openSearch.trim();
-  const closedFiltersActive = !!closedSearch.trim() || closedDelivery !== 'all' || closedPayment !== 'all';
+  const openFiltersActive = openSupplier !== 'all' || !!openDateFrom || !!openDateTo;
+  const closedFiltersActive = closedSupplier !== 'all' || !!closedDateFrom || !!closedDateTo || closedDelivery !== 'all';
 
-  // Context-aware export data function
+  // Shared column transforms
+  const dateTransform = (date) => date && !isNaN(new Date(date)) ? format(new Date(date), 'dd/MM/yyyy') : '';
+  const totalTransform = (amount, row) => `${row?.currency || 'GBP'} ${parseFloat(amount || 0).toFixed(2)}`;
+  const aedTransform = (amount) => `AED ${parseFloat(amount || 0).toFixed(2)}`;
+  const deliveryTransform = (_, row) => {
+    const ordQty = getTotalOrderedQuantity(row);
+    const recQty = getTotalReceivedQuantity(row);
+    return ordQty > 0 && recQty < ordQty ? 'Short Delivery' : 'Complete';
+  };
+
+  // Open section export columns (matches on-screen columns)
+  const openExportColumns = {
+    poNumber: "PO Number",
+    supplierName: { label: "Supplier", transform: (v, row) => v || row?.brandName || '' },
+    orderDate: { label: "Order Date", transform: dateTransform },
+    totalAmount: { label: "Total", transform: totalTransform },
+    grandTotal: { label: "Total (AED)", transform: aedTransform },
+    lineItems: { label: "Line Items", transform: (_, row) => getLineItemsCount(row) },
+    orderedQty: { label: "Ordered", transform: (_, row) => getTotalOrderedQuantity(row) },
+    receivedQty: { label: "Received", transform: (_, row) => getTotalReceivedQuantity(row) },
+    status: { label: "Status", transform: (s) => s?.toUpperCase() || '' },
+  };
+
+  // Closed section export columns (matches on-screen columns; no Status, adds Delivery)
+  const closedExportColumns = {
+    poNumber: "PO Number",
+    supplierName: { label: "Supplier", transform: (v, row) => v || row?.brandName || '' },
+    orderDate: { label: "Order Date", transform: dateTransform },
+    totalAmount: { label: "Total", transform: totalTransform },
+    grandTotal: { label: "Total (AED)", transform: aedTransform },
+    lineItems: { label: "Lines", transform: (_, row) => getLineItemsCount(row) },
+    orderedQty: { label: "Ordered", transform: (_, row) => getTotalOrderedQuantity(row) },
+    receivedQty: { label: "Received", transform: (_, row) => getTotalReceivedQuantity(row) },
+    delivery: { label: "Delivery", transform: deliveryTransform },
+  };
+
+  // Context-aware export — wired to filtered lists
   const getContextAwareExportData = () => {
-    let exportData = [];
-    let exportType = "Goods Receipts";
-    let itemCount = 0;
+    const deliveryLabel = closedDelivery !== 'all'
+      ? (closedDelivery === 'short' ? ' — Short Delivery' : ' — Complete')
+      : '';
 
     if (showOpenReceipts && !showClosedReceipts) {
-      // Export only open goods receipts
-      exportData = openPOs;
-      exportType = "Open Goods Receipts";
-      itemCount = openPOs.length;
+      return {
+        exportData: filteredOpenPOs,
+        exportType: `Open Goods Receipts${openFiltersActive ? ` (${filteredOpenPOs.length} of ${openPOs.length})` : ''}`,
+        itemCount: filteredOpenPOs.length,
+        columns: openExportColumns,
+      };
     } else if (!showOpenReceipts && showClosedReceipts) {
-      // Export only closed goods receipts
-      exportData = closedPOs;
-      exportType = "Closed Goods Receipts";
-      itemCount = closedPOs.length;
-    } else if (showOpenReceipts && showClosedReceipts) {
-      // Export all goods receipts
-      exportData = [...openPOs, ...closedPOs];
-      exportType = "All Goods Receipts";
-      itemCount = openPOs.length + closedPOs.length;
-    }
-
-
-    return { exportData, exportType, itemCount };
-  };
-
-  const { exportData: contextExportData, exportType, itemCount } = getContextAwareExportData();
-
-  // Define columns for goods receipts export
-  const goodsReceiptsColumns = {
-    poNumber: "PO Number",
-    brandName: "Brand",
-    orderDate: {
-      label: "Order Date",
-      transform: (date) => date && !isNaN(new Date(date)) ? format(new Date(date), 'dd/MM/yyyy') : ''
-    },
-    totalAmount: {
-      label: "Total",
-      transform: (amount, row) => `${row?.currency || 'GBP'} ${parseFloat(amount || 0).toFixed(2)}`
-    },
-    grandTotal: {
-      label: "Total (AED)", 
-      transform: (amount) => `AED ${parseFloat(amount || 0).toFixed(2)}`
-    },
-    lineItems: "Line Items",
-    orderedQty: "Ordered",
-    receivedQty: "Received",
-    status: {
-      label: "Status",
-      transform: (status) => status?.toUpperCase() || ''
+      return {
+        exportData: filteredClosedPOs,
+        exportType: `Closed Goods Receipts${closedFiltersActive ? ` (${filteredClosedPOs.length} of ${closedPOs.length}${deliveryLabel})` : ''}`,
+        itemCount: filteredClosedPOs.length,
+        columns: closedExportColumns,
+      };
+    } else {
+      return {
+        exportData: [...filteredOpenPOs, ...filteredClosedPOs],
+        exportType: "All Goods Receipts",
+        itemCount: filteredOpenPOs.length + filteredClosedPOs.length,
+        columns: openExportColumns,
+      };
     }
   };
+
+  const { exportData: contextExportData, exportType, itemCount, columns: goodsReceiptsColumns } = getContextAwareExportData();
 
   return (
     <>
@@ -858,24 +889,44 @@ export default function GoodsReceiptsTab({
                 </Button>
               </CollapsibleTrigger>
               <CollapsibleContent>
-                {/* Open section search */}
-                <div className="mb-3 flex items-center gap-2">
-                  <div className="relative flex-1 max-w-xs">
-                    <Search className="absolute left-2.5 top-2 h-4 w-4 text-gray-400" />
-                    <Input
-                      placeholder="Search PO or supplier..."
-                      value={openSearch}
-                      onChange={e => setOpenSearch(e.target.value)}
-                      className="pl-8 h-8 text-sm"
-                    />
-                    {openSearch && (
-                      <button onClick={() => setOpenSearch('')} className="absolute right-2 top-2 text-gray-400 hover:text-gray-600">
-                        <X className="h-4 w-4" />
-                      </button>
-                    )}
-                  </div>
+                {/* Open section filters */}
+                <div className="mb-3 flex flex-wrap items-center gap-2">
+                  <Select value={openSupplier} onValueChange={setOpenSupplier}>
+                    <SelectTrigger className="h-8 w-44 text-sm">
+                      <SelectValue placeholder="All Suppliers" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="all">All Suppliers</SelectItem>
+                      {openSupplierOptions.map(s => (
+                        <SelectItem key={s} value={s}>{s}</SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                  <Input
+                    type="date"
+                    value={openDateFrom}
+                    onChange={e => setOpenDateFrom(e.target.value)}
+                    className="h-8 w-36 text-sm"
+                    title="Order date from"
+                  />
+                  <span className="text-xs text-gray-400">to</span>
+                  <Input
+                    type="date"
+                    value={openDateTo}
+                    onChange={e => setOpenDateTo(e.target.value)}
+                    className="h-8 w-36 text-sm"
+                    title="Order date to"
+                  />
                   {openFiltersActive && (
-                    <span className="text-xs text-gray-500">{filteredOpenPOs.length} of {openPOs.length}</span>
+                    <>
+                      <span className="text-xs text-gray-500">{filteredOpenPOs.length} of {openPOs.length}</span>
+                      <button
+                        onClick={() => { setOpenSupplier('all'); setOpenDateFrom(''); setOpenDateTo(''); }}
+                        className="text-xs text-blue-600 hover:text-blue-800 underline"
+                      >
+                        Clear
+                      </button>
+                    </>
                   )}
                 </div>
                 {openPOs.length === 0 ? (
@@ -972,22 +1023,34 @@ export default function GoodsReceiptsTab({
               <CollapsibleContent className="mt-3">
                 {/* Closed section filters */}
                 <div className="flex flex-wrap items-center gap-2 mb-3">
-                  <div className="relative flex-1 min-w-[180px] max-w-xs">
-                    <Search className="absolute left-2.5 top-2 h-4 w-4 text-gray-400" />
-                    <Input
-                      placeholder="Search PO or supplier..."
-                      value={closedSearch}
-                      onChange={e => setClosedSearch(e.target.value)}
-                      className="pl-8 h-8 text-sm"
-                    />
-                    {closedSearch && (
-                      <button onClick={() => setClosedSearch('')} className="absolute right-2 top-2 text-gray-400 hover:text-gray-600">
-                        <X className="h-4 w-4" />
-                      </button>
-                    )}
-                  </div>
+                  <Select value={closedSupplier} onValueChange={setClosedSupplier}>
+                    <SelectTrigger className="h-8 w-44 text-sm">
+                      <SelectValue placeholder="All Suppliers" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="all">All Suppliers</SelectItem>
+                      {closedSupplierOptions.map(s => (
+                        <SelectItem key={s} value={s}>{s}</SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                  <Input
+                    type="date"
+                    value={closedDateFrom}
+                    onChange={e => setClosedDateFrom(e.target.value)}
+                    className="h-8 w-36 text-sm"
+                    title="Order date from"
+                  />
+                  <span className="text-xs text-gray-400">to</span>
+                  <Input
+                    type="date"
+                    value={closedDateTo}
+                    onChange={e => setClosedDateTo(e.target.value)}
+                    className="h-8 w-36 text-sm"
+                    title="Order date to"
+                  />
                   <Select value={closedDelivery} onValueChange={setClosedDelivery}>
-                    <SelectTrigger className="h-8 w-38 text-sm">
+                    <SelectTrigger className="h-8 w-40 text-sm">
                       <SelectValue />
                     </SelectTrigger>
                     <SelectContent>
@@ -996,26 +1059,16 @@ export default function GoodsReceiptsTab({
                       <SelectItem value="complete">Complete</SelectItem>
                     </SelectContent>
                   </Select>
-                  <Select value={closedPayment} onValueChange={setClosedPayment}>
-                    <SelectTrigger className="h-8 w-38 text-sm">
-                      <SelectValue />
-                    </SelectTrigger>
-                    <SelectContent>
-                      <SelectItem value="all">All Payments</SelectItem>
-                      <SelectItem value="outstanding">Outstanding</SelectItem>
-                      <SelectItem value="paid">Paid</SelectItem>
-                    </SelectContent>
-                  </Select>
                   {closedFiltersActive && (
-                    <span className="text-xs text-gray-500 ml-1">{filteredClosedPOs.length} of {closedPOs.length}</span>
-                  )}
-                  {closedFiltersActive && (
-                    <button
-                      onClick={() => { setClosedSearch(''); setClosedDelivery('all'); setClosedPayment('all'); }}
-                      className="text-xs text-blue-600 hover:text-blue-800 underline"
-                    >
-                      Clear
-                    </button>
+                    <>
+                      <span className="text-xs text-gray-500">{filteredClosedPOs.length} of {closedPOs.length}</span>
+                      <button
+                        onClick={() => { setClosedSupplier('all'); setClosedDateFrom(''); setClosedDateTo(''); setClosedDelivery('all'); }}
+                        className="text-xs text-blue-600 hover:text-blue-800 underline"
+                      >
+                        Clear
+                      </button>
+                    </>
                   )}
                 </div>
                 {filteredClosedPOs.length === 0 ? (
