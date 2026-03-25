@@ -33,7 +33,7 @@ function formatLogDate(dateString: string) {
   if (!dateString) return '-';
   try {
     const date = typeof dateString === 'string' ? parseISO(dateString) : new Date(dateString);
-    return isValid(date) ? format(date, 'dd/MM/yy HH:mm') : '-';
+    return isValid(date) ? format(date, 'dd/MM/yyyy HH:mm') : '-';
   } catch {
     return '-';
   }

@@ -66,7 +66,7 @@ export default function PoGrnReport({ purchaseOrders, goodsReceipts, suppliers =
     if (!dateString) return '-';
     try {
       const date = new Date(dateString);
-      return date && !isNaN(date) ? format(date, 'dd/MM/yy') : '-';
+      return date && !isNaN(date) ? format(date, 'dd/MM/yyyy') : '-';
     } catch {
       return '-';
     }
@@ -130,8 +130,8 @@ export default function PoGrnReport({ purchaseOrders, goodsReceipts, suppliers =
   };
   const formatPoDateRange = () => {
     if (poCustomRange.from && poCustomRange.to)
-      return `${format(poCustomRange.from, 'MMM dd')} - ${format(poCustomRange.to, 'MMM dd')}`;
-    if (poCustomRange.from) return `${format(poCustomRange.from, 'MMM dd')} - ...`;
+      return `${format(poCustomRange.from, 'dd/MM')} - ${format(poCustomRange.to, 'dd/MM')}`;
+    if (poCustomRange.from) return `${format(poCustomRange.from, 'dd/MM')} - ...`;
     return 'Pick date range';
   };
 
@@ -159,8 +159,8 @@ export default function PoGrnReport({ purchaseOrders, goodsReceipts, suppliers =
   };
   const formatGrnDateRange = () => {
     if (grnCustomRange.from && grnCustomRange.to)
-      return `${format(grnCustomRange.from, 'MMM dd')} - ${format(grnCustomRange.to, 'MMM dd')}`;
-    if (grnCustomRange.from) return `${format(grnCustomRange.from, 'MMM dd')} - ...`;
+      return `${format(grnCustomRange.from, 'dd/MM')} - ${format(grnCustomRange.to, 'dd/MM')}`;
+    if (grnCustomRange.from) return `${format(grnCustomRange.from, 'dd/MM')} - ...`;
     return 'Pick date range';
   };
 

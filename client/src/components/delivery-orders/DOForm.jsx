@@ -234,7 +234,7 @@ export default function DOForm({ open, onClose, editingDO, currentUser, onSucces
 
   const getFilteredProducts = (brandId) => {
     if (!brandId) return [];
-    return products.filter(product => product.brandId === brandId);
+    return products.filter(product => String(product.brandId) === String(brandId));
   };
 
   const removeItem = (index) => {

@@ -1376,11 +1376,15 @@ export async function registerRoutes(app: Express): Promise<Server> {
             });
           }
         }
-        // Always update total_amount from the actual inserted items
+        // Always update total_amount and grand_total from the actual inserted items
+        const poFxRate = parseFloat(String(purchaseOrder.fxRateToAed)) || 4.85;
+        const poCurrency = purchaseOrder.currency || 'GBP';
+        const computedGrandTotal = poCurrency === 'AED' ? computedTotal : computedTotal * poFxRate;
         await db.update(purchaseOrders)
-          .set({ totalAmount: computedTotal.toFixed(2) })
+          .set({ totalAmount: computedTotal.toFixed(2), grandTotal: computedGrandTotal.toFixed(2) })
           .where(eq(purchaseOrders.id, purchaseOrder.id));
         purchaseOrder.totalAmount = computedTotal.toFixed(2);
+        purchaseOrder.grandTotal = computedGrandTotal.toFixed(2);
       }
       
       writeAuditLog({ actor: req.user!.id, actorName: req.user?.username || String(req.user!.id), targetId: String(purchaseOrder.id), targetType: 'purchase_order', action: 'CREATE', details: `PO #${purchaseOrder.poNumber} created` });
@@ -1412,9 +1416,11 @@ export async function registerRoutes(app: Express): Promise<Server> {
         // Delete existing line items
         await db.delete(purchaseOrderItems).where(eq(purchaseOrderItems.poId, poId));
         
+        let updatedComputedTotal = 0;
         // Insert new line items
         for (const item of req.body.items) {
           if (item.productId && item.quantity > 0) {
+            updatedComputedTotal += parseFloat(item.lineTotal) || 0;
             await db.insert(purchaseOrderItems).values({
               poId: poId,
               productId: parseInt(item.productId),
@@ -1426,6 +1432,13 @@ export async function registerRoutes(app: Express): Promise<Server> {
             });
           }
         }
+        // Update totalAmount and grandTotal from actual inserted items
+        const putFxRate = parseFloat(String(req.body.fxRateToAed || updatedPO.fxRateToAed)) || 4.85;
+        const putCurrency = req.body.currency || updatedPO.currency || 'GBP';
+        const updatedGrandTotal = putCurrency === 'AED' ? updatedComputedTotal : updatedComputedTotal * putFxRate;
+        await db.update(purchaseOrders)
+          .set({ totalAmount: updatedComputedTotal.toFixed(2), grandTotal: updatedGrandTotal.toFixed(2) })
+          .where(eq(purchaseOrders.id, poId));
       }
       
       writeAuditLog({ actor: req.user!.id, actorName: req.user?.username || String(req.user!.id), targetId: String(poId), targetType: 'purchase_order', action: 'UPDATE', details: `PO #${updatedPO.poNumber} updated (status: ${updatedPO.status})` });

@@ -165,7 +165,7 @@ export default function VATReportTab({ invoices, customers, books, companySettin
     if (!dateString) return '-';
     try {
       const date = typeof dateString === 'string' ? parseISO(dateString) : new Date(dateString);
-      return isValid(date) ? format(date, 'dd-MMM-yyyy') : '-';
+      return isValid(date) ? format(date, 'dd/MM/yyyy') : '-';
     } catch {
       return '-';
     }

@@ -325,12 +325,12 @@ export default function GoodsReceiptsTab({
             <TableCell className="w-[130px]">{po.brandName || 'Unknown Brand'}</TableCell>
             <TableCell className="w-[100px]">
               {po.orderDate && !isNaN(new Date(po.orderDate)) ? 
-                format(new Date(po.orderDate), 'dd/MM/yy') : 
+                format(new Date(po.orderDate), 'dd/MM/yyyy') : 
                 '-'
               }
             </TableCell>
             <TableCell className="w-[110px]">{po.currency || 'GBP'} {parseFloat(po.totalAmount || 0).toFixed(2)}</TableCell>
-            <TableCell className="w-[110px]">AED {parseFloat(po.grandTotal || 0).toFixed(2)}</TableCell>
+            <TableCell className="w-[110px]">{getAedStr(po)}</TableCell>
             <TableCell className="w-[80px]">{getLineItemsCount(po)}</TableCell>
             <TableCell className="w-[70px]">{ordQty}</TableCell>
             <TableCell className="w-[70px]">{recQty}</TableCell>
@@ -791,7 +791,15 @@ export default function GoodsReceiptsTab({
   // Shared column transforms
   const dateTransform = (date) => date && !isNaN(new Date(date)) ? format(new Date(date), 'dd/MM/yyyy') : '';
   const totalTransform = (amount, row) => `${row?.currency || 'GBP'} ${parseFloat(amount || 0).toFixed(2)}`;
-  const aedTransform = (amount) => `AED ${parseFloat(amount || 0).toFixed(2)}`;
+  const getAedEquivalent = (po) => {
+    const amount = parseFloat(po.totalAmount) || 0;
+    const currency = po.currency || 'GBP';
+    if (currency === 'AED') return amount;
+    const rate = parseFloat(po.fxRateToAed) || 4.85;
+    return amount * rate;
+  };
+  const getAedStr = (po) => `AED ${getAedEquivalent(po).toFixed(2)}`;
+  const aedTransform = (_, row) => getAedStr(row);
   const deliveryTransform = (_, row) => {
     const ordQty = getTotalOrderedQuantity(row);
     const recQty = getTotalReceivedQuantity(row);
@@ -980,12 +988,12 @@ export default function GoodsReceiptsTab({
                             <td className="p-2 align-middle" style={{width: '140px'}}>{po.brandName || 'Unknown Brand'}</td>
                             <td className="p-2 align-middle" style={{width: '100px'}}>
                               {po.orderDate && !isNaN(new Date(po.orderDate)) ? 
-                                format(new Date(po.orderDate), 'dd/MM/yy') : 
+                                format(new Date(po.orderDate), 'dd/MM/yyyy') : 
                                 '-'
                               }
                             </td>
                             <td className="p-2 align-middle" style={{width: '110px'}}>{po.currency || 'GBP'} {parseFloat(po.totalAmount || 0).toFixed(2)}</td>
-                            <td className="p-2 align-middle" style={{width: '110px'}}>AED {parseFloat(po.grandTotal || 0).toFixed(2)}</td>
+                            <td className="p-2 align-middle" style={{width: '110px'}}>{getAedStr(po)}</td>
                             <td className="p-2 align-middle" style={{width: '90px'}}>{getLineItemsCount(po)}</td>
                             <td className="p-2 align-middle" style={{width: '80px'}}>{getTotalOrderedQuantity(po)}</td>
                             <td className="p-2 align-middle" style={{width: '80px'}}>{getTotalReceivedQuantity(po)}</td>
@@ -1144,12 +1152,12 @@ export default function GoodsReceiptsTab({
                               <td className="p-2 align-middle" style={{width: '130px'}}>{po.brandName || 'Unknown Brand'}</td>
                               <td className="p-2 align-middle" style={{width: '90px'}}>
                                 {po.orderDate && !isNaN(new Date(po.orderDate)) ? 
-                                  format(new Date(po.orderDate), 'dd/MM/yy') : 
+                                  format(new Date(po.orderDate), 'dd/MM/yyyy') : 
                                   '-'
                                 }
                               </td>
                               <td className="p-2 align-middle" style={{width: '110px'}}>{po.currency || 'GBP'} {parseFloat(po.totalAmount || 0).toFixed(2)}</td>
-                              <td className="p-2 align-middle" style={{width: '110px'}}>AED {parseFloat(po.grandTotal || 0).toFixed(2)}</td>
+                              <td className="p-2 align-middle" style={{width: '110px'}}>{getAedStr(po)}</td>
                               <td className="p-2 align-middle" style={{width: '70px'}}>{getLineItemsCount(po)}</td>
                               <td className="p-2 align-middle" style={{width: '70px'}}>{ordQty}</td>
                               <td className="p-2 align-middle" style={{width: '70px'}}>{recQty}</td>

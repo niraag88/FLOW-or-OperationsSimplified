@@ -52,7 +52,7 @@ export default function QuotationFilters({ selectedStatuses, setSelectedStatuses
 
   const formatCustomDateRange = () => {
     if (customStartDate && customEndDate) {
-      return `${format(customStartDate, 'MMM dd')} - ${format(customEndDate, 'MMM dd')}`;
+      return `${format(customStartDate, 'dd/MM')} - ${format(customEndDate, 'dd/MM')}`;
     }
     return 'Pick date range';
   };

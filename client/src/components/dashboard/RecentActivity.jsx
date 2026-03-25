@@ -74,7 +74,7 @@ export default function RecentActivity({ data }) {
       case 'draft': return 'bg-gray-100 text-gray-700 border-gray-200';
       case 'confirmed': case 'sent': case 'submitted': return 'bg-blue-100 text-blue-700 border-blue-200';
       case 'delivered': case 'paid': return 'bg-emerald-100 text-emerald-700 border-emerald-200';
-      case 'cancelled': case 'overdue': return 'bg-red-100 text-red-700 border-red-200';
+      case 'cancelled': return 'bg-red-100 text-red-700 border-red-200';
       case 'in_transit': return 'bg-amber-100 text-amber-700 border-amber-200';
       case 'partially_received': return 'bg-orange-100 text-orange-700 border-orange-200';
       default: return 'bg-gray-100 text-gray-700 border-gray-200';
@@ -120,7 +120,7 @@ export default function RecentActivity({ data }) {
                     {activity.status?.replace(/_/g, ' ')}
                   </Badge>
                   <p className="text-xs text-gray-400 mt-1">
-                    {format(activity.date, 'MMM d, HH:mm')}
+                    {format(activity.date, 'dd/MM HH:mm')}
                   </p>
                 </div>
               </div>

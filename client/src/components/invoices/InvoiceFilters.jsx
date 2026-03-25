@@ -30,7 +30,7 @@ export default function InvoiceFilters({ selectedStatuses, setSelectedStatuses, 
                           (paymentStatusFilter && paymentStatusFilter !== 'all');
 
   // Get unique values
-  const uniqueStatuses = ['draft', 'submitted'];
+  const uniqueStatuses = ['draft', 'submitted', 'delivered'];
   const uniqueTaxTreatments = ['standard', 'exempt', 'reverse_charge'];
 
   const handleDateRangeChange = (value) => {
@@ -56,7 +56,7 @@ export default function InvoiceFilters({ selectedStatuses, setSelectedStatuses, 
 
   const formatCustomDateRange = () => {
     if (customStartDate && customEndDate) {
-      return `${format(customStartDate, 'MMM dd')} - ${format(customEndDate, 'MMM dd')}`;
+      return `${format(customStartDate, 'dd/MM')} - ${format(customEndDate, 'dd/MM')}`;
     }
     return 'Pick date range';
   };

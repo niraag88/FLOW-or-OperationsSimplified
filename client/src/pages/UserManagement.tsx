@@ -13,6 +13,7 @@ import { Switch } from '@/components/ui/switch';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { Tabs, TabsList, TabsTrigger, TabsContent } from '@/components/ui/tabs';
 import { UserPlus, Edit, Trash2, Shield, Users, CheckCircle, XCircle, ClipboardList } from 'lucide-react';
+import { formatDate } from '@/utils/dateUtils';
 import { apiRequest } from '@/lib/queryClient';
 import { useToast } from '@/hooks/use-toast';
 import AuditLogTable from '@/components/user-management/AuditLogTable';
@@ -437,10 +438,10 @@ export default function UserManagement() {
                             </div>
                           </TableCell>
                           <TableCell className="text-sm text-gray-500">
-                            {new Date(u.createdAt).toLocaleDateString()}
+                            {formatDate(u.createdAt)}
                           </TableCell>
                           <TableCell className="text-sm text-gray-500">
-                            {u.lastLogin ? new Date(u.lastLogin).toLocaleDateString() : 'Never'}
+                            {u.lastLogin ? formatDate(u.lastLogin) : 'Never'}
                           </TableCell>
                           <TableCell>
                             {isAdmin && (
