@@ -8,10 +8,9 @@ import {
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
 import { Button } from "@/components/ui/button";
-import { MoreHorizontal, Edit2, Download, Trash2, Eye, CheckCircle, RotateCcw, Upload, Paperclip, X } from "lucide-react";
+import { MoreHorizontal, Edit2, Download, Trash2, Eye, CheckCircle, RotateCcw, Upload, Paperclip, X, Printer } from "lucide-react";
 import { useToast } from "@/components/ui/use-toast";
-import { exportToXLSX } from "../utils/export";
-import { format } from 'date-fns';
+import { exportPODetailToXLSX, printPOGRNSummary } from "../utils/export";
 import { PurchaseOrder } from "@/api/entities";
 import SimpleConfirmDialog from "../common/SimpleConfirmDialog";
 import MarkPOPaidDialog from "./MarkPOPaidDialog";
@@ -26,60 +25,19 @@ export default function POActionsDropdown({ po, canEdit, onEdit, onRefresh, curr
 
   const handleExportXLSX = async () => {
     try {
-      const response = await fetch(`/api/purchase-orders/${po.id}/items`);
-      const items = await response.json();
-      
-      const exportData = [];
-      
-      exportData.push({
-        'Document Type': 'PURCHASE ORDER',
-        'PO Number': po.poNumber,
-        'Order Date': format(new Date(po.orderDate), 'yyyy-MM-dd'),
-        'Expected Delivery': po.expectedDelivery ? format(new Date(po.expectedDelivery), 'yyyy-MM-dd') : '',
-        'Currency': po.currency || 'GBP',
-        'Status': po.status
-      });
-
-      exportData.push({});
-
-      exportData.push({
-        'Product Code': 'PRODUCT CODE',
-        'Description': 'DESCRIPTION',
-        'Quantity': 'QTY',
-        'Unit Price': 'UNIT PRICE',
-        'Line Total': 'LINE TOTAL'
-      });
-
-      if (items && items.length > 0) {
-        items.forEach(item => {
-          exportData.push({
-            'Product Code': item.productSku || '',
-            'Description': item.productName || '',
-            'Quantity': item.quantity || 0,
-            'Unit Price': parseFloat(item.unitPrice || 0).toFixed(2),
-            'Line Total': parseFloat(item.lineTotal || 0).toFixed(2)
-          });
-        });
-      }
-
-      exportData.push({});
-
-      exportData.push({
-        'Product Code': '',
-        'Description': '',
-        'Quantity': '',
-        'Unit Price': `TOTAL (${po.currency || 'GBP'}):`,
-        'Line Total': parseFloat(po.totalAmount || 0).toFixed(2)
-      });
-      
-      exportToXLSX(exportData, `Purchase_Order_${po.poNumber}`);
+      await exportPODetailToXLSX(po.id, po.poNumber);
+      toast({ title: 'Export successful', description: `${po.poNumber} exported to Excel.` });
     } catch (error) {
       console.error('Error exporting XLSX:', error);
-      toast({
-        title: 'Export Failed',
-        description: 'Failed to export XLSX. Please try again.',
-        variant: 'destructive'
-      });
+      toast({ title: 'Export Failed', description: 'Failed to export XLSX. Please try again.', variant: 'destructive' });
+    }
+  };
+
+  const handlePrintGRNSummary = async () => {
+    try {
+      await printPOGRNSummary(po.id);
+    } catch {
+      toast({ title: 'Error', description: 'Could not load purchase order details for printing.', variant: 'destructive' });
     }
   };
 
@@ -204,8 +162,14 @@ export default function POActionsDropdown({ po, canEdit, onEdit, onRefresh, curr
           )}
           <DropdownMenuItem onClick={handleViewPrint}>
             <Eye className="w-4 h-4 mr-2" />
-            View & Print
+            View & Print PO
           </DropdownMenuItem>
+          {(po.status === 'closed' || Number(po.receivedQty) > 0) && (
+            <DropdownMenuItem onClick={handlePrintGRNSummary}>
+              <Printer className="w-4 h-4 mr-2" />
+              Print GRN Summary
+            </DropdownMenuItem>
+          )}
           <DropdownMenuItem onClick={handleExportXLSX}>
             <Download className="w-4 h-4 mr-2" />
             Export to XLSX
