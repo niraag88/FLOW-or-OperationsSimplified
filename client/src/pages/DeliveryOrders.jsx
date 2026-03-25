@@ -1,5 +1,6 @@
 
 import React, { useState, useEffect } from "react";
+import { format } from "date-fns";
 import { useAuth } from "@/hooks/useAuth";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -252,7 +253,7 @@ export default function DeliveryOrders() {
             columns={{
               do_number: 'DO Number',
               customer_name: 'Customer',
-              order_date: { label: 'Order Date', transform: (date) => date ? new Date(date).toLocaleDateString('en-GB') : '' },
+              order_date: { label: 'Order Date', transform: (date) => date ? format(new Date(date), 'dd/MM/yy') : '' },
               reference: 'Reference',
               status: 'Status',
               subtotal: { label: 'Subtotal (AED)', transform: (val) => `${val || 0}` },

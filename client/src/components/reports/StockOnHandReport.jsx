@@ -1,5 +1,6 @@
 
 import React, { useState, useMemo } from "react";
+import { format } from "date-fns";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Badge } from "@/components/ui/badge";
@@ -49,7 +50,7 @@ export default function StockOnHandReport({ products, lots, canExport }) {
     location: item.location,
     batch_no: item.batch_no,
     qty_on_hand: item.qty_on_hand,
-    expiry_date: item.expiry_date ? new Date(item.expiry_date).toLocaleDateString('en-GB') : 'N/A',
+    expiry_date: item.expiry_date ? format(new Date(item.expiry_date), 'dd/MM/yy') : 'N/A',
     cost_per_unit: item.cost_per_unit,
     currency: item.currency,
     status: item.is_low_stock ? 'Low Stock' : 'In Stock'
@@ -129,7 +130,7 @@ export default function StockOnHandReport({ products, lots, canExport }) {
                     <TableCell className="font-medium">{item.qty_on_hand}</TableCell>
                     <TableCell>
                       {item.expiry_date
-                        ? new Date(item.expiry_date).toLocaleDateString()
+                        ? format(new Date(item.expiry_date), 'dd/MM/yy')
                         : "N/A"}
                     </TableCell>
                     <TableCell>

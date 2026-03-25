@@ -1,4 +1,5 @@
 import React, { useState, useMemo } from "react";
+import { format } from "date-fns";
 import { Card, CardContent } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -16,7 +17,7 @@ function fmtDate(val) {
   try {
     const d = new Date(val);
     if (isNaN(d)) return "—";
-    return d.toLocaleDateString("en-GB");
+    return format(d, 'dd/MM/yy');
   } catch {
     return "—";
   }

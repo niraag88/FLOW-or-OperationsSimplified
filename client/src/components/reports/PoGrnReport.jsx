@@ -66,7 +66,7 @@ export default function PoGrnReport({ purchaseOrders, goodsReceipts, suppliers =
     if (!dateString) return '-';
     try {
       const date = new Date(dateString);
-      return date && !isNaN(date) ? format(date, 'dd/MM/yyyy') : '-';
+      return date && !isNaN(date) ? format(date, 'dd/MM/yy') : '-';
     } catch {
       return '-';
     }

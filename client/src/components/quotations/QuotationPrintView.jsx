@@ -1,4 +1,5 @@
 import React, { useState, useEffect } from 'react';
+import { format } from 'date-fns';
 import { useNavigate } from 'react-router-dom';
 import "../../styles/print.css";
 
@@ -51,11 +52,7 @@ export default function QuotationPrintView() {
   const formatDate = (dateString) => {
     if (!dateString) return '';
     const date = new Date(dateString);
-    return date.toLocaleDateString('en-GB', { 
-      day: '2-digit', 
-      month: '2-digit', 
-      year: 'numeric' 
-    });
+    return format(date, 'dd/MM/yy');
   };
 
   const formatCurrency = (amount, currency = 'AED') => {

@@ -1,6 +1,12 @@
 import * as XLSX from 'xlsx';
 import jsPDF from 'jspdf';
 import autoTable from 'jspdf-autotable';
+import { format } from 'date-fns';
+
+const fmtShort = (dateStr) => {
+  if (!dateStr) return '';
+  try { return format(new Date(dateStr), 'dd/MM/yy'); } catch { return ''; }
+};
 
 export const exportToCsv = (data, filename) => {
   if (!data || data.length === 0) {
@@ -72,7 +78,7 @@ export const exportToPDF = (data, filename, title = 'Export', columns = null) =>
     
     // Add timestamp
     doc.setFontSize(10);
-    doc.text(`Generated: ${new Date().toLocaleString()}`, 14, 30);
+    doc.text(`Generated: ${format(new Date(), 'dd/MM/yy HH:mm')}`, 14, 30);
     
     // Prepare table data
     const headers = columns || Object.keys(data[0]);
@@ -191,8 +197,7 @@ export const exportQuotationToXLSX = async (quotation) => {
         const row = [line.trim(), '', ''];
         if (index === 0) {
           row.push('Date:');
-          const quotationDate = fullQuotation.quoteDate || fullQuotation.quotation_date ? 
-            new Date(fullQuotation.quoteDate || fullQuotation.quotation_date).toLocaleDateString('en-GB') : '';
+          const quotationDate = fmtShort(fullQuotation.quoteDate || fullQuotation.quotation_date);
           row.push(quotationDate);
         } else if (index === 1) {
           row.push('Customer:');
@@ -209,7 +214,7 @@ export const exportQuotationToXLSX = async (quotation) => {
       const phoneRow = [`Tel: ${companyInfo.phone}`, '', ''];
       if (fullQuotation.referenceDate || fullQuotation.reference_date) {
         phoneRow.push('Reference Date:');
-        const refDate = new Date(fullQuotation.referenceDate || fullQuotation.reference_date).toLocaleDateString('en-GB');
+        const refDate = fmtShort(fullQuotation.referenceDate || fullQuotation.reference_date);
         phoneRow.push(refDate);
       }
       exportData.push(phoneRow);
@@ -349,7 +354,7 @@ export const exportInvoiceToXLSX = async (invoice) => {
     
     // Invoice details
     exportData.push(['Invoice Number:', invoice.invoice_number || '', '', '', '', '', '']);
-    exportData.push(['Invoice Date:', invoice.invoice_date ? new Date(invoice.invoice_date).toLocaleDateString('en-GB') : '', '', '', '', '', '']);
+    exportData.push(['Invoice Date:', fmtShort(invoice.invoice_date), '', '', '', '', '']);
     exportData.push(['Customer:', invoice.customer_name || 'Unknown Customer', '', '', '', '', '']);
     exportData.push(['Reference:', invoice.reference || '', '', '', '', '', '']);
     exportData.push(['Currency:', invoice.currency || 'AED', '', '', '', '', '']);
@@ -440,10 +445,10 @@ export const exportDeliveryOrderToXLSX = async (deliveryOrder) => {
     
     // DO details
     exportData.push(['DO Number:', deliveryOrder.do_number || '', '', '', '', '', '']);
-    exportData.push(['Order Date:', deliveryOrder.order_date ? new Date(deliveryOrder.order_date).toLocaleDateString('en-GB') : '', '', '', '', '', '']);
+    exportData.push(['Order Date:', fmtShort(deliveryOrder.order_date), '', '', '', '', '']);
     exportData.push(['Customer:', deliveryOrder.customer_name || 'Unknown Customer', '', '', '', '', '']);
     exportData.push(['Reference:', deliveryOrder.reference || '', '', '', '', '', '']);
-    exportData.push(['Reference Date:', deliveryOrder.reference_date ? new Date(deliveryOrder.reference_date).toLocaleDateString('en-GB') : '', '', '', '', '', '']);
+    exportData.push(['Reference Date:', fmtShort(deliveryOrder.reference_date), '', '', '', '', '']);
     exportData.push(['Currency:', deliveryOrder.currency || 'AED', '', '', '', '', '']);
     exportData.push(['Status:', deliveryOrder.status || '', '', '', '', '', '']);
     
@@ -637,14 +642,14 @@ export const exportPurchaseOrderToPDF = async (purchaseOrder) => {
     
     rightY += 10;
     doc.text('PO Date', 130, rightY);
-    const orderDate = purchaseOrder.orderDate ? new Date(purchaseOrder.orderDate).toLocaleDateString('en-GB') : '';
+    const orderDate = fmtShort(purchaseOrder.orderDate);
     if (orderDate) {
       doc.text(orderDate, 175, rightY);
     }
 
     rightY += 10;
     doc.text('Expected Delivery', 130, rightY);
-    const expectedDelivery = purchaseOrder.expectedDelivery ? new Date(purchaseOrder.expectedDelivery).toLocaleDateString('en-GB') : '';
+    const expectedDelivery = fmtShort(purchaseOrder.expectedDelivery);
     if (expectedDelivery) {
       doc.text(expectedDelivery, 175, rightY);
     }
@@ -747,7 +752,7 @@ export const printPOGRNSummary = async (poId) => {
   const d = await res.json();
   const currency = d.currency || 'GBP';
   const fmt = (n) => `${currency} ${parseFloat(n || 0).toFixed(2)}`;
-  const fmtDate = (s) => s ? new Date(s).toLocaleDateString('en-GB') : '—';
+  const fmtDate = (s) => fmtShort(s) || '—';
 
   const orderedRows = (d.items || []).map(item => `
     <tr>
@@ -880,7 +885,7 @@ export const printPOGRNSummary = async (poId) => {
   ${reconSection}
 
   <div class="doc-footer">
-    <p>Generated on: ${new Date().toLocaleDateString('en-GB')} at ${new Date().toLocaleTimeString('en-GB')}</p>
+    <p>Generated on: ${format(new Date(), 'dd/MM/yy HH:mm')}</p>
   </div>
 </body>
 </html>`;
@@ -895,7 +900,7 @@ export const exportPODetailToXLSX = async (poId, poNumber) => {
   if (!res.ok) throw new Error('Failed to load PO detail');
   const d = await res.json();
   const currency = d.currency || 'GBP';
-  const fmtDate = (s) => s ? new Date(s).toLocaleDateString('en-GB') : '';
+  const fmtDate = (s) => fmtShort(s);
   const fmtNum = (n) => parseFloat(n || 0).toFixed(2);
 
   const rows = [];

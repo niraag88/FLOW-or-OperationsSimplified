@@ -10,6 +10,7 @@ import { Button } from "@/components/ui/button";
 import { Download, Eye } from "lucide-react";
 import { exportToCsv, exportToXLSX, exportToPDF } from "../utils/export";
 import { formatCurrency } from "@/utils/currency";
+import { format } from "date-fns";
 
 export default function ExportDropdown({ products, activeTab, stockSubTab, stockMovements, lowStockProducts, outOfStockProducts }) {
   const [isExporting, setIsExporting] = useState(false);
@@ -93,7 +94,7 @@ export default function ExportDropdown({ products, activeTab, stockSubTab, stock
             </table>
             
             <div class="print-footer">
-              <p>Generated on: ${new Date().toLocaleDateString('en-GB')} at ${new Date().toLocaleTimeString('en-GB')}</p>
+              <p>Generated on: ${format(new Date(), 'dd/MM/yy HH:mm')}</p>
               <p>Total Products: ${products.length}</p>
             </div>
             
@@ -154,8 +155,8 @@ export default function ExportDropdown({ products, activeTab, stockSubTab, stock
   // Helper function to prepare stock movements export data
   const getStockMovementsExportData = () => {
     return stockMovements.map(movement => ({
-      Date: new Date(movement.createdAt).toLocaleDateString(),
-      Time: new Date(movement.createdAt).toLocaleTimeString(),
+      Date: format(new Date(movement.createdAt), 'dd/MM/yy'),
+      Time: format(new Date(movement.createdAt), 'HH:mm'),
       'Product SKU': movement.productSku,
       'Product Name': movement.productName,
       'Movement Type': movement.movementType,

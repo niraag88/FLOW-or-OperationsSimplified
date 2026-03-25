@@ -131,7 +131,7 @@ export default function ExportDropdown({
             </table>
             
             <div class="print-footer">
-              <p>Generated on: ${new Date().toLocaleDateString('en-GB')} at ${new Date().toLocaleTimeString('en-GB')}</p>
+              <p>Generated on: ${format(new Date(), 'dd/MM/yy HH:mm')}</p>
               <p>Total Records: ${exportData.length}</p>
             </div>
           </body>

@@ -51,7 +51,7 @@ export default function LotsTab({ products, loading, canEdit, currentUser, onRef
       await RecycleBin.create({
         document_type: 'StockCount',
         document_id: selectedStockCount.id,
-        document_number: `Stock Count - ${format(new Date(selectedStockCount.count_date), 'MMM dd, yyyy')}`,
+        document_number: `Stock Count - ${format(new Date(selectedStockCount.count_date), 'dd/MM/yy')}`,
         document_data: selectedStockCount,
         deleted_by: currentUser.email,
         deleted_date: new Date().toISOString(),
@@ -104,7 +104,7 @@ export default function LotsTab({ products, loading, canEdit, currentUser, onRef
 
     // Add header row with stock count info
     const headerData = [{
-      'Product Code': `Stock Count Date: ${format(new Date(stockCount.count_date), 'MMM dd, yyyy')}`,
+      'Product Code': `Stock Count Date: ${format(new Date(stockCount.count_date), 'dd/MM/yy')}`,
       'Brand': `Total Products: ${stockCount.total_products}`,
       'Product Name': `Total Quantity: ${stockCount.total_quantity}`,
       'Size': `Created By: ${stockCount.created_by}`,
@@ -202,7 +202,7 @@ export default function LotsTab({ products, loading, canEdit, currentUser, onRef
                 {stockCounts.map((stockCount) => (
                   <TableRow key={stockCount.id} className="hover:bg-gray-50">
                     <TableCell className="font-medium">
-                      {format(new Date(stockCount.count_date), 'MMM dd, yyyy')}
+                      {format(new Date(stockCount.count_date), 'dd/MM/yy')}
                     </TableCell>
                     <TableCell>
                       <Badge variant="outline">{stockCount.total_products}</Badge>
@@ -216,7 +216,7 @@ export default function LotsTab({ products, loading, canEdit, currentUser, onRef
                       {stockCount.created_by}
                     </TableCell>
                     <TableCell className="text-sm text-gray-500">
-                      {format(new Date(stockCount.updated_at), 'MMM dd, yyyy h:mm a')}
+                      {format(new Date(stockCount.updated_at), 'dd/MM/yy HH:mm')}
                     </TableCell>
                     <TableCell>
                       <div className="flex items-center gap-2">
@@ -267,7 +267,7 @@ export default function LotsTab({ products, loading, canEdit, currentUser, onRef
                 <div className="flex items-start justify-between mb-3">
                   <div>
                     <h3 className="font-semibold text-gray-900">
-                      {format(new Date(stockCount.count_date), 'MMM dd, yyyy')}
+                      {format(new Date(stockCount.count_date), 'dd/MM/yy')}
                     </h3>
                     <p className="text-sm text-gray-600">{stockCount.created_by}</p>
                   </div>
@@ -321,7 +321,7 @@ export default function LotsTab({ products, loading, canEdit, currentUser, onRef
                   <div className="col-span-2">
                     <p className="text-gray-500">Last Modified</p>
                     <p className="text-sm font-medium">
-                      {format(new Date(stockCount.updated_at), 'MMM dd, yyyy h:mm a')}
+                      {format(new Date(stockCount.updated_at), 'dd/MM/yy HH:mm')}
                     </p>
                   </div>
                 </div>
@@ -349,7 +349,7 @@ export default function LotsTab({ products, loading, canEdit, currentUser, onRef
         }}
         onConfirm={handleDeleteStockCount}
         title="Delete Stock Count"
-        description={`Are you sure you want to delete the stock count from ${selectedStockCount ? format(new Date(selectedStockCount.count_date), 'MMM dd, yyyy') : ''}? This will move it to the recycle bin.`}
+        description={`Are you sure you want to delete the stock count from ${selectedStockCount ? format(new Date(selectedStockCount.count_date), 'dd/MM/yy') : ''}? This will move it to the recycle bin.`}
         confirmText="Yes, Delete"
         confirmVariant="destructive"
       />

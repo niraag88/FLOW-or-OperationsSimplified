@@ -4,7 +4,7 @@ import { format } from 'date-fns';
 export default function StockCountTemplate({ data, settings }) {
   const formatDate = (dateString) => {
     if (!dateString) return '';
-    return format(new Date(dateString), 'MMM dd, yyyy');
+    return format(new Date(dateString), 'dd/MM/yy');
   };
 
   return (
@@ -137,7 +137,7 @@ export default function StockCountTemplate({ data, settings }) {
         </div>
         
         <div className="text-center mt-8 text-xs text-gray-500">
-          Generated on {format(new Date(), 'MMM dd, yyyy HH:mm')}
+          Generated on {format(new Date(), 'dd/MM/yy HH:mm')}
         </div>
       </div>
     </div>

@@ -16,6 +16,7 @@ import InvoiceFilters from "../components/invoices/InvoiceFilters";
 import CreateFromExistingDialog from "../components/invoices/CreateFromExistingDialog";
 import { getDerivedInvoiceStatus } from "../components/invoices/invoiceUtils";
 import ExportDropdown from "../components/common/ExportDropdown";
+import { format } from "date-fns";
 
 import InvoiceTemplate from "../components/print/InvoiceTemplate";
 import { createRoot } from 'react-dom/client';
@@ -402,14 +403,14 @@ export default function Invoices() {
             columns={{
               invoiceNumber: 'Invoice Number',
               customerName: 'Customer',
-              invoiceDate: { label: 'Invoice Date', transform: (date) => date ? new Date(date).toLocaleDateString('en-GB') : '' },
+              invoiceDate: { label: 'Invoice Date', transform: (date) => date ? format(new Date(date), 'dd/MM/yy') : '' },
               reference: 'Reference',
               status: { label: 'Status', transform: (val) => val ? val.toUpperCase() : '' },
               vatAmount: { label: 'VAT (AED)', transform: (val, item) => `AED ${parseFloat(val || 0).toFixed(2)}` },
               amount: { label: 'Total (AED)', transform: (val) => `AED ${parseFloat(val || 0).toFixed(2)}` },
               currency: 'Currency',
               paymentStatus: { label: 'Payment Status', transform: (val) => val ? val.charAt(0).toUpperCase() + val.slice(1) : 'Outstanding' },
-              paymentReceivedDate: { label: 'Payment Date', transform: (val) => val ? new Date(val).toLocaleDateString('en-GB') : '' },
+              paymentReceivedDate: { label: 'Payment Date', transform: (val) => val ? format(new Date(val), 'dd/MM/yy') : '' },
               paymentRemarks: { label: 'Payment Remarks', transform: (val) => val || '' }
             }}
             isLoading={loading}

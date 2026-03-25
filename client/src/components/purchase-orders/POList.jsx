@@ -1,4 +1,5 @@
 import React, { useState } from "react";
+import { format } from "date-fns";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Badge } from "@/components/ui/badge";
@@ -58,7 +59,7 @@ export default function POList({ purchaseOrders, totalCount, loading, canEdit, c
   const formatPaymentDate = (dateVal) => {
     if (!dateVal) return null;
     try {
-      return new Date(dateVal).toLocaleDateString('en-GB', { day: '2-digit', month: 'short', year: 'numeric' });
+      return format(new Date(dateVal), 'dd/MM/yy');
     } catch {
       return null;
     }

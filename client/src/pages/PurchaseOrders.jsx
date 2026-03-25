@@ -13,6 +13,7 @@ import GoodsReceiptsTab from "../components/purchase-orders/GoodsReceiptsTab";
 import POFilters from "../components/purchase-orders/POFilters";
 import ExportDropdown from "../components/common/ExportDropdown";
 import POQuickViewModal from "../components/purchase-orders/POQuickViewModal";
+import { format } from "date-fns";
 
 
 export default function PurchaseOrders() {
@@ -216,7 +217,7 @@ export default function PurchaseOrders() {
     brandName: "Brand",
     orderDate: {
       label: "Order Date",
-      transform: (date) => date && !isNaN(new Date(date)) ? new Date(date).toLocaleDateString('en-GB') : ''
+      transform: (date) => date && !isNaN(new Date(date)) ? format(new Date(date), 'dd/MM/yy') : ''
     },
     totalAmount: {
       label: "Total",
@@ -254,7 +255,7 @@ export default function PurchaseOrders() {
             columns={activeTab === 'purchase-orders' ? {
               poNumber: 'PO Number',
               supplierName: 'Supplier',
-              orderDate: { label: 'Order Date', transform: (date) => date ? new Date(date).toLocaleDateString('en-GB') : '' },
+              orderDate: { label: 'Order Date', transform: (date) => date ? format(new Date(date), 'dd/MM/yy') : '' },
               status: { label: 'Status', transform: (val) => val ? val.toUpperCase() : '' },
               currency: 'Currency',
               fxRateToAed: { label: 'FX Rate (to AED)', transform: (val) => val ? parseFloat(val).toFixed(4) : '' },
@@ -268,7 +269,7 @@ export default function PurchaseOrders() {
                 return `AED ${aed.toFixed(2)}`;
               }},
               paymentStatus: { label: 'Payment Status', transform: (val) => val ? val.charAt(0).toUpperCase() + val.slice(1) : 'Outstanding' },
-              paymentMadeDate: { label: 'Payment Date', transform: (val) => val ? new Date(val).toLocaleDateString('en-GB') : '' },
+              paymentMadeDate: { label: 'Payment Date', transform: (val) => val ? format(new Date(val), 'dd/MM/yy') : '' },
               paymentRemarks: { label: 'Payment Remarks', transform: (val) => val || '' }
             } : goodsReceiptsColumns}
             isLoading={loading}

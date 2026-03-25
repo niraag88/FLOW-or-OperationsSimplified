@@ -6,7 +6,7 @@ export default function DOTemplate({ data, customer, settings }) {
     if (!dateString) return '';
     try {
       const date = typeof dateString === 'string' ? parseISO(dateString) : new Date(dateString);
-      return isValid(date) ? format(date, 'dd/MM/yyyy') : '';
+      return isValid(date) ? format(date, 'dd/MM/yy') : '';
     } catch (error) {
       return '';
     }

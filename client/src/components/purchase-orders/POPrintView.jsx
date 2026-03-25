@@ -1,6 +1,7 @@
 import React, { useEffect, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import "../../styles/print.css";
+import { format } from 'date-fns';
 
 export default function POPrintView() {
   const navigate = useNavigate();
@@ -48,11 +49,7 @@ export default function POPrintView() {
   const formatDate = (dateString) => {
     if (!dateString) return '';
     const date = new Date(dateString);
-    return date.toLocaleDateString('en-GB', { 
-      day: '2-digit', 
-      month: '2-digit', 
-      year: 'numeric' 
-    });
+    return format(date, 'dd/MM/yy');
   };
 
   const formatAmount = (amount, currency) => {

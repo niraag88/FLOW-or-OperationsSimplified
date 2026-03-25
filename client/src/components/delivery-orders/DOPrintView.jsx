@@ -2,6 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { useParams } from 'react-router-dom';
 import { DeliveryOrder, CompanySettings } from '@/api/entities';
 import "../../styles/print.css";
+import { format } from 'date-fns';
 
 export default function DOPrintView() {
   const { id } = useParams();
@@ -49,7 +50,7 @@ export default function DOPrintView() {
 
   const formatDate = (dateString) => {
     if (!dateString) return '';
-    return new Date(dateString).toLocaleDateString('en-GB');
+    try { return format(new Date(dateString), 'dd/MM/yy'); } catch { return ''; }
   };
 
   const formatCurrency = (amount, currency = 'AED') => {

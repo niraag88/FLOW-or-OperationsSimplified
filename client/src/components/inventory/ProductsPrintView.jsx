@@ -1,4 +1,5 @@
 import React, { useEffect } from 'react';
+import { format } from 'date-fns';
 
 export default function ProductsPrintView({ products, onClose }) {
   useEffect(() => {
@@ -70,7 +71,7 @@ export default function ProductsPrintView({ products, onClose }) {
       </table>
 
       <div className="print-footer">
-        <p>Generated on: {new Date().toLocaleDateString('en-GB')} at {new Date().toLocaleTimeString('en-GB')}</p>
+        <p>Generated on: {format(new Date(), 'dd/MM/yy HH:mm')}</p>
         <p>Total Products: {products?.length || 0}</p>
       </div>
     </div>

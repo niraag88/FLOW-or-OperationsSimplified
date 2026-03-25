@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import "../../styles/print.css";
+import { format } from 'date-fns';
 
 export default function InvoicePrintView() {
   const { id } = useParams();
@@ -50,11 +51,7 @@ export default function InvoicePrintView() {
   const formatDate = (dateString) => {
     if (!dateString) return '';
     const date = new Date(dateString);
-    return date.toLocaleDateString('en-GB', { 
-      day: '2-digit', 
-      month: '2-digit', 
-      year: 'numeric' 
-    });
+    return format(date, 'dd/MM/yy');
   };
 
   const formatCurrency = (amount, currency = 'AED') => {

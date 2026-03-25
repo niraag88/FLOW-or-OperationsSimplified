@@ -988,7 +988,7 @@ export default function StockTab({ products, loading, canEdit, currentUser, onRe
                     <PopoverTrigger asChild>
                       <Button variant="outline" className="justify-between w-44">
                         {movementDateFilter.start || movementDateFilter.end ? 
-                          `${movementDateFilter.start ? format(new Date(movementDateFilter.start), 'dd/MM/yyyy') : 'Start'} - ${movementDateFilter.end ? format(new Date(movementDateFilter.end), 'dd/MM/yyyy') : 'End'}` : 
+                          `${movementDateFilter.start ? format(new Date(movementDateFilter.start), 'dd/MM/yy') : 'Start'} - ${movementDateFilter.end ? format(new Date(movementDateFilter.end), 'dd/MM/yy') : 'End'}` : 
                           "Date Range"
                         }
                         <ChevronDown className="ml-2 h-4 w-4" />
@@ -1105,7 +1105,7 @@ export default function StockTab({ products, loading, canEdit, currentUser, onRe
                     {paginatedMovements.data.map((movement) => (
                       <TableRow key={movement.id}>
                         <TableCell className="text-sm">
-                          {format(new Date(movement.createdAt), 'dd/MM/yyyy HH:mm')}
+                          {format(new Date(movement.createdAt), 'dd/MM/yy HH:mm')}
                         </TableCell>
                         <TableCell>{movement.brandName || '-'}</TableCell>
                         <TableCell>

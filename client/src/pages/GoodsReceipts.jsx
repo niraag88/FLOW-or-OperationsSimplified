@@ -202,7 +202,7 @@ export default function GoodsReceipts() {
                   <SelectContent>
                     {purchaseOrders.map(po => (
                       <SelectItem key={po.id} value={po.id.toString()}>
-                        {po.poNumber} - {po.supplierName} ({format(new Date(po.orderDate), 'dd/MM/yyyy')})
+                        {po.poNumber} - {po.supplierName} ({format(new Date(po.orderDate), 'dd/MM/yy')})
                       </SelectItem>
                     ))}
                   </SelectContent>
@@ -328,7 +328,7 @@ export default function GoodsReceipts() {
                       PO#{receipt.poId}
                     </TableCell>
                     <TableCell>
-                      {format(new Date(receipt.receivedDate), 'dd/MM/yyyy')}
+                      {format(new Date(receipt.receivedDate), 'dd/MM/yy')}
                     </TableCell>
                     <TableCell>
                       <div className="flex items-center gap-1.5 flex-wrap">

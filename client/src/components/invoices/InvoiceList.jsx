@@ -1,4 +1,5 @@
 import React, { useState } from "react";
+import { format } from "date-fns";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Badge } from "@/components/ui/badge";
@@ -21,7 +22,7 @@ export default function InvoiceList({ invoices, totalCount, loading, canEdit, ca
     try {
       const date = new Date(dateString);
       if (isNaN(date.getTime())) return '-';
-      return date.toLocaleDateString('en-GB', { day: '2-digit', month: 'short', year: 'numeric' });
+      return format(date, 'dd/MM/yy');
     } catch {
       return '-';
     }
@@ -32,7 +33,7 @@ export default function InvoiceList({ invoices, totalCount, loading, canEdit, ca
     try {
       const date = new Date(dateString);
       if (isNaN(date.getTime())) return '-';
-      return date.toLocaleDateString('en-GB', { day: '2-digit', month: '2-digit', year: '2-digit' });
+      return format(date, 'dd/MM/yy');
     } catch {
       return '-';
     }

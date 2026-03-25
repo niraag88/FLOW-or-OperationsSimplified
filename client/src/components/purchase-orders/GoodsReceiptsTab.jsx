@@ -325,7 +325,7 @@ export default function GoodsReceiptsTab({
             <TableCell className="w-[130px]">{po.brandName || 'Unknown Brand'}</TableCell>
             <TableCell className="w-[100px]">
               {po.orderDate && !isNaN(new Date(po.orderDate)) ? 
-                format(new Date(po.orderDate), 'dd/MM/yyyy') : 
+                format(new Date(po.orderDate), 'dd/MM/yy') : 
                 '-'
               }
             </TableCell>
@@ -789,7 +789,7 @@ export default function GoodsReceiptsTab({
   const closedFiltersActive = closedSupplier !== 'all' || !!closedDateFrom || !!closedDateTo || closedDelivery !== 'all';
 
   // Shared column transforms
-  const dateTransform = (date) => date && !isNaN(new Date(date)) ? format(new Date(date), 'dd/MM/yyyy') : '';
+  const dateTransform = (date) => date && !isNaN(new Date(date)) ? format(new Date(date), 'dd/MM/yy') : '';
   const totalTransform = (amount, row) => `${row?.currency || 'GBP'} ${parseFloat(amount || 0).toFixed(2)}`;
   const getAedEquivalent = (po) => {
     const amount = parseFloat(po.totalAmount) || 0;
@@ -988,7 +988,7 @@ export default function GoodsReceiptsTab({
                             <td className="p-2 align-middle" style={{width: '140px'}}>{po.brandName || 'Unknown Brand'}</td>
                             <td className="p-2 align-middle" style={{width: '100px'}}>
                               {po.orderDate && !isNaN(new Date(po.orderDate)) ? 
-                                format(new Date(po.orderDate), 'dd/MM/yyyy') : 
+                                format(new Date(po.orderDate), 'dd/MM/yy') : 
                                 '-'
                               }
                             </td>
@@ -1152,7 +1152,7 @@ export default function GoodsReceiptsTab({
                               <td className="p-2 align-middle" style={{width: '130px'}}>{po.brandName || 'Unknown Brand'}</td>
                               <td className="p-2 align-middle" style={{width: '90px'}}>
                                 {po.orderDate && !isNaN(new Date(po.orderDate)) ? 
-                                  format(new Date(po.orderDate), 'dd/MM/yyyy') : 
+                                  format(new Date(po.orderDate), 'dd/MM/yy') : 
                                   '-'
                                 }
                               </td>
@@ -1267,7 +1267,7 @@ export default function GoodsReceiptsTab({
             <DialogTitle>
               Receive Goods - {selectedPOForReceive?.brandName || 'Unknown Brand'} - {selectedPOForReceive?.poNumber}
               {selectedPOForReceive?.orderDate && !isNaN(new Date(selectedPOForReceive.orderDate)) && 
-                ` - ${format(new Date(selectedPOForReceive.orderDate), 'dd/MM/yyyy')}`
+                ` - ${format(new Date(selectedPOForReceive.orderDate), 'dd/MM/yy')}`
               }
             </DialogTitle>
             <DialogDescription>
