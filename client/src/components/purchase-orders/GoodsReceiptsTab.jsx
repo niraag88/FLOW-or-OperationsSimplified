@@ -6,8 +6,9 @@ import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
-import { ShoppingCart, CheckCircle2, Package, Truck, MoreHorizontal, XCircle, ChevronDown, ChevronRight, Eye, Download, Trash2, FileText, FileSpreadsheet, AlertTriangle, Paperclip, X } from "lucide-react";
+import { ShoppingCart, CheckCircle2, Package, Truck, MoreHorizontal, XCircle, ChevronDown, ChevronRight, Eye, Download, Trash2, FileText, FileSpreadsheet, AlertTriangle, Paperclip, X, RefreshCw } from "lucide-react";
 import UploadFileDialog from "../common/UploadFileDialog";
+import POQuickViewModal from "./POQuickViewModal";
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -56,6 +57,7 @@ export default function GoodsReceiptsTab({
   // State is now managed by parent component for context-aware export
   const [showDeleteDialog, setShowDeleteDialog] = useState(false);
   const [deletingPO, setDeletingPO] = useState(null);
+  const [quickViewPoId, setQuickViewPoId] = useState(null);
   // GRN document attachment state
   const [pendingDocs, setPendingDocs] = useState([null, null, null]);
   const [attachGrnState, setAttachGrnState] = useState(null); // { grnId, slot, receiptNumber }
@@ -284,6 +286,22 @@ export default function GoodsReceiptsTab({
   const handleDeletePO = (po) => {
     setDeletingPO(po);
     setShowDeleteDialog(true);
+  };
+
+  const handleReopenPO = async (po) => {
+    try {
+      const res = await fetch(`/api/purchase-orders/${po.id}/status`, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        credentials: 'include',
+        body: JSON.stringify({ status: 'submitted' }),
+      });
+      if (!res.ok) throw new Error('Failed to re-open purchase order');
+      toast({ title: 'PO Re-opened', description: `${po.poNumber} has been moved back to Open.` });
+      onRefresh();
+    } catch {
+      toast({ title: 'Error', description: 'Could not re-open the purchase order.', variant: 'destructive' });
+    }
   };
 
   const confirmDeletePO = async () => {
@@ -995,7 +1013,26 @@ export default function GoodsReceiptsTab({
                           <React.Fragment key={po.id}>
                             <tr className="border-b transition-colors hover:bg-muted/50">
                               <td className="p-2 align-middle font-medium" style={{width: '130px'}}>
-                                <span>{po.poNumber}</span>
+                                <div className="flex items-center gap-1.5">
+                                  <button
+                                    onClick={() => setQuickViewPoId(po.id)}
+                                    className="text-blue-600 hover:text-blue-800 hover:underline font-medium text-left"
+                                  >
+                                    {po.poNumber}
+                                  </button>
+                                  {isPartial && (
+                                    <Tooltip>
+                                      <TooltipTrigger asChild>
+                                        <span className="inline-flex cursor-default">
+                                          <AlertTriangle className="w-3.5 h-3.5 text-amber-500" />
+                                        </span>
+                                      </TooltipTrigger>
+                                      <TooltipContent side="top">
+                                        <p className="text-xs">Short delivery</p>
+                                      </TooltipContent>
+                                    </Tooltip>
+                                  )}
+                                </div>
                               </td>
                               <td className="p-2 align-middle" style={{width: '130px'}}>{po.brandName || 'Unknown Brand'}</td>
                               <td className="p-2 align-middle" style={{width: '90px'}}>
@@ -1047,13 +1084,22 @@ export default function GoodsReceiptsTab({
                                     </Button>
                                   </DropdownMenuTrigger>
                                   <DropdownMenuContent align="end">
-                                    <DropdownMenuItem onClick={() => handleViewAndPrint(po)}>
+                                    <DropdownMenuItem onClick={() => setQuickViewPoId(po.id)}>
                                       <Eye className="w-4 h-4 mr-2" />
+                                      View Details
+                                    </DropdownMenuItem>
+                                    <DropdownMenuItem onClick={() => handleViewAndPrint(po)}>
+                                      <FileText className="w-4 h-4 mr-2" />
                                       View & Print
                                     </DropdownMenuItem>
                                     <DropdownMenuItem onClick={() => handleExportToXLSX(po)}>
                                       <Download className="w-4 h-4 mr-2" />
                                       Export to XLSX
+                                    </DropdownMenuItem>
+                                    <DropdownMenuSeparator />
+                                    <DropdownMenuItem onClick={() => handleReopenPO(po)}>
+                                      <RefreshCw className="w-4 h-4 mr-2" />
+                                      Re-open PO
                                     </DropdownMenuItem>
                                     <DropdownMenuSeparator />
                                     <DropdownMenuItem 
@@ -1067,149 +1113,6 @@ export default function GoodsReceiptsTab({
                                 </DropdownMenu>
                               </td>
                             </tr>
-                            {poGRNs.length > 0 && poGRNs.map(grn => (
-                              <React.Fragment key={`grn-${grn.id}`}>
-                                <tr className="bg-blue-50/40 border-b text-xs text-gray-600">
-                                  <td className="pl-6 py-1.5 align-middle" style={{width: '130px', paddingRight: '8px'}}>
-                                    <span className="font-mono text-blue-700">{grn.receiptNumber}</span>
-                                  </td>
-                                  <td className="p-1.5 align-middle text-gray-500" style={{width: '130px'}}>
-                                    {grn.receivedDate ? format(new Date(grn.receivedDate), 'dd/MM/yy') : '-'}
-                                  </td>
-                                  <td className="p-1.5 align-middle text-gray-400 italic" colSpan={7}>
-                                    {grn.isPartial ? (
-                                      <span className="inline-flex items-center gap-0.5 text-amber-700 bg-amber-100 border border-amber-200 rounded px-1.5 py-0.5 font-medium not-italic">
-                                        <AlertTriangle className="w-3 h-3" />
-                                        Short delivery
-                                      </span>
-                                    ) : (
-                                      <span className="inline-flex items-center gap-0.5 text-green-700 not-italic">
-                                        <CheckCircle2 className="w-3 h-3" />
-                                        Full delivery
-                                      </span>
-                                    )}
-                                  </td>
-                                  <td className="p-1.5 align-middle" style={{width: '80px'}}>
-                                    <div className="flex gap-1 items-center">
-                                      {[grn.scanKey1, grn.scanKey2, grn.scanKey3].map((key, ki) => {
-                                        const docLabel = ki === 0 ? 'View Supplier Invoice' : `View Supporting Doc ${ki + 1}`;
-                                        return key ? (
-                                          <Tooltip key={ki}>
-                                            <TooltipTrigger asChild>
-                                              <button
-                                                type="button"
-                                                onClick={() => handleViewGrnDoc(key)}
-                                                className={ki === 0 ? 'text-green-600 hover:text-green-800 transition-colors' : 'text-blue-600 hover:text-blue-800 transition-colors'}
-                                              >
-                                                <Paperclip className="w-3.5 h-3.5" />
-                                              </button>
-                                            </TooltipTrigger>
-                                            <TooltipContent>{docLabel}</TooltipContent>
-                                          </Tooltip>
-                                        ) : null;
-                                      })}
-                                    </div>
-                                  </td>
-                                  <td className="p-1.5 align-middle" style={{width: '80px'}}>
-                                    {canEdit && (
-                                      <DropdownMenu>
-                                        <DropdownMenuTrigger asChild>
-                                          <Button variant="ghost" size="sm" className="h-6 w-6 p-0">
-                                            <MoreHorizontal className="w-3 h-3" />
-                                          </Button>
-                                        </DropdownMenuTrigger>
-                                        <DropdownMenuContent align="end">
-                                          {/* Attach: show for each empty slot */}
-                                          {!grn.scanKey1 && (
-                                            <DropdownMenuItem onClick={() => setAttachGrnState({ grnId: grn.id, slot: 1, receiptNumber: grn.receiptNumber })}>
-                                              <Paperclip className="w-3.5 h-3.5 mr-2 text-green-600" />
-                                              Attach Supplier Invoice
-                                            </DropdownMenuItem>
-                                          )}
-                                          {grn.scanKey1 && !grn.scanKey2 && (
-                                            <DropdownMenuItem onClick={() => setAttachGrnState({ grnId: grn.id, slot: 2, receiptNumber: grn.receiptNumber })}>
-                                              <Paperclip className="w-3.5 h-3.5 mr-2 text-blue-600" />
-                                              Attach Supporting Doc 2
-                                            </DropdownMenuItem>
-                                          )}
-                                          {grn.scanKey2 && !grn.scanKey3 && (
-                                            <DropdownMenuItem onClick={() => setAttachGrnState({ grnId: grn.id, slot: 3, receiptNumber: grn.receiptNumber })}>
-                                              <Paperclip className="w-3.5 h-3.5 mr-2 text-blue-600" />
-                                              Attach Supporting Doc 3
-                                            </DropdownMenuItem>
-                                          )}
-                                          {/* Remove: show for each filled slot */}
-                                          {(grn.scanKey1 || grn.scanKey2 || grn.scanKey3) && (
-                                            <DropdownMenuSeparator />
-                                          )}
-                                          {grn.scanKey1 && (
-                                            <DropdownMenuItem className="text-red-600" onClick={() => handleRemoveGrnDoc(grn.id, 1)}>
-                                              <X className="w-3.5 h-3.5 mr-2" />
-                                              Remove Supplier Invoice
-                                            </DropdownMenuItem>
-                                          )}
-                                          {grn.scanKey2 && (
-                                            <DropdownMenuItem className="text-red-600" onClick={() => handleRemoveGrnDoc(grn.id, 2)}>
-                                              <X className="w-3.5 h-3.5 mr-2" />
-                                              Remove Supporting Doc 2
-                                            </DropdownMenuItem>
-                                          )}
-                                          {grn.scanKey3 && (
-                                            <DropdownMenuItem className="text-red-600" onClick={() => handleRemoveGrnDoc(grn.id, 3)}>
-                                              <X className="w-3.5 h-3.5 mr-2" />
-                                              Remove Supporting Doc 3
-                                            </DropdownMenuItem>
-                                          )}
-                                        </DropdownMenuContent>
-                                      </DropdownMenu>
-                                    )}
-                                  </td>
-                                </tr>
-                                {grn.items && grn.items.length > 0 && (
-                                  <tr className="bg-slate-50/60 border-b">
-                                    <td colSpan={11} className="p-0">
-                                      <div className="mx-6 my-1.5 border rounded overflow-hidden">
-                                        <table className="w-full text-xs">
-                                          <thead>
-                                            <tr className="bg-slate-100 border-b">
-                                              <th className="px-3 py-1.5 text-left font-medium text-gray-600">Product</th>
-                                              <th className="px-3 py-1.5 text-right font-medium text-gray-600">Ordered</th>
-                                              <th className="px-3 py-1.5 text-right font-medium text-gray-600">Received</th>
-                                              <th className="px-3 py-1.5 text-right font-medium text-gray-600">Unit Price</th>
-                                              <th className="px-3 py-1.5 text-right font-medium text-gray-600">Received Value</th>
-                                              <th className="px-3 py-1.5 text-center font-medium text-gray-600">Note</th>
-                                            </tr>
-                                          </thead>
-                                          <tbody>
-                                            {grn.items.map((item, idx) => {
-                                              const recVal = (parseFloat(item.receivedQuantity || 0) * parseFloat(item.unitPrice || 0)).toFixed(2);
-                                              const short = (item.receivedQuantity ?? 0) < (item.orderedQuantity ?? 0);
-                                              return (
-                                                <tr key={idx} className={`border-b ${short ? 'bg-amber-50/40' : ''}`}>
-                                                  <td className="px-3 py-1 text-gray-800">{item.productName || 'Unknown'}</td>
-                                                  <td className="px-3 py-1 text-right text-gray-700">{item.orderedQuantity ?? 0}</td>
-                                                  <td className="px-3 py-1 text-right text-gray-700">{item.receivedQuantity ?? 0}</td>
-                                                  <td className="px-3 py-1 text-right text-gray-700">{po.currency || 'GBP'} {parseFloat(item.unitPrice || 0).toFixed(2)}</td>
-                                                  <td className="px-3 py-1 text-right text-gray-700">{po.currency || 'GBP'} {recVal}</td>
-                                                  <td className="px-3 py-1 text-center">
-                                                    {short && (
-                                                      <span className="inline-flex items-center gap-0.5 text-amber-700 bg-amber-100 border border-amber-200 rounded px-1 py-0.5 font-medium">
-                                                        <AlertTriangle className="w-2.5 h-2.5" />
-                                                        Short
-                                                      </span>
-                                                    )}
-                                                  </td>
-                                                </tr>
-                                              );
-                                            })}
-                                          </tbody>
-                                        </table>
-                                      </div>
-                                    </td>
-                                  </tr>
-                                )}
-                              </React.Fragment>
-                            ))}
                           </React.Fragment>
                         );
                       })}
@@ -1431,6 +1334,13 @@ export default function GoodsReceiptsTab({
           maxSizeMB={2}
         />
       )}
+
+      {/* PO Quick View Modal */}
+      <POQuickViewModal
+        poId={quickViewPoId}
+        open={!!quickViewPoId}
+        onClose={() => setQuickViewPoId(null)}
+      />
     </>
   );
 }
