@@ -39,9 +39,10 @@ export default function CreateFromExistingDialog({ open, onClose, onDocumentSele
   const loadSubmittedDocuments = async () => {
     setLoading(true);
     try {
-      // Load sent/accepted quotations and submitted invoices with customer data
-      const [quotationsData, invoicesData, customersData] = await Promise.all([
-        Quotation.filter({ status: 'sent,accepted' }, '-updated_date'),
+      // Fetch ALL quotations and filter client-side for eligible statuses
+      // (sent, accepted, submitted) — avoids comma-encoding issues with filter()
+      const [allQuotationsData, invoicesData, customersData] = await Promise.all([
+        Quotation.list(),
         Invoice.filter({ status: 'submitted' }, '-updated_date'),
         Customer.list()
       ]);
@@ -52,13 +53,20 @@ export default function CreateFromExistingDialog({ open, onClose, onDocumentSele
         customerMap[customer.id] = customer.customer_name || customer.name;
       });
 
+      // Client-side filter for eligible quotation statuses
+      const eligibleStatuses = ['sent', 'accepted', 'submitted'];
+      const filteredQuotations = allQuotationsData.filter(quotation => {
+        const status = (quotation.status || '').toLowerCase().trim();
+        return eligibleStatuses.includes(status);
+      });
+
       // Enrich quotations with customer names and sort by date (newest first)
-      const enrichedQuotations = quotationsData
+      const enrichedQuotations = filteredQuotations
         .map(quotation => ({
           ...quotation,
-          customerName: customerMap[quotation.customer_id] || 'Unknown Customer'
+          customerName: customerMap[quotation.customerId || quotation.customer_id] || 'Unknown Customer'
         }))
-        .sort((a, b) => new Date(b.updated_date || b.updatedDate) - new Date(a.updated_date || a.updatedDate));
+        .sort((a, b) => new Date(b.updatedAt || b.createdAt || b.updated_date || b.updatedDate) - new Date(a.updatedAt || a.createdAt || a.updated_date || a.updatedDate));
 
       // Enrich invoices with customer names and sort by date (newest first)
       const enrichedInvoices = invoicesData

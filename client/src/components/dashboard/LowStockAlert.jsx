@@ -8,7 +8,7 @@ export default function LowStockAlert({ products, lowStockThreshold = 6 }) {
   const threshold = parseInt(lowStockThreshold) || 6;
   const allLowStock = (products || []).filter(p => {
     const qty = p.stockQuantity || 0;
-    return qty > 0 && qty <= threshold;
+    return qty <= threshold;
   });
   const lowStockProducts = allLowStock.slice(0, 5);
 
