@@ -1097,10 +1097,17 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  // Optimized endpoint for stock analysis with pre-calculated summaries
+  // Optimized endpoint for stock analysis with pre-calculated summaries.
+  // Uses the saved company-settings lowStockThreshold when no ?threshold= query param is given.
   app.get('/api/products/stock-analysis', requireAuth(), async (req: AuthenticatedRequest, res) => {
     try {
-      const lowStockThreshold = req.query.threshold ? parseInt(String(req.query.threshold)) : 6;
+      let lowStockThreshold: number;
+      if (req.query.threshold) {
+        lowStockThreshold = parseInt(String(req.query.threshold));
+      } else {
+        const settings = await businessStorage.getCompanySettings();
+        lowStockThreshold = settings?.lowStockThreshold ?? 6;
+      }
       const stockData = await businessStorage.getProductsWithStockAnalysis(lowStockThreshold);
       res.json(stockData);
     } catch (error) {

@@ -7,7 +7,7 @@ import { Textarea } from "@/components/ui/textarea";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { useToast } from "@/hooks/use-toast";
 import { Package, Save, Plus, AlertTriangle } from "lucide-react";
-import { apiRequest } from "@/lib/queryClient";
+import { apiRequest, queryClient } from "@/lib/queryClient";
 
 export default function InventorySettings() {
   const [settings, setSettings] = useState({
@@ -84,19 +84,32 @@ export default function InventorySettings() {
   const saveSettings = async () => {
     setIsSaving(true);
     try {
-      await apiRequest("PUT", "/api/company-settings", {
-        lowStockThreshold: parseInt(settings.lowStockThreshold) || 6,
+      const threshold = parseInt(settings.lowStockThreshold) || 6;
+      const res = await apiRequest("PUT", "/api/company-settings", {
+        lowStockThreshold: threshold,
       });
-      
+      if (!res.ok) {
+        const body = await res.json().catch(() => ({}));
+        throw new Error(body?.error || `Server error ${res.status}`);
+      }
+
+      // Invalidate caches so the dashboard and inventory page
+      // immediately reflect the updated threshold without a page refresh.
+      await Promise.all([
+        queryClient.invalidateQueries({ queryKey: ["/api/dashboard"] }),
+        queryClient.invalidateQueries({ queryKey: ["/api/company-settings"] }),
+        queryClient.invalidateQueries({ queryKey: ["/api/products/stock-analysis"] }),
+      ]);
+
       toast({
-        title: "Success",
-        description: "Inventory settings saved successfully",
+        title: "Settings saved",
+        description: `Low stock threshold updated to ${threshold} units. The dashboard will now reflect this change.`,
       });
     } catch (error) {
       console.error("Error saving settings:", error);
       toast({
-        title: "Error",
-        description: "Failed to save inventory settings",
+        title: "Failed to save settings",
+        description: error?.message || "Please try again.",
         variant: "destructive",
       });
     } finally {
