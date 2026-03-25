@@ -17,7 +17,8 @@ export default function Inventory() {
   const [totalProducts, setTotalProducts] = useState(0);
   const [stockCounts, setStockCounts] = useState([]);
   const [loading, setLoading] = useState(true);
-  const [allBrands, setAllBrands] = useState([]);
+  const [uniqueBrands, setUniqueBrands] = useState([]);
+  const [uniqueSizes, setUniqueSizes] = useState([]);
   const [searchTerm, setSearchTerm] = useState("");
   const [activeTab, setActiveTab] = useState("products");
   const [selectedBrands, setSelectedBrands] = useState([]);
@@ -36,15 +37,18 @@ export default function Inventory() {
   const canEdit = ['Admin', 'Manager', 'Staff'].includes(currentUser?.role);
   const canDelete = ['Admin', 'Manager', 'Staff'].includes(currentUser?.role);
 
-  // Load brand list once for filter dropdown
+  // Load filter options (brands + sizes) once on mount
   useEffect(() => {
-    fetch('/api/brands', { credentials: 'include' })
-      .then(r => r.ok ? r.json() : [])
-      .then(data => setAllBrands(Array.isArray(data) ? data : []))
+    fetch('/api/products/filter-options', { credentials: 'include' })
+      .then(r => r.ok ? r.json() : { brands: [], sizes: [] })
+      .then(data => {
+        setUniqueBrands(data.brands || []);
+        setUniqueSizes(data.sizes || []);
+      })
       .catch(() => {});
   }, []);
 
-  // Load products with server-side pagination + search
+  // Load products with server-side pagination, search, and brand/size filters
   useEffect(() => {
     let cancelled = false;
     const fetchProducts = async () => {
@@ -55,6 +59,8 @@ export default function Inventory() {
           pageSize: String(itemsPerPage),
         });
         if (searchTerm) params.set('search', searchTerm);
+        if (selectedBrands.length > 0) params.set('brand', selectedBrands.join(','));
+        if (selectedSizes.length > 0) params.set('size', selectedSizes.join(','));
 
         const [productResp, stockData] = await Promise.all([
           fetch(`/api/products?${params}`, { credentials: 'include' }).then(r => r.json()),
@@ -75,7 +81,7 @@ export default function Inventory() {
     };
     fetchProducts();
     return () => { cancelled = true; };
-  }, [currentPage, itemsPerPage, searchTerm, refreshTrigger]);
+  }, [currentPage, itemsPerPage, searchTerm, selectedBrands, selectedSizes, refreshTrigger]);
 
   const handleRefresh = () => {
     setRefreshTrigger(prev => prev + 1);
@@ -91,26 +97,14 @@ export default function Inventory() {
     setStockSubTabData({ stockMovements, lowStockProducts, outOfStockProducts });
   };
 
-  // Client-side brand/size filter on the current server page
-  const filteredProducts = products.filter(product => {
-    const matchesBrand = selectedBrands.length === 0 || selectedBrands.includes(product.brandName);
-    const matchesSize = selectedSizes.length === 0 || selectedSizes.includes(product.description);
-    return matchesBrand && matchesSize;
-  });
+  // No client-side slicing — server already filtered and paginated
+  const paginatedProducts = products;
 
-  // Pagination is server-side — no slicing
-  const paginatedProducts = filteredProducts;
-
-  // Total pages based on server total
   const totalPages = Math.ceil(totalProducts / itemsPerPage);
   const startIndex = (currentPage - 1) * itemsPerPage;
   const endIndex = startIndex + itemsPerPage;
 
   const resetPagination = () => setCurrentPage(1);
-
-  // Brand list from all brands endpoint; sizes from current page data
-  const uniqueBrands = allBrands.map(b => b.name).filter(Boolean).sort();
-  const uniqueSizes = [...new Set(products.map(p => p.description).filter(Boolean))].sort();
 
   return (
     <div className="space-y-6">
@@ -123,7 +117,7 @@ export default function Inventory() {
         
         <div className="flex items-center gap-3 flex-wrap">
           <ExportDropdown 
-            products={filteredProducts} 
+            products={products} 
             activeTab={activeTab}
             stockSubTab={stockSubTab}
             stockMovements={stockSubTabData.stockMovements}
@@ -159,7 +153,7 @@ export default function Inventory() {
 
         <TabsContent value="products" className="mt-6">
           <ProductsTab 
-            products={filteredProducts}
+            products={products}
             paginatedProducts={paginatedProducts}
             totalProducts={totalProducts}
             loading={loading}
@@ -187,7 +181,7 @@ export default function Inventory() {
 
         <TabsContent value="stock" className="mt-6">
           <StockTab 
-            products={filteredProducts}
+            products={products}
             loading={loading}
             canEdit={canEdit}
             currentUser={currentUser}

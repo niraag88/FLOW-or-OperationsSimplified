@@ -1061,6 +1061,16 @@ export async function registerRoutes(app: Express): Promise<Server> {
   });
 
   // Product management routes
+  app.get('/api/products/filter-options', requireAuth(), async (req: AuthenticatedRequest, res) => {
+    try {
+      const result = await businessStorage.getProductFilterOptions();
+      res.json(result);
+    } catch (error) {
+      console.error('Error fetching product filter options:', error);
+      res.status(500).json({ error: 'Failed to fetch filter options' });
+    }
+  });
+
   app.get('/api/products', requireAuth(), async (req: AuthenticatedRequest, res) => {
     try {
       // SKU exact-match filter (used by PO form product lookup)
@@ -1074,8 +1084,12 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const pageSize = req.query.pageSize ? parseInt(String(req.query.pageSize)) : undefined;
       const search = req.query.search ? String(req.query.search) : undefined;
       const category = req.query.category ? String(req.query.category) : undefined;
+      const brandParam = req.query.brand ? String(req.query.brand) : undefined;
+      const sizeParam = req.query.size ? String(req.query.size) : undefined;
+      const brandNames = brandParam ? brandParam.split(',').map(s => s.trim()).filter(Boolean) : undefined;
+      const sizes = sizeParam ? sizeParam.split(',').map(s => s.trim()).filter(Boolean) : undefined;
 
-      const result = await businessStorage.getProducts({ page, pageSize, search, category });
+      const result = await businessStorage.getProducts({ page, pageSize, search, category, brandNames, sizes });
       res.json(result);
     } catch (error) {
       console.error('Error fetching products:', error);

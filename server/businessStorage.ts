@@ -94,8 +94,26 @@ export class BusinessStorage {
   }
 
   // Product operations
-  async getProducts(params?: { page?: number; pageSize?: number; search?: string; category?: string }): Promise<any> {
-    const { page, pageSize, search, category } = params || {};
+  async getProductFilterOptions(): Promise<{ brands: string[]; sizes: string[] }> {
+    const [brandRows, sizeRows] = await Promise.all([
+      db.selectDistinct({ name: brands.name })
+        .from(products)
+        .innerJoin(brands, eq(products.brandId, brands.id))
+        .where(eq(products.isActive, true))
+        .orderBy(brands.name),
+      db.selectDistinct({ description: products.description })
+        .from(products)
+        .where(and(eq(products.isActive, true), sql`${products.description} IS NOT NULL`))
+        .orderBy(products.description),
+    ]);
+    return {
+      brands: brandRows.map(r => r.name).filter(Boolean) as string[],
+      sizes: sizeRows.map(r => r.description).filter(Boolean) as string[],
+    };
+  }
+
+  async getProducts(params?: { page?: number; pageSize?: number; search?: string; category?: string; brandNames?: string[]; sizes?: string[] }): Promise<any> {
+    const { page, pageSize, search, category, brandNames, sizes } = params || {};
 
     const conditions: any[] = [eq(products.isActive, true)];
     if (search) {
@@ -103,6 +121,12 @@ export class BusinessStorage {
     }
     if (category) {
       conditions.push(eq(products.category, category));
+    }
+    if (brandNames && brandNames.length > 0) {
+      conditions.push(inArray(brands.name, brandNames));
+    }
+    if (sizes && sizes.length > 0) {
+      conditions.push(inArray(products.description, sizes));
     }
     const whereCondition = conditions.length > 0 ? and(...conditions) : undefined;
 
