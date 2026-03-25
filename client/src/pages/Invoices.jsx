@@ -131,11 +131,9 @@ export default function Invoices() {
     handleRefresh();
     if (sourceQuotationId) {
       try {
-        await fetch(`/api/quotations/${sourceQuotationId}/status`, {
+        await fetch(`/api/quotations/${sourceQuotationId}/convert`, {
           method: 'PATCH',
-          headers: { 'Content-Type': 'application/json' },
           credentials: 'include',
-          body: JSON.stringify({ status: 'converted' }),
         });
       } catch (err) {
         console.warn('Could not update source quotation status:', err);

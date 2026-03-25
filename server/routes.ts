@@ -2559,25 +2559,25 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  // PATCH quotation status — accessible to all authenticated users (e.g., Staff converting a quotation to an invoice)
-  app.patch('/api/quotations/:id/status', requireAuth(), async (req: AuthenticatedRequest, res) => {
+  // PATCH quotation/:id/convert — marks a quotation as 'converted' after an invoice is created from it.
+  // Accessible to all authenticated users (Staff can create invoices). Only allows the -> converted
+  // transition from an eligible status; it does NOT allow arbitrary status changes.
+  app.patch('/api/quotations/:id/convert', requireAuth(), async (req: AuthenticatedRequest, res) => {
     try {
       const id = parseInt(req.params.id);
-      const { status } = req.body;
-      if (!status || typeof status !== 'string') {
-        return res.status(400).json({ error: 'status is required' });
+      const [existing] = await db.select({ id: quotations.id, status: quotations.status, quoteNumber: quotations.quoteNumber })
+        .from(quotations).where(eq(quotations.id, id));
+      if (!existing) return res.status(404).json({ error: 'Quotation not found' });
+      const ELIGIBLE = ['draft', 'sent', 'submitted', 'accepted'];
+      if (!ELIGIBLE.includes(existing.status)) {
+        return res.status(409).json({ error: `Quotation is already in status '${existing.status}' and cannot be converted` });
       }
-      const ALLOWED = ['draft', 'sent', 'accepted', 'rejected', 'expired', 'converted'];
-      if (!ALLOWED.includes(status)) {
-        return res.status(400).json({ error: `status must be one of: ${ALLOWED.join(', ')}` });
-      }
-      const updatedQuote = await businessStorage.updateQuotation(id, { status });
-      if (!updatedQuote) return res.status(404).json({ error: 'Quotation not found' });
-      writeAuditLog({ actor: req.user!.id, actorName: req.user?.username || String(req.user!.id), targetId: String(id), targetType: 'quotation', action: 'UPDATE', details: `Quotation #${updatedQuote.quoteNumber} status changed to ${status}` });
+      const updatedQuote = await businessStorage.updateQuotation(id, { status: 'converted' });
+      writeAuditLog({ actor: req.user!.id, actorName: req.user?.username || String(req.user!.id), targetId: String(id), targetType: 'quotation', action: 'UPDATE', details: `Quotation #${existing.quoteNumber} marked as converted (invoice created)` });
       res.json(updatedQuote);
     } catch (error) {
-      console.error('Error updating quotation status:', error);
-      res.status(500).json({ error: 'Failed to update quotation status' });
+      console.error('Error converting quotation:', error);
+      res.status(500).json({ error: 'Failed to convert quotation' });
     }
   });
 
