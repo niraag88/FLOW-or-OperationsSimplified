@@ -17,7 +17,7 @@ import SimpleConfirmDialog from "../common/SimpleConfirmDialog";
 import MarkPOPaidDialog from "./MarkPOPaidDialog";
 import UploadFileDialog from "../common/UploadFileDialog";
 
-export default function POActionsDropdown({ po, canEdit, onEdit, onRefresh }) {
+export default function POActionsDropdown({ po, canEdit, onEdit, onRefresh, currentUser }) {
   const { toast } = useToast();
   const [showDeleteDialog, setShowDeleteDialog] = useState(false);
   const [showMarkPaidDialog, setShowMarkPaidDialog] = useState(false);

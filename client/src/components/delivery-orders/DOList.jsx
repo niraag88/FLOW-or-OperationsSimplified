@@ -125,6 +125,7 @@ export default function DOList({ deliveryOrders, totalCount, loading, canEdit, c
                       canEdit={canEdit}
                       onEdit={onEdit}
                       onRefresh={onRefresh}
+                      currentUser={currentUser}
                     />
                   </TableCell>
                 </TableRow>

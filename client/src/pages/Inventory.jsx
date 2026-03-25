@@ -5,14 +5,8 @@ import { createPageUrl } from "@/utils";
 import { useAuth } from "@/hooks/useAuth";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Button } from "@/components/ui/button";
-import { Input } from "@/components/ui/input";
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
-import { Checkbox } from "@/components/ui/checkbox";
-import { Badge } from "@/components/ui/badge";
-import { Plus, Search, Filter, ChevronDown, X } from "lucide-react";
-import { Product } from "@/api/entities";
-import { StockCount } from "@/api/entities"; // Changed from InventoryLot
+import { Plus } from "lucide-react";
+import { StockCount } from "@/api/entities";
 import ProductsTab from "../components/inventory/ProductsTab";
 import StockTab from "../components/inventory/StockTab";
 import ExportDropdown from "../components/inventory/ExportDropdown";
@@ -20,8 +14,10 @@ import QuickAddProduct from "../components/inventory/QuickAddProduct";
 
 export default function Inventory() {
   const [products, setProducts] = useState([]);
-  const [stockCounts, setStockCounts] = useState([]); // Changed from lots
+  const [totalProducts, setTotalProducts] = useState(0);
+  const [stockCounts, setStockCounts] = useState([]);
   const [loading, setLoading] = useState(true);
+  const [allBrands, setAllBrands] = useState([]);
   const [searchTerm, setSearchTerm] = useState("");
   const [activeTab, setActiveTab] = useState("products");
   const [selectedBrands, setSelectedBrands] = useState([]);
@@ -36,104 +32,85 @@ export default function Inventory() {
     outOfStockProducts: []
   });
 
-  useEffect(() => {
-    loadData();
-  }, [refreshTrigger]);
+  const { user: currentUser } = useAuth();
+  const canEdit = ['Admin', 'Manager', 'Staff'].includes(currentUser?.role);
+  const canDelete = ['Admin', 'Manager', 'Staff'].includes(currentUser?.role);
 
-  const loadData = async () => {
-    setLoading(true);
-    try {
-      const [productsData, stockCountsData] = await Promise.all([
-        Product.list('-updated_date'),
-        Promise.resolve()
-          .then(() => StockCount.list('-created_date'))
-          .catch(() => []),
-      ]);
-      setProducts(productsData);
-      setStockCounts(stockCountsData);
-    } catch (error) {
-      console.error("Error loading inventory data:", error);
-      setProducts([]);
-    } finally {
-      setLoading(false);
-    }
-  };
+  // Load brand list once for filter dropdown
+  useEffect(() => {
+    fetch('/api/brands', { credentials: 'include' })
+      .then(r => r.ok ? r.json() : [])
+      .then(data => setAllBrands(Array.isArray(data) ? data : []))
+      .catch(() => {});
+  }, []);
+
+  // Load products with server-side pagination + search
+  useEffect(() => {
+    let cancelled = false;
+    const fetchProducts = async () => {
+      setLoading(true);
+      try {
+        const params = new URLSearchParams({
+          page: String(currentPage),
+          pageSize: String(itemsPerPage),
+        });
+        if (searchTerm) params.set('search', searchTerm);
+
+        const [productResp, stockData] = await Promise.all([
+          fetch(`/api/products?${params}`, { credentials: 'include' }).then(r => r.json()),
+          Promise.resolve().then(() => StockCount.list('-created_date')).catch(() => []),
+        ]);
+
+        if (!cancelled) {
+          setProducts(productResp.data || []);
+          setTotalProducts(productResp.total || 0);
+          setStockCounts(Array.isArray(stockData) ? stockData : []);
+        }
+      } catch (error) {
+        console.error("Error loading inventory data:", error);
+        if (!cancelled) { setProducts([]); setTotalProducts(0); }
+      } finally {
+        if (!cancelled) setLoading(false);
+      }
+    };
+    fetchProducts();
+    return () => { cancelled = true; };
+  }, [currentPage, itemsPerPage, searchTerm, refreshTrigger]);
 
   const handleRefresh = () => {
     setRefreshTrigger(prev => prev + 1);
   };
 
-  const handleProductAdded = (newProduct) => {
-    setProducts(prev => [newProduct, ...prev]);
-    setTimeout(() => {
-      const element = document.querySelector(`[data-product-id="${newProduct.id}"]`);
-      if (element) {
-        element.classList.add('bg-emerald-50', 'border-emerald-200');
-        setTimeout(() => {
-          element.classList.remove('bg-emerald-50', 'border-emerald-200');
-        }, 5000);
-      }
-    }, 100);
+  const handleProductAdded = () => {
+    setCurrentPage(1);
+    setRefreshTrigger(prev => prev + 1);
   };
 
   const handleStockSubTabChange = (subTab, stockMovements, lowStockProducts, outOfStockProducts) => {
     setStockSubTab(subTab);
-    setStockSubTabData({
-      stockMovements,
-      lowStockProducts,
-      outOfStockProducts
-    });
+    setStockSubTabData({ stockMovements, lowStockProducts, outOfStockProducts });
   };
 
-  const { user: currentUser } = useAuth();
-  const canEdit = ['Admin', 'Manager', 'Staff'].includes(currentUser?.role);
-  const canDelete = ['Admin', 'Manager', 'Staff'].includes(currentUser?.role);
-
+  // Client-side brand/size filter on the current server page
   const filteredProducts = products.filter(product => {
-    const matchesSearch = product.sku?.toLowerCase().includes(searchTerm.toLowerCase()) ||
-                         product.name?.toLowerCase().includes(searchTerm.toLowerCase()) ||
-                         product.description?.toLowerCase().includes(searchTerm.toLowerCase());
-    
     const matchesBrand = selectedBrands.length === 0 || selectedBrands.includes(product.brandName);
     const matchesSize = selectedSizes.length === 0 || selectedSizes.includes(product.description);
-    
-    return matchesSearch && matchesBrand && matchesSize;
+    return matchesBrand && matchesSize;
   });
 
-  // Calculate pagination
-  const totalPages = Math.ceil(filteredProducts.length / itemsPerPage);
+  // Pagination is server-side — no slicing
+  const paginatedProducts = filteredProducts;
+
+  // Total pages based on server total
+  const totalPages = Math.ceil(totalProducts / itemsPerPage);
   const startIndex = (currentPage - 1) * itemsPerPage;
   const endIndex = startIndex + itemsPerPage;
-  const paginatedProducts = filteredProducts.slice(startIndex, endIndex);
 
-  // Reset to first page when filters change
-  const resetPagination = () => {
-    setCurrentPage(1);
-  };
+  const resetPagination = () => setCurrentPage(1);
 
-  // Get unique brands and sizes for filter dropdowns
-  const uniqueBrands = [...new Set(products.map(p => p.brandName).filter(Boolean))].sort();
+  // Brand list from all brands endpoint; sizes from current page data
+  const uniqueBrands = allBrands.map(b => b.name).filter(Boolean).sort();
   const uniqueSizes = [...new Set(products.map(p => p.description).filter(Boolean))].sort();
-
-  // Removed filteredLots as lots state is no longer managed here
-  /*
-  const filteredLots = lots.filter(lot => {
-    const product = products.find(p => p.id === lot.product_id);
-    return (
-      lot.batch_no?.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      lot.location?.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      product?.product_code?.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      product?.product_name?.toLowerCase().includes(searchTerm.toLowerCase())
-    );
-  });
-  */
-  // Removed filteredPOs as purchaseOrders state is no longer managed here
-  /*
-  const filteredPOs = purchaseOrders.filter(po => 
-    po.po_number?.toLowerCase().includes(searchTerm.toLowerCase()) ||
-    po.notes?.toLowerCase().includes(searchTerm.toLowerCase())
-  );
-  */
 
   return (
     <div className="space-y-6">
@@ -173,7 +150,6 @@ export default function Inventory() {
         </div>
       </div>
 
-
       {/* Tabs */}
       <Tabs value={activeTab} onValueChange={setActiveTab} className="w-full">
         <TabsList className="grid w-full max-w-lg grid-cols-2">
@@ -185,6 +161,7 @@ export default function Inventory() {
           <ProductsTab 
             products={filteredProducts}
             paginatedProducts={paginatedProducts}
+            totalProducts={totalProducts}
             loading={loading}
             canEdit={canEdit}
             canDelete={canDelete}

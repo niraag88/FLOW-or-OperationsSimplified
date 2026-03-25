@@ -18,6 +18,7 @@ import SimpleConfirmDialog from "../common/SimpleConfirmDialog";
 export default function ProductsTab({ 
   products, 
   paginatedProducts, 
+  totalProducts,
   loading, 
   canEdit, 
   canDelete, 
@@ -139,7 +140,7 @@ export default function ProductsTab({
         <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
           <CardTitle className="flex items-center gap-2">
             <Package className="w-5 h-5" />
-            Products ({products?.length || 0})
+            Products ({totalProducts || 0})
           </CardTitle>
         </CardHeader>
 
@@ -362,11 +363,11 @@ export default function ProductsTab({
               </div>
 
               {/* Pagination Controls */}
-              {products.length > 0 && (
+              {totalProducts > 0 && (
                 <div className="flex flex-wrap items-center justify-between gap-4 mt-6 pt-4 border-t">
                   <div className="flex items-center gap-2">
                     <span className="text-sm text-gray-700">
-                      Showing {startIndex + 1} to {Math.min(endIndex, products.length)} of {products.length} products
+                      Showing {startIndex + 1} to {Math.min(endIndex, totalProducts)} of {totalProducts} products
                     </span>
                   </div>
                   
@@ -385,7 +386,7 @@ export default function ProductsTab({
                           <SelectItem value="20">20</SelectItem>
                           <SelectItem value="50">50</SelectItem>
                           <SelectItem value="100">100</SelectItem>
-                          <SelectItem value={products.length.toString()}>All</SelectItem>
+                          <SelectItem value="500">500</SelectItem>
                         </SelectContent>
                       </Select>
                     </div>

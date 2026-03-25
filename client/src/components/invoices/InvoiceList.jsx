@@ -230,6 +230,7 @@ export default function InvoiceList({ invoices, totalCount, loading, canEdit, ca
                           canOverride={canOverride}
                           onEdit={onEdit}
                           onRefresh={onRefresh}
+                          currentUser={currentUser}
                         />
                       </TableCell>
                     </TableRow>

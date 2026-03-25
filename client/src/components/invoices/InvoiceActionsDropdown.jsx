@@ -19,7 +19,7 @@ import CreateInvoiceFromQuotationDialog from './CreateInvoiceFromQuotationDialog
 import CreateFromExistingDialog from './CreateFromExistingDialog';
 import UploadFileDialog from "../common/UploadFileDialog";
 
-export default function InvoiceActionsDropdown({ invoice, canEdit, onEdit, onRefresh }) {
+export default function InvoiceActionsDropdown({ invoice, canEdit, onEdit, onRefresh, currentUser }) {
   const { toast } = useToast();
   const [showDeleteDialog, setShowDeleteDialog] = useState(false);
   const [showMarkPaidDialog, setShowMarkPaidDialog] = useState(false);

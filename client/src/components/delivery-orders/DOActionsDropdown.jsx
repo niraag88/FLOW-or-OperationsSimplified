@@ -16,7 +16,7 @@ import SimpleConfirmDialog from "../common/SimpleConfirmDialog";
 import { DeliveryOrder } from "@/api/entities";
 import UploadFileDialog from "../common/UploadFileDialog";
 
-export default function DOActionsDropdown({ doOrder, canEdit, onEdit, onRefresh }) {
+export default function DOActionsDropdown({ doOrder, canEdit, onEdit, onRefresh, currentUser }) {
   const { toast } = useToast();
   const [showDeleteDialog, setShowDeleteDialog] = useState(false);
   const [showUploadDialog, setShowUploadDialog] = useState(false);

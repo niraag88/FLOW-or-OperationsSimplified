@@ -134,6 +134,7 @@ export default function QuotationList({ quotations, totalCount, loading, canEdit
                         canOverride={canOverride}
                         onEdit={onEdit}
                         onRefresh={onRefresh}
+                        currentUser={currentUser}
                       />
                     </TableCell>
                   </TableRow>
