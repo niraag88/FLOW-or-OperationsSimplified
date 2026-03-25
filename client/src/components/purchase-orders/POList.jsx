@@ -13,7 +13,7 @@ import MarkPOPaidDialog from "./MarkPOPaidDialog";
 import POActionsDropdown from "./POActionsDropdown";
 import { formatCurrency } from "@/utils/currency";
 
-export default function POList({ purchaseOrders, totalCount, loading, canEdit, currentUser, onEdit, onRefresh }) {
+export default function POList({ purchaseOrders, totalCount, loading, canEdit, currentUser, onEdit, onRefresh, onQuickView }) {
   const [showReceiveDialog, setShowReceiveDialog] = useState(false);
   const [selectedPO, setSelectedPO] = useState(null);
   const [showEditPaymentDialog, setShowEditPaymentDialog] = useState(false);
@@ -129,7 +129,12 @@ export default function POList({ purchaseOrders, totalCount, loading, canEdit, c
                     <TableRow key={po.id} className="hover:bg-gray-50">
                       <TableCell className="font-medium">
                         <div className="flex items-center gap-1.5">
-                          <span>{po.poNumber}</span>
+                          <button
+                            onClick={() => onQuickView && onQuickView(po.id)}
+                            className="text-blue-600 hover:text-blue-800 hover:underline font-medium text-left transition-colors"
+                          >
+                            {po.poNumber}
+                          </button>
                           {po.supplierScanKey && (
                             <Tooltip>
                               <TooltipTrigger asChild>

@@ -1471,6 +1471,102 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  // GET /api/purchase-orders/:id/detail — full PO detail for Quick View modal
+  // Returns: PO header + items + GRNs (with scan keys + reconciliation items)
+  app.get('/api/purchase-orders/:id/detail', requireAuth(), async (req: AuthenticatedRequest, res) => {
+    try {
+      const poId = parseInt(req.params.id);
+
+      // PO header
+      const po = await businessStorage.getPurchaseOrderById(poId);
+      if (!po) return res.status(404).json({ error: 'Purchase order not found' });
+
+      // Supplier name
+      const [supplierRow] = await db.select({ name: suppliers.name })
+        .from(suppliers).where(eq(suppliers.id, po.supplierId!));
+
+      // PO items
+      const rawItems = await db.select({
+        id: purchaseOrderItems.id,
+        productId: purchaseOrderItems.productId,
+        productName: products.name,
+        productSku: products.sku,
+        productSize: products.size,
+        descriptionOverride: purchaseOrderItems.descriptionOverride,
+        sizeOverride: purchaseOrderItems.sizeOverride,
+        quantity: purchaseOrderItems.quantity,
+        receivedQuantity: purchaseOrderItems.receivedQuantity,
+        unitPrice: purchaseOrderItems.unitPrice,
+        lineTotal: purchaseOrderItems.lineTotal,
+      }).from(purchaseOrderItems)
+        .leftJoin(products, eq(purchaseOrderItems.productId, products.id))
+        .where(eq(purchaseOrderItems.poId, poId));
+
+      const items = rawItems.map(item => ({
+        ...item,
+        productName: item.descriptionOverride ?? item.productName,
+        size: item.sizeOverride ?? item.productSize,
+      }));
+
+      // GRNs linked to this PO (with their scan keys)
+      const grnRows = await db.select({
+        id: goodsReceipts.id,
+        receiptNumber: goodsReceipts.receiptNumber,
+        receivedDate: goodsReceipts.receivedDate,
+        notes: goodsReceipts.notes,
+        scanKey1: goodsReceipts.scanKey1,
+        scanKey2: goodsReceipts.scanKey2,
+        scanKey3: goodsReceipts.scanKey3,
+      }).from(goodsReceipts)
+        .where(eq(goodsReceipts.poId, poId))
+        .orderBy(goodsReceipts.receivedDate);
+
+      // GRN items for reconciliation (received qty × unit price)
+      const grnIds = grnRows.map(g => g.id);
+      let grnItems: any[] = [];
+      if (grnIds.length > 0) {
+        grnItems = await db.select({
+          receiptId: goodsReceiptItems.receiptId,
+          orderedQuantity: goodsReceiptItems.orderedQuantity,
+          receivedQuantity: goodsReceiptItems.receivedQuantity,
+          unitPrice: goodsReceiptItems.unitPrice,
+        }).from(goodsReceiptItems)
+          .where(inArray(goodsReceiptItems.receiptId, grnIds));
+      }
+
+      // Compute reconciliation totals
+      const totalOrdered = items.reduce((s, i) => s + (parseFloat(i.lineTotal as string) || 0), 0);
+      const totalReceivedValue = grnItems.reduce((s, gi) => {
+        const qty = parseFloat(gi.receivedQuantity as string) || 0;
+        const price = parseFloat(gi.unitPrice as string) || 0;
+        return s + qty * price;
+      }, 0);
+
+      const grns = grnRows.map(g => ({
+        ...g,
+        items: grnItems.filter(gi => gi.receiptId === g.id),
+      }));
+
+      const hasGrns = grns.length > 0;
+      res.json({
+        ...po,
+        supplierName: supplierRow?.name || null,
+        items,
+        grns,
+        reconciliation: {
+          hasGrns,
+          originalTotal: totalOrdered,
+          receivedTotal: totalReceivedValue,
+          difference: totalOrdered - totalReceivedValue,
+          isShortDelivery: hasGrns && totalReceivedValue < totalOrdered - 0.005,
+        },
+      });
+    } catch (error) {
+      console.error('Error fetching PO detail:', error);
+      res.status(500).json({ error: 'Failed to fetch purchase order detail' });
+    }
+  });
+
   // Get purchase order items for goods receipt
   app.get('/api/purchase-orders/:id/items', requireAuth(), async (req: AuthenticatedRequest, res) => {
     try {

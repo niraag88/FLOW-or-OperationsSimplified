@@ -9,9 +9,10 @@ import { Plus, Search } from "lucide-react";
 import { PurchaseOrder } from "@/api/entities";
 import POList from "../components/purchase-orders/POList";
 import POForm from "../components/purchase-orders/POForm";
-import GoodsReceiptsTab from "../components/purchase-orders/GoodsReceiptsTab"; // Changed import
+import GoodsReceiptsTab from "../components/purchase-orders/GoodsReceiptsTab";
 import POFilters from "../components/purchase-orders/POFilters";
 import ExportDropdown from "../components/common/ExportDropdown";
+import POQuickViewModal from "../components/purchase-orders/POQuickViewModal";
 
 
 export default function PurchaseOrders() {
@@ -29,6 +30,7 @@ export default function PurchaseOrders() {
     dateRange: "all"
   });
   const [refreshTrigger, setRefreshTrigger] = useState(0);
+  const [quickViewPoId, setQuickViewPoId] = useState(null);
   const [financialYears, setFinancialYears] = useState([]);
   const [financialYearsLoaded, setFinancialYearsLoaded] = useState(false);
   const hasFetchedPOsRef = useRef(false);
@@ -319,6 +321,7 @@ export default function PurchaseOrders() {
             currentUser={currentUser}
             onEdit={handleEditPO}
             onRefresh={handleRefresh}
+            onQuickView={(id) => setQuickViewPoId(id)}
           />
 
           {/* Pagination Controls for POs */}
@@ -427,6 +430,13 @@ export default function PurchaseOrders() {
         editingPO={editingPO}
         currentUser={currentUser}
         onSuccess={handleRefresh}
+      />
+
+      {/* PO Quick View Modal */}
+      <POQuickViewModal
+        poId={quickViewPoId}
+        open={!!quickViewPoId}
+        onClose={() => setQuickViewPoId(null)}
       />
     </div>
   );
