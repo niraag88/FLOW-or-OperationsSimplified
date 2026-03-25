@@ -5,8 +5,9 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
-import { ShoppingCart, CheckCircle2, Package, Truck, MoreHorizontal, XCircle, ChevronDown, ChevronRight, Eye, Download, Trash2, FileText, FileSpreadsheet, AlertTriangle, Paperclip, X, RefreshCw } from "lucide-react";
+import { ShoppingCart, CheckCircle2, Package, Truck, MoreHorizontal, XCircle, ChevronDown, ChevronRight, Eye, Download, Trash2, FileText, FileSpreadsheet, AlertTriangle, Paperclip, X, RefreshCw, Search } from "lucide-react";
 import UploadFileDialog from "../common/UploadFileDialog";
 import POQuickViewModal from "./POQuickViewModal";
 import {
@@ -58,6 +59,11 @@ export default function GoodsReceiptsTab({
   const [showDeleteDialog, setShowDeleteDialog] = useState(false);
   const [deletingPO, setDeletingPO] = useState(null);
   const [quickViewPoId, setQuickViewPoId] = useState(null);
+  // Inline filter state for each section
+  const [openSearch, setOpenSearch] = useState('');
+  const [closedSearch, setClosedSearch] = useState('');
+  const [closedDelivery, setClosedDelivery] = useState('all');
+  const [closedPayment, setClosedPayment] = useState('all');
   // GRN document attachment state
   const [pendingDocs, setPendingDocs] = useState([null, null, null]);
   const [attachGrnState, setAttachGrnState] = useState(null); // { grnId, slot, receiptNumber }
@@ -732,6 +738,37 @@ export default function GoodsReceiptsTab({
   const openPOs = purchaseOrders.filter(po => po.status === 'submitted');
   const closedPOs = purchaseOrders.filter(po => po.status === 'closed');
 
+  const filteredOpenPOs = openSearch.trim()
+    ? openPOs.filter(po => {
+        const q = openSearch.toLowerCase();
+        return po.poNumber?.toLowerCase().includes(q) ||
+               po.supplierName?.toLowerCase().includes(q) ||
+               po.brandName?.toLowerCase().includes(q);
+      })
+    : openPOs;
+
+  const filteredClosedPOs = closedPOs.filter(po => {
+    if (closedSearch.trim()) {
+      const q = closedSearch.toLowerCase();
+      if (!(po.poNumber?.toLowerCase().includes(q) ||
+            po.supplierName?.toLowerCase().includes(q) ||
+            po.brandName?.toLowerCase().includes(q))) return false;
+    }
+    if (closedDelivery !== 'all') {
+      const isPartial = Number(po.orderedQty) > 0 && Number(po.receivedQty) < Number(po.orderedQty);
+      if (closedDelivery === 'short' && !isPartial) return false;
+      if (closedDelivery === 'complete' && isPartial) return false;
+    }
+    if (closedPayment !== 'all') {
+      if (closedPayment === 'paid' && po.paymentStatus !== 'paid') return false;
+      if (closedPayment === 'outstanding' && po.paymentStatus === 'paid') return false;
+    }
+    return true;
+  });
+
+  const openFiltersActive = !!openSearch.trim();
+  const closedFiltersActive = !!closedSearch.trim() || closedDelivery !== 'all' || closedPayment !== 'all';
+
   // Context-aware export data function
   const getContextAwareExportData = () => {
     let exportData = [];
@@ -819,11 +856,36 @@ export default function GoodsReceiptsTab({
                 </Button>
               </CollapsibleTrigger>
               <CollapsibleContent>
+                {/* Open section search */}
+                <div className="mb-3 flex items-center gap-2">
+                  <div className="relative flex-1 max-w-xs">
+                    <Search className="absolute left-2.5 top-2 h-4 w-4 text-gray-400" />
+                    <Input
+                      placeholder="Search PO or supplier..."
+                      value={openSearch}
+                      onChange={e => setOpenSearch(e.target.value)}
+                      className="pl-8 h-8 text-sm"
+                    />
+                    {openSearch && (
+                      <button onClick={() => setOpenSearch('')} className="absolute right-2 top-2 text-gray-400 hover:text-gray-600">
+                        <X className="h-4 w-4" />
+                      </button>
+                    )}
+                  </div>
+                  {openFiltersActive && (
+                    <span className="text-xs text-gray-500">{filteredOpenPOs.length} of {openPOs.length}</span>
+                  )}
+                </div>
                 {openPOs.length === 0 ? (
                   <div className="text-center py-8 text-gray-500 border-2 border-dashed border-gray-200 rounded-lg">
                     <ShoppingCart className="w-12 h-12 mx-auto mb-4 opacity-50" />
                     <p className="font-semibold">No Submitted Purchase Orders</p>
                     <p>There are no purchase orders awaiting goods receipt.</p>
+                  </div>
+                ) : filteredOpenPOs.length === 0 ? (
+                  <div className="text-center py-6 text-gray-500 border-2 border-dashed border-gray-200 rounded-lg">
+                    <p className="font-semibold">No results</p>
+                    <p className="text-sm">No open POs match your search.</p>
                   </div>
                 ) : (
                   <div className="overflow-x-auto border rounded-lg">
@@ -843,7 +905,7 @@ export default function GoodsReceiptsTab({
                         </tr>
                       </thead>
                       <tbody>
-                        {openPOs.map((po) => (
+                        {filteredOpenPOs.map((po) => (
                           <tr key={po.id} className="border-b transition-colors hover:bg-muted/50">
                             <td className="p-2 align-middle font-medium" style={{width: '120px'}}>{po.poNumber}</td>
                             <td className="p-2 align-middle" style={{width: '140px'}}>{po.brandName || 'Unknown Brand'}</td>
@@ -906,7 +968,61 @@ export default function GoodsReceiptsTab({
                 </Button>
               </CollapsibleTrigger>
               <CollapsibleContent className="mt-3">
-                <div className="overflow-x-auto border rounded-lg">
+                {/* Closed section filters */}
+                <div className="flex flex-wrap items-center gap-2 mb-3">
+                  <div className="relative flex-1 min-w-[180px] max-w-xs">
+                    <Search className="absolute left-2.5 top-2 h-4 w-4 text-gray-400" />
+                    <Input
+                      placeholder="Search PO or supplier..."
+                      value={closedSearch}
+                      onChange={e => setClosedSearch(e.target.value)}
+                      className="pl-8 h-8 text-sm"
+                    />
+                    {closedSearch && (
+                      <button onClick={() => setClosedSearch('')} className="absolute right-2 top-2 text-gray-400 hover:text-gray-600">
+                        <X className="h-4 w-4" />
+                      </button>
+                    )}
+                  </div>
+                  <Select value={closedDelivery} onValueChange={setClosedDelivery}>
+                    <SelectTrigger className="h-8 w-38 text-sm">
+                      <SelectValue />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="all">All Deliveries</SelectItem>
+                      <SelectItem value="short">Short Delivery</SelectItem>
+                      <SelectItem value="complete">Complete</SelectItem>
+                    </SelectContent>
+                  </Select>
+                  <Select value={closedPayment} onValueChange={setClosedPayment}>
+                    <SelectTrigger className="h-8 w-38 text-sm">
+                      <SelectValue />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="all">All Payments</SelectItem>
+                      <SelectItem value="outstanding">Outstanding</SelectItem>
+                      <SelectItem value="paid">Paid</SelectItem>
+                    </SelectContent>
+                  </Select>
+                  {closedFiltersActive && (
+                    <span className="text-xs text-gray-500 ml-1">{filteredClosedPOs.length} of {closedPOs.length}</span>
+                  )}
+                  {closedFiltersActive && (
+                    <button
+                      onClick={() => { setClosedSearch(''); setClosedDelivery('all'); setClosedPayment('all'); }}
+                      className="text-xs text-blue-600 hover:text-blue-800 underline"
+                    >
+                      Clear
+                    </button>
+                  )}
+                </div>
+                {filteredClosedPOs.length === 0 ? (
+                  <div className="text-center py-6 text-gray-500 border-2 border-dashed border-gray-200 rounded-lg">
+                    <p className="font-semibold">No results</p>
+                    <p className="text-sm">No closed POs match your filters.</p>
+                  </div>
+                ) : null}
+                <div className={filteredClosedPOs.length === 0 ? 'hidden' : 'overflow-x-auto border rounded-lg'}>
                   <table className="w-full text-sm" style={{tableLayout: 'fixed'}}>
                     <thead>
                       <tr className="border-b bg-muted/50">
@@ -924,7 +1040,7 @@ export default function GoodsReceiptsTab({
                       </tr>
                     </thead>
                     <tbody>
-                      {closedPOs.map((po) => {
+                      {filteredClosedPOs.map((po) => {
                         const poGRNs = (goodsReceipts || []).filter(grn => (grn.poId ?? grn.purchase_order_id) === po.id);
                         const ordQty = getTotalOrderedQuantity(po);
                         const recQty = getTotalReceivedQuantity(po);
