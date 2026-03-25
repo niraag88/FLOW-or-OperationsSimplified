@@ -181,8 +181,8 @@ export default function GoodsReceiptsTab({
 
   // These functions now simply return the server-provided data
   const getLineItemsCount = (po) => po.lineItems || 0;
-  const getTotalOrderedQuantity = (po) => po.orderedQty || 0;
-  const getTotalReceivedQuantity = (po) => po.receivedQty || 0;
+  const getTotalOrderedQuantity = (po) => Number(po.orderedQty) || 0;
+  const getTotalReceivedQuantity = (po) => Number(po.receivedQty) || 0;
 
   // Handler functions for closed PO actions — delegate to shared utilities in export.jsx
   const handleViewAndPrint = async (po) => {
