@@ -51,8 +51,10 @@ export default function QuotationPrintView() {
 
   const formatDate = (dateString) => {
     if (!dateString) return '';
-    const date = new Date(dateString);
-    return format(date, 'dd/MM/yy');
+    try {
+      const date = new Date(dateString);
+      return isNaN(date.getTime()) ? '' : format(date, 'dd/MM/yy');
+    } catch { return ''; }
   };
 
   const formatCurrency = (amount, currency = 'AED') => {

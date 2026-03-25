@@ -50,7 +50,10 @@ export default function DOPrintView() {
 
   const formatDate = (dateString) => {
     if (!dateString) return '';
-    try { return format(new Date(dateString), 'dd/MM/yy'); } catch { return ''; }
+    try {
+      const date = new Date(dateString);
+      return isNaN(date.getTime()) ? '' : format(date, 'dd/MM/yy');
+    } catch { return ''; }
   };
 
   const formatCurrency = (amount, currency = 'AED') => {
