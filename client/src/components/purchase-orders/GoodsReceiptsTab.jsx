@@ -22,7 +22,7 @@ import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, D
 import { Textarea } from "@/components/ui/textarea";
 import { Label } from "@/components/ui/label";
 import ExportDropdown from "../common/ExportDropdown";
-import { exportToXLSX } from "../utils/export";
+import * as XLSX from "xlsx";
 import { format } from "date-fns";
 import { PurchaseOrder } from "@/api/entities";
 import { GoodsReceipt } from "@/api/entities";
@@ -343,38 +343,108 @@ export default function GoodsReceiptsTab({
 
   const handleExportToXLSX = async (po) => {
     try {
-      const response = await fetch(`/api/purchase-orders/${po.id}/items`);
-      const items = response.ok ? await response.json() : [];
+      const res = await fetch(`/api/purchase-orders/${po.id}/detail`, { credentials: 'include' });
+      if (!res.ok) throw new Error('Failed to load PO detail');
+      const d = await res.json();
+      const currency = d.currency || 'GBP';
+      const fmtDate = (s) => s ? new Date(s).toLocaleDateString('en-GB') : '';
+      const fmtNum = (n) => parseFloat(n || 0).toFixed(2);
 
-      const exportData = items.length > 0
-        ? items.map((item) => ({
-            'PO Number': po.poNumber,
-            'Supplier': po.supplierName || po.brandName || '',
-            'Order Date': po.orderDate ? format(new Date(po.orderDate), 'dd/MM/yyyy') : '',
-            'Product Code': item.productCode || item.sku || '',
-            'Product Name': item.productName || item.name || item.description || '',
-            'Qty Ordered': item.quantity,
-            'Qty Received': item.receivedQuantity ?? 0,
-            [`Unit Price (${po.currency || 'GBP'})`]: parseFloat(item.unitPrice || 0).toFixed(2),
-            [`Line Total (${po.currency || 'GBP'})`]: parseFloat(item.lineTotal || 0).toFixed(2),
-            'Status': po.status?.toUpperCase() || '',
-          }))
-        : [{
-            'PO Number': po.poNumber,
-            'Supplier': po.supplierName || po.brandName || '',
-            'Order Date': po.orderDate ? format(new Date(po.orderDate), 'dd/MM/yyyy') : '',
-            [`Total (${po.currency || 'GBP'})`]: parseFloat(po.totalAmount || 0).toFixed(2),
-            'Total (AED)': parseFloat(po.grandTotal || 0).toFixed(2),
-            'Line Items': po.lineItems || 0,
-            'Qty Ordered': po.orderedQty || 0,
-            'Qty Received': po.receivedQty || 0,
-            'Status': po.status?.toUpperCase() || '',
-          }];
+      const rows = [];
 
-      exportToXLSX(exportData, `PO_${po.poNumber}`, 'Purchase Order');
+      // ── Section 1: PO Header ──
+      rows.push(['PURCHASE ORDER', '', '', '']);
+      rows.push([]);
+      rows.push(['PO Number:', d.poNumber || '', '', '']);
+      rows.push(['Supplier:', d.supplierName || '', '', '']);
+      rows.push(['Currency:', currency, '', '']);
+      rows.push(['Order Date:', fmtDate(d.orderDate), '', '']);
+      if (d.expectedDelivery) rows.push(['Expected Delivery:', fmtDate(d.expectedDelivery), '', '']);
+      rows.push(['Status:', (d.status || '').toUpperCase(), '', '']);
+      rows.push(['Payment Status:', (d.paymentStatus || '').toUpperCase(), '', '']);
+      if (d.notes) rows.push(['Notes:', d.notes, '', '']);
+
+      // ── Section 2: Items Ordered ──
+      rows.push([]);
+      rows.push(['ITEMS ORDERED', '', '', '', '', '']);
+      rows.push(['Product', 'SKU', 'Qty Ordered', `Unit Price (${currency})`, `Line Total (${currency})`]);
+      for (const item of (d.items || [])) {
+        rows.push([
+          item.productName || '—',
+          item.productSku || '',
+          item.quantity || 0,
+          fmtNum(item.unitPrice),
+          fmtNum(item.lineTotal),
+        ]);
+      }
+      rows.push(['', '', '', 'Original PO Total:', fmtNum(d.totalAmount)]);
+
+      // ── Sections 3 + 4: GRNs + Reconciliation (only when receipts exist) ──
+      const recon = d.reconciliation;
+      const hasGrns = recon?.hasGrns && d.grns && d.grns.length > 0;
+
+      if (hasGrns) {
+        rows.push([]);
+        rows.push(['GOODS RECEIPTS', '', '', '', '', '']);
+
+        for (const grn of d.grns.filter(g => g.items && g.items.length > 0)) {
+          const grnShort = grn.items.some(
+            i => (parseInt(i.receivedQuantity) || 0) < (parseInt(i.orderedQuantity) || 0)
+          );
+          const grnTotal = grn.items.reduce(
+            (s, i) => s + (parseFloat(i.receivedQuantity) || 0) * (parseFloat(i.unitPrice) || 0), 0
+          );
+          rows.push([]);
+          rows.push([
+            grn.receiptNumber || `GRN-${grn.id}`,
+            grn.receivedDate ? fmtDate(grn.receivedDate) : '',
+            grnShort ? 'Short delivery' : 'Full delivery',
+            '', '',
+          ]);
+          rows.push(['Product', 'SKU', 'Qty Ordered', 'Qty Received', `Unit Price (${currency})`, `Received Value (${currency})`]);
+          for (const item of grn.items) {
+            const recQty = parseInt(item.receivedQuantity) || 0;
+            const ordQty = parseInt(item.orderedQuantity) || 0;
+            const price = parseFloat(item.unitPrice) || 0;
+            rows.push([
+              item.productName || '—',
+              item.productSku || '',
+              ordQty,
+              recQty,
+              fmtNum(price),
+              fmtNum(recQty * price),
+            ]);
+          }
+          rows.push(['', '', '', '', 'Receipt Total:', fmtNum(grnTotal)]);
+        }
+
+        // ── Section 4: Reconciliation ──
+        rows.push([]);
+        rows.push(['RECONCILIATION', '', '', '']);
+        rows.push(['Original PO Value:', fmtNum(recon.originalTotal), '', '']);
+        rows.push(['Received Value:', fmtNum(recon.receivedTotal), '', '']);
+        if (recon.isShortDelivery) {
+          rows.push(['Short by:', fmtNum(recon.difference), '', '']);
+        }
+        rows.push(['Payable Value:', fmtNum(recon.receivedTotal), '', '']);
+      }
+
+      const workbook = XLSX.utils.book_new();
+      const worksheet = XLSX.utils.aoa_to_sheet(rows);
+      worksheet['!cols'] = [
+        { width: 28 },
+        { width: 18 },
+        { width: 14 },
+        { width: 14 },
+        { width: 20 },
+        { width: 22 },
+      ];
+      XLSX.utils.book_append_sheet(workbook, worksheet, 'Purchase Order');
+      XLSX.writeFile(workbook, `PO_${d.poNumber}_${new Date().toISOString().split('T')[0]}.xlsx`);
+
       toast({
         title: "Export successful",
-        description: `${po.poNumber} exported to Excel.`,
+        description: `${d.poNumber} exported to Excel.`,
         variant: "default"
       });
     } catch (error) {
