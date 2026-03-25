@@ -202,6 +202,58 @@ export default function POQuickViewModal({ poId, open, onClose }) {
               )}
             </Section>
 
+            {/* ── Items Received (only if GRNs exist) ── */}
+            {recon?.hasGrns && detail.items && detail.items.length > 0 && (
+              <>
+                <Separator />
+                <Section title="Items Received">
+                  <div className="rounded-md border overflow-hidden">
+                    <Table>
+                      <TableHeader>
+                        <TableRow className="bg-gray-50">
+                          <TableHead>Product</TableHead>
+                          <TableHead className="text-right w-24">Qty Received</TableHead>
+                          <TableHead className="text-right w-32">Unit Price</TableHead>
+                          <TableHead className="text-right w-32">Line Total</TableHead>
+                        </TableRow>
+                      </TableHeader>
+                      <TableBody>
+                        {detail.items.map((item) => {
+                          const receivedQty = parseFloat(item.receivedQuantity) || 0;
+                          const unitPrice = parseFloat(item.unitPrice) || 0;
+                          const receivedLineTotal = receivedQty * unitPrice;
+                          return (
+                            <TableRow key={item.id}>
+                              <TableCell>
+                                <div className="font-medium text-sm">{item.productName || "—"}</div>
+                                {item.size && <div className="text-xs text-gray-500">{item.size}</div>}
+                                {item.productSku && !item.descriptionOverride && (
+                                  <div className="text-xs text-gray-400">{item.productSku}</div>
+                                )}
+                              </TableCell>
+                              <TableCell className="text-right text-sm">{receivedQty}</TableCell>
+                              <TableCell className="text-right text-sm">
+                                {formatCurrency(unitPrice, currency)}
+                              </TableCell>
+                              <TableCell className="text-right text-sm font-medium">
+                                {formatCurrency(receivedLineTotal, currency)}
+                              </TableCell>
+                            </TableRow>
+                          );
+                        })}
+                      </TableBody>
+                    </Table>
+                    <div className="flex justify-end px-4 py-2.5 bg-gray-50 border-t">
+                      <span className="text-sm font-semibold text-gray-700 mr-4">Received Total</span>
+                      <span className="text-sm font-bold">
+                        {formatCurrency(recon.receivedTotal, currency)}
+                      </span>
+                    </div>
+                  </div>
+                </Section>
+              </>
+            )}
+
             {/* ── Reconciliation (only if GRNs exist) ── */}
             {recon?.hasGrns && (
               <>
@@ -238,6 +290,14 @@ export default function POQuickViewModal({ poId, open, onClose }) {
                           </span>
                         </div>
                       )}
+                      <div className={`flex justify-between pt-2 mt-1 border-t ${recon.isShortDelivery ? "border-amber-200" : "border-green-200"}`}>
+                        <span className={`font-semibold text-base ${recon.isShortDelivery ? "text-amber-900" : "text-green-900"}`}>
+                          Payable Value
+                        </span>
+                        <span className={`font-bold text-base ${recon.isShortDelivery ? "text-amber-900" : "text-green-900"}`}>
+                          {formatCurrency(recon.receivedTotal, currency)}
+                        </span>
+                      </div>
                     </div>
                     <p className="text-xs text-gray-500 mt-3">
                       The original PO value is preserved as issued. Reconciliation shows what was actually received against goods receipts.
