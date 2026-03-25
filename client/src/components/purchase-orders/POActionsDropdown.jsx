@@ -167,7 +167,7 @@ export default function POActionsDropdown({ po, canEdit, onEdit, onRefresh, curr
           {(po.status === 'closed' || Number(po.receivedQty) > 0) && (
             <DropdownMenuItem onClick={handlePrintGRNSummary}>
               <Printer className="w-4 h-4 mr-2" />
-              Print GRN Summary
+              View & Print GRN Summary
             </DropdownMenuItem>
           )}
           <DropdownMenuItem onClick={handleExportXLSX}>
