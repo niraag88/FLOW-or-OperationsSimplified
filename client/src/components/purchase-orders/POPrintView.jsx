@@ -77,9 +77,6 @@ export default function POPrintView() {
   }
 
   const currency = poData.currency || 'GBP';
-  const fxRate = parseFloat(poData.fxRateToAed) || 4.85;
-  const totalAmount = parseFloat(poData.totalAmount) || 0;
-  const aedTotal = currency === 'AED' ? totalAmount : totalAmount * fxRate;
 
   return (
     <div className="print-container">
@@ -126,16 +123,6 @@ export default function POPrintView() {
               <span className="po-label">Expected Delivery</span>
               <span className="po-value">{formatDate(poData.expectedDelivery)}</span>
             </div>
-            <div className="po-info-row">
-              <span className="po-label">Currency</span>
-              <span className="po-value">{currency}</span>
-            </div>
-            {currency !== 'AED' && (
-              <div className="po-info-row">
-                <span className="po-label">FX Rate (to AED)</span>
-                <span className="po-value">{fxRate.toFixed(4)}</span>
-              </div>
-            )}
           </div>
         </div>
 
@@ -195,12 +182,6 @@ export default function POPrintView() {
             <span className="totals-label">Total</span>
             <span className="totals-value">{formatAmount(poData.totalAmount, currency)}</span>
           </div>
-          {currency !== 'AED' && (
-            <div className="totals-row">
-              <span className="totals-label">Total (AED equivalent)</span>
-              <span className="totals-value">{formatAmount(aedTotal, 'AED')}</span>
-            </div>
-          )}
         </div>
 
         {/* Payment Confirmation Section */}
