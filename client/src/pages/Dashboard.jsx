@@ -71,11 +71,11 @@ export default function Dashboard() {
       <DashboardStats data={data} />
 
       {/* Quick Actions + Low Stock */}
-      <div className="grid grid-cols-1 xl:grid-cols-3 gap-8">
-        <div className="xl:col-span-2">
+      <div className="grid grid-cols-1 xl:grid-cols-3 gap-8 items-stretch">
+        <div className="xl:col-span-2 flex flex-col">
           <QuickActions />
         </div>
-        <div>
+        <div className="flex flex-col">
           <LowStockAlert products={data.products} lowStockThreshold={lowStockThreshold} />
         </div>
       </div>
