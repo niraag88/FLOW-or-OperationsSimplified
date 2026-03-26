@@ -1,4 +1,6 @@
-import React, { useState, useEffect } from "react";
+import React, { useState } from "react";
+import { useQuery } from "@tanstack/react-query";
+import { queryClient } from "@/lib/queryClient";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Badge } from "@/components/ui/badge";
@@ -8,15 +10,13 @@ import { Textarea } from "@/components/ui/textarea";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
-import { PackageCheck, Plus, Search, Save, TrendingUp, AlertTriangle } from "lucide-react";
+import { PackageCheck, Save, TrendingUp, AlertTriangle } from "lucide-react";
 import { useToast } from "@/components/ui/use-toast";
 import { format } from "date-fns";
 
+const STALE_3MIN = 3 * 60 * 1000;
+
 export default function GoodsReceipts() {
-  const [goodsReceipts, setGoodsReceipts] = useState([]);
-  const [purchaseOrders, setPurchaseOrders] = useState([]);
-  const [loadingReceipts, setLoadingReceipts] = useState(true);
-  const [loadingPOs, setLoadingPOs] = useState(true);
   const [showCreateDialog, setShowCreateDialog] = useState(false);
   const [selectedPO, setSelectedPO] = useState(null);
   const [receivingItems, setReceivingItems] = useState([]);
@@ -24,62 +24,43 @@ export default function GoodsReceipts() {
   const [creating, setCreating] = useState(false);
   const { toast } = useToast();
 
-  useEffect(() => {
-    loadGoodsReceipts();
-    loadPurchaseOrders();
-  }, []);
+  const { data: goodsReceipts = [], isLoading: loadingReceipts } = useQuery({
+    queryKey: ['/api/goods-receipts'],
+    queryFn: async () => {
+      const r = await fetch('/api/goods-receipts', { credentials: 'include' });
+      if (!r.ok) throw new Error('Failed to fetch goods receipts');
+      return r.json();
+    },
+    staleTime: STALE_3MIN,
+  });
 
-  const loadGoodsReceipts = async () => {
-    try {
-      const response = await fetch('/api/goods-receipts', { credentials: 'include' });
-      if (!response.ok) throw new Error('Failed to fetch goods receipts');
-      const data = await response.json();
-      setGoodsReceipts(data);
-    } catch (error) {
-      console.error("Error loading goods receipts:", error);
-      toast({
-        title: "Error",
-        description: "Failed to load goods receipts.",
-        variant: "destructive",
-      });
-    } finally {
-      setLoadingReceipts(false);
-    }
-  };
+  const { data: allPOs, isLoading: loadingPOs } = useQuery({
+    queryKey: ['/api/purchase-orders', 'standalone-grn'],
+    queryFn: async () => {
+      const r = await fetch('/api/purchase-orders', { credentials: 'include' });
+      if (!r.ok) throw new Error('Failed to fetch purchase orders');
+      const result = await r.json();
+      return Array.isArray(result) ? result : (result.data || []);
+    },
+    staleTime: STALE_3MIN,
+  });
 
-  const loadPurchaseOrders = async () => {
-    try {
-      const response = await fetch('/api/purchase-orders', { credentials: 'include' });
-      if (!response.ok) throw new Error('Failed to fetch purchase orders');
-      const data = await response.json();
-      
-      // Only show POs that are confirmed but not fully received
-      const availablePOs = data.filter(po => 
-        po.status === 'confirmed' || po.status === 'sent'
-      );
-      setPurchaseOrders(availablePOs);
-    } catch (error) {
-      console.error("Error loading purchase orders:", error);
-      setPurchaseOrders([]);
-    } finally {
-      setLoadingPOs(false);
-    }
-  };
+  const purchaseOrders = (allPOs || []).filter(po =>
+    po.status === 'confirmed' || po.status === 'sent'
+  );
 
   const handlePOSelection = async (poId) => {
     try {
-      // Get PO items
       const response = await fetch(`/api/purchase-orders/${poId}/items`, { credentials: 'include' });
       if (!response.ok) throw new Error('Failed to fetch PO items');
       const items = await response.json();
-      
+
       const po = purchaseOrders.find(p => p.id === parseInt(poId));
       setSelectedPO(po);
-      
-      // Initialize receiving items with ordered quantities
+
       setReceivingItems(items.map(item => ({
         ...item,
-        receivedQuantity: item.quantity, // Default to ordered quantity
+        receivedQuantity: item.quantity,
         poItemId: item.id
       })));
     } catch (error) {
@@ -94,9 +75,9 @@ export default function GoodsReceipts() {
 
   const handleQuantityChange = (itemId, quantity) => {
     const numQuantity = Math.max(0, parseInt(quantity) || 0);
-    setReceivingItems(prev => 
-      prev.map(item => 
-        item.id === itemId 
+    setReceivingItems(prev =>
+      prev.map(item =>
+        item.id === itemId
           ? { ...item, receivedQuantity: Math.min(numQuantity, item.quantity) }
           : item
       )
@@ -109,7 +90,7 @@ export default function GoodsReceipts() {
     setCreating(true);
     try {
       const itemsToReceive = receivingItems.filter(item => item.receivedQuantity > 0);
-      
+
       if (itemsToReceive.length === 0) {
         toast({
           title: "No Items",
@@ -143,20 +124,20 @@ export default function GoodsReceipts() {
       }
 
       const result = await response.json();
-      
+
       toast({
         title: "Success",
         description: result.message,
       });
 
-      // Reset form and reload data
       setShowCreateDialog(false);
       setSelectedPO(null);
       setReceivingItems([]);
       setNotes("");
-      loadGoodsReceipts();
-      loadPurchaseOrders();
-      
+
+      queryClient.invalidateQueries({ queryKey: ['/api/goods-receipts'] });
+      queryClient.invalidateQueries({ queryKey: ['/api/purchase-orders'] });
+
     } catch (error) {
       console.error("Error creating goods receipt:", error);
       toast({
@@ -177,7 +158,7 @@ export default function GoodsReceipts() {
           <h1 className="text-2xl font-bold text-gray-900">Goods Receipts</h1>
           <p className="text-gray-600">Receive items from purchase orders and update stock automatically</p>
         </div>
-        
+
         <Dialog open={showCreateDialog} onOpenChange={setShowCreateDialog}>
           <DialogTrigger asChild>
             <Button className="bg-emerald-600 hover:bg-emerald-700">
@@ -185,19 +166,18 @@ export default function GoodsReceipts() {
               Receive Goods
             </Button>
           </DialogTrigger>
-          
+
           <DialogContent className="max-w-4xl max-h-[80vh] overflow-y-auto">
             <DialogHeader>
               <DialogTitle>Create Goods Receipt</DialogTitle>
             </DialogHeader>
-            
+
             <div className="space-y-4">
-              {/* PO Selection */}
               <div>
                 <label className="text-sm font-medium">Select Purchase Order</label>
-                <Select onValueChange={handlePOSelection}>
+                <Select onValueChange={handlePOSelection} disabled={loadingPOs}>
                   <SelectTrigger>
-                    <SelectValue placeholder="Choose a purchase order..." />
+                    <SelectValue placeholder={loadingPOs ? "Loading..." : "Choose a purchase order..."} />
                   </SelectTrigger>
                   <SelectContent>
                     {purchaseOrders.map(po => (
@@ -209,7 +189,6 @@ export default function GoodsReceipts() {
                 </Select>
               </div>
 
-              {/* Items to Receive */}
               {selectedPO && (
                 <>
                   <div>
@@ -255,7 +234,6 @@ export default function GoodsReceipts() {
                     </Table>
                   </div>
 
-                  {/* Notes */}
                   <div>
                     <label className="text-sm font-medium">Notes (Optional)</label>
                     <Textarea
@@ -266,16 +244,15 @@ export default function GoodsReceipts() {
                     />
                   </div>
 
-                  {/* Create Button */}
                   <div className="flex justify-end gap-3">
-                    <Button 
-                      variant="outline" 
+                    <Button
+                      variant="outline"
                       onClick={() => setShowCreateDialog(false)}
                       disabled={creating}
                     >
                       Cancel
                     </Button>
-                    <Button 
+                    <Button
                       onClick={handleCreateReceipt}
                       disabled={creating || receivingItems.every(item => item.receivedQuantity === 0)}
                     >
@@ -332,7 +309,7 @@ export default function GoodsReceipts() {
                     </TableCell>
                     <TableCell>
                       <div className="flex items-center gap-1.5 flex-wrap">
-                        <Badge 
+                        <Badge
                           variant={receipt.status === 'confirmed' ? 'default' : 'secondary'}
                           className={receipt.status === 'confirmed' ? 'bg-green-100 text-green-800' : ''}
                         >
@@ -380,7 +357,7 @@ export default function GoodsReceipts() {
             <div>
               <h3 className="font-semibold text-blue-900">Automated Stock Management</h3>
               <p className="text-sm text-blue-700 mt-1">
-                When you receive goods from purchase orders, stock levels are automatically updated. 
+                When you receive goods from purchase orders, stock levels are automatically updated.
                 When you create invoices and process sales, stock is automatically deducted.
               </p>
               <div className="mt-3 text-xs text-blue-600">
