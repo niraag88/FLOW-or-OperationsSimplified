@@ -1563,6 +1563,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
           productId: goodsReceiptItems.productId,
           productName: products.name,
           productSku: products.sku,
+          productSize: products.size,
           orderedQuantity: goodsReceiptItems.orderedQuantity,
           receivedQuantity: goodsReceiptItems.receivedQuantity,
           unitPrice: goodsReceiptItems.unitPrice,

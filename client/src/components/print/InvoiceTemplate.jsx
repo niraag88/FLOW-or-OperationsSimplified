@@ -136,7 +136,10 @@ export default function InvoiceTemplate({ data, customer, settings }) {
                   {/* Corrected cell order to match header */}
                   <td className="py-3 px-4 border-r border-gray-200 font-medium">{item.product_code || '-'}</td>
                   <td className="py-3 px-4 border-r border-gray-200">{item.brand_name || '-'}</td>
-                  <td className="py-3 px-4 border-r border-gray-200">{item.description}</td>
+                  <td className="py-3 px-4 border-r border-gray-200">
+                    <div>{item.description}</div>
+                    {item.size && <div className="text-xs text-gray-400 mt-0.5">{item.size}</div>}
+                  </td>
                   <td className="text-center py-3 px-4 border-r border-gray-200">{item.quantity}</td>
                   <td className="text-right py-3 px-4 border-r border-gray-200">{(item.unit_price || 0).toFixed(2)}</td>
                   <td className="text-right py-3 px-4 font-medium">{(item.line_total || 0).toFixed(2)}</td>

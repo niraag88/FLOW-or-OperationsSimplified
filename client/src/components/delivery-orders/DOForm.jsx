@@ -181,6 +181,7 @@ export default function DOForm({ open, onClose, editingDO, currentUser, onSucces
       product_id: "",
       product_code: "",
       description: "",
+      size: "",
       quantity: 1,
       unit_price: 0,
       line_total: 0
@@ -218,6 +219,7 @@ export default function DOForm({ open, onClose, editingDO, currentUser, onSucces
           ...newItems[index],
           product_code: product.sku || "",
           description: `${product.name || ''}${product.description ? ` - ${product.description}` : ''}`,
+          size: product.size || "",
           unit_price: product.unitPrice || 0
         };
       }
@@ -415,7 +417,7 @@ export default function DOForm({ open, onClose, editingDO, currentUser, onSucces
                             {getFilteredProducts(item.brand_id).map(p => (
                               <SelectItem key={p.id} value={p.id.toString()}>
                                 <div className="flex flex-col">
-                                  <p className="font-medium truncate">{p.name}</p>
+                                  <p className="font-medium truncate">{p.name}{p.size ? ` (${p.size})` : ''}</p>
                                   {p.description && <p className="text-sm text-gray-500">{p.description}</p>}
                                 </div>
                               </SelectItem>

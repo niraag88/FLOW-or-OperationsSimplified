@@ -21,6 +21,7 @@ export default function POTemplate({ data, brand, settings }) {
   const headers = [
     { label: 'Product Code', align: 'left' },
     { label: 'Description', align: 'left' },
+    { label: 'Size', align: 'center' },
     { label: 'Qty', align: 'center' },
     { label: `Unit Price (${data.currency})`, align: 'right' },
     { label: `Line Total (${data.currency})`, align: 'right' }
@@ -67,8 +68,8 @@ export default function POTemplate({ data, brand, settings }) {
         headers={headers}
         items={data.items}
         currency={data.currency}
-        showSize={false}
-        colSpan={5}
+        showSize={true}
+        colSpan={6}
       />
 
       <TotalsSummary

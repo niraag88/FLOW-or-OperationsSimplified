@@ -301,6 +301,7 @@ export default function POQuickViewModal({ poId, open, onClose }) {
                                   <TableRow key={idx} className={isItemShort ? "bg-amber-50/40" : ""}>
                                     <TableCell>
                                       <div className="font-medium text-sm">{item.productName || "—"}</div>
+                                      {item.productSize && <div className="text-xs text-gray-500">{item.productSize}</div>}
                                       {item.productSku && <div className="text-xs text-gray-400">{item.productSku}</div>}
                                     </TableCell>
                                     <TableCell className="text-right text-sm text-gray-500">{ordQty}</TableCell>

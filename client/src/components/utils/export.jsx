@@ -754,17 +754,33 @@ export const printPOGRNSummary = async (poId) => {
   const fmt = (n) => `${currency} ${parseFloat(n || 0).toFixed(2)}`;
   const fmtDate = (s) => fmtShort(s) || '—';
 
+  const productCell = (name, size, sku) =>
+    `${name || '—'}${size ? `<br/><span class="size-text">${size}</span>` : ''}${sku ? `<br/><span class="sku">${sku}</span>` : ''}`;
+
   const orderedRows = (d.items || []).map(item => `
     <tr>
-      <td>${item.productName || '—'}</td>
-      <td>${item.productSku || ''}</td>
+      <td>${productCell(item.productName, item.size, item.productSku)}</td>
       <td class="num">${item.quantity}</td>
       <td class="num">${fmt(item.unitPrice)}</td>
       <td class="num">${fmt(item.lineTotal)}</td>
     </tr>`).join('');
-  const orderedFooter = `<tr class="footer-row"><td colspan="4" class="num-label">Original PO Total</td><td class="num"><strong>${fmt(d.totalAmount)}</strong></td></tr>`;
+  const orderedFooter = `<tr class="footer-row"><td colspan="3" class="num-label">Original PO Total</td><td class="num"><strong>${fmt(d.totalAmount)}</strong></td></tr>`;
 
   const hasGrns = d.grns && d.grns.length > 0 && d.reconciliation?.hasGrns;
+
+  const receivedRows = hasGrns ? (d.items || []).map(item => {
+    const recQty = parseFloat(item.receivedQuantity) || 0;
+    const unitPrice = parseFloat(item.unitPrice) || 0;
+    return `<tr>
+      <td>${productCell(item.productName, item.size, item.productSku)}</td>
+      <td class="num">${recQty}</td>
+      <td class="num">${fmt(unitPrice)}</td>
+      <td class="num">${fmt(recQty * unitPrice)}</td>
+    </tr>`;
+  }).join('') : '';
+  const receivedTotal = hasGrns ? (d.items || []).reduce((s, i) => s + (parseFloat(i.receivedQuantity) || 0) * (parseFloat(i.unitPrice) || 0), 0) : 0;
+  const receivedFooter = `<tr class="footer-row"><td colspan="3" class="num-label">Received Total</td><td class="num"><strong>${fmt(receivedTotal)}</strong></td></tr>`;
+
   const grnSections = hasGrns ? d.grns.filter(g => g.items && g.items.length > 0).map(grn => {
     const grnShort = grn.items.some(i => (parseInt(i.receivedQuantity) || 0) < (parseInt(i.orderedQuantity) || 0));
     const grnTotal = grn.items.reduce((s, i) => s + (parseFloat(i.receivedQuantity) || 0) * (parseFloat(i.unitPrice) || 0), 0);
@@ -773,7 +789,7 @@ export const printPOGRNSummary = async (poId) => {
       const ordQty = parseInt(item.orderedQuantity) || 0;
       const short = recQty < ordQty;
       return `<tr${short ? ' class="short-row"' : ''}>
-        <td>${item.productName || '—'}<br/><span class="sku">${item.productSku || ''}</span></td>
+        <td>${productCell(item.productName, item.productSize, item.productSku)}</td>
         <td class="num">${ordQty}</td>
         <td class="num">${recQty}${short ? ' ⚠' : ''}</td>
         <td class="num">${fmt(item.unitPrice)}</td>
@@ -833,6 +849,7 @@ export const printPOGRNSummary = async (poId) => {
     .data-table .num-label { text-align: right; font-style: italic; color: #555; }
     .footer-row td { background: #f9f9f9; font-weight: 600; }
     .short-row td { background: #fffbeb; }
+    .size-text { font-size: 8pt; color: #666; }
     .sku { font-size: 8pt; color: #888; }
     .grn-header { font-size: 10pt; margin: 0 0 6px; display: flex; align-items: center; gap: 6px; }
     .grn-date { color: #555; font-weight: normal; }
@@ -874,11 +891,20 @@ export const printPOGRNSummary = async (poId) => {
   <div class="section">
     <h2 class="section-title">Items Ordered</h2>
     <table class="data-table">
-      <thead><tr><th>Product</th><th>SKU</th><th class="num">Qty Ordered</th><th class="num">Unit Price</th><th class="num">Line Total</th></tr></thead>
+      <thead><tr><th>Product</th><th class="num">Qty Ordered</th><th class="num">Unit Price</th><th class="num">Line Total</th></tr></thead>
       <tbody>${orderedRows}</tbody>
       <tfoot>${orderedFooter}</tfoot>
     </table>
   </div>
+
+  ${hasGrns ? `<div class="section">
+    <h2 class="section-title">Items Received</h2>
+    <table class="data-table">
+      <thead><tr><th>Product</th><th class="num">Qty Received</th><th class="num">Unit Price</th><th class="num">Received Value</th></tr></thead>
+      <tbody>${receivedRows}</tbody>
+      <tfoot>${receivedFooter}</tfoot>
+    </table>
+  </div>` : ''}
 
   ${hasGrns ? `<div class="section"><h2 class="section-title">Goods Receipts</h2>${grnSections}</div>` : ''}
 

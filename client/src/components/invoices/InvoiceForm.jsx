@@ -215,6 +215,7 @@ export default function InvoiceForm({ open, onClose, editingInvoice, currentUser
       product_id: "",
       product_code: "",
       description: "",
+      size: "",
       quantity: 1,
       unit_price: 0,
       line_total: 0
@@ -262,6 +263,7 @@ export default function InvoiceForm({ open, onClose, editingInvoice, currentUser
           ...newItems[index],
           product_code: product.sku || "",
           description: `${product.name || ''}${product.description ? ` - ${product.description}` : ''}`,
+          size: product.size || "",
           unit_price: product.unitPrice || 0
         };
       }
@@ -507,7 +509,7 @@ export default function InvoiceForm({ open, onClose, editingInvoice, currentUser
                             {getFilteredProducts(item.brand_id).map(p => (
                               <SelectItem key={p.id} value={p.id.toString()}>
                                 <div className="flex flex-col">
-                                  <p className="font-medium truncate">{p.name}</p>
+                                  <p className="font-medium truncate">{p.name}{p.size ? ` (${p.size})` : ''}</p>
                                   {p.description && <p className="text-sm text-gray-500">{p.description}</p>}
                                 </div>
                               </SelectItem>
