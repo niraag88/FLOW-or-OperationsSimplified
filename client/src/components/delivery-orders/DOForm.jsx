@@ -207,6 +207,7 @@ export default function DOForm({ open, onClose, editingDO, currentUser, onSucces
         product_id: "",
         product_code: "",
         description: "",
+        size: "",
         unit_price: 0,
         line_total: 0
       };

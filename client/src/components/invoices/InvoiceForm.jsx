@@ -244,6 +244,7 @@ export default function InvoiceForm({ open, onClose, editingInvoice, currentUser
         product_id: "",
         product_code: "",
         description: "",
+        size: "",
         unit_price: 0,
         line_total: 0
       };
