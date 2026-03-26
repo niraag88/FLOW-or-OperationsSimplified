@@ -327,6 +327,7 @@ export default function InvoiceForm({ open, onClose, editingInvoice, currentUser
           product_id: item.product_id,
           product_code: item.product_code,
           description: item.description,
+          size: item.size || "",
           quantity: parseInt(item.quantity) || 0,
           unit_price: parseFloat(item.unit_price) || 0,
           line_total: parseFloat((item.line_total || 0).toFixed(2))
@@ -519,7 +520,14 @@ export default function InvoiceForm({ open, onClose, editingInvoice, currentUser
                       </div>
 
                       <div className="space-y-2">
-                        <Label>Description</Label>
+                        <div className="flex items-center gap-2">
+                          <Label>Description</Label>
+                          {item.size && (
+                            <span className="text-xs text-gray-500 bg-gray-100 px-1.5 py-0.5 rounded">
+                              {item.size}
+                            </span>
+                          )}
+                        </div>
                         <Input 
                           value={item.description || ''} 
                           onChange={(e) => updateItem(index, 'description', e.target.value)} 

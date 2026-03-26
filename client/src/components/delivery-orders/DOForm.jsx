@@ -427,7 +427,14 @@ export default function DOForm({ open, onClose, editingDO, currentUser, onSucces
                       </div>
 
                       <div className="space-y-2">
-                        <Label>Description</Label>
+                        <div className="flex items-center gap-2">
+                          <Label>Description</Label>
+                          {item.size && (
+                            <span className="text-xs text-gray-500 bg-gray-100 px-1.5 py-0.5 rounded">
+                              {item.size}
+                            </span>
+                          )}
+                        </div>
                         <Input 
                           value={item.description} 
                           onChange={(e) => updateItem(index, 'description', e.target.value)} 
