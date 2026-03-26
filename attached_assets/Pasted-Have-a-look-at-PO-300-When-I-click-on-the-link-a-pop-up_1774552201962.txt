@@ -1,0 +1,19 @@
+Have a look at PO 300. When I click on the link, a pop-up appears and it shows:
+1. the supplier order date currency notes (that's all fine)
+2. items ordered (which is the first table)
+3. items received
+4. goods receipt
+Don't you think there's more information here? There is duplication; it is items ordered and it should be, I guess, items received. I am not against the fact that you are showing goods receipt. Receipts are to show that items received at this and it's based on the goods receipt of this; that's fine.
+The issue, for example, is that when you then compare it, to let's say, when you click on the three dots in actions and you click on view and print GRN summary, it doesn't follow that same format. It shows over here:
+- PO300
+- goods receipt summaries
+- supplier currency
+- order date
+- status
+- closed
+- payment status
+- outstanding INR
+- notes
+You see there is some information here that is different; it is showing more information. The fact that it is the status, the payment status, the notes that it is showing here. Also what it shows you is that the first table is items ordered and the second table is goods receipts. There's no items ordered, then items received, then goods receipt, which is how it is over there.
+Also if you notice in items ordered, it's just the product, then its SKU, quantity ordered, unit price, line total. In goods receipt the item and the SKU number is right underneath it; it doesn't follow that same format. What it's doing is that if the quantity ordered in items ordered and goods receipt is not directly under each other, it is there a bit in cross. We need to see, okay, 60 quantity ordered 60, then quantity received 30 over here. Why is it that the SKU is a separate column here but it's not the same in goods receipt? I'm not against it but then I would like it, ideally, for all the tables to look similar.
+I'm not completely against it but my bigger issue is that by clicking PO 300 the pop-up that pop-up has slightly different information. It has a few purchase order details that are less; the fact that its status, the payment status, the notes are there, but at least the status and payment status. It doesn't follow the same tabular format. Items ordered is correct and then it has items received and then it has goods receipts. I'm not against the extra information that is showing, where it's items ordered and items received, which basically should be the total and then it's based on goods receipt. If there were two, for example, it would show both of them separately and the middle table was basically just a total. I like that but it probably needs two more bits of information that show up here from the Actions View and Print GRN Summary, which are the payment status and the status. This document, the view in print GRN summary, needs to follow the same format as in the pop-up of the additional table of information that is in the middle. Also in the View and Print GRN Summary I would like that it follows the same methodology of product, with the SKU number underneath it, if you would like. I want it both to look relatively similar rather than it displaying slightly different and different ways of showing that information basically.
