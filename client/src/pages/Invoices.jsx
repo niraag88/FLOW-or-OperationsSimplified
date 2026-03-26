@@ -1,5 +1,7 @@
 
 import React, { useState, useEffect } from "react";
+import { useQuery, keepPreviousData } from "@tanstack/react-query";
+import { queryClient } from "@/lib/queryClient";
 import { useAuth } from "@/hooks/useAuth";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -22,12 +24,12 @@ import InvoiceTemplate from "../components/print/InvoiceTemplate";
 import { createRoot } from 'react-dom/client';
 import { useToast } from '@/hooks/use-toast';
 
+const STALE_3MIN = 3 * 60 * 1000;
+
 export default function Invoices() {
-  const [invoices, setInvoices] = useState([]);
   const [customers, setCustomers] = useState([]);
   const [products, setProducts] = useState([]);
   const [brands, setBrands] = useState([]);
-  const [loading, setLoading] = useState(true);
   const [searchTerm, setSearchTerm] = useState("");
   const [showInvoiceForm, setShowInvoiceForm] = useState(false);
   const [editingInvoice, setEditingInvoice] = useState(null);
@@ -37,14 +39,12 @@ export default function Invoices() {
   const [dateRange, setDateRange] = useState("all");
   const [paymentStatusFilter, setPaymentStatusFilter] = useState('all');
   const [showCreateFromExistingDialog, setShowCreateFromExistingDialog] = useState(false);
-  const [refreshTrigger, setRefreshTrigger] = useState(0);
   const [financialYears, setFinancialYears] = useState([]);
   const [sourceQuotationId, setSourceQuotationId] = useState(null);
 
   // Pagination state
   const [currentPage, setCurrentPage] = useState(1);
   const [itemsPerPage, setItemsPerPage] = useState(50);
-  const [totalCount, setTotalCount] = useState(0);
   const [debouncedSearch, setDebouncedSearch] = useState("");
   
   // Toast hook for error handling
@@ -79,42 +79,44 @@ export default function Invoices() {
     return () => clearTimeout(timer);
   }, [searchTerm]);
 
-  useEffect(() => {
-    const params = new URLSearchParams();
-    const isAll = itemsPerPage === 9999;
-    if (!isAll) {
-      params.set('page', String(currentPage));
-      params.set('pageSize', String(itemsPerPage));
-    }
-    if (debouncedSearch) params.set('search', debouncedSearch);
-    if (selectedStatuses.length) params.set('status', selectedStatuses.join(','));
-    if (selectedCustomers.length) params.set('customerId', selectedCustomers.join(','));
-    if (selectedTaxTreatments.length) params.set('taxTreatment', selectedTaxTreatments.join(','));
-    if (paymentStatusFilter && paymentStatusFilter !== 'all') params.set('paymentStatus', paymentStatusFilter);
-    const today = new Date();
-    const toStr = (d) => d.toISOString().split('T')[0];
-    if (dateRange && dateRange !== 'all') {
-      if (dateRange === 'today') { const d = toStr(today); params.set('dateFrom', d); params.set('dateTo', d); }
-      else if (dateRange === 'week') { const s = new Date(today); s.setDate(today.getDate() - today.getDay()); s.setHours(0,0,0,0); params.set('dateFrom', toStr(s)); }
-      else if (dateRange === 'month') params.set('dateFrom', toStr(new Date(today.getFullYear(), today.getMonth(), 1)));
-      else if (dateRange === 'quarter') { const q = Math.floor(today.getMonth() / 3); params.set('dateFrom', toStr(new Date(today.getFullYear(), q * 3, 1))); }
-      else if (typeof dateRange === 'object' && dateRange.type === 'custom') { params.set('dateFrom', toStr(new Date(dateRange.startDate))); params.set('dateTo', toStr(new Date(dateRange.endDate))); }
-    }
-    const closedYears = financialYears.filter(y => y.status === 'Closed');
-    if (closedYears.length > 0) {
-      params.set('excludeYears', closedYears.map(cy => `${cy.startDate},${cy.endDate}`).join(';'));
-    }
-    setLoading(true);
-    fetch(`/api/invoices?${params}`, { credentials: 'include' })
-      .then(r => r.json())
-      .then(result => {
-        const data = Array.isArray(result) ? result : (result.data || []);
-        setInvoices(data);
-        setTotalCount(Array.isArray(result) ? data.length : (result.total || 0));
-      })
-      .catch(err => console.error('Error loading invoices:', err))
-      .finally(() => setLoading(false));
-  }, [currentPage, itemsPerPage, debouncedSearch, selectedStatuses, selectedCustomers, selectedTaxTreatments, dateRange, financialYears, refreshTrigger, paymentStatusFilter]);
+  const excludeYearsKey = financialYears
+    .filter(y => y.status === 'Closed')
+    .map(cy => `${cy.startDate},${cy.endDate}`)
+    .join(';');
+
+  const { data: invoiceResult, isLoading: loading } = useQuery({
+    queryKey: ['/api/invoices', currentPage, itemsPerPage, debouncedSearch, selectedStatuses, selectedCustomers, selectedTaxTreatments, dateRange, excludeYearsKey, paymentStatusFilter],
+    queryFn: async () => {
+      const params = new URLSearchParams();
+      const isAll = itemsPerPage === 9999;
+      if (!isAll) {
+        params.set('page', String(currentPage));
+        params.set('pageSize', String(itemsPerPage));
+      }
+      if (debouncedSearch) params.set('search', debouncedSearch);
+      if (selectedStatuses.length) params.set('status', selectedStatuses.join(','));
+      if (selectedCustomers.length) params.set('customerId', selectedCustomers.join(','));
+      if (selectedTaxTreatments.length) params.set('taxTreatment', selectedTaxTreatments.join(','));
+      if (paymentStatusFilter && paymentStatusFilter !== 'all') params.set('paymentStatus', paymentStatusFilter);
+      const today = new Date();
+      const toStr = (d) => d.toISOString().split('T')[0];
+      if (dateRange && dateRange !== 'all') {
+        if (dateRange === 'today') { const d = toStr(today); params.set('dateFrom', d); params.set('dateTo', d); }
+        else if (dateRange === 'week') { const s = new Date(today); s.setDate(today.getDate() - today.getDay()); s.setHours(0,0,0,0); params.set('dateFrom', toStr(s)); }
+        else if (dateRange === 'month') params.set('dateFrom', toStr(new Date(today.getFullYear(), today.getMonth(), 1)));
+        else if (dateRange === 'quarter') { const q = Math.floor(today.getMonth() / 3); params.set('dateFrom', toStr(new Date(today.getFullYear(), q * 3, 1))); }
+        else if (typeof dateRange === 'object' && dateRange.type === 'custom') { params.set('dateFrom', toStr(new Date(dateRange.startDate))); params.set('dateTo', toStr(new Date(dateRange.endDate))); }
+      }
+      if (excludeYearsKey) params.set('excludeYears', excludeYearsKey);
+      const r = await fetch(`/api/invoices?${params}`, { credentials: 'include' });
+      return r.json();
+    },
+    staleTime: STALE_3MIN,
+    placeholderData: keepPreviousData,
+  });
+
+  const invoices = Array.isArray(invoiceResult) ? invoiceResult : (invoiceResult?.data || []);
+  const totalCount = Array.isArray(invoiceResult) ? invoices.length : (invoiceResult?.total || 0);
 
   // Use preloaded customers for better performance
   const availableCustomers = React.useMemo(() => {
@@ -125,7 +127,7 @@ export default function Invoices() {
   }, [customers]);
 
   const handleRefresh = () => {
-    setRefreshTrigger(prev => prev + 1);
+    queryClient.invalidateQueries({ queryKey: ['/api/invoices'] });
   };
 
   const handleInvoiceSaveSuccess = async () => {

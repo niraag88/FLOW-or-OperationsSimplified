@@ -255,6 +255,7 @@ export const products = pgTable("products", {
   productsSkuIdx: index("products_sku_idx").on(table.sku),
   productsIsActiveIdx: index("products_is_active_idx").on(table.isActive),
   productsCategoryIdx: index("products_category_idx").on(table.category),
+  productsBrandIdx: index("products_brand_id_idx").on(table.brandId),
 }));
 
 // Invoice Line Items table
@@ -363,6 +364,7 @@ export const quotations = pgTable("quotations", {
   updatedAt: timestamp("updated_at").defaultNow().notNull(),
 }, (table) => ({
   quotationsStatusCustomerIdx: index("quotations_status_customer_idx").on(table.status, table.customerId),
+  quotationsCustomerIdx: index("quotations_customer_id_idx").on(table.customerId),
 }));
 
 // Quotation Items table
@@ -539,7 +541,9 @@ export const stockMovements = pgTable("stock_movements", {
   notes: text("notes"),
   createdBy: varchar("created_by").references(() => users.id).notNull(),
   createdAt: timestamp("created_at").defaultNow().notNull(),
-});
+}, (table) => ({
+  stockMovementsProductIdx: index("stock_movements_product_id_idx").on(table.productId),
+}));
 
 // Recycle Bin table for soft deletes
 export const recycleBin = pgTable("recycle_bin", {

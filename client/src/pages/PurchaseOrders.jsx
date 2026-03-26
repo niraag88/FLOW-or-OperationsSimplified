@@ -1,5 +1,7 @@
 
 import React, { useState, useEffect, useRef } from "react";
+import { useQuery, keepPreviousData } from "@tanstack/react-query";
+import { queryClient } from "@/lib/queryClient";
 import { useAuth } from "@/hooks/useAuth";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -15,12 +17,11 @@ import ExportDropdown from "../components/common/ExportDropdown";
 import POQuickViewModal from "../components/purchase-orders/POQuickViewModal";
 import { format } from "date-fns";
 
+const STALE_3MIN = 3 * 60 * 1000;
 
 export default function PurchaseOrders() {
-  const [purchaseOrders, setPurchaseOrders] = useState([]);
   const [allPOs, setAllPOs] = useState([]);
   const [goodsReceipts, setGoodsReceipts] = useState([]);
-  const [loading, setLoading] = useState(true);
   const [searchTerm, setSearchTerm] = useState("");
   const [activeTab, setActiveTab] = useState("purchase-orders");
   const [showPOForm, setShowPOForm] = useState(false);
@@ -30,18 +31,20 @@ export default function PurchaseOrders() {
     supplier: "all",
     dateRange: "all"
   });
-  const [refreshTrigger, setRefreshTrigger] = useState(0);
   const [quickViewPoId, setQuickViewPoId] = useState(null);
   const [financialYears, setFinancialYears] = useState([]);
   const [financialYearsLoaded, setFinancialYearsLoaded] = useState(false);
   const hasFetchedPOsRef = useRef(false);
 
+  // Separate refresh counter only for the GRN tab (raw fetches)
+  const [grnRefreshCount, setGrnRefreshCount] = useState(0);
+
   // Pagination state
   const [currentPage, setCurrentPage] = useState(1);
   const [itemsPerPage, setItemsPerPage] = useState(50);
-  const [totalCount, setTotalCount] = useState(0);
   const [debouncedSearch, setDebouncedSearch] = useState("");
 
+  // Load financial years once on mount
   useEffect(() => {
     fetch('/api/books', { credentials: 'include' })
       .then(r => r.ok ? r.json() : [])
@@ -51,6 +54,53 @@ export default function PurchaseOrders() {
         setFinancialYearsLoaded(true);
       });
   }, []);
+
+  // Compute the closed-years key for the query cache (stable string)
+  const excludeYearsKey = financialYears
+    .filter(y => y.status === 'Closed')
+    .map(cy => `${cy.startDate},${cy.endDate}`)
+    .join(';');
+
+  const buildPoParams = () => {
+    const params = new URLSearchParams();
+    const isAll = itemsPerPage === 9999;
+    if (!isAll) {
+      params.set('page', String(currentPage));
+      params.set('pageSize', String(itemsPerPage));
+    }
+    if (debouncedSearch) params.set('search', debouncedSearch);
+    if (filters.status && filters.status !== 'all') params.set('status', filters.status);
+    if (filters.supplier && filters.supplier !== 'all') params.set('supplierId', String(filters.supplier));
+    if (filters.paymentStatus && filters.paymentStatus !== 'all') params.set('paymentStatus', filters.paymentStatus);
+    const today = new Date();
+    const toStr = (d) => d.toISOString().split('T')[0];
+    if (filters.dateRange && filters.dateRange !== 'all') {
+      const dr = filters.dateRange;
+      if (dr === 'today') { const d = toStr(today); params.set('dateFrom', d); params.set('dateTo', d); }
+      else if (dr === 'week') { const s = new Date(today); s.setDate(today.getDate() - today.getDay()); s.setHours(0,0,0,0); params.set('dateFrom', toStr(s)); }
+      else if (dr === 'month') params.set('dateFrom', toStr(new Date(today.getFullYear(), today.getMonth(), 1)));
+      else if (dr === 'quarter') { const q = Math.floor(today.getMonth() / 3); params.set('dateFrom', toStr(new Date(today.getFullYear(), q * 3, 1))); }
+      else if (typeof dr === 'object' && dr.type === 'custom') { params.set('dateFrom', toStr(new Date(dr.startDate))); params.set('dateTo', toStr(new Date(dr.endDate))); }
+    }
+    if (excludeYearsKey) params.set('excludeYears', excludeYearsKey);
+    return params;
+  };
+
+  // Main PO list — React Query with 3-min cache
+  const { data: poResult, isLoading: loading } = useQuery({
+    queryKey: ['/api/purchase-orders', currentPage, itemsPerPage, debouncedSearch, filters, excludeYearsKey],
+    queryFn: async () => {
+      const params = buildPoParams();
+      const r = await fetch(`/api/purchase-orders?${params}`, { credentials: 'include' });
+      return r.json();
+    },
+    enabled: financialYearsLoaded,
+    staleTime: STALE_3MIN,
+    placeholderData: keepPreviousData,
+  });
+
+  const purchaseOrders = Array.isArray(poResult) ? poResult : (poResult?.data || []);
+  const totalCount = Array.isArray(poResult) ? purchaseOrders.length : (poResult?.total || 0);
 
   const fetchGoodsReceipts = () => {
     fetch('/api/goods-receipts', { credentials: 'include' })
@@ -84,12 +134,12 @@ export default function PurchaseOrders() {
     fetchGoodsReceipts();
   }, [activeTab]);
 
-  // On refresh: re-fetch submitted+closed POs and GRNs if currently on goods-receipts tab
+  // On GRN refresh trigger
   useEffect(() => {
-    if (refreshTrigger === 0 || activeTab !== 'goods-receipts') return;
+    if (grnRefreshCount === 0 || activeTab !== 'goods-receipts') return;
     fetchAllPOsForGRNTab();
     fetchGoodsReceipts();
-  }, [refreshTrigger]);
+  }, [grnRefreshCount]);
 
   useEffect(() => {
     const timer = setTimeout(() => {
@@ -99,46 +149,9 @@ export default function PurchaseOrders() {
     return () => clearTimeout(timer);
   }, [searchTerm]);
 
-  useEffect(() => {
-    if (!financialYearsLoaded) return;
-    const params = new URLSearchParams();
-    const isAll = itemsPerPage === 9999;
-    if (!isAll) {
-      params.set('page', String(currentPage));
-      params.set('pageSize', String(itemsPerPage));
-    }
-    if (debouncedSearch) params.set('search', debouncedSearch);
-    if (filters.status && filters.status !== 'all') params.set('status', filters.status);
-    if (filters.supplier && filters.supplier !== 'all') params.set('supplierId', String(filters.supplier));
-    if (filters.paymentStatus && filters.paymentStatus !== 'all') params.set('paymentStatus', filters.paymentStatus);
-    const today = new Date();
-    const toStr = (d) => d.toISOString().split('T')[0];
-    if (filters.dateRange && filters.dateRange !== 'all') {
-      const dr = filters.dateRange;
-      if (dr === 'today') { const d = toStr(today); params.set('dateFrom', d); params.set('dateTo', d); }
-      else if (dr === 'week') { const s = new Date(today); s.setDate(today.getDate() - today.getDay()); s.setHours(0,0,0,0); params.set('dateFrom', toStr(s)); }
-      else if (dr === 'month') params.set('dateFrom', toStr(new Date(today.getFullYear(), today.getMonth(), 1)));
-      else if (dr === 'quarter') { const q = Math.floor(today.getMonth() / 3); params.set('dateFrom', toStr(new Date(today.getFullYear(), q * 3, 1))); }
-      else if (typeof dr === 'object' && dr.type === 'custom') { params.set('dateFrom', toStr(new Date(dr.startDate))); params.set('dateTo', toStr(new Date(dr.endDate))); }
-    }
-    const closedYears = financialYears.filter(y => y.status === 'Closed');
-    if (closedYears.length > 0) {
-      params.set('excludeYears', closedYears.map(cy => `${cy.startDate},${cy.endDate}`).join(';'));
-    }
-    setLoading(true);
-    fetch(`/api/purchase-orders?${params}`, { credentials: 'include' })
-      .then(r => r.json())
-      .then(result => {
-        const data = Array.isArray(result) ? result : (result.data || []);
-        setPurchaseOrders(data);
-        setTotalCount(Array.isArray(result) ? data.length : (result.total || 0));
-      })
-      .catch(err => console.error('Error loading purchase orders:', err))
-      .finally(() => setLoading(false));
-  }, [financialYearsLoaded, currentPage, itemsPerPage, debouncedSearch, filters, financialYears, refreshTrigger]);
-
   const handleRefresh = () => {
-    setRefreshTrigger(prev => prev + 1);
+    queryClient.invalidateQueries({ queryKey: ['/api/purchase-orders'] });
+    setGrnRefreshCount(prev => prev + 1);
   };
 
   const handleNewPO = () => {
@@ -171,8 +184,7 @@ export default function PurchaseOrders() {
     if (debouncedSearch) params.set('search', debouncedSearch);
     if (filters.status && filters.status !== 'all') params.set('status', filters.status);
     if (filters.supplier && filters.supplier !== 'all') params.set('supplierId', String(filters.supplier));
-    const closedYears = financialYears.filter(y => y.status === 'Closed');
-    if (closedYears.length > 0) params.set('excludeYears', closedYears.map(cy => `${cy.startDate},${cy.endDate}`).join(';'));
+    if (excludeYearsKey) params.set('excludeYears', excludeYearsKey);
     const today = new Date();
     const toStr = (d) => d.toISOString().split('T')[0];
     if (filters.dateRange && filters.dateRange !== 'all') {
@@ -201,15 +213,14 @@ export default function PurchaseOrders() {
     const openPOs = allPOs.filter(po => po.status === 'submitted');
     const closedPOs = allPOs.filter(po => po.status === 'closed');
     
-    // Context-aware export based on expanded sections
     if (showOpenReceipts && !showClosedReceipts) {
-      return openPOs; // Only open
+      return openPOs;
     } else if (!showOpenReceipts && showClosedReceipts) {
-      return closedPOs; // Only closed  
+      return closedPOs;
     } else if (showOpenReceipts && showClosedReceipts) {
-      return [...openPOs, ...closedPOs]; // Both
+      return [...openPOs, ...closedPOs];
     }
-    return []; // Neither expanded
+    return [];
   };
 
   const goodsReceiptsColumns = {
@@ -335,7 +346,6 @@ export default function PurchaseOrders() {
               </div>
               
               <div className="flex items-center gap-4">
-                {/* Items per page selector */}
                 <div className="flex items-center gap-2">
                   <span className="text-sm text-gray-700">Show:</span>
                   <Select value={itemsPerPage.toString()} onValueChange={(value) => {
@@ -354,7 +364,6 @@ export default function PurchaseOrders() {
                   </Select>
                 </div>
                 
-                {/* Page navigation */}
                 {totalPagesPos > 1 && (
                   <div className="flex items-center gap-2">
                     <Button

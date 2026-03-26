@@ -1,11 +1,13 @@
 
 import React, { useState, useEffect } from "react";
+import { useQuery, keepPreviousData } from "@tanstack/react-query";
+import { queryClient } from "@/lib/queryClient";
 import { format } from "date-fns";
 import { useAuth } from "@/hooks/useAuth";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { Plus, Search, FileText } from "lucide-react"; // Added FileText
+import { Plus, Search, FileText } from "lucide-react";
 import { DeliveryOrder } from "@/api/entities";
 import { Customer } from "@/api/entities";
 import { Product } from "@/api/entities";
@@ -14,18 +16,18 @@ import { User } from "@/api/entities";
 import DOList from "../components/delivery-orders/DOList";
 import DOForm from "../components/delivery-orders/DOForm";
 import DOFilters from "../components/delivery-orders/DOFilters";
-import CreateFromExistingDialog from "../components/delivery-orders/CreateFromExistingDialog"; // New import
+import CreateFromExistingDialog from "../components/delivery-orders/CreateFromExistingDialog";
 import ExportDropdown from "../components/common/ExportDropdown";
 
 import DOTemplate from "../components/print/DOTemplate";
 import { createRoot } from 'react-dom/client';
 
+const STALE_3MIN = 3 * 60 * 1000;
+
 export default function DeliveryOrders() {
-  const [deliveryOrders, setDeliveryOrders] = useState([]);
   const [customers, setCustomers] = useState([]);
   const [products, setProducts] = useState([]);
   const [brands, setBrands] = useState([]);
-  const [loading, setLoading] = useState(true);
   const [searchTerm, setSearchTerm] = useState("");
   const [showDOForm, setShowDOForm] = useState(false);
   const [editingDO, setEditingDO] = useState(null);
@@ -33,14 +35,12 @@ export default function DeliveryOrders() {
   const [selectedCustomers, setSelectedCustomers] = useState([]);
   const [selectedTaxTreatments, setSelectedTaxTreatments] = useState([]);
   const [dateRange, setDateRange] = useState("all");
-  const [refreshTrigger, setRefreshTrigger] = useState(0);
   const [showCreateFromExistingDialog, setShowCreateFromExistingDialog] = useState(false);
   const [financialYears, setFinancialYears] = useState([]);
 
   // Pagination state
   const [currentPage, setCurrentPage] = useState(1);
   const [itemsPerPage, setItemsPerPage] = useState(50);
-  const [totalCount, setTotalCount] = useState(0);
   const [debouncedSearch, setDebouncedSearch] = useState("");
 
   const { user: currentUser } = useAuth();
@@ -73,41 +73,43 @@ export default function DeliveryOrders() {
     return () => clearTimeout(timer);
   }, [searchTerm]);
 
-  useEffect(() => {
-    const params = new URLSearchParams();
-    const isAll = itemsPerPage === 9999;
-    if (!isAll) {
-      params.set('page', String(currentPage));
-      params.set('pageSize', String(itemsPerPage));
-    }
-    if (debouncedSearch) params.set('search', debouncedSearch);
-    if (selectedStatuses.length) params.set('status', selectedStatuses.join(','));
-    if (selectedCustomers.length) params.set('customerId', selectedCustomers.join(','));
-    if (selectedTaxTreatments.length) params.set('taxTreatment', selectedTaxTreatments.join(','));
-    const today = new Date();
-    const toStr = (d) => d.toISOString().split('T')[0];
-    if (dateRange && dateRange !== 'all') {
-      if (dateRange === 'today') { const d = toStr(today); params.set('dateFrom', d); params.set('dateTo', d); }
-      else if (dateRange === 'week') { const s = new Date(today); s.setDate(today.getDate() - today.getDay()); s.setHours(0,0,0,0); params.set('dateFrom', toStr(s)); }
-      else if (dateRange === 'month') params.set('dateFrom', toStr(new Date(today.getFullYear(), today.getMonth(), 1)));
-      else if (dateRange === 'quarter') { const q = Math.floor(today.getMonth() / 3); params.set('dateFrom', toStr(new Date(today.getFullYear(), q * 3, 1))); }
-      else if (typeof dateRange === 'object' && dateRange.type === 'custom') { params.set('dateFrom', toStr(new Date(dateRange.startDate))); params.set('dateTo', toStr(new Date(dateRange.endDate))); }
-    }
-    const closedYears = financialYears.filter(y => y.status === 'Closed');
-    if (closedYears.length > 0) {
-      params.set('excludeYears', closedYears.map(cy => `${cy.startDate},${cy.endDate}`).join(';'));
-    }
-    setLoading(true);
-    fetch(`/api/delivery-orders?${params}`, { credentials: 'include' })
-      .then(r => r.json())
-      .then(result => {
-        const data = Array.isArray(result) ? result : (result.data || []);
-        setDeliveryOrders(data);
-        setTotalCount(Array.isArray(result) ? data.length : (result.total || 0));
-      })
-      .catch(err => console.error('Error loading delivery orders:', err))
-      .finally(() => setLoading(false));
-  }, [currentPage, itemsPerPage, debouncedSearch, selectedStatuses, selectedCustomers, selectedTaxTreatments, dateRange, financialYears, refreshTrigger]);
+  const excludeYearsKey = financialYears
+    .filter(y => y.status === 'Closed')
+    .map(cy => `${cy.startDate},${cy.endDate}`)
+    .join(';');
+
+  const { data: doResult, isLoading: loading } = useQuery({
+    queryKey: ['/api/delivery-orders', currentPage, itemsPerPage, debouncedSearch, selectedStatuses, selectedCustomers, selectedTaxTreatments, dateRange, excludeYearsKey],
+    queryFn: async () => {
+      const params = new URLSearchParams();
+      const isAll = itemsPerPage === 9999;
+      if (!isAll) {
+        params.set('page', String(currentPage));
+        params.set('pageSize', String(itemsPerPage));
+      }
+      if (debouncedSearch) params.set('search', debouncedSearch);
+      if (selectedStatuses.length) params.set('status', selectedStatuses.join(','));
+      if (selectedCustomers.length) params.set('customerId', selectedCustomers.join(','));
+      if (selectedTaxTreatments.length) params.set('taxTreatment', selectedTaxTreatments.join(','));
+      const today = new Date();
+      const toStr = (d) => d.toISOString().split('T')[0];
+      if (dateRange && dateRange !== 'all') {
+        if (dateRange === 'today') { const d = toStr(today); params.set('dateFrom', d); params.set('dateTo', d); }
+        else if (dateRange === 'week') { const s = new Date(today); s.setDate(today.getDate() - today.getDay()); s.setHours(0,0,0,0); params.set('dateFrom', toStr(s)); }
+        else if (dateRange === 'month') params.set('dateFrom', toStr(new Date(today.getFullYear(), today.getMonth(), 1)));
+        else if (dateRange === 'quarter') { const q = Math.floor(today.getMonth() / 3); params.set('dateFrom', toStr(new Date(today.getFullYear(), q * 3, 1))); }
+        else if (typeof dateRange === 'object' && dateRange.type === 'custom') { params.set('dateFrom', toStr(new Date(dateRange.startDate))); params.set('dateTo', toStr(new Date(dateRange.endDate))); }
+      }
+      if (excludeYearsKey) params.set('excludeYears', excludeYearsKey);
+      const r = await fetch(`/api/delivery-orders?${params}`, { credentials: 'include' });
+      return r.json();
+    },
+    staleTime: STALE_3MIN,
+    placeholderData: keepPreviousData,
+  });
+
+  const deliveryOrders = Array.isArray(doResult) ? doResult : (doResult?.data || []);
+  const totalCount = Array.isArray(doResult) ? deliveryOrders.length : (doResult?.total || 0);
 
   // Use preloaded customers for better performance
   const availableCustomers = React.useMemo(() => {
@@ -118,7 +120,7 @@ export default function DeliveryOrders() {
   }, [customers]);
 
   const handleRefresh = () => {
-    setRefreshTrigger(prev => prev + 1);
+    queryClient.invalidateQueries({ queryKey: ['/api/delivery-orders'] });
   };
 
   const handleNewDO = () => {

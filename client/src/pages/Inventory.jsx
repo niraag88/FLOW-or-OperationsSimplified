@@ -1,5 +1,7 @@
 
 import React, { useState, useEffect } from "react";
+import { useQuery, keepPreviousData } from "@tanstack/react-query";
+import { queryClient } from "@/lib/queryClient";
 import { Link } from "react-router-dom";
 import { createPageUrl } from "@/utils";
 import { useAuth } from "@/hooks/useAuth";
@@ -12,11 +14,10 @@ import StockTab from "../components/inventory/StockTab";
 import ExportDropdown from "../components/inventory/ExportDropdown";
 import QuickAddProduct from "../components/inventory/QuickAddProduct";
 
+const STALE_3MIN = 3 * 60 * 1000;
+
 export default function Inventory() {
-  const [products, setProducts] = useState([]);
-  const [totalProducts, setTotalProducts] = useState(0);
   const [stockCounts, setStockCounts] = useState([]);
-  const [loading, setLoading] = useState(true);
   const [uniqueBrands, setUniqueBrands] = useState([]);
   const [uniqueSizes, setUniqueSizes] = useState([]);
   const [searchTerm, setSearchTerm] = useState("");
@@ -25,7 +26,6 @@ export default function Inventory() {
   const [selectedSizes, setSelectedSizes] = useState([]);
   const [currentPage, setCurrentPage] = useState(1);
   const [itemsPerPage, setItemsPerPage] = useState(50);
-  const [refreshTrigger, setRefreshTrigger] = useState(0);
   const [stockSubTab, setStockSubTab] = useState("stock-levels");
   const [stockSubTabData, setStockSubTabData] = useState({
     stockMovements: [],
@@ -49,47 +49,37 @@ export default function Inventory() {
   }, []);
 
   // Load products with server-side pagination, search, and brand/size filters
-  useEffect(() => {
-    let cancelled = false;
-    const fetchProducts = async () => {
-      setLoading(true);
-      try {
-        const params = new URLSearchParams({
-          page: String(currentPage),
-          pageSize: String(itemsPerPage),
-        });
-        if (searchTerm) params.set('search', searchTerm);
-        if (selectedBrands.length > 0) params.set('brand', selectedBrands.join(','));
-        if (selectedSizes.length > 0) params.set('size', selectedSizes.join(','));
+  const { data: productResp, isLoading: loading } = useQuery({
+    queryKey: ['/api/products', currentPage, itemsPerPage, searchTerm, selectedBrands, selectedSizes],
+    queryFn: async () => {
+      const params = new URLSearchParams({
+        page: String(currentPage),
+        pageSize: String(itemsPerPage),
+      });
+      if (searchTerm) params.set('search', searchTerm);
+      if (selectedBrands.length > 0) params.set('brand', selectedBrands.join(','));
+      if (selectedSizes.length > 0) params.set('size', selectedSizes.join(','));
+      const [resp, stockData] = await Promise.all([
+        fetch(`/api/products?${params}`, { credentials: 'include' }).then(r => r.json()),
+        Promise.resolve().then(() => StockCount.list('-created_date')).catch(() => []),
+      ]);
+      setStockCounts(Array.isArray(stockData) ? stockData : []);
+      return resp;
+    },
+    staleTime: STALE_3MIN,
+    placeholderData: keepPreviousData,
+  });
 
-        const [productResp, stockData] = await Promise.all([
-          fetch(`/api/products?${params}`, { credentials: 'include' }).then(r => r.json()),
-          Promise.resolve().then(() => StockCount.list('-created_date')).catch(() => []),
-        ]);
-
-        if (!cancelled) {
-          setProducts(productResp.data || []);
-          setTotalProducts(productResp.total || 0);
-          setStockCounts(Array.isArray(stockData) ? stockData : []);
-        }
-      } catch (error) {
-        console.error("Error loading inventory data:", error);
-        if (!cancelled) { setProducts([]); setTotalProducts(0); }
-      } finally {
-        if (!cancelled) setLoading(false);
-      }
-    };
-    fetchProducts();
-    return () => { cancelled = true; };
-  }, [currentPage, itemsPerPage, searchTerm, selectedBrands, selectedSizes, refreshTrigger]);
+  const products = productResp?.data || [];
+  const totalProducts = productResp?.total || 0;
 
   const handleRefresh = () => {
-    setRefreshTrigger(prev => prev + 1);
+    queryClient.invalidateQueries({ queryKey: ['/api/products'] });
   };
 
   const handleProductAdded = () => {
     setCurrentPage(1);
-    setRefreshTrigger(prev => prev + 1);
+    queryClient.invalidateQueries({ queryKey: ['/api/products'] });
   };
 
   const handleStockSubTabChange = (subTab, stockMovements, lowStockProducts, outOfStockProducts) => {
