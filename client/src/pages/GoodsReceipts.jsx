@@ -1,4 +1,4 @@
-import React, { useState } from "react";
+import React, { useState, useEffect } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { queryClient } from "@/lib/queryClient";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -24,7 +24,7 @@ export default function GoodsReceipts() {
   const [creating, setCreating] = useState(false);
   const { toast } = useToast();
 
-  const { data: goodsReceipts = [], isLoading: loadingReceipts } = useQuery({
+  const { data: goodsReceipts = [], isLoading: loadingReceipts, error: grnError } = useQuery({
     queryKey: ['/api/goods-receipts'],
     queryFn: async () => {
       const r = await fetch('/api/goods-receipts', { credentials: 'include' });
@@ -33,6 +33,12 @@ export default function GoodsReceipts() {
     },
     staleTime: STALE_3MIN,
   });
+
+  useEffect(() => {
+    if (grnError) {
+      toast({ title: "Error", description: "Failed to load goods receipts.", variant: "destructive" });
+    }
+  }, [grnError]);
 
   const { data: allPOs, isLoading: loadingPOs } = useQuery({
     queryKey: ['/api/purchase-orders', 'standalone-grn'],
