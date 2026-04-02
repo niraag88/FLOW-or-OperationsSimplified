@@ -15,6 +15,7 @@ export const printStyles = `
       padding: 32px !important;
       box-shadow: none;
       border: none;
+      min-height: calc(297mm - 2.4cm) !important;
     }
   }
 `;

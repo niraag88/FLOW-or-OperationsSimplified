@@ -283,9 +283,10 @@
     margin: 0.75in;
   }
   
-  /* Ensure page breaks work correctly */
+  /* Constrain page height to printable area so footer stays on page 1 */
   .print-page {
     page-break-inside: avoid;
+    min-height: calc(297mm - 1.5in);
   }
   
   /* Maintain colors for printing */
