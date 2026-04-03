@@ -6,6 +6,7 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { useToast } from "@/components/ui/use-toast";
+import { queryClient } from "@/lib/queryClient";
 import { Product } from "@/api/entities";
 import { Brand } from "@/api/entities";
 import { CompanySettings } from "@/api/entities";
@@ -164,6 +165,9 @@ export default function EditProduct() {
         before: originalProduct,
         after: updatedProduct 
       });
+
+      // Invalidate products cache so Inventory reflects the update immediately
+      queryClient.invalidateQueries({ queryKey: ['/api/products'] });
       
       toast({
         title: "Success",
@@ -201,13 +205,8 @@ export default function EditProduct() {
         navigate(createPageUrl('Inventory'));
       } else if (event.key === 'Enter' && (event.metaKey || event.ctrlKey)) {
         handleSave();
-      } else if (event.key === 'Enter') {
-        const activeElement = document.activeElement;
-        // Prevent default Enter key behavior on textareas and buttons, otherwise trigger save
-        if (activeElement.tagName !== 'TEXTAREA' && activeElement.tagName !== 'BUTTON') {
-          handleSave();
-        }
       }
+      // Plain Enter no longer triggers save — use the Save button to avoid accidental submissions
     };
 
     window.addEventListener('keydown', handleKeyDown);
