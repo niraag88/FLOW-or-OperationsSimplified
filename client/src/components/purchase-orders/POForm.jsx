@@ -526,7 +526,7 @@ export default function POForm({ open, onClose, editingPO, currentUser, onSucces
                             <SelectContent>
                               {getFilteredProducts().map(product => (
                                 <SelectItem key={product.id} value={product.id.toString()}>
-                                  {product.name}{product.size ? ` - ${product.size}` : ''}
+                                  {product.name}{product.description ? ` - ${product.description}` : ''}
                                 </SelectItem>
                               ))}
                             </SelectContent>
