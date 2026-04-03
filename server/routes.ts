@@ -1193,6 +1193,11 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
       const DATA_ROWS = 500;
 
+      // Format Product Code column (col B) as text to prevent scientific notation
+      ws.getColumn(2).numFmt = '@';
+      // Also explicitly set format on the example row's code cell
+      ws.getCell(2, 2).numFmt = '@';
+
       // Brand name data validation (from hidden sheet column A)
       if (activeNames.length > 0) {
         for (let r = 3; r <= DATA_ROWS + 2; r++) {
