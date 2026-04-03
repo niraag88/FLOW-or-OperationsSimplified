@@ -77,25 +77,28 @@ export default function ExportDropdown({
 <head>
   <title>${subtitle}</title>
   <style>
-    body { font-family: Arial, sans-serif; margin: 20px; font-size: 12px; }
-    h1 { font-size: 16px; margin: 0 0 2px 0; }
-    h2 { font-size: 13px; color: #555; margin: 0 0 16px 0; font-weight: normal; }
-    table { width: 100%; border-collapse: collapse; margin-bottom: 20px; }
-    th, td { border: 1px solid #ccc; padding: 5px 8px; text-align: left; }
-    th { background: #f0f0f0; font-weight: bold; font-size: 11px; }
-    td { font-size: 11px; }
-    .footer { margin-top: 12px; font-size: 10px; color: #888; }
-    @media print { body { margin: 0; } }
+    body { font-family: Arial, sans-serif; margin: 20px; }
+    .print-header { text-align: center; margin-bottom: 30px; }
+    .print-header h1 { font-size: 24px; margin-bottom: 5px; }
+    .print-header h2 { font-size: 18px; color: #666; margin-top: 0; font-weight: normal; }
+    table { width: 100%; border-collapse: collapse; margin-bottom: 30px; }
+    th, td { border: 1px solid #ddd; padding: 8px; text-align: left; }
+    th { background: #f5f5f5; font-weight: bold; }
+    td { font-size: 12px; }
+    .print-footer { margin-top: 30px; font-size: 10px; color: #666; text-align: center; }
+    @media print { body { margin: 0; } table { font-size: 10px; } }
   </style>
 </head>
 <body>
-  <h1>Business Operations</h1>
-  <h2>${subtitle}</h2>
+  <div class="print-header">
+    <h1>Business Operations</h1>
+    <h2>${subtitle}</h2>
+  </div>
   <table>
     <thead><tr>${headerCells}</tr></thead>
     <tbody>${bodyRows}</tbody>
   </table>
-  <div class="footer">
+  <div class="print-footer">
     <p>Generated: ${now} &nbsp;|&nbsp; Total records: ${total}</p>
   </div>
 </body>
