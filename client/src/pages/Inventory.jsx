@@ -123,7 +123,7 @@ export default function Inventory() {
           {activeTab === "products" && (
             <DropdownMenu>
               <DropdownMenuTrigger asChild>
-                <Button variant="outline">
+                <Button className="bg-emerald-600 hover:bg-emerald-700 text-white">
                   <Plus className="w-4 h-4 mr-2" />
                   Add Product
                   <ChevronDown className="w-4 h-4 ml-2" />
