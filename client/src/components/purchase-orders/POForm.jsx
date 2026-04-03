@@ -86,55 +86,59 @@ export default function POForm({ open, onClose, editingPO, currentUser, onSucces
   };
 
   const loadInitialData = async () => {
-    const settled = await Promise.allSettled([
-      Brand.list(),
-      Product.list(),
-      fetch('/api/company-settings'),
-      editingPO ? Promise.resolve(null) : fetch('/api/purchase-orders/next-number', { credentials: 'include' })
-    ]);
+    try {
+      const settled = await Promise.allSettled([
+        Brand.list(),
+        Product.list(),
+        fetch('/api/company-settings'),
+        editingPO ? Promise.resolve(null) : fetch('/api/purchase-orders/next-number', { credentials: 'include' })
+      ]);
 
-    const brandsData = settled[0].status === 'fulfilled' ? settled[0].value : [];
-    const productsData = settled[1].status === 'fulfilled' ? settled[1].value : [];
-    const settingsResponse = settled[2].status === 'fulfilled' ? settled[2].value : null;
-    const nextNumberResponse = settled[3].status === 'fulfilled' ? settled[3].value : null;
+      const brandsData = settled[0].status === 'fulfilled' ? settled[0].value : [];
+      const productsData = settled[1].status === 'fulfilled' ? settled[1].value : [];
+      const settingsResponse = settled[2].status === 'fulfilled' ? settled[2].value : null;
+      const nextNumberResponse = settled[3].status === 'fulfilled' ? settled[3].value : null;
 
-    const filteredBrands = (brandsData || []).filter(b => b.isActive !== false).sort((a, b) => (a.name || '').localeCompare(b.name || ''));
-    setBrands(filteredBrands);
-    setProducts(productsData || []);
+      const filteredBrands = (brandsData || []).filter(b => b.isActive !== false).sort((a, b) => (a.name || '').localeCompare(b.name || ''));
+      setBrands(filteredBrands);
+      setProducts(productsData || []);
 
-    let settings = null;
-    if (settingsResponse && settingsResponse.ok) {
-      try {
-        settings = await settingsResponse.json();
-        setCompanySettings(settings);
-      } catch {}
-    }
+      let settings = null;
+      if (settingsResponse && settingsResponse.ok) {
+        try {
+          settings = await settingsResponse.json();
+          setCompanySettings(settings);
+        } catch {}
+      }
 
-    if (editingPO) {
-      await loadEditingData(filteredBrands, settings);
-    } else {
-      let nextPONumber = "";
-      try {
-        if (nextNumberResponse && nextNumberResponse.ok) {
-          const data = await nextNumberResponse.json();
-          nextPONumber = data.nextNumber || "";
-        }
-      } catch {}
+      if (editingPO) {
+        await loadEditingData(filteredBrands, settings);
+      } else {
+        let nextPONumber = "";
+        try {
+          if (nextNumberResponse && nextNumberResponse.ok) {
+            const data = await nextNumberResponse.json();
+            nextPONumber = data.nextNumber || "";
+          }
+        } catch {}
 
-      const defaultRate = settings ? getRateToAed('GBP', settings) : 4.85;
-      setFormData({
-        poNumber: nextPONumber,
-        brandId: "",
-        orderDate: new Date().toISOString().split('T')[0],
-        expectedDelivery: "",
-        status: "draft",
-        notes: "",
-        currency: "GBP",
-        fxRateToAed: defaultRate.toFixed(4),
-        totalAmount: "0.00",
-        items: []
-      });
-      setCurrencyExplicitlySet(false);
+        const defaultRate = settings ? getRateToAed('GBP', settings) : 4.85;
+        setFormData({
+          poNumber: nextPONumber,
+          brandId: "",
+          orderDate: new Date().toISOString().split('T')[0],
+          expectedDelivery: "",
+          status: "draft",
+          notes: "",
+          currency: "GBP",
+          fxRateToAed: defaultRate.toFixed(4),
+          totalAmount: "0.00",
+          items: []
+        });
+        setCurrencyExplicitlySet(false);
+      }
+    } catch (error) {
+      console.error("Error loading PO form data:", error);
     }
   };
 
