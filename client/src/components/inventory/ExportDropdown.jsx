@@ -283,6 +283,8 @@ export default function ExportDropdown({
           return { type: "Low Stock Alerts", count: lowStockProducts?.length || 0 };
         case "movements":
           return { type: "Stock Movements", count: stockMovements?.length || 0 };
+        case "out-of-stock":
+          return { type: "Out of Stock", count: outOfStockProducts?.length || 0 };
         default:
           return { type: "Stock Data", count: 0 };
       }
