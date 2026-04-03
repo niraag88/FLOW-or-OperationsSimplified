@@ -7,6 +7,7 @@ import { Client } from '@replit/object-storage';
 import { invoices, deliveryOrders, auditLog, users, recycleBin, type InsertAuditLog, type InsertUser, type UpdateUser, type User, type InsertInvoice } from "@shared/schema";
 import { insertBrandSchema, insertSupplierSchema, insertCustomerSchema, insertProductSchema, insertPurchaseOrderSchema, insertQuotationSchema, insertInvoiceSchema, insertDeliveryOrderSchema, stockCounts, stockCountItems, goodsReceipts, goodsReceiptItems, stockMovements, products, purchaseOrders, purchaseOrderItems, invoiceLineItems, deliveryOrderItems, suppliers, brands, quotations, quotationItems, customers, companySettings, financialYears, insertFinancialYearSchema, storageObjects } from "@shared/schema";
 import * as XLSX from 'xlsx';
+import ExcelJS from 'exceljs';
 import { db } from "./db";
 import { eq, desc, sum, inArray, sql } from "drizzle-orm";
 import pkg from 'pg';
@@ -1128,31 +1129,104 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  app.get('/api/products/:id', requireAuth(), async (req: AuthenticatedRequest, res) => {
+  // Bulk product template download (server-side, uses exceljs for real data-validation dropdowns)
+  // MUST be registered before /api/products/:id to avoid route shadowing
+  app.get('/api/products/bulk-template', requireAuth(), async (req: AuthenticatedRequest, res) => {
     try {
-      const productId = parseInt(req.params.id);
-      const product = await businessStorage.getProductById(productId);
-      
-      if (!product) {
-        return res.status(404).json({ error: 'Product not found' });
-      }
-      
-      res.json(product);
-    } catch (error) {
-      console.error('Error fetching product:', error);
-      res.status(500).json({ error: 'Failed to fetch product' });
-    }
-  });
+      const allBrands = await businessStorage.getBrands();
+      const activeNames = allBrands.filter((b: any) => b.isActive !== false).map((b: any) => b.name);
 
-  app.post('/api/products', requireAuth(), async (req: AuthenticatedRequest, res) => {
-    try {
-      const validatedData = insertProductSchema.parse(req.body);
-      const product = await businessStorage.createProduct(validatedData);
-      writeAuditLog({ actor: req.user!.id, actorName: req.user?.username || String(req.user!.id), targetId: String(product.id), targetType: 'product', action: 'CREATE', details: `Product '${product.name}' (SKU: ${product.sku}) created` });
-      res.status(201).json(product);
+      const wb = new ExcelJS.Workbook();
+      wb.creator = 'FLOW';
+      wb.created = new Date();
+
+      // Hidden sheet to store brand list (for named-range data validation)
+      const brandSheet = wb.addWorksheet('_Brands', { state: 'veryHidden' });
+      activeNames.forEach((name: string, i: number) => {
+        brandSheet.getCell(i + 1, 1).value = name;
+      });
+
+      const SUPPORTED_CURRENCIES = ['AED', 'GBP', 'USD', 'INR'];
+      const currencySheet = wb.addWorksheet('_Currencies', { state: 'veryHidden' });
+      SUPPORTED_CURRENCIES.forEach((c, i) => {
+        currencySheet.getCell(i + 1, 1).value = c;
+      });
+
+      const ws = wb.addWorksheet('Products');
+
+      ws.columns = [
+        { header: 'Brand Name', key: 'brand', width: 22 },
+        { header: 'Product Code', key: 'code', width: 16 },
+        { header: 'Product Name', key: 'name', width: 32 },
+        { header: 'Size', key: 'size', width: 12 },
+        { header: 'Purchase Price', key: 'purchasePrice', width: 16 },
+        { header: 'Purchase Price Currency', key: 'purchaseCurrency', width: 24 },
+        { header: 'Sale Price (AED)', key: 'salePrice', width: 16 },
+      ];
+
+      // Style header row
+      const headerRow = ws.getRow(1);
+      headerRow.eachCell(cell => {
+        cell.font = { bold: true, color: { argb: 'FFFFFFFF' } };
+        cell.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FF1E40AF' } };
+        cell.alignment = { horizontal: 'center', vertical: 'middle' };
+        cell.border = {
+          bottom: { style: 'thin', color: { argb: 'FFCBCBCB' } },
+        };
+      });
+      headerRow.height = 20;
+
+      // Example row (greyed out)
+      ws.addRow({
+        brand: activeNames[0] || 'My Brand',
+        code: 'MYSKU001',
+        name: 'Example Product',
+        size: '250ml',
+        purchasePrice: 5.00,
+        purchaseCurrency: 'GBP',
+        salePrice: 25.00,
+      });
+      const exampleRow = ws.getRow(2);
+      exampleRow.eachCell(cell => {
+        cell.font = { italic: true, color: { argb: 'FF9CA3AF' } };
+      });
+
+      const DATA_ROWS = 500;
+
+      // Brand name data validation (from hidden sheet column A)
+      if (activeNames.length > 0) {
+        for (let r = 3; r <= DATA_ROWS + 2; r++) {
+          ws.getCell(r, 1).dataValidation = {
+            type: 'list',
+            allowBlank: true,
+            formulae: [`_Brands!$A$1:$A$${activeNames.length}`],
+            showErrorMessage: true,
+            errorTitle: 'Invalid Brand',
+            error: 'Please select a brand from the list.',
+          };
+        }
+      }
+
+      // Currency data validation
+      for (let r = 3; r <= DATA_ROWS + 2; r++) {
+        ws.getCell(r, 6).dataValidation = {
+          type: 'list',
+          allowBlank: true,
+          formulae: ['_Currencies!$A$1:$A$4'],
+          showErrorMessage: true,
+          errorTitle: 'Invalid Currency',
+          error: `Must be one of: ${SUPPORTED_CURRENCIES.join(', ')}`,
+        };
+      }
+
+      res.setHeader('Content-Type', 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet');
+      res.setHeader('Content-Disposition', 'attachment; filename="bulk-add-products-template.xlsx"');
+      res.setHeader('Cache-Control', 'no-cache');
+
+      await wb.xlsx.write(res);
     } catch (error) {
-      console.error('Error creating product:', error);
-      res.status(500).json({ error: 'Failed to create product' });
+      console.error('Error generating bulk template:', error);
+      res.status(500).json({ error: 'Failed to generate template' });
     }
   });
 
@@ -1183,7 +1257,11 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const existingSkuRows = await db.select({ sku: products.sku }).from(products);
       const existingSkus = new Set(existingSkuRows.map(r => r.sku?.toUpperCase()));
 
-      const created: any[] = [];
+      // Pre-validate all rows before any DB writes
+      const preValidated: Array<{
+        row: number; sku: string; brandId: number; name: string;
+        description: string | null; costPrice: string; costPriceCurrency: string; unitPrice: string;
+      }> = [];
       const failed: Array<{ row: number; sku: string; message: string }> = [];
       const seenSkus = new Set<string>();
 
@@ -1222,21 +1300,41 @@ export async function registerRoutes(app: Express): Promise<Server> {
         }
 
         seenSkus.add(sku);
+        preValidated.push({
+          row: rowNum,
+          sku,
+          brandId,
+          name,
+          description: (row.size || '').trim() || null,
+          costPrice: row.purchasePrice || '0',
+          costPriceCurrency: row.purchasePriceCurrency || 'GBP',
+          unitPrice: salePrice,
+        });
+      }
 
-        try {
-          const product = await businessStorage.createProduct({
-            sku,
-            brandId,
-            name,
-            description: (row.size || '').trim() || null,
-            costPrice: row.purchasePrice || '0',
-            costPriceCurrency: row.purchasePriceCurrency || 'GBP',
-            unitPrice: salePrice,
-            stockQuantity: 0,
-            minStockLevel: 10,
-            isActive: true,
-          });
-          existingSkus.add(sku);
+      // Insert all valid rows inside a single transaction
+      const createdProducts: any[] = [];
+      if (preValidated.length > 0) {
+        await db.transaction(async (tx) => {
+          for (const item of preValidated) {
+            const [product] = await tx.insert(products).values({
+              sku: item.sku,
+              brandId: item.brandId,
+              name: item.name,
+              description: item.description,
+              costPrice: item.costPrice,
+              costPriceCurrency: item.costPriceCurrency,
+              unitPrice: item.unitPrice,
+              stockQuantity: 0,
+              minStockLevel: 10,
+              isActive: true,
+            }).returning();
+            createdProducts.push(product);
+          }
+        });
+
+        // Write audit logs after successful transaction
+        for (const product of createdProducts) {
           writeAuditLog({
             actor: req.user!.id,
             actorName: req.user?.username || String(req.user!.id),
@@ -1245,16 +1343,41 @@ export async function registerRoutes(app: Express): Promise<Server> {
             action: 'CREATE',
             details: `Product '${product.name}' (SKU: ${product.sku}) created via bulk import`,
           });
-          created.push(product);
-        } catch (err) {
-          failed.push({ row: rowNum, sku, message: 'Failed to insert product' });
         }
       }
 
-      res.status(201).json({ created: created.length, failed: failed.length, errors: failed });
+      res.status(201).json({ created: createdProducts.length, failed: failed.length, errors: failed });
     } catch (error) {
       console.error('Error bulk-creating products:', error);
       res.status(500).json({ error: 'Failed to bulk-create products' });
+    }
+  });
+
+  app.post('/api/products', requireAuth(), async (req: AuthenticatedRequest, res) => {
+    try {
+      const validatedData = insertProductSchema.parse(req.body);
+      const product = await businessStorage.createProduct(validatedData);
+      writeAuditLog({ actor: req.user!.id, actorName: req.user?.username || String(req.user!.id), targetId: String(product.id), targetType: 'product', action: 'CREATE', details: `Product '${product.name}' (SKU: ${product.sku}) created` });
+      res.status(201).json(product);
+    } catch (error) {
+      console.error('Error creating product:', error);
+      res.status(500).json({ error: 'Failed to create product' });
+    }
+  });
+
+  app.get('/api/products/:id', requireAuth(), async (req: AuthenticatedRequest, res) => {
+    try {
+      const productId = parseInt(req.params.id);
+      const product = await businessStorage.getProductById(productId);
+      
+      if (!product) {
+        return res.status(404).json({ error: 'Product not found' });
+      }
+      
+      res.json(product);
+    } catch (error) {
+      console.error('Error fetching product:', error);
+      res.status(500).json({ error: 'Failed to fetch product' });
     }
   });
 

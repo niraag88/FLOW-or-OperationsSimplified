@@ -1,10 +1,8 @@
 
 import React, { useState, useRef, useCallback } from "react";
 import { useNavigate } from "react-router-dom";
-import { useQuery } from "@tanstack/react-query";
 import { queryClient } from "@/lib/queryClient";
 import { Button } from "@/components/ui/button";
-import { Badge } from "@/components/ui/badge";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
 import { useToast } from "@/components/ui/use-toast";
@@ -21,6 +19,7 @@ import {
 } from "lucide-react";
 import * as XLSX from "xlsx";
 import { SUPPORTED_CURRENCIES } from "@/utils/currency";
+import { useQuery } from "@tanstack/react-query";
 
 const HEADERS = [
   "Brand Name",
@@ -30,16 +29,6 @@ const HEADERS = [
   "Purchase Price",
   "Purchase Price Currency",
   "Sale Price (AED)",
-];
-
-const EXAMPLE_ROW = [
-  "My Brand",
-  "MYSKU001",
-  "Example Product",
-  "250ml",
-  "5.00",
-  "GBP",
-  "25.00",
 ];
 
 const SKU_REGEX = /^[A-Za-z0-9]{1,50}$/;
@@ -63,7 +52,7 @@ function parseSheet(workbook) {
 
     if (!brandName && !productCode && !productName && !salePrice) continue;
     if (brandName === HEADERS[0]) continue;
-    if (brandName === EXAMPLE_ROW[0] && productCode === EXAMPLE_ROW[1].toUpperCase()) continue;
+    if (productCode === "MYSKU001" && productName === "Example Product") continue;
 
     rows.push({ brandName, productCode, productName, size, purchasePrice, purchasePriceCurrency, salePrice, _rowIndex: i });
   }
@@ -125,79 +114,27 @@ export default function BulkAddProduct() {
   const brands = brandsData || [];
   const brandsSet = new Set(brands.map((b) => b.name.trim().toLowerCase()));
 
-  const downloadTemplate = useCallback(() => {
-    const wb = XLSX.utils.book_new();
-
-    const worksheetData = [HEADERS, EXAMPLE_ROW];
-    const ws = XLSX.utils.aoa_to_sheet(worksheetData);
-
-    ws["!cols"] = [
-      { wch: 20 },
-      { wch: 16 },
-      { wch: 30 },
-      { wch: 12 },
-      { wch: 16 },
-      { wch: 22 },
-      { wch: 16 },
-    ];
-
-    const numRows = 502;
-
-    const currencyValidation = {
-      type: "list",
-      formula1: `"${SUPPORTED_CURRENCIES.join(",")}"`,
-      sqref: `F2:F${numRows}`,
-      showDropDown: false,
-    };
-
-    if (!ws["!dataValidations"]) ws["!dataValidations"] = [];
-    ws["!dataValidations"].push(currencyValidation);
-
-    if (brands.length > 0) {
-      const brandNames = brands.filter((b) => b.isActive !== false).map((b) => b.name);
-      if (brandNames.length > 0) {
-        const brandChunks = [];
-        let chunk = [];
-        for (const name of brandNames) {
-          chunk.push(name);
-          if (chunk.join(",").length > 200) {
-            brandChunks.push(chunk.join(","));
-            chunk = [];
-          }
-        }
-        if (chunk.length > 0) brandChunks.push(chunk.join(","));
-
-        ws["!dataValidations"].push({
-          type: "list",
-          formula1: `"${brandChunks[0]}"`,
-          sqref: `A2:A${numRows}`,
-          showDropDown: false,
-        });
-      }
+  const downloadTemplate = useCallback(async () => {
+    try {
+      const resp = await fetch("/api/products/bulk-template", { credentials: "include" });
+      if (!resp.ok) throw new Error("Failed to generate template");
+      const blob = await resp.blob();
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement("a");
+      a.href = url;
+      a.download = "bulk-add-products-template.xlsx";
+      document.body.appendChild(a);
+      a.click();
+      document.body.removeChild(a);
+      URL.revokeObjectURL(url);
+    } catch (err) {
+      toast({
+        title: "Download failed",
+        description: "Could not generate the template. Please try again.",
+        variant: "destructive",
+      });
     }
-
-    const headerStyle = {
-      font: { bold: true, color: { rgb: "FFFFFF" } },
-      fill: { fgColor: { rgb: "1E40AF" } },
-      alignment: { horizontal: "center" },
-    };
-    const exampleStyle = {
-      font: { color: { rgb: "9CA3AF" }, italic: true },
-    };
-
-    HEADERS.forEach((_, colIdx) => {
-      const cellAddr = XLSX.utils.encode_cell({ r: 0, c: colIdx });
-      if (ws[cellAddr]) ws[cellAddr].s = headerStyle;
-    });
-
-    EXAMPLE_ROW.forEach((_, colIdx) => {
-      const cellAddr = XLSX.utils.encode_cell({ r: 1, c: colIdx });
-      if (ws[cellAddr]) ws[cellAddr].s = exampleStyle;
-    });
-
-    XLSX.utils.book_append_sheet(wb, ws, "Products");
-    XLSX.writeFile(wb, "bulk-add-products-template.xlsx");
-  }, [brands]);
+  }, [toast]);
 
   const processFile = useCallback(
     (file) => {
