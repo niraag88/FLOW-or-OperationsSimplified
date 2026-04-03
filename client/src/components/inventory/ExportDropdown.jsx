@@ -8,270 +8,286 @@ import {
 } from "@/components/ui/dropdown-menu";
 import { Button } from "@/components/ui/button";
 import { Download, Eye } from "lucide-react";
-import { exportToCsv, exportToXLSX, exportToPDF } from "../utils/export";
+import { exportToXLSX } from "../utils/export";
 import { formatCurrency } from "@/utils/currency";
 import { format } from "date-fns";
 
-export default function ExportDropdown({ products, activeTab, stockSubTab, stockMovements, lowStockProducts, outOfStockProducts }) {
+export default function ExportDropdown({
+  products,
+  totalProducts,
+  activeTab,
+  stockSubTab,
+  stockMovements,
+  lowStockProducts,
+  outOfStockProducts,
+  searchTerm,
+  selectedBrands,
+  selectedSizes,
+}) {
   const [isExporting, setIsExporting] = useState(false);
 
-  // Helper function to prepare product export data
-  const getProductExportData = () => {
-    return products.map(product => ({
-      Brand: product.brandName || '-',
-      'Product Code': product.sku,
-      'Product Name': product.name,
-      Size: product.description || '-',
-      'Cost Price': formatCurrency(product.costPrice, product.costPriceCurrency || 'GBP'),
-      'Sale Price': `AED ${product.unitPrice}`,
-      Status: product.isActive ? 'Active' : 'Inactive'
-    }));
+  // Fetch ALL matching products from the server (respects active filters, ignores pagination)
+  const fetchAllProducts = async () => {
+    const params = new URLSearchParams();
+    if (searchTerm) params.set("search", searchTerm);
+    if (selectedBrands && selectedBrands.length > 0) params.set("brand", selectedBrands.join(","));
+    if (selectedSizes && selectedSizes.length > 0) params.set("size", selectedSizes.join(","));
+    const resp = await fetch(`/api/products?${params}`, { credentials: "include" });
+    if (!resp.ok) throw new Error("Failed to fetch products for export");
+    const result = await resp.json();
+    return Array.isArray(result) ? result : (result.data || []);
   };
 
-  const exportProducts = async (format = 'csv') => {
+  const buildProductRows = (list) =>
+    list.map((p) => ({
+      Brand: p.brandName || "-",
+      "Product Code": p.sku || "-",
+      "Product Name": p.name || "-",
+      Size: p.description || "-",
+      "Cost Price": formatCurrency(p.costPrice, p.costPriceCurrency || "GBP"),
+      "Sale Price (AED)": `AED ${parseFloat(p.unitPrice || 0).toFixed(2)}`,
+      Status: p.isActive ? "Active" : "Inactive",
+    }));
+
+  // Opens a print window synchronously (must be called inside a user gesture),
+  // shows a loading state, then populates content after async work completes.
+  const openPrintWindow = () => {
+    const pw = window.open("", "_blank");
+    if (!pw) {
+      alert("Please allow popups in your browser to use View & Print.");
+      return null;
+    }
+    pw.document.write(`<!DOCTYPE html><html><head><style>
+      body{font-family:Arial,sans-serif;margin:20px;font-size:12px;color:#333;}
+    </style></head><body><p style="color:#888">Loading&hellip;</p></body></html>`);
+    pw.document.close();
+    return pw;
+  };
+
+  const writePrintContent = (pw, subtitle, headers, rows, total) => {
+    const now = format(new Date(), "dd/MM/yy HH:mm");
+    const headerCells = headers.map((h) => `<th>${h}</th>`).join("");
+    const bodyRows = rows
+      .map((row) => `<tr>${headers.map((h) => `<td>${String(row[h] ?? "-")}</td>`).join("")}</tr>`)
+      .join("");
+
+    pw.document.open();
+    pw.document.write(`<!DOCTYPE html>
+<html>
+<head>
+  <title>${subtitle}</title>
+  <style>
+    body { font-family: Arial, sans-serif; margin: 20px; font-size: 12px; }
+    h1 { font-size: 16px; margin: 0 0 2px 0; }
+    h2 { font-size: 13px; color: #555; margin: 0 0 16px 0; font-weight: normal; }
+    table { width: 100%; border-collapse: collapse; margin-bottom: 20px; }
+    th, td { border: 1px solid #ccc; padding: 5px 8px; text-align: left; }
+    th { background: #f0f0f0; font-weight: bold; font-size: 11px; }
+    td { font-size: 11px; }
+    .footer { margin-top: 12px; font-size: 10px; color: #888; }
+    @media print { body { margin: 0; } }
+  </style>
+</head>
+<body>
+  <h1>Business Operations</h1>
+  <h2>${subtitle}</h2>
+  <table>
+    <thead><tr>${headerCells}</tr></thead>
+    <tbody>${bodyRows}</tbody>
+  </table>
+  <div class="footer">
+    <p>Generated: ${now} &nbsp;|&nbsp; Total records: ${total}</p>
+  </div>
+</body>
+</html>`);
+    pw.document.close();
+  };
+
+  const exportProducts = async (exportFmt) => {
+    // For print: open window immediately in the user-gesture context BEFORE any async work
+    const pw = exportFmt === "pdf" ? openPrintWindow() : null;
+    if (exportFmt === "pdf" && !pw) return;
+
     setIsExporting(true);
     try {
-      const exportData = getProductExportData();
-      const filename = `products-${new Date().toISOString().split('T')[0]}`;
-      
-      if (format === 'xlsx') {
-        exportToXLSX(exportData, filename, 'Products');
-      } else if (format === 'pdf') {
-        // Open print view in new tab for PDF printing
-        const printWindow = window.open('', '_blank');
-        printWindow.document.write(`
-          <!DOCTYPE html>
-          <html>
-          <head>
-            <title>Product Inventory Report</title>
-            <style>
-              body { font-family: Arial, sans-serif; margin: 20px; }
-              .print-header { text-align: center; margin-bottom: 30px; }
-              .print-header h1 { font-size: 24px; margin-bottom: 5px; }
-              .print-header h2 { font-size: 18px; color: #666; margin-top: 0; }
-              .print-table { width: 100%; border-collapse: collapse; margin-bottom: 30px; }
-              .print-table th, .print-table td { border: 1px solid #ddd; padding: 8px; text-align: left; }
-              .print-table th { background-color: #f5f5f5; font-weight: bold; }
-              .print-table td { font-size: 12px; }
-              .print-footer { margin-top: 30px; font-size: 10px; color: #666; text-align: center; }
-              @media print {
-                body { margin: 0; }
-                .print-table { font-size: 10px; }
-              }
-            </style>
-          </head>
-          <body>
-            <div class="print-header">
-              <h1>Inventory Management</h1>
-              <h2>Products</h2>
-            </div>
-            
-            <table class="print-table">
-              <thead>
-                <tr>
-                  <th>Brand</th>
-                  <th>Product Code</th>
-                  <th>Product Name</th>
-                  <th>Size</th>
-                  <th>Cost Price</th>
-                  <th>Sale Price</th>
-                  <th>Status</th>
-                </tr>
-              </thead>
-              <tbody>
-                ${products.map(product => `
-                  <tr>
-                    <td>${product.brandName || '-'}</td>
-                    <td>${product.sku || '-'}</td>
-                    <td>${product.name || '-'}</td>
-                    <td>${product.size || '-'}</td>
-                    <td>${formatCurrency(product.costPrice, product.costPriceCurrency || 'GBP')}</td>
-                    <td>AED ${product.unitPrice}</td>
-                    <td>${product.isActive ? 'Active' : 'Inactive'}</td>
-                  </tr>
-                `).join('')}
-              </tbody>
-            </table>
-            
-            <div class="print-footer">
-              <p>Generated on: ${format(new Date(), 'dd/MM/yy HH:mm')}</p>
-              <p>Total Products: ${products.length}</p>
-            </div>
-            
-          </body>
-          </html>
-        `);
-        printWindow.document.close();
+      const allProducts = await fetchAllProducts();
+      const filename = `products-${new Date().toISOString().split("T")[0]}`;
+
+      if (exportFmt === "xlsx") {
+        exportToXLSX(buildProductRows(allProducts), filename, "Products");
       } else {
-        exportToCsv(exportData, filename);
+        const headers = ["Brand", "Product Code", "Product Name", "Size", "Cost Price", "Sale Price (AED)", "Status"];
+        writePrintContent(pw, "Products", headers, buildProductRows(allProducts), allProducts.length);
       }
-      
-    } catch (error) {
-      console.error('Export error:', error);
+    } catch (err) {
+      console.error("Export error:", err);
+      if (pw) pw.close();
+      alert("Export failed. Please try again.");
     } finally {
       setIsExporting(false);
     }
   };
 
-  // Helper function to prepare current stock export data
-  const getCurrentStockExportData = () => {
-    return products.map(product => {
-      const stock = product.stockQuantity || 0;
-      const status = stock === 0 ? 'Out of Stock' : stock <= (product.minStockLevel || 10) ? 'Low Stock' : 'In Stock';
-      
+  const buildCurrentStockRows = (list) =>
+    list.map((p) => {
+      const stock = p.stockQuantity || 0;
+      const status = stock === 0 ? "Out of Stock" : stock <= (p.minStockLevel || 10) ? "Low Stock" : "In Stock";
       return {
-        SKU: product.sku,
-        'Product Name': product.name,
-        'Current Stock': stock,
-        'Min Stock Level': product.minStockLevel || 10,
+        SKU: p.sku,
+        "Product Name": p.name,
+        "Current Stock": stock,
+        "Min Stock Level": p.minStockLevel || 10,
         Status: status,
-        'Cost Price': product.costPrice || 0,
-        'Stock Value': (stock * (parseFloat(product.costPrice) || 0)).toFixed(2)
+        "Cost Price": p.costPrice || 0,
+        "Stock Value": (stock * (parseFloat(p.costPrice) || 0)).toFixed(2),
       };
     });
-  };
 
-  const exportCurrentStock = async (format = 'csv') => {
+  const exportCurrentStock = async (exportFmt) => {
+    const pw = exportFmt === "pdf" ? openPrintWindow() : null;
+    if (exportFmt === "pdf" && !pw) return;
+
     setIsExporting(true);
     try {
-      const exportData = getCurrentStockExportData();
-      const filename = `current-stock-${new Date().toISOString().split('T')[0]}`;
-      
-      if (format === 'xlsx') {
-        exportToXLSX(exportData, filename, 'Current Stock');
-      } else if (format === 'pdf') {
-        exportToPDF(exportData, filename, 'Current Stock Report');
+      const allProducts = await fetchAllProducts();
+      const filename = `current-stock-${new Date().toISOString().split("T")[0]}`;
+      const rows = buildCurrentStockRows(allProducts);
+
+      if (exportFmt === "xlsx") {
+        exportToXLSX(rows, filename, "Current Stock");
       } else {
-        exportToCsv(exportData, filename);
+        const headers = ["SKU", "Product Name", "Current Stock", "Min Stock Level", "Status", "Cost Price", "Stock Value"];
+        writePrintContent(pw, "Current Stock Levels", headers, rows, allProducts.length);
       }
-      
-    } catch (error) {
-      console.error('Export error:', error);
+    } catch (err) {
+      console.error("Export error:", err);
+      if (pw) pw.close();
+      alert("Export failed. Please try again.");
     } finally {
       setIsExporting(false);
     }
   };
 
-  // Helper function to prepare stock movements export data
-  const getStockMovementsExportData = () => {
-    return stockMovements.map(movement => ({
-      Date: format(new Date(movement.createdAt), 'dd/MM/yy'),
-      Time: format(new Date(movement.createdAt), 'HH:mm'),
-      'Product SKU': movement.productSku,
-      'Product Name': movement.productName,
-      'Movement Type': movement.movementType,
-      Quantity: movement.quantity,
-      'Previous Stock': movement.previousStock,
-      'New Stock': movement.newStock,
-      'Unit Cost': movement.unitCost || 0,
-      Notes: movement.notes || ''
+  const buildMovementRows = (list) =>
+    list.map((m) => ({
+      Date: format(new Date(m.createdAt), "dd/MM/yy"),
+      Time: format(new Date(m.createdAt), "HH:mm"),
+      "Product SKU": m.productSku,
+      "Product Name": m.productName,
+      "Movement Type": m.movementType,
+      Quantity: m.quantity,
+      "Previous Stock": m.previousStock,
+      "New Stock": m.newStock,
+      "Unit Cost": m.unitCost || 0,
+      Notes: m.notes || "",
     }));
-  };
 
-  const exportStockMovements = async (format = 'csv') => {
+  const exportStockMovements = async (exportFmt) => {
+    const pw = exportFmt === "pdf" ? openPrintWindow() : null;
+    if (exportFmt === "pdf" && !pw) return;
+
     setIsExporting(true);
     try {
-      const exportData = getStockMovementsExportData();
-      const filename = `stock-movements-${new Date().toISOString().split('T')[0]}`;
-      
-      if (format === 'xlsx') {
-        exportToXLSX(exportData, filename, 'Stock Movements');
-      } else if (format === 'pdf') {
-        exportToPDF(exportData, filename, 'Stock Movements Report');
+      const filename = `stock-movements-${new Date().toISOString().split("T")[0]}`;
+      const rows = buildMovementRows(stockMovements || []);
+
+      if (exportFmt === "xlsx") {
+        exportToXLSX(rows, filename, "Stock Movements");
       } else {
-        exportToCsv(exportData, filename);
+        const headers = ["Date", "Time", "Product SKU", "Product Name", "Movement Type", "Quantity", "Previous Stock", "New Stock", "Unit Cost", "Notes"];
+        writePrintContent(pw, "Stock Movements", headers, rows, rows.length);
       }
-      
-    } catch (error) {
-      console.error('Export error:', error);
+    } catch (err) {
+      console.error("Export error:", err);
+      if (pw) pw.close();
     } finally {
       setIsExporting(false);
     }
   };
 
-  // Helper function to prepare low stock export data
-  const getLowStockExportData = () => {
-    return lowStockProducts.map(product => ({
-      SKU: product.sku,
-      'Product Name': product.name,
-      'Current Stock': product.stockQuantity || 0,
-      'Min Stock Level': product.minStockLevel || 10,
-      'Reorder Needed': Math.max(0, (product.maxStockLevel || 50) - (product.stockQuantity || 0)),
-      'Cost Price': product.costPrice || 0,
-      'Stock Value': ((product.stockQuantity || 0) * (parseFloat(product.costPrice) || 0)).toFixed(2)
+  const buildLowStockRows = (list) =>
+    list.map((p) => ({
+      SKU: p.sku,
+      "Product Name": p.name,
+      "Current Stock": p.stockQuantity || 0,
+      "Min Stock Level": p.minStockLevel || 10,
+      "Reorder Needed": Math.max(0, (p.maxStockLevel || 50) - (p.stockQuantity || 0)),
+      "Cost Price": p.costPrice || 0,
+      "Stock Value": ((p.stockQuantity || 0) * (parseFloat(p.costPrice) || 0)).toFixed(2),
     }));
-  };
 
-  const exportLowStock = async (format = 'csv') => {
+  const exportLowStock = async (exportFmt) => {
+    const pw = exportFmt === "pdf" ? openPrintWindow() : null;
+    if (exportFmt === "pdf" && !pw) return;
+
     setIsExporting(true);
     try {
-      const exportData = getLowStockExportData();
-      const filename = `low-stock-alerts-${new Date().toISOString().split('T')[0]}`;
-      
-      if (format === 'xlsx') {
-        exportToXLSX(exportData, filename, 'Low Stock Alerts');
-      } else if (format === 'pdf') {
-        exportToPDF(exportData, filename, 'Low Stock Alerts Report');
+      const filename = `low-stock-alerts-${new Date().toISOString().split("T")[0]}`;
+      const rows = buildLowStockRows(lowStockProducts || []);
+
+      if (exportFmt === "xlsx") {
+        exportToXLSX(rows, filename, "Low Stock Alerts");
       } else {
-        exportToCsv(exportData, filename);
+        const headers = ["SKU", "Product Name", "Current Stock", "Min Stock Level", "Reorder Needed", "Cost Price", "Stock Value"];
+        writePrintContent(pw, "Low Stock Alerts", headers, rows, rows.length);
       }
-      
-    } catch (error) {
-      console.error('Export error:', error);
+    } catch (err) {
+      console.error("Export error:", err);
+      if (pw) pw.close();
     } finally {
       setIsExporting(false);
     }
   };
 
-  // Helper function to prepare out of stock export data
-  const getOutOfStockExportData = () => {
-    return outOfStockProducts.map(product => ({
-      SKU: product.sku,
-      'Product Name': product.name,
-      Brand: product.brandName || '',
-      Size: product.description || '',
-      'Current Stock': 0,
-      Status: 'Out of Stock'
+  const buildOutOfStockRows = (list) =>
+    list.map((p) => ({
+      SKU: p.sku,
+      "Product Name": p.name,
+      Brand: p.brandName || "",
+      Size: p.description || "",
+      "Current Stock": 0,
+      Status: "Out of Stock",
     }));
-  };
 
-  const exportOutOfStock = async (format = 'csv') => {
+  const exportOutOfStock = async (exportFmt) => {
+    const pw = exportFmt === "pdf" ? openPrintWindow() : null;
+    if (exportFmt === "pdf" && !pw) return;
+
     setIsExporting(true);
     try {
-      const exportData = getOutOfStockExportData();
-      const filename = `out-of-stock-${new Date().toISOString().split('T')[0]}`;
-      
-      if (format === 'xlsx') {
-        exportToXLSX(exportData, filename, 'Out of Stock');
-      } else if (format === 'pdf') {
-        exportToPDF(exportData, filename, 'Out of Stock Report');
+      const filename = `out-of-stock-${new Date().toISOString().split("T")[0]}`;
+      const rows = buildOutOfStockRows(outOfStockProducts || []);
+
+      if (exportFmt === "xlsx") {
+        exportToXLSX(rows, filename, "Out of Stock");
       } else {
-        exportToCsv(exportData, filename);
+        const headers = ["SKU", "Product Name", "Brand", "Size", "Current Stock", "Status"];
+        writePrintContent(pw, "Out of Stock Products", headers, rows, rows.length);
       }
-      
-    } catch (error) {
-      console.error('Export error:', error);
+    } catch (err) {
+      console.error("Export error:", err);
+      if (pw) pw.close();
     } finally {
       setIsExporting(false);
     }
   };
 
   const getDataTypeAndCount = () => {
-    if (activeTab === 'products') {
-      return { type: 'Products', count: products.length };
-    } else if (activeTab === 'stock') {
+    if (activeTab === "products") {
+      return { type: "Products", count: totalProducts ?? products.length };
+    } else if (activeTab === "stock") {
       switch (stockSubTab) {
-        case 'stock-levels':
-          return { type: 'Current Stock', count: products.length };
-        case 'low-stock':
-          return { type: 'Low Stock Alerts', count: lowStockProducts?.length || 0 };
-        case 'movements':
-          return { type: 'Stock Movements', count: stockMovements?.length || 0 };
+        case "stock-levels":
+          return { type: "Current Stock", count: totalProducts ?? products.length };
+        case "low-stock":
+          return { type: "Low Stock Alerts", count: lowStockProducts?.length || 0 };
+        case "movements":
+          return { type: "Stock Movements", count: stockMovements?.length || 0 };
         default:
-          return { type: 'Stock Data', count: 0 };
+          return { type: "Stock Data", count: 0 };
       }
     }
-    return { type: 'Data', count: 0 };
+    return { type: "Data", count: 0 };
   };
 
   const { type: dataType, count: itemCount } = getDataTypeAndCount();
@@ -281,113 +297,85 @@ export default function ExportDropdown({ products, activeTab, stockSubTab, stock
       <DropdownMenuTrigger asChild>
         <Button variant="outline" disabled={isExporting}>
           <Download className="w-4 h-4 mr-2" />
-          {isExporting ? 'Exporting...' : 'Export'}
+          {isExporting ? "Exporting..." : "Export"}
         </Button>
       </DropdownMenuTrigger>
       <DropdownMenuContent align="end" className="w-56">
         <div className="px-3 py-2 text-sm font-medium text-gray-700 border-b">
           Export {dataType} ({itemCount} records)
         </div>
-        
-        {activeTab === 'products' && (
+
+        {activeTab === "products" && (
           <>
-            <DropdownMenuItem 
-              onClick={() => exportProducts('pdf')}
-              disabled={itemCount === 0}
-            >
+            <DropdownMenuItem onClick={() => exportProducts("pdf")} disabled={itemCount === 0 || isExporting}>
               <Eye className="w-4 h-4 mr-2" />
-              View & Print
+              View &amp; Print
             </DropdownMenuItem>
-            <DropdownMenuItem 
-              onClick={() => exportProducts('xlsx')}
-              disabled={itemCount === 0}
-            >
+            <DropdownMenuItem onClick={() => exportProducts("xlsx")} disabled={itemCount === 0 || isExporting}>
               <Download className="w-4 h-4 mr-2" />
               Export to XLSX
             </DropdownMenuItem>
           </>
         )}
-        
-        {activeTab === 'stock' && stockSubTab === 'stock-levels' && (
+
+        {activeTab === "stock" && stockSubTab === "stock-levels" && (
           <>
-            <DropdownMenuItem 
-              onClick={() => exportCurrentStock('pdf')}
-              disabled={itemCount === 0}
-            >
+            <DropdownMenuItem onClick={() => exportCurrentStock("pdf")} disabled={itemCount === 0 || isExporting}>
               <Eye className="w-4 h-4 mr-2" />
-              View & Print
+              View &amp; Print
             </DropdownMenuItem>
-            <DropdownMenuItem 
-              onClick={() => exportCurrentStock('xlsx')}
-              disabled={itemCount === 0}
-            >
+            <DropdownMenuItem onClick={() => exportCurrentStock("xlsx")} disabled={itemCount === 0 || isExporting}>
               <Download className="w-4 h-4 mr-2" />
               Export to XLSX
             </DropdownMenuItem>
           </>
         )}
-        
-        {activeTab === 'stock' && stockSubTab === 'movements' && (
+
+        {activeTab === "stock" && stockSubTab === "movements" && (
           <>
-            <DropdownMenuItem 
-              onClick={() => exportStockMovements('pdf')}
-              disabled={itemCount === 0}
-            >
+            <DropdownMenuItem onClick={() => exportStockMovements("pdf")} disabled={itemCount === 0 || isExporting}>
               <Eye className="w-4 h-4 mr-2" />
-              View & Print
+              View &amp; Print
             </DropdownMenuItem>
-            <DropdownMenuItem 
-              onClick={() => exportStockMovements('xlsx')}
-              disabled={itemCount === 0}
-            >
+            <DropdownMenuItem onClick={() => exportStockMovements("xlsx")} disabled={itemCount === 0 || isExporting}>
               <Download className="w-4 h-4 mr-2" />
               Export to XLSX
             </DropdownMenuItem>
           </>
         )}
-        
-        {activeTab === 'stock' && stockSubTab === 'low-stock' && (
+
+        {activeTab === "stock" && stockSubTab === "low-stock" && (
           <>
-            <DropdownMenuItem 
-              onClick={() => exportLowStock('pdf')}
-              disabled={itemCount === 0}
-            >
+            <DropdownMenuItem onClick={() => exportLowStock("pdf")} disabled={itemCount === 0 || isExporting}>
               <Eye className="w-4 h-4 mr-2" />
-              View & Print
+              View &amp; Print
             </DropdownMenuItem>
-            <DropdownMenuItem 
-              onClick={() => exportLowStock('xlsx')}
-              disabled={itemCount === 0}
-            >
+            <DropdownMenuItem onClick={() => exportLowStock("xlsx")} disabled={itemCount === 0 || isExporting}>
               <Download className="w-4 h-4 mr-2" />
               Export to XLSX
             </DropdownMenuItem>
           </>
         )}
-        
-        {activeTab === 'stock' && stockSubTab === 'out-of-stock' && (
+
+        {activeTab === "stock" && stockSubTab === "out-of-stock" && (
           <>
-            <DropdownMenuItem 
-              onClick={() => exportOutOfStock('pdf')}
-              disabled={itemCount === 0}
-            >
+            <DropdownMenuItem onClick={() => exportOutOfStock("pdf")} disabled={itemCount === 0 || isExporting}>
               <Eye className="w-4 h-4 mr-2" />
-              View & Print
+              View &amp; Print
             </DropdownMenuItem>
-            <DropdownMenuItem 
-              onClick={() => exportOutOfStock('xlsx')}
-              disabled={itemCount === 0}
-            >
+            <DropdownMenuItem onClick={() => exportOutOfStock("xlsx")} disabled={itemCount === 0 || isExporting}>
               <Download className="w-4 h-4 mr-2" />
               Export to XLSX
             </DropdownMenuItem>
           </>
         )}
-        
+
         <DropdownMenuSeparator />
-        
+
         <div className="px-3 py-2 text-xs text-gray-500">
-          {activeTab === 'products' ? 'Exports all filtered products' : `Exports data from ${dataType.toLowerCase()} view`}
+          {activeTab === "products"
+            ? "Exports all filtered products across all pages"
+            : `Exports data from ${dataType.toLowerCase()} view`}
         </div>
       </DropdownMenuContent>
     </DropdownMenu>

@@ -108,12 +108,16 @@ export default function Inventory() {
         
         <div className="flex items-center gap-3 flex-wrap">
           <ExportDropdown 
-            products={products} 
+            products={products}
+            totalProducts={totalProducts}
             activeTab={activeTab}
             stockSubTab={stockSubTab}
             stockMovements={stockSubTabData.stockMovements}
             lowStockProducts={stockSubTabData.lowStockProducts}
             outOfStockProducts={stockSubTabData.outOfStockProducts}
+            searchTerm={searchTerm}
+            selectedBrands={selectedBrands}
+            selectedSizes={selectedSizes}
           />
           
           {activeTab === "products" && (
