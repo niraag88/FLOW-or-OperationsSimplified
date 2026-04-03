@@ -1224,9 +1224,10 @@ export async function registerRoutes(app: Express): Promise<Server> {
       res.setHeader('Cache-Control', 'no-cache');
 
       await wb.xlsx.write(res);
+      res.end();
     } catch (error) {
       console.error('Error generating bulk template:', error);
-      res.status(500).json({ error: 'Failed to generate template' });
+      if (!res.headersSent) res.status(500).json({ error: 'Failed to generate template' });
     }
   });
 
@@ -1288,6 +1289,29 @@ export async function registerRoutes(app: Express): Promise<Server> {
         }
         if (!salePrice && salePrice !== '0') {
           failed.push({ row: rowNum, sku, message: 'Sale price is required' });
+          continue;
+        }
+        const salePriceNum = parseFloat(salePrice);
+        if (isNaN(salePriceNum) || salePriceNum < 0) {
+          failed.push({ row: rowNum, sku, message: 'Sale price must be a valid non-negative number' });
+          continue;
+        }
+        if (row.purchasePrice) {
+          const purchasePriceNum = parseFloat(row.purchasePrice);
+          if (isNaN(purchasePriceNum) || purchasePriceNum < 0) {
+            failed.push({ row: rowNum, sku, message: 'Purchase price must be a valid non-negative number' });
+            continue;
+          }
+        }
+        const validCurrencies = ['AED', 'GBP', 'USD', 'INR'];
+        const currency = (row.purchasePriceCurrency || 'GBP').toUpperCase();
+        if (!validCurrencies.includes(currency)) {
+          failed.push({ row: rowNum, sku, message: `Purchase currency must be one of: ${validCurrencies.join(', ')}` });
+          continue;
+        }
+        const skuPattern = /^[A-Za-z0-9]{1,50}$/;
+        if (!skuPattern.test(sku)) {
+          failed.push({ row: rowNum, sku, message: 'Product code must be 1–50 letters and numbers only' });
           continue;
         }
         if (existingSkus.has(sku)) {
