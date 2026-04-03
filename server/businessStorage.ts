@@ -284,6 +284,7 @@ export class BusinessStorage {
       id: purchaseOrders.id,
       poNumber: purchaseOrders.poNumber,
       supplierId: purchaseOrders.supplierId,
+      brandId: purchaseOrders.brandId,
       status: purchaseOrders.status,
       orderDate: purchaseOrders.orderDate,
       expectedDelivery: purchaseOrders.expectedDelivery,
@@ -302,13 +303,14 @@ export class BusinessStorage {
       paymentRemarks: purchaseOrders.paymentRemarks,
       supplierScanKey: purchaseOrders.supplierScanKey,
       supplierName: suppliers.name,
-      brandName: suppliers.name,
+      brandName: brands.name,
       lineItems: sql<number>`coalesce(${itemsAgg.lineItems}, 0)`.as('lineItems'),
       orderedQty: sql<number>`coalesce(${itemsAgg.orderedQty}, 0)`.as('orderedQty'),
       receivedQty: sql<number>`coalesce(${receivedAgg.receivedQty}, 0)`.as('receivedQty'),
       reconciledAmount: sql<string>`${receivedAgg.reconciledAmount}`.as('reconciledAmount')
     }).from(purchaseOrders)
       .leftJoin(suppliers, eq(purchaseOrders.supplierId, suppliers.id))
+      .leftJoin(brands, eq(purchaseOrders.brandId, brands.id))
       .leftJoin(itemsAgg, eq(itemsAgg.poId, purchaseOrders.id))
       .leftJoin(receivedAgg, eq(receivedAgg.poId, purchaseOrders.id))
       .where(whereCondition)
@@ -325,6 +327,7 @@ export class BusinessStorage {
       id: purchaseOrders.id,
       poNumber: purchaseOrders.poNumber,
       supplierId: purchaseOrders.supplierId,
+      brandId: purchaseOrders.brandId,
       status: purchaseOrders.status,
       orderDate: purchaseOrders.orderDate,
       expectedDelivery: purchaseOrders.expectedDelivery,

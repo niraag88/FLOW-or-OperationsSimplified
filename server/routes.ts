@@ -181,8 +181,8 @@ async function generatePOPDF(purchaseOrder: any): Promise<string> {
 
       <div class="section grid">
         <div>
-          <h3>Supplier:</h3>
-          <p><strong>${purchaseOrder.supplierName || 'Unknown Supplier'}</strong></p>
+          <h3>Brand:</h3>
+          <p><strong>${purchaseOrder.brandName || 'Unknown Brand'}</strong></p>
         </div>
         <div>
           <h3>Order Details:</h3>
@@ -1768,9 +1768,12 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const po = await businessStorage.getPurchaseOrderById(poId);
       if (!po) return res.status(404).json({ error: 'Purchase order not found' });
 
-      // Supplier name
-      const [supplierRow] = await db.select({ name: suppliers.name })
-        .from(suppliers).where(eq(suppliers.id, po.supplierId!));
+      // Supplier or brand name for display
+      const [supplierRow] = po.supplierId
+        ? await db.select({ name: suppliers.name }).from(suppliers).where(eq(suppliers.id, po.supplierId))
+        : po.brandId
+          ? await db.select({ name: brands.name }).from(brands).where(eq(brands.id, po.brandId))
+          : [undefined];
 
       // PO items
       const rawItems = await db.select({

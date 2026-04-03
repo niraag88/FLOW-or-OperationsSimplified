@@ -15,6 +15,20 @@
       "when": 1774550788755,
       "tag": "0001_ambitious_wildside",
       "breakpoints": true
+    },
+    {
+      "idx": 2,
+      "version": "7",
+      "when": 1775208923720,
+      "tag": "0002_useful_inhumans",
+      "breakpoints": true
+    },
+    {
+      "idx": 3,
+      "version": "7",
+      "when": 1775209105049,
+      "tag": "0003_numerous_red_ghost",
+      "breakpoints": true
     }
   ]
 }

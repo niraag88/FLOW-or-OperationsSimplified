@@ -1,0 +1,1 @@
+ALTER TABLE "goods_receipts" ALTER COLUMN "supplier_id" DROP NOT NULL;

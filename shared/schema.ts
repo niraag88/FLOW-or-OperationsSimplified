@@ -300,7 +300,8 @@ export type InsertDeliveryOrderItem = z.infer<typeof insertDeliveryOrderItemSche
 export const purchaseOrders = pgTable("purchase_orders", {
   id: serial("id").primaryKey(),
   poNumber: text("po_number").notNull().unique(),
-  supplierId: integer("supplier_id").references(() => suppliers.id).notNull(),
+  supplierId: integer("supplier_id").references(() => suppliers.id),
+  brandId: integer("brand_id").references(() => brands.id),
   status: text("status").notNull().default("draft"), // draft, sent, confirmed, received, cancelled
   orderDate: timestamp("order_date").defaultNow().notNull(),
   expectedDelivery: timestamp("expected_delivery"),
@@ -499,7 +500,7 @@ export const goodsReceipts = pgTable("goods_receipts", {
   id: serial("id").primaryKey(),
   receiptNumber: text("receipt_number").notNull().unique(),
   poId: integer("po_id").references(() => purchaseOrders.id).notNull(),
-  supplierId: integer("supplier_id").references(() => suppliers.id).notNull(),
+  supplierId: integer("supplier_id").references(() => suppliers.id),
   receivedDate: timestamp("received_date").defaultNow().notNull(),
   status: text("status").notNull().default("pending"), // pending, confirmed, cancelled
   notes: text("notes"),
@@ -617,7 +618,7 @@ export const insertProductSchema = createInsertSchema(products).pick({
 
 export const insertPurchaseOrderSchema = createInsertSchema(purchaseOrders).pick({
   poNumber: true,
-  supplierId: true,
+  brandId: true,
   status: true,
   orderDate: true,
   expectedDelivery: true,
@@ -630,6 +631,7 @@ export const insertPurchaseOrderSchema = createInsertSchema(purchaseOrders).pick
   objectKey: true,
   createdBy: true,
 }).extend({
+  supplierId: z.number().nullable().optional(),
   paymentStatus: z.enum(['outstanding', 'paid']).optional(),
   paymentMadeDate: z.string().nullable().optional(),
   paymentRemarks: z.string().nullable().optional(),
