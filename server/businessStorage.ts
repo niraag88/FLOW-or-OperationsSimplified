@@ -345,7 +345,10 @@ export class BusinessStorage {
       paymentStatus: purchaseOrders.paymentStatus,
       paymentMadeDate: purchaseOrders.paymentMadeDate,
       paymentRemarks: purchaseOrders.paymentRemarks,
-    }).from(purchaseOrders).where(eq(purchaseOrders.id, id));
+      brandName: brands.name,
+    }).from(purchaseOrders)
+      .leftJoin(brands, eq(purchaseOrders.brandId, brands.id))
+      .where(eq(purchaseOrders.id, id));
     return po;
   }
 

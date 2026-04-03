@@ -20,7 +20,7 @@ export default function POList({ purchaseOrders, totalCount, loading, canEdit, c
   const [showEditPaymentDialog, setShowEditPaymentDialog] = useState(false);
   const [editPaymentPO, setEditPaymentPO] = useState(null);
 
-  const getBrandName = (po) => po.brandName || po.supplierName || '';
+  const getBrandName = (po) => po.brandName || '';
 
   const getStatusColor = (status) => {
     switch (status?.toLowerCase()) {
