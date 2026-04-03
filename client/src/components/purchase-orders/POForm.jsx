@@ -220,7 +220,7 @@ export default function POForm({ open, onClose, editingPO, currentUser, onSucces
       if (product) {
         newItems[index].productSku = product.sku;
         newItems[index].productName = product.name;
-        newItems[index].size = product.size || '';
+        newItems[index].size = product.description || '';
         newItems[index].unitPrice = parseFloat(product.costPrice) || 0;
         newItems[index].lineTotal = newItems[index].quantity * (parseFloat(product.costPrice) || 0);
 
