@@ -1156,6 +1156,108 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  app.post('/api/products/bulk', requireAuth(), async (req: AuthenticatedRequest, res) => {
+    try {
+      const rows: Array<{
+        brandName: string;
+        productCode: string;
+        productName: string;
+        size?: string;
+        purchasePrice?: string;
+        purchasePriceCurrency?: string;
+        salePrice: string;
+      }> = req.body.rows;
+
+      if (!Array.isArray(rows) || rows.length === 0) {
+        return res.status(400).json({ error: 'No rows provided' });
+      }
+
+      // Load all brands once for name→id lookup
+      const allBrands = await businessStorage.getBrands();
+      const brandMap = new Map<string, number>();
+      for (const b of allBrands) {
+        brandMap.set(b.name.trim().toLowerCase(), b.id);
+      }
+
+      // Load existing SKUs to check uniqueness
+      const existingSkuRows = await db.select({ sku: products.sku }).from(products);
+      const existingSkus = new Set(existingSkuRows.map(r => r.sku?.toUpperCase()));
+
+      const created: any[] = [];
+      const failed: Array<{ row: number; sku: string; message: string }> = [];
+      const seenSkus = new Set<string>();
+
+      for (let i = 0; i < rows.length; i++) {
+        const row = rows[i];
+        const rowNum = i + 1;
+
+        const brandId = brandMap.get((row.brandName || '').trim().toLowerCase());
+        const sku = (row.productCode || '').trim().toUpperCase();
+        const name = (row.productName || '').trim();
+        const salePrice = row.salePrice;
+
+        if (!brandId) {
+          failed.push({ row: rowNum, sku, message: `Brand "${row.brandName}" not found` });
+          continue;
+        }
+        if (!sku) {
+          failed.push({ row: rowNum, sku, message: 'Product code is required' });
+          continue;
+        }
+        if (!name) {
+          failed.push({ row: rowNum, sku, message: 'Product name is required' });
+          continue;
+        }
+        if (!salePrice && salePrice !== '0') {
+          failed.push({ row: rowNum, sku, message: 'Sale price is required' });
+          continue;
+        }
+        if (existingSkus.has(sku)) {
+          failed.push({ row: rowNum, sku, message: `Product code "${sku}" already exists` });
+          continue;
+        }
+        if (seenSkus.has(sku)) {
+          failed.push({ row: rowNum, sku, message: `Duplicate product code "${sku}" in this import` });
+          continue;
+        }
+
+        seenSkus.add(sku);
+
+        try {
+          const product = await businessStorage.createProduct({
+            sku,
+            brandId,
+            name,
+            description: (row.size || '').trim() || null,
+            costPrice: row.purchasePrice || '0',
+            costPriceCurrency: row.purchasePriceCurrency || 'GBP',
+            unitPrice: salePrice,
+            stockQuantity: 0,
+            minStockLevel: 10,
+            isActive: true,
+          });
+          existingSkus.add(sku);
+          writeAuditLog({
+            actor: req.user!.id,
+            actorName: req.user?.username || String(req.user!.id),
+            targetId: String(product.id),
+            targetType: 'product',
+            action: 'CREATE',
+            details: `Product '${product.name}' (SKU: ${product.sku}) created via bulk import`,
+          });
+          created.push(product);
+        } catch (err) {
+          failed.push({ row: rowNum, sku, message: 'Failed to insert product' });
+        }
+      }
+
+      res.status(201).json({ created: created.length, failed: failed.length, errors: failed });
+    } catch (error) {
+      console.error('Error bulk-creating products:', error);
+      res.status(500).json({ error: 'Failed to bulk-create products' });
+    }
+  });
+
   app.put('/api/products/:id', requireAuth(), async (req: AuthenticatedRequest, res) => {
     try {
       const productId = parseInt(req.params.id);

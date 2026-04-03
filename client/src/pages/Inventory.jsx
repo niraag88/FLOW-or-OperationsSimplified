@@ -2,21 +2,27 @@
 import React, { useState, useEffect } from "react";
 import { useQuery, keepPreviousData } from "@tanstack/react-query";
 import { queryClient } from "@/lib/queryClient";
-import { Link } from "react-router-dom";
+import { Link, useNavigate } from "react-router-dom";
 import { createPageUrl } from "@/utils";
 import { useAuth } from "@/hooks/useAuth";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Button } from "@/components/ui/button";
-import { Plus } from "lucide-react";
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu";
+import { Plus, ChevronDown, FileSpreadsheet } from "lucide-react";
 import { StockCount } from "@/api/entities";
 import ProductsTab from "../components/inventory/ProductsTab";
 import StockTab from "../components/inventory/StockTab";
 import ExportDropdown from "../components/inventory/ExportDropdown";
-import QuickAddProduct from "../components/inventory/QuickAddProduct";
 
 const STALE_3MIN = 3 * 60 * 1000;
 
 export default function Inventory() {
+  const navigate = useNavigate();
   const [stockCounts, setStockCounts] = useState([]);
   const [uniqueBrands, setUniqueBrands] = useState([]);
   const [uniqueSizes, setUniqueSizes] = useState([]);
@@ -77,11 +83,6 @@ export default function Inventory() {
     queryClient.invalidateQueries({ queryKey: ['/api/products'] });
   };
 
-  const handleProductAdded = () => {
-    setCurrentPage(1);
-    queryClient.invalidateQueries({ queryKey: ['/api/products'] });
-  };
-
   const handleStockSubTabChange = (subTab, stockMovements, lowStockProducts, outOfStockProducts) => {
     setStockSubTab(subTab);
     setStockSubTabData({ stockMovements, lowStockProducts, outOfStockProducts });
@@ -116,20 +117,25 @@ export default function Inventory() {
           />
           
           {activeTab === "products" && (
-            <>
-              <QuickAddProduct 
-                onProductAdded={handleProductAdded}
-                canAdd={canEdit}
-                currentUser={currentUser}
-              />
-              
-              <Button asChild variant="outline">
-                <Link to={createPageUrl('AddProduct')}>
+            <DropdownMenu>
+              <DropdownMenuTrigger asChild>
+                <Button variant="outline">
                   <Plus className="w-4 h-4 mr-2" />
                   Add Product
-                </Link>
-              </Button>
-            </>
+                  <ChevronDown className="w-4 h-4 ml-2" />
+                </Button>
+              </DropdownMenuTrigger>
+              <DropdownMenuContent align="end">
+                <DropdownMenuItem onClick={() => navigate(createPageUrl('AddProduct'))}>
+                  <Plus className="w-4 h-4 mr-2" />
+                  Add Product
+                </DropdownMenuItem>
+                <DropdownMenuItem onClick={() => navigate(createPageUrl('BulkAddProduct'))}>
+                  <FileSpreadsheet className="w-4 h-4 mr-2" />
+                  Bulk Add Products
+                </DropdownMenuItem>
+              </DropdownMenuContent>
+            </DropdownMenu>
           )}
         </div>
       </div>

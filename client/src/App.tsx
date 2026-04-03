@@ -18,6 +18,7 @@ const Invoices = lazy(() => import("@/pages/Invoices.jsx"));
 const Reports = lazy(() => import("@/pages/Reports.jsx"));
 const Settings = lazy(() => import("@/pages/Settings.jsx"));
 const AddProduct = lazy(() => import("@/pages/AddProduct.jsx"));
+const BulkAddProduct = lazy(() => import("@/pages/BulkAddProduct.jsx"));
 const EditProduct = lazy(() => import("@/pages/EditProduct.jsx"));
 const StockCountNew = lazy(() => import("@/pages/StockCountNew.jsx"));
 const GoodsReceipts = lazy(() => import("@/pages/GoodsReceipts.jsx"));
@@ -113,6 +114,11 @@ function PagesContent() {
         <Route path="/AddProduct" element={
           <ProtectedRoute>
             <Layout currentPageName="Add Product"><AddProduct /></Layout>
+          </ProtectedRoute>
+        } />
+        <Route path="/BulkAddProduct" element={
+          <ProtectedRoute>
+            <Layout currentPageName="Bulk Add Products"><BulkAddProduct /></Layout>
           </ProtectedRoute>
         } />
         <Route path="/products/edit/:id" element={
