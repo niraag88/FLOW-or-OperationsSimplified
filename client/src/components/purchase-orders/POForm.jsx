@@ -106,6 +106,18 @@ export default function POForm({ open, onClose, editingPO, currentUser, onSucces
       if (editingPO) {
         await loadEditingData(filteredBrands, settings);
       } else {
+        setFormData({
+          poNumber: "",
+          brandId: "",
+          orderDate: new Date().toISOString().split('T')[0],
+          expectedDelivery: "",
+          status: "draft",
+          notes: "",
+          currency: "GBP",
+          fxRateToAed: "4.8500",
+          totalAmount: "0.00",
+          items: []
+        });
         setCurrencyExplicitlySet(false);
         generatePONumber();
         if (settings) {
