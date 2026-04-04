@@ -1350,7 +1350,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
               sku: item.sku,
               brandId: item.brandId,
               name: item.name,
-              description: item.description,
+              size: item.size,
               costPrice: item.costPrice,
               costPriceCurrency: item.costPriceCurrency,
               unitPrice: item.unitPrice,
