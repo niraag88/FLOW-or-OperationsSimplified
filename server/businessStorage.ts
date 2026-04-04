@@ -101,14 +101,14 @@ export class BusinessStorage {
         .innerJoin(brands, eq(products.brandId, brands.id))
         .where(eq(products.isActive, true))
         .orderBy(brands.name),
-      db.selectDistinct({ description: products.description })
+      db.selectDistinct({ size: products.size })
         .from(products)
-        .where(and(eq(products.isActive, true), sql`${products.description} IS NOT NULL`))
-        .orderBy(products.description),
+        .where(and(eq(products.isActive, true), sql`${products.size} IS NOT NULL`))
+        .orderBy(products.size),
     ]);
     return {
       brands: brandRows.map(r => r.name).filter(Boolean) as string[],
-      sizes: sizeRows.map(r => r.description).filter(Boolean) as string[],
+      sizes: sizeRows.map(r => r.size).filter(Boolean) as string[],
     };
   }
 

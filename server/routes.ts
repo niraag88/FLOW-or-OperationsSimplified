@@ -1266,7 +1266,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       // Pre-validate all rows before any DB writes
       const preValidated: Array<{
         row: number; sku: string; brandId: number; name: string;
-        description: string | null; costPrice: string; costPriceCurrency: string; unitPrice: string;
+        size: string | null; costPrice: string; costPriceCurrency: string; unitPrice: string;
       }> = [];
       const failed: Array<{ row: number; sku: string; message: string }> = [];
       const seenSkus = new Set<string>();
