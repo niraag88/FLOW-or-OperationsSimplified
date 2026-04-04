@@ -11,7 +11,6 @@ import { Button } from "@/components/ui/button";
 import { MoreHorizontal, Edit2, Download, Trash2, Eye, CheckCircle, RotateCcw, Upload, Printer } from "lucide-react";
 import { useToast } from "@/components/ui/use-toast";
 import { exportPODetailToXLSX, printPOGRNSummary } from "../utils/export";
-import { PurchaseOrder } from "@/api/entities";
 import SimpleConfirmDialog from "../common/SimpleConfirmDialog";
 import MarkPOPaidDialog from "./MarkPOPaidDialog";
 import UploadFileDialog from "../common/UploadFileDialog";
@@ -47,7 +46,14 @@ export default function POActionsDropdown({ po, canEdit, onEdit, onRefresh, curr
 
   const handleDelete = async () => {
     try {
-      await PurchaseOrder.delete(po.id);
+      const res = await fetch(`/api/purchase-orders/${po.id}`, {
+        method: 'DELETE',
+        credentials: 'include',
+      });
+      if (!res.ok) {
+        const body = await res.json().catch(() => ({}));
+        throw new Error(body.error || 'Failed to delete the purchase order.');
+      }
       toast({
         title: 'Purchase Order Deleted',
         description: `${po.poNumber} has been moved to the recycle bin.`
@@ -58,7 +64,7 @@ export default function POActionsDropdown({ po, canEdit, onEdit, onRefresh, curr
       console.error('Error deleting purchase order:', error);
       toast({
         title: 'Delete Failed',
-        description: 'Failed to delete the purchase order. Please try again.',
+        description: error.message || 'Failed to delete the purchase order. Please try again.',
         variant: 'destructive'
       });
     }

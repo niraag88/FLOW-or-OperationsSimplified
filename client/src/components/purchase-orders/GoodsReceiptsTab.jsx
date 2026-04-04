@@ -27,8 +27,6 @@ import { printPOGRNSummary, exportPODetailToXLSX } from "../utils/export";
 import { format } from "date-fns";
 import { useToast } from "@/hooks/use-toast";
 import SimpleConfirmDialog from "../common/SimpleConfirmDialog";
-import { RecycleBin } from "@/api/entities";
-import { AuditLog } from "@/api/entities";
 
 export default function GoodsReceiptsTab({ 
   purchaseOrders, 
@@ -233,40 +231,14 @@ export default function GoodsReceiptsTab({
     if (!deletingPO) return;
     
     try {
-      // Move to recycle bin
-      await RecycleBin.create({
-        document_type: 'PurchaseOrder',
-        document_id: deletingPO.id,
-        document_number: deletingPO.poNumber,
-        document_data: deletingPO,
-        deleted_by: currentUser?.email || 'unknown',
-        deleted_date: new Date().toISOString(),
-        reason: 'Deleted from Goods Receipts',
-        original_status: deletingPO.status,
-        can_restore: true
-      });
-
-      // Log the deletion
-      await AuditLog.create({
-        entity_type: 'PurchaseOrder',
-        entity_id: deletingPO.id,
-        action: 'deleted',
-        user_email: currentUser?.email || 'unknown',
-        changes: { 
-          document_number: deletingPO.poNumber,
-          deletion_reason: 'Deleted from Goods Receipts UI',
-          moved_to_recycle_bin: true
-        },
-        timestamp: new Date().toISOString()
-      });
-
-      // Delete from main table (this will remove it from the UI)
       const response = await fetch(`/api/purchase-orders/${deletingPO.id}`, {
-        method: 'DELETE'
+        method: 'DELETE',
+        credentials: 'include',
       });
       
       if (!response.ok) {
-        throw new Error('Failed to delete purchase order');
+        const body = await response.json().catch(() => ({}));
+        throw new Error(body.error || 'Failed to delete the purchase order.');
       }
 
       toast({
@@ -277,7 +249,6 @@ export default function GoodsReceiptsTab({
       setShowDeleteDialog(false);
       setDeletingPO(null);
       
-      // Refresh the data
       if (onRefresh) {
         onRefresh();
       }
@@ -285,7 +256,7 @@ export default function GoodsReceiptsTab({
       console.error('Error deleting purchase order:', error);
       toast({
         title: 'Delete Failed',
-        description: 'Failed to delete the purchase order. Please try again.',
+        description: error.message || 'Failed to delete the purchase order. Please try again.',
         variant: 'destructive'
       });
     }
