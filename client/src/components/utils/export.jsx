@@ -805,15 +805,14 @@ export const printPOGRNSummary = async (poId) => {
         </h3>
         <table class="data-table">
           <thead><tr><th>Product</th><th class="num">Qty Ordered</th><th class="num">Qty Received</th><th class="num">Unit Price</th><th class="num">Received Value</th></tr></thead>
-          <tbody>${itemRows}</tbody>
-          <tfoot><tr class="footer-row"><td colspan="4" class="num-label">Receipt Total</td><td class="num"><strong>${fmt(grnTotal)}</strong></td></tr></tfoot>
+          <tbody>${itemRows}<tr class="footer-row"><td colspan="4" class="num-label">Receipt Total</td><td class="num"><strong>${fmt(grnTotal)}</strong></td></tr></tbody>
         </table>
       </div>`;
   }).join('') : '';
 
   const recon = d.reconciliation;
   const reconSection = hasGrns ? `
-    <div class="section recon-box ${recon.isShortDelivery ? 'recon-short' : 'recon-full'}">
+    <div class="section section-compact recon-box ${recon.isShortDelivery ? 'recon-short' : 'recon-full'}">
       <h3>${recon.isShortDelivery ? '⚠ Short Delivery' : '✓ Fully Delivered'}</h3>
       <table class="recon-table">
         <tr><td>Original PO Value</td><td class="num">${fmt(recon.originalTotal)}</td></tr>
@@ -828,7 +827,7 @@ export const printPOGRNSummary = async (poId) => {
 <html>
 <head>
   <meta charset="utf-8"/>
-  <title>Purchase Order ${d.poNumber}</title>
+  <title>GRN Summary - ${d.poNumber}</title>
   <style>
     @page { size: A4 portrait; margin: 15mm; }
     body { font-family: Arial, sans-serif; font-size: 11pt; color: #111; margin: 24px 40px; }
@@ -837,7 +836,8 @@ export const printPOGRNSummary = async (poId) => {
     .doc-header h1 { font-size: 20pt; margin: 0 0 4px; }
     .doc-header h2 { font-size: 14pt; margin: 0 0 2px; color: #333; }
     .doc-header h3 { font-size: 11pt; margin: 0; color: #666; font-weight: normal; }
-    .section { margin-bottom: 20px; page-break-inside: avoid; }
+    .section { margin-bottom: 20px; }
+    .section-compact { page-break-inside: avoid; }
     h2.section-title { font-size: 11pt; text-transform: uppercase; letter-spacing: 0.05em; color: #555; border-bottom: 1px solid #ccc; padding-bottom: 4px; margin-bottom: 8px; }
     .info-table { width: 100%; border-collapse: collapse; margin-bottom: 4px; }
     .info-table th { text-align: left; color: #666; font-weight: normal; width: 160px; padding: 3px 0; }
@@ -875,7 +875,7 @@ export const printPOGRNSummary = async (poId) => {
     <h3>Goods Receipt Summary</h3>
   </div>
 
-  <div class="section">
+  <div class="section section-compact">
     <h2 class="section-title">Purchase Order Details</h2>
     <table class="info-table">
       <tr><th>Supplier</th><td>${d.supplierName || '—'}</td></tr>
@@ -892,8 +892,7 @@ export const printPOGRNSummary = async (poId) => {
     <h2 class="section-title">Items Ordered</h2>
     <table class="data-table">
       <thead><tr><th>Product</th><th class="num">Qty Ordered</th><th class="num">Unit Price</th><th class="num">Line Total</th></tr></thead>
-      <tbody>${orderedRows}</tbody>
-      <tfoot>${orderedFooter}</tfoot>
+      <tbody>${orderedRows}${orderedFooter}</tbody>
     </table>
   </div>
 
@@ -901,8 +900,7 @@ export const printPOGRNSummary = async (poId) => {
     <h2 class="section-title">Items Received</h2>
     <table class="data-table">
       <thead><tr><th>Product</th><th class="num">Qty Received</th><th class="num">Unit Price</th><th class="num">Received Value</th></tr></thead>
-      <tbody>${receivedRows}</tbody>
-      <tfoot>${receivedFooter}</tfoot>
+      <tbody>${receivedRows}${receivedFooter}</tbody>
     </table>
   </div>` : ''}
 
