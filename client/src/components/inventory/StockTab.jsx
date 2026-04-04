@@ -133,16 +133,6 @@ export default function StockTab({ products, loading, canEdit, currentUser, onRe
   const uniqueMovementTypes = [...new Set(stockMovements.map(m => m.movementType).filter(Boolean))].sort();
 
   // Filter functions
-  const filterProducts = (productList, searchTerm) => {
-    if (!searchTerm) return productList;
-    const term = searchTerm.toLowerCase();
-    return productList.filter(product => 
-      (product.name || '').toLowerCase().includes(term) ||
-      (product.sku || '').toLowerCase().includes(term) ||
-      (product.brandName || '').toLowerCase().includes(term) ||
-      (product.description || '').toLowerCase().includes(term)
-    );
-  };
 
   // Advanced filter function for current stock
   const applyAdvancedStockFilters = (productList, searchTerm, selectedBrands, selectedSizes, selectedStatus, stockLevelRange) => {
@@ -200,16 +190,6 @@ export default function StockTab({ products, loading, canEdit, currentUser, onRe
     return filtered;
   };
 
-  const filterMovements = (movementList, searchTerm) => {
-    if (!searchTerm) return movementList;
-    const term = searchTerm.toLowerCase();
-    return movementList.filter(movement => 
-      (movement.productName || '').toLowerCase().includes(term) ||
-      (movement.productSku || '').toLowerCase().includes(term) ||
-      (movement.movementType || '').toLowerCase().includes(term) ||
-      (movement.notes || '').toLowerCase().includes(term)
-    );
-  };
 
   // Advanced filter function for movements
   const applyAdvancedMovementFilters = (movementList, searchTerm, selectedBrands, selectedTypes, dateRange) => {
@@ -510,7 +490,7 @@ export default function StockTab({ products, loading, canEdit, currentUser, onRe
                 </p>
               </div>
               <div className="h-6 w-6 bg-green-100 rounded-full flex items-center justify-center flex-shrink-0 ml-2">
-                <span className="text-green-600 text-xs font-bold">$</span>
+                <span className="text-green-600 text-xs font-bold">AED</span>
               </div>
             </div>
           </CardContent>

@@ -2,7 +2,7 @@
 import React, { useState, useEffect } from "react";
 import { useQuery, keepPreviousData } from "@tanstack/react-query";
 import { queryClient } from "@/lib/queryClient";
-import { Link, useNavigate } from "react-router-dom";
+import { useNavigate } from "react-router-dom";
 import { createPageUrl } from "@/utils";
 import { useAuth } from "@/hooks/useAuth";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
@@ -13,8 +13,7 @@ import {
   DropdownMenuItem,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
-import { Plus, ChevronDown, FileSpreadsheet } from "lucide-react";
-import { StockCount } from "@/api/entities";
+import { Plus, ChevronDown, FileSpreadsheet, ClipboardList } from "lucide-react";
 import ProductsTab from "../components/inventory/ProductsTab";
 import StockTab from "../components/inventory/StockTab";
 import ExportDropdown from "../components/inventory/ExportDropdown";
@@ -23,7 +22,6 @@ const STALE_3MIN = 3 * 60 * 1000;
 
 export default function Inventory() {
   const navigate = useNavigate();
-  const [stockCounts, setStockCounts] = useState([]);
   const [uniqueBrands, setUniqueBrands] = useState([]);
   const [uniqueSizes, setUniqueSizes] = useState([]);
   const [searchTerm, setSearchTerm] = useState("");
@@ -65,11 +63,7 @@ export default function Inventory() {
       if (searchTerm) params.set('search', searchTerm);
       if (selectedBrands.length > 0) params.set('brand', selectedBrands.join(','));
       if (selectedSizes.length > 0) params.set('size', selectedSizes.join(','));
-      const [resp, stockData] = await Promise.all([
-        fetch(`/api/products?${params}`, { credentials: 'include' }).then(r => r.json()),
-        Promise.resolve().then(() => StockCount.list('-created_date')).catch(() => []),
-      ]);
-      setStockCounts(Array.isArray(stockData) ? stockData : []);
+      const resp = await fetch(`/api/products?${params}`, { credentials: 'include' }).then(r => r.json());
       return resp;
     },
     staleTime: STALE_3MIN,
@@ -120,7 +114,7 @@ export default function Inventory() {
             selectedSizes={selectedSizes}
           />
           
-          {activeTab === "products" && (
+          {activeTab === "products" && canEdit && (
             <DropdownMenu>
               <DropdownMenuTrigger asChild>
                 <Button className="bg-emerald-600 hover:bg-emerald-700 text-white">
@@ -140,6 +134,16 @@ export default function Inventory() {
                 </DropdownMenuItem>
               </DropdownMenuContent>
             </DropdownMenu>
+          )}
+
+          {activeTab === "stock" && canEdit && (
+            <Button
+              className="bg-emerald-600 hover:bg-emerald-700 text-white"
+              onClick={() => navigate('/stock-count')}
+            >
+              <ClipboardList className="w-4 h-4 mr-2" />
+              New Stock Count
+            </Button>
           )}
         </div>
       </div>
