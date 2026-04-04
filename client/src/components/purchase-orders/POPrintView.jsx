@@ -127,7 +127,7 @@ export default function POPrintView() {
 
         {/* Supplier Section */}
         <div className="print-supplier-section">
-          <div className="supplier-title">SUPPLIER/BRAND</div>
+          <div className="supplier-title">BRAND</div>
           <div className="supplier-name">{poData.supplierName}</div>
           {poData.supplierAddress && (
             <div className="supplier-address">{poData.supplierAddress}</div>

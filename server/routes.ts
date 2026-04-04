@@ -4586,6 +4586,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
         supplierEmail: suppliers.email,
         supplierPhone: suppliers.phone,
         brandName: brands.name,
+        brandAddress: brands.description,
         brandContactPerson: brands.contactPerson,
         brandContactEmail: brands.contactEmail,
         brandContactPhone: brands.contactPhone,
@@ -4612,7 +4613,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
       // Resolve supplier/brand: prefer explicit supplier, fall back to brand
       const resolvedSupplierName = purchaseOrder.supplierName || purchaseOrder.brandName;
-      const resolvedSupplierAddress = purchaseOrder.supplierAddress;
+      const resolvedSupplierAddress = purchaseOrder.supplierAddress || purchaseOrder.brandAddress;
       const resolvedContactPerson = purchaseOrder.supplierContactPerson || purchaseOrder.brandContactPerson;
       const resolvedEmail = purchaseOrder.supplierEmail || purchaseOrder.brandContactEmail;
       const resolvedPhone = purchaseOrder.supplierPhone || purchaseOrder.brandContactPhone;
