@@ -786,7 +786,7 @@ export default function POForm({ open, onClose, editingPO, currentUser, onSucces
                           {/* Block 2: PO-level uploaded document — always shown if set */}
                           {poScanKey && (
                             <div className={`space-y-1.5 ${grnInvoices.length > 0 ? 'pt-1.5 border-t border-blue-100' : ''}`}>
-                              <p className="text-xs font-medium text-gray-600">Uploaded Document</p>
+                              <p className="text-xs font-medium text-gray-600">PO-level Document</p>
                               <div className="flex items-center gap-3 bg-white border border-blue-100 rounded px-3 py-2">
                                 <FileText className="w-4 h-4 text-blue-600 flex-shrink-0" />
                                 <div className="flex-1 min-w-0">
