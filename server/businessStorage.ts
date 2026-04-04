@@ -126,7 +126,7 @@ export class BusinessStorage {
       conditions.push(inArray(brands.name, brandNames));
     }
     if (sizes && sizes.length > 0) {
-      conditions.push(inArray(products.description, sizes));
+      conditions.push(inArray(products.size, sizes));
     }
     const whereCondition = conditions.length > 0 ? and(...conditions) : undefined;
 
