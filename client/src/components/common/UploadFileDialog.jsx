@@ -23,9 +23,9 @@ function getFileExtension(mimeType) {
 
 function buildStorageKey(recordType, documentNumber, file) {
   const year = new Date().getFullYear();
-  const ext = getFileExtension(file.type);
   const safeName = (documentNumber || 'doc').replace(/[^a-zA-Z0-9\-_]/g, '-');
-  return `${recordType}/${year}/${safeName}-attachment.${ext}`;
+  const origName = file.name.replace(/[^a-zA-Z0-9._-]/g, '-').toLowerCase();
+  return `${recordType}/${year}/${safeName}/${Date.now()}-${origName}`;
 }
 
 export default function UploadFileDialog({ open, onClose, onSuccess, recordType, recordId, documentNumber, maxSizeMB = 25 }) {

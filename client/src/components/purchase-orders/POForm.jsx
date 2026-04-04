@@ -739,17 +739,24 @@ export default function POForm({ open, onClose, editingPO, currentUser, onSucces
                       <p className="text-xs text-gray-500">Loading documents...</p>
                     ) : (() => {
                       const grnInvoices = grnDocs.filter(grn => grn.scanKey1);
-                      const hasGrnInvoices = grnInvoices.length > 0;
                       const supportingDocs = grnDocs.flatMap(grn =>
                         [
                           grn.scanKey2 && { key: grn.scanKey2, grn, slot: 2 },
                           grn.scanKey3 && { key: grn.scanKey3, grn, slot: 3 },
                         ].filter(Boolean)
                       );
+                      const hasAnyDoc = grnInvoices.length > 0 || poScanKey || supportingDocs.length > 0;
+
+                      const extractFilename = (key) => {
+                        if (!key) return '';
+                        const last = key.split('/').pop() || key;
+                        return last.replace(/^\d{10,}-/, '');
+                      };
+
                       return (
                         <div className="space-y-2">
-                          {/* GRN-level supplier invoices (slot 1 per GRN) */}
-                          {hasGrnInvoices ? (
+                          {/* Block 1: GRN per-delivery invoices (slot 1 per GRN) */}
+                          {grnInvoices.length > 0 && (
                             <div className="space-y-1.5">
                               <p className="text-xs font-medium text-gray-600">Per-Delivery Invoices</p>
                               {grnInvoices.map(grn => (
@@ -774,15 +781,16 @@ export default function POForm({ open, onClose, editingPO, currentUser, onSucces
                                 </div>
                               ))}
                             </div>
-                          ) : poScanKey ? (
-                            /* PO-level document shown as fallback when no per-delivery invoices exist */
-                            <div className="space-y-1.5">
+                          )}
+
+                          {/* Block 2: PO-level uploaded document — always shown if set */}
+                          {poScanKey && (
+                            <div className={`space-y-1.5 ${grnInvoices.length > 0 ? 'pt-1.5 border-t border-blue-100' : ''}`}>
                               <p className="text-xs font-medium text-gray-600">Uploaded Document</p>
                               <div className="flex items-center gap-3 bg-white border border-blue-100 rounded px-3 py-2">
                                 <FileText className="w-4 h-4 text-blue-600 flex-shrink-0" />
                                 <div className="flex-1 min-w-0">
-                                  <p className="text-xs font-medium text-gray-800 truncate">{editingPO.poNumber}</p>
-                                  <p className="text-xs text-gray-500">PO-level document</p>
+                                  <p className="text-xs font-medium text-gray-800 truncate">{extractFilename(poScanKey)}</p>
                                 </div>
                                 <Button
                                   type="button"
@@ -805,11 +813,9 @@ export default function POForm({ open, onClose, editingPO, currentUser, onSucces
                                 </Button>
                               </div>
                             </div>
-                          ) : (
-                            <p className="text-xs text-gray-500 italic">No supplier invoices attached yet. Use the Goods Receipts tab to attach a per-delivery invoice, or use the ⋮ menu on the PO to upload a document.</p>
                           )}
 
-                          {/* Supporting docs from GRNs (slots 2 & 3) */}
+                          {/* Block 3: GRN supporting documents (slots 2 & 3) */}
                           {supportingDocs.length > 0 && (
                             <div className="pt-1.5 border-t border-blue-100">
                               <p className="text-xs font-medium text-gray-600 mb-1.5">Supporting Documents</p>
@@ -835,6 +841,11 @@ export default function POForm({ open, onClose, editingPO, currentUser, onSucces
                                 </div>
                               ))}
                             </div>
+                          )}
+
+                          {/* Empty state — only shown when no documents at all */}
+                          {!hasAnyDoc && (
+                            <p className="text-xs text-gray-500 italic">No documents attached yet. Use the Goods Receipts tab to attach a per-delivery invoice, or use the ⋮ menu on the PO to upload a document.</p>
                           )}
                         </div>
                       );
