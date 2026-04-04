@@ -3289,9 +3289,9 @@ export async function registerRoutes(app: Express): Promise<Server> {
             );
           }
 
-          // Atomic PO item received-quantity increment (no separate SELECT needed)
+          // Atomic PO item received-quantity increment (COALESCE handles nullable column)
           await tx.update(purchaseOrderItems)
-            .set({ receivedQuantity: sql`received_quantity + ${item.receivedQuantity}` })
+            .set({ receivedQuantity: sql`COALESCE(received_quantity, 0) + ${item.receivedQuantity}` })
             .where(eq(purchaseOrderItems.id, item.poItemId));
         }
 
