@@ -33,6 +33,7 @@ export default function POForm({ open, onClose, editingPO, currentUser, onSucces
   const [grnDocs, setGrnDocs] = useState([]);
   const [loadingGrnDocs, setLoadingGrnDocs] = useState(false);
   const [supplierDocsOpen, setSupplierDocsOpen] = useState(true);
+  const [poScanKey, setPoScanKey] = useState(null);
   const { toast } = useToast();
   
   const [formData, setFormData] = useState({
@@ -50,6 +51,7 @@ export default function POForm({ open, onClose, editingPO, currentUser, onSucces
 
   useEffect(() => {
     if (open) {
+      setPoScanKey(editingPO?.supplierScanKey || null);
       loadInitialData();
       if (editingPO?.id) {
         loadGrnDocs(editingPO.id);
@@ -96,8 +98,8 @@ export default function POForm({ open, onClose, editingPO, currentUser, onSucces
         const data = await res.json().catch(() => ({}));
         throw new Error(data.error || 'Failed to remove document');
       }
+      setPoScanKey(null);
       toast({ title: 'Document Removed', description: 'The document has been removed from this purchase order.' });
-      if (onRefresh) onRefresh();
     } catch (e) {
       toast({ title: 'Error', description: 'Could not remove the document. Please try again.', variant: 'destructive' });
     }
@@ -770,8 +772,8 @@ export default function POForm({ open, onClose, editingPO, currentUser, onSucces
                                 </div>
                               ))}
                             </div>
-                          ) : editingPO.supplierScanKey ? (
-                            /* Consolidated invoice shown as fallback when no per-delivery invoices exist */
+                          ) : poScanKey ? (
+                            /* PO-level document shown as fallback when no per-delivery invoices exist */
                             <div className="space-y-1.5">
                               <p className="text-xs font-medium text-gray-600">Uploaded Document</p>
                               <div className="flex items-center gap-3 bg-white border border-blue-100 rounded px-3 py-2">
@@ -785,7 +787,7 @@ export default function POForm({ open, onClose, editingPO, currentUser, onSucces
                                   variant="ghost"
                                   size="sm"
                                   className="h-7 px-2 text-blue-600 hover:text-blue-800"
-                                  onClick={() => handleViewDoc(editingPO.supplierScanKey)}
+                                  onClick={() => handleViewDoc(poScanKey)}
                                 >
                                   <ExternalLink className="w-3.5 h-3.5 mr-1" />
                                   View
