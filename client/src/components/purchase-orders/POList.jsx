@@ -136,13 +136,13 @@ export default function POList({ purchaseOrders, totalCount, loading, canEdit, c
                           >
                             {po.poNumber}
                           </button>
-                          {po.supplierScanKey && (
+                          {(po.supplierScanKey || po.hasGrnAttachment) && (
                             <Tooltip>
                               <TooltipTrigger asChild>
                                 <Paperclip className="w-3.5 h-3.5 text-blue-500 shrink-0" />
                               </TooltipTrigger>
                               <TooltipContent side="top">
-                                <p className="text-xs">Supplier invoice attached</p>
+                                <p className="text-xs">Documents attached — open PO to view</p>
                               </TooltipContent>
                             </Tooltip>
                           )}

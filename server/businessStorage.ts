@@ -302,6 +302,15 @@ export class BusinessStorage {
       paymentMadeDate: purchaseOrders.paymentMadeDate,
       paymentRemarks: purchaseOrders.paymentRemarks,
       supplierScanKey: purchaseOrders.supplierScanKey,
+      hasGrnAttachment: sql<boolean>`exists(
+        select 1 from goods_receipts
+        where goods_receipts.po_id = ${purchaseOrders.id}
+          and (
+            goods_receipts.scan_key_1 is not null
+            or goods_receipts.scan_key_2 is not null
+            or goods_receipts.scan_key_3 is not null
+          )
+      )`.as('hasGrnAttachment'),
       supplierName: suppliers.name,
       brandName: brands.name,
       lineItems: sql<number>`coalesce(${itemsAgg.lineItems}, 0)`.as('lineItems'),

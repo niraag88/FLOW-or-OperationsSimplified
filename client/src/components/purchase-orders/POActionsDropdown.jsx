@@ -134,7 +134,7 @@ export default function POActionsDropdown({ po, canEdit, onEdit, onRefresh, curr
         const data = await res.json().catch(() => ({}));
         throw new Error(data.error || 'Failed to remove file');
       }
-      toast({ title: 'File Removed', description: 'The supplier invoice has been removed.' });
+      toast({ title: 'File Removed', description: 'The document has been removed.' });
       onRefresh();
     } catch (error) {
       console.error('Error removing file:', error);
@@ -189,20 +189,20 @@ export default function POActionsDropdown({ po, canEdit, onEdit, onRefresh, curr
           <DropdownMenuSeparator />
           <DropdownMenuItem onClick={() => setShowUploadDialog(true)}>
             <Upload className="w-4 h-4 mr-2" />
-            Attach Consolidated Invoice
+            Upload Document
           </DropdownMenuItem>
           {hasSupplierScanKey && (
             <>
               <DropdownMenuItem onClick={handleViewFile}>
                 <Paperclip className="w-4 h-4 mr-2" />
-                View Consolidated Invoice
+                View Document
               </DropdownMenuItem>
               <DropdownMenuItem
                 onClick={() => setShowRemoveFileDialog(true)}
                 className="text-orange-600 focus:text-orange-600"
               >
                 <X className="w-4 h-4 mr-2" />
-                Remove Consolidated Invoice
+                Remove Document
               </DropdownMenuItem>
             </>
           )}
@@ -236,8 +236,8 @@ export default function POActionsDropdown({ po, canEdit, onEdit, onRefresh, curr
         open={showRemoveFileDialog}
         onClose={() => setShowRemoveFileDialog(false)}
         onConfirm={handleRemoveFile}
-        title="Remove Consolidated Invoice"
-        description={`Remove the uploaded consolidated invoice from PO "${poNumber}"? The file will be permanently deleted.`}
+        title="Remove Document"
+        description={`Remove the uploaded document from PO "${poNumber}"? The file will be permanently deleted.`}
         confirmText="Yes, Remove"
         confirmVariant="destructive"
       />
