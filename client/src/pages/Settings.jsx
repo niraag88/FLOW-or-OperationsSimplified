@@ -2,6 +2,7 @@ import React, { useState } from "react";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Settings as SettingsIcon, Users, Building2, Package2, Database, HardDrive, Trash2, Package, Trash, Archive, FolderMinus } from "lucide-react";
+import { useAuth } from "@/hooks/useAuth";
 
 // Import setting components
 import CompanySettings from "../components/settings/CompanySettings";
@@ -17,6 +18,7 @@ import InventorySettings from "../components/settings/InventorySettings";
 
 export default function Settings() {
   const [activeTab, setActiveTab] = useState("company");
+  const { user: currentUser } = useAuth();
 
   return (
     <div className="space-y-4 sm:space-y-6">
@@ -93,7 +95,9 @@ export default function Settings() {
         <TabsContent value="storage" className="mt-4 sm:mt-6">
           <div className="space-y-6">
             <SettingsStorage />
-            <RetentionSettings />
+            {currentUser?.role === 'Admin' && (
+              <RetentionSettings currentUser={currentUser} />
+            )}
           </div>
         </TabsContent>
 
