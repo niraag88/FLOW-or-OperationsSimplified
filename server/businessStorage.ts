@@ -610,20 +610,28 @@ export class BusinessStorage {
   }
 
   // Generate sequential numbers
-  // Find the highest numeric suffix from existing POs with the given prefix.
-  // Fetches all matching PO numbers and parses the last dash-segment as an integer.
-  // Returns 0 when no POs with this prefix exist yet.
+  // Find the highest numeric suffix from existing POs that match the EXACT prefix sequence.
+  // "Exact" means po_number = "<prefix>-<digits>" with no extra dash-segments.
+  // Example: prefix "PO" matches "PO-114" but NOT "PO-UAE-001" (different prefix scheme).
+  // Returns 0 when no POs with this exact prefix format exist yet.
   private async getMaxExistingPoNumber(prefix: string): Promise<number> {
+    // LIKE gives us a coarse superset; the JS loop enforces the exact shape.
     const existing = await db
       .select({ poNumber: purchaseOrders.poNumber })
       .from(purchaseOrders)
       .where(like(purchaseOrders.poNumber, `${prefix}-%`));
 
+    // prefix has N dash-separated segments (e.g. "PO" → 1, "PO-UAE" → 2).
+    // A valid PO number for this prefix has exactly N+1 segments, with the last being all digits.
+    const prefixSegmentCount = prefix.split('-').length;
     let maxNum = 0;
     for (const row of existing) {
       const parts = row.poNumber.split('-');
-      const num = parseInt(parts[parts.length - 1], 10);
-      if (!isNaN(num) && num > maxNum) maxNum = num;
+      const lastPart = parts[parts.length - 1];
+      if (parts.length === prefixSegmentCount + 1 && /^\d+$/.test(lastPart)) {
+        const num = parseInt(lastPart, 10);
+        if (num > maxNum) maxNum = num;
+      }
     }
     return maxNum;
   }
@@ -634,9 +642,13 @@ export class BusinessStorage {
     const prefix = rawPrefix.endsWith('-') ? rawPrefix.slice(0, -1) : rawPrefix;
     const counterNumber = settings?.nextPoNumber || 1;
 
-    // Always derive from the actual purchase_orders table so that deletions
-    // never leave gaps — the counter in company_settings is only the fallback
-    // when no POs with this prefix exist yet (e.g. first PO in a fresh system).
+    // Derive the next number exclusively from the actual purchase_orders table.
+    // This makes numbering deletion-proof: if POs 115-125 were created then deleted,
+    // dbMaxNumber = 114 and nextNumber = 115, regardless of what the counter says.
+    // The counter (company_settings.next_po_number) is only used as a fallback when
+    // no POs with this prefix exist yet (fresh system / first PO ever).
+    // Note: using MAX(dbMax+1, counter) would be wrong here — the counter is inflated
+    // by deletions and must be ignored once the DB is the source of truth.
     const dbMaxNumber = await this.getMaxExistingPoNumber(prefix);
     const nextNumber = dbMaxNumber > 0 ? dbMaxNumber + 1 : Math.max(counterNumber, 1);
 
@@ -645,7 +657,8 @@ export class BusinessStorage {
       ? `${prefix}-${String(nextNumber).padStart(3, '0')}`
       : `${prefix}-${nextNumber}`;
 
-    // Sync the counter forward so it stays consistent with reality
+    // Sync the counter forward so it roughly tracks reality (it won't be used for
+    // sequencing while DB data exists, but keeps the value reasonable).
     if (settings) {
       await this.updateCompanySettings({
         ...settings,
@@ -657,7 +670,7 @@ export class BusinessStorage {
   }
 
   async getNextPoNumber() {
-    // Preview the next number without incrementing — must use identical logic to
+    // Preview the next number without incrementing — uses identical logic to
     // generatePoNumber() so the form always shows the number that will be assigned.
     const settings = await this.getCompanySettings();
     const rawPrefix = settings?.poNumberPrefix || 'PO';
