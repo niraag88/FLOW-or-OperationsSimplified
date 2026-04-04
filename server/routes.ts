@@ -2352,12 +2352,33 @@ export async function registerRoutes(app: Express): Promise<Server> {
   app.delete('/api/purchase-orders/:id/scan-key', requireAuth(['Admin', 'Manager', 'Staff']), async (req: AuthenticatedRequest, res) => {
     try {
       const id = parseInt(req.params.id);
+      const [po] = await db.select().from(purchaseOrders).where(eq(purchaseOrders.id, id));
+      if (!po) return res.status(404).json({ error: 'Purchase order not found' });
+
+      if (po.supplierScanKey) {
+        try {
+          await objectStorageClient.delete(po.supplierScanKey);
+          await db.delete(storageObjects).where(eq(storageObjects.key, po.supplierScanKey));
+        } catch (storageErr) {
+          console.warn('Could not delete object from storage (clearing key anyway):', storageErr);
+        }
+      }
+
       const [updated] = await db
         .update(purchaseOrders)
         .set({ supplierScanKey: null, updatedAt: new Date() })
         .where(eq(purchaseOrders.id, id))
         .returning();
-      if (!updated) return res.status(404).json({ error: 'Purchase order not found' });
+
+      writeAuditLog({
+        actor: req.user!.id,
+        actorName: req.user?.username || String(req.user!.id),
+        targetId: String(id),
+        targetType: 'purchase_order',
+        action: 'REMOVE_FILE',
+        details: `Document removed from Purchase Order #${po.poNumber}`,
+      });
+
       res.json(updated);
     } catch (error) {
       console.error('Error removing PO scan key:', error);
