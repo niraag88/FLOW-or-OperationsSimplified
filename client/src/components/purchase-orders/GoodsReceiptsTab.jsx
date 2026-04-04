@@ -532,13 +532,14 @@ export default function GoodsReceiptsTab({
         body: JSON.stringify({ status: 'closed' }),
       });
       if (!response.ok) {
-        throw new Error('Failed to close purchase order');
+        const body = await response.json().catch(() => ({}));
+        throw new Error(body.error || 'Failed to close purchase order');
       }
       toast({ title: "Success", description: `${closingPO.poNumber} has been closed.` });
       onRefresh();
     } catch (error) {
       console.error("Error force closing PO:", error);
-      toast({ title: "Error", description: "Could not close the Purchase Order.", variant: "destructive" });
+      toast({ title: "Error", description: error.message || 'Could not close the Purchase Order.', variant: "destructive" });
     } finally {
       setProcessingPO(null);
       setShowCloseConfirm(false);
