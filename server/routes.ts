@@ -1675,22 +1675,37 @@ export async function registerRoutes(app: Express): Promise<Server> {
       
       // Handle line items update
       if (req.body.items && Array.isArray(req.body.items)) {
+        // Snapshot existing receivedQuantity per product before deleting
+        const existingItems = await db
+          .select({ productId: purchaseOrderItems.productId, receivedQuantity: purchaseOrderItems.receivedQuantity })
+          .from(purchaseOrderItems)
+          .where(eq(purchaseOrderItems.poId, poId));
+        const receivedQtyByProduct = new Map<number, number>();
+        for (const ei of existingItems) {
+          // If the same product appears multiple times, take the max to be safe
+          const existing = receivedQtyByProduct.get(ei.productId) ?? 0;
+          receivedQtyByProduct.set(ei.productId, Math.max(existing, ei.receivedQuantity ?? 0));
+        }
+
         // Delete existing line items
         await db.delete(purchaseOrderItems).where(eq(purchaseOrderItems.poId, poId));
         
         let updatedComputedTotal = 0;
-        // Insert new line items
+        // Insert new line items, preserving receivedQuantity for products that had GRNs
         for (const item of req.body.items) {
           if (item.productId && item.quantity > 0) {
+            const productId = parseInt(item.productId);
+            const prevReceived = receivedQtyByProduct.get(productId) ?? 0;
             updatedComputedTotal += parseFloat(item.lineTotal) || 0;
             await db.insert(purchaseOrderItems).values({
               poId: poId,
-              productId: parseInt(item.productId),
+              productId,
               quantity: item.quantity,
               unitPrice: item.unitPrice.toString(),
               lineTotal: item.lineTotal.toString(),
               descriptionOverride: item.productName || null,
               sizeOverride: item.size || null,
+              receivedQuantity: prevReceived,
             });
           }
         }
