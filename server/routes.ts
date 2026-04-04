@@ -3069,6 +3069,9 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
     // Atomic SQL increment — no read-modify-write race condition.
     // COALESCE guards against nullable stock_quantity rows.
+    // RETURNING captures both values from SQL:
+    //   newStock     = stock_quantity after the update
+    //   previousStock = stock_quantity - qty (evaluated after update, so new - delta = old)
     const [updated] = await dbClient
       .update(products)
       .set({ 
@@ -3076,16 +3079,17 @@ export async function registerRoutes(app: Express): Promise<Server> {
         updatedAt: new Date()
       })
       .where(eq(products.id, productId))
-      .returning({ newStock: products.stockQuantity });
+      .returning({
+        newStock: products.stockQuantity,
+        previousStock: sql<number>`${products.stockQuantity} - ${quantityChange}`,
+      });
 
     if (!updated) {
       throw new Error(`Product with ID ${productId} not found`);
     }
 
-    // RETURNING gives the post-update value; previousStock is derived algebraically.
-    // This is equivalent to RETURNING stock_quantity - qty AS previous_stock.
     const newStock = updated.newStock ?? 0;
-    const previousStock = newStock - quantityChange;
+    const previousStock = updated.previousStock ?? 0;
 
     // Create stock movement record
     await dbClient.insert(stockMovements).values({
