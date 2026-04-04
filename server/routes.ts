@@ -3059,18 +3059,16 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
   // === AUTOMATED INVENTORY MANAGEMENT ===
 
-  // Type alias for either the global db or a Drizzle transaction — both expose the same query API.
+  // db or a transaction object share the same query API in Drizzle.
   type DbClient = typeof db | Parameters<Parameters<typeof db.transaction>[0]>[0];
 
-  // Helper function to update product stock and create movement record.
-  // Accepts an optional `tx` (Drizzle transaction) so it can run atomically inside
-  // a larger transaction. Without `tx` it uses the global `db` connection.
+  // Updates product stock atomically and records a stock movement.
+  // Pass `tx` to run inside a caller-provided transaction.
   async function updateProductStock(productId: number, quantityChange: number, movementType: string, referenceId: number, referenceType: string, unitCost: number, notes: string, userId: string, tx?: DbClient) {
     const dbClient: DbClient = tx ?? db;
 
-    // Atomic increment — avoids the read-modify-write race condition.
-    // COALESCE handles the rare NULL stock_quantity case (schema allows null).
-    // RETURNING gives us the NEW stock value; previousStock is derived from it.
+    // Atomic SQL increment — no read-modify-write race condition.
+    // COALESCE guards against nullable stock_quantity rows.
     const [updated] = await dbClient
       .update(products)
       .set({ 
@@ -3244,8 +3242,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const receiptCount = await db.select().from(goodsReceipts).then(rows => rows.length);
       const receiptNumber = `GR${String(receiptCount + 1).padStart(4, '0')}`;
 
-      // All writes are wrapped in a single transaction for atomicity.
-      // If any step fails the entire GRN is rolled back cleanly.
+      // All writes are wrapped in a single transaction — rollback on any failure.
       let receipt!: typeof goodsReceipts.$inferSelect;
       let allReceived = false;
 
@@ -3275,7 +3272,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
               unitPrice: item.unitPrice.toString()
             });
 
-            // Atomic stock update (race-condition-free, runs inside transaction)
+            // Atomic stock update inside transaction
             await updateProductStock(
               item.productId,
               item.receivedQuantity,
@@ -3289,13 +3286,13 @@ export async function registerRoutes(app: Express): Promise<Server> {
             );
           }
 
-          // Atomic PO item received-quantity increment (COALESCE handles nullable column)
+          // Atomic PO item received-quantity increment
           await tx.update(purchaseOrderItems)
             .set({ receivedQuantity: sql`COALESCE(received_quantity, 0) + ${item.receivedQuantity}` })
             .where(eq(purchaseOrderItems.id, item.poItemId));
         }
 
-        // Check PO status using updated values visible within this transaction
+        // Check PO status within same transaction to see updated received quantities
         const poItems = await tx.select().from(purchaseOrderItems).where(eq(purchaseOrderItems.poId, poId));
         allReceived = poItems.every(item => (item.receivedQuantity ?? 0) >= item.quantity);
 
