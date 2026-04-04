@@ -4563,6 +4563,9 @@ export async function registerRoutes(app: Express): Promise<Server> {
       }
 
       // Get purchase order data from database
+      // LEFT JOIN both suppliers (via supplier_id) and brands (via brand_id).
+      // Brand fields serve as fallback when no explicit supplier is linked —
+      // the PO form only sets brand_id, so supplier_id is NULL for most POs.
       const [purchaseOrder] = await db.select({
         id: purchaseOrders.id,
         poNumber: purchaseOrders.poNumber,
@@ -4582,8 +4585,13 @@ export async function registerRoutes(app: Express): Promise<Server> {
         supplierContactPerson: suppliers.contactPerson,
         supplierEmail: suppliers.email,
         supplierPhone: suppliers.phone,
+        brandName: brands.name,
+        brandContactPerson: brands.contactPerson,
+        brandContactEmail: brands.contactEmail,
+        brandContactPhone: brands.contactPhone,
       }).from(purchaseOrders)
         .leftJoin(suppliers, eq(purchaseOrders.supplierId, suppliers.id))
+        .leftJoin(brands, eq(purchaseOrders.brandId, brands.id))
         .where(eq(purchaseOrders.id, parseInt(poId as string)));
       
       if (!purchaseOrder) {
@@ -4602,9 +4610,21 @@ export async function registerRoutes(app: Express): Promise<Server> {
         .leftJoin(products, eq(purchaseOrderItems.productId, products.id))
         .where(eq(purchaseOrderItems.poId, parseInt(poId as string)));
 
+      // Resolve supplier/brand: prefer explicit supplier, fall back to brand
+      const resolvedSupplierName = purchaseOrder.supplierName || purchaseOrder.brandName;
+      const resolvedSupplierAddress = purchaseOrder.supplierAddress;
+      const resolvedContactPerson = purchaseOrder.supplierContactPerson || purchaseOrder.brandContactPerson;
+      const resolvedEmail = purchaseOrder.supplierEmail || purchaseOrder.brandContactEmail;
+      const resolvedPhone = purchaseOrder.supplierPhone || purchaseOrder.brandContactPhone;
+
       // Add items to purchase order object
       const purchaseOrderWithItems = {
         ...purchaseOrder,
+        supplierName: resolvedSupplierName,
+        supplierAddress: resolvedSupplierAddress,
+        supplierContactPerson: resolvedContactPerson,
+        supplierEmail: resolvedEmail,
+        supplierPhone: resolvedPhone,
         items: items.map(item => ({
           product_code: item.productCode,
           description: item.description,
