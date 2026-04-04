@@ -144,7 +144,14 @@
   color: #1a1a1a;
 }
 
-.supplier-address, .supplier-contact {
+.supplier-address {
+  font-size: 11px;
+  margin-bottom: 2px;
+  color: #333;
+  white-space: pre-wrap;
+}
+
+.supplier-contact {
   font-size: 11px;
   margin-bottom: 2px;
   color: #333;
