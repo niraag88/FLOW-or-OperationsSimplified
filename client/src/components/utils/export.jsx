@@ -845,7 +845,7 @@ export const printPOGRNSummary = async (poId) => {
     .data-table { width: 100%; border-collapse: collapse; font-size: 10pt; }
     .data-table th { background: #f5f5f5; border: 1px solid #ccc; padding: 6px 8px; text-align: left; font-size: 9pt; }
     .data-table td { border: 1px solid #ccc; padding: 5px 8px; }
-    .data-table tr { page-break-inside: avoid; }
+    .data-table tr { page-break-inside: avoid; break-inside: avoid; }
     .data-table .num { text-align: right; }
     .data-table .num-label { text-align: right; font-style: italic; color: #555; }
     .footer-row td { background: #f9f9f9; font-weight: 600; }
