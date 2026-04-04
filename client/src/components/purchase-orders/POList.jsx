@@ -9,14 +9,11 @@ import { Skeleton } from "@/components/ui/skeleton";
 import { formatDate } from "@/utils/dateUtils";
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
-import ReceiveGoodsDialog from "./ReceiveGoodsDialog";
 import MarkPOPaidDialog from "./MarkPOPaidDialog";
 import POActionsDropdown from "./POActionsDropdown";
 import { formatCurrency } from "@/utils/currency";
 
 export default function POList({ purchaseOrders, totalCount, loading, canEdit, currentUser, onEdit, onRefresh, onQuickView }) {
-  const [showReceiveDialog, setShowReceiveDialog] = useState(false);
-  const [selectedPO, setSelectedPO] = useState(null);
   const [showEditPaymentDialog, setShowEditPaymentDialog] = useState(false);
   const [editPaymentPO, setEditPaymentPO] = useState(null);
 
@@ -44,11 +41,6 @@ export default function POList({ purchaseOrders, totalCount, loading, canEdit, c
     const ordered = Number(po.orderedQty) || 0;
     const received = Number(po.receivedQty) || 0;
     return ordered > 0 && received < ordered;
-  };
-
-  const handleReceiveGoods = (po) => {
-    setSelectedPO(po);
-    setShowReceiveDialog(true);
   };
 
   const handleEditPayment = (po) => {
@@ -254,19 +246,6 @@ export default function POList({ purchaseOrders, totalCount, loading, canEdit, c
           )}
         </CardContent>
       </Card>
-
-      {showReceiveDialog && (
-        <ReceiveGoodsDialog
-          open={showReceiveDialog}
-          onClose={() => setShowReceiveDialog(false)}
-          purchaseOrder={selectedPO}
-          onSuccess={() => {
-            setShowReceiveDialog(false);
-            onRefresh();
-          }}
-          currentUser={currentUser}
-        />
-      )}
 
       {showEditPaymentDialog && editPaymentPO && (
         <MarkPOPaidDialog
