@@ -770,10 +770,12 @@ export const printPOGRNSummary = async (poId) => {
 
   const receivedRows = hasGrns ? (d.items || []).map(item => {
     const recQty = parseFloat(item.receivedQuantity) || 0;
+    const ordQty = parseFloat(item.quantity) || 0;
     const unitPrice = parseFloat(item.unitPrice) || 0;
-    return `<tr>
+    const short = recQty < ordQty;
+    return `<tr${short ? ' class="short-row"' : ''}>
       <td>${productCell(item.productName, item.size, item.productSku)}</td>
-      <td class="num">${recQty}</td>
+      <td class="num">${recQty}${short ? ' ⚠' : ''}</td>
       <td class="num">${fmt(unitPrice)}</td>
       <td class="num">${fmt(recQty * unitPrice)}</td>
     </tr>`;
