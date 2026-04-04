@@ -302,7 +302,7 @@ export const purchaseOrders = pgTable("purchase_orders", {
   poNumber: text("po_number").notNull().unique(),
   supplierId: integer("supplier_id").references(() => suppliers.id),
   brandId: integer("brand_id").references(() => brands.id),
-  status: text("status").notNull().default("draft"), // draft, sent, confirmed, received, cancelled
+  status: text("status").notNull().default("draft"), // draft | submitted | closed
   orderDate: timestamp("order_date").defaultNow().notNull(),
   expectedDelivery: timestamp("expected_delivery"),
   totalAmount: decimal("total_amount", { precision: 10, scale: 2 }).default("0.00"),
