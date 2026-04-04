@@ -7,3 +7,5 @@ vite.config.ts.*
 cookies.txt
 attached_assets/*.pdf
 attached_assets/*.PDF
+test-results/
+playwright-report/
