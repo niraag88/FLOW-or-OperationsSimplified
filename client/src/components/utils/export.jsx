@@ -833,6 +833,7 @@ export const printPOGRNSummary = async (poId) => {
   <style>
     @page { size: A4 portrait; margin: 15mm 15mm 22mm 15mm; @bottom-center { content: "Page " counter(page); font-size: 8pt; color: #888; } }
     body { font-family: Arial, sans-serif; font-size: 11pt; color: #111; margin: 24px 40px; }
+    * { -webkit-print-color-adjust: exact; print-color-adjust: exact; }
     @media print { body { margin: 0; } }
     .doc-header { text-align: center; margin-bottom: 24px; border-bottom: 2px solid #111; padding-bottom: 12px; }
     .doc-header h1 { font-size: 20pt; margin: 0 0 4px; }
