@@ -610,41 +610,67 @@ export class BusinessStorage {
   }
 
   // Generate sequential numbers
+  // Find the highest numeric suffix from existing POs with the given prefix.
+  // Fetches all matching PO numbers and parses the last dash-segment as an integer.
+  // Returns 0 when no POs with this prefix exist yet.
+  private async getMaxExistingPoNumber(prefix: string): Promise<number> {
+    const existing = await db
+      .select({ poNumber: purchaseOrders.poNumber })
+      .from(purchaseOrders)
+      .where(like(purchaseOrders.poNumber, `${prefix}-%`));
+
+    let maxNum = 0;
+    for (const row of existing) {
+      const parts = row.poNumber.split('-');
+      const num = parseInt(parts[parts.length - 1], 10);
+      if (!isNaN(num) && num > maxNum) maxNum = num;
+    }
+    return maxNum;
+  }
+
   async generatePoNumber() {
-    // Get settings for configurable numbering
     const settings = await this.getCompanySettings();
     const rawPrefix = settings?.poNumberPrefix || 'PO';
     const prefix = rawPrefix.endsWith('-') ? rawPrefix.slice(0, -1) : rawPrefix;
-    const nextNumber = settings?.nextPoNumber || 1;
-    
-    // Simple format: PREFIX-NUMBER (e.g., PO-1, PO-UAE-001)
-    const formattedNumber = prefix.includes('-') 
-      ? `${prefix}-${String(nextNumber).padStart(3, '0')}`  // PO-UAE-001 style
-      : `${prefix}-${nextNumber}`;  // PO-1 style
-    
-    // Update next number in settings
+    const counterNumber = settings?.nextPoNumber || 1;
+
+    // Always derive from the actual purchase_orders table so that deletions
+    // never leave gaps — the counter in company_settings is only the fallback
+    // when no POs with this prefix exist yet (e.g. first PO in a fresh system).
+    const dbMaxNumber = await this.getMaxExistingPoNumber(prefix);
+    const nextNumber = dbMaxNumber > 0 ? dbMaxNumber + 1 : Math.max(counterNumber, 1);
+
+    // Simple format: PREFIX-NUMBER (e.g., PO-115) or PREFIX-PART-NNN (e.g., PO-UAE-001)
+    const formattedNumber = prefix.includes('-')
+      ? `${prefix}-${String(nextNumber).padStart(3, '0')}`
+      : `${prefix}-${nextNumber}`;
+
+    // Sync the counter forward so it stays consistent with reality
     if (settings) {
       await this.updateCompanySettings({
         ...settings,
         nextPoNumber: nextNumber + 1
       });
     }
-    
+
     return formattedNumber;
   }
 
   async getNextPoNumber() {
-    // Preview the next number without incrementing it
+    // Preview the next number without incrementing — must use identical logic to
+    // generatePoNumber() so the form always shows the number that will be assigned.
     const settings = await this.getCompanySettings();
     const rawPrefix = settings?.poNumberPrefix || 'PO';
     const prefix = rawPrefix.endsWith('-') ? rawPrefix.slice(0, -1) : rawPrefix;
-    const nextNumber = settings?.nextPoNumber || 1;
-    
-    // Simple format: PREFIX-NUMBER (e.g., PO-1, PO-UAE-001)
-    const formattedNumber = prefix.includes('-') 
-      ? `${prefix}-${String(nextNumber).padStart(3, '0')}`  // PO-UAE-001 style
-      : `${prefix}-${nextNumber}`;  // PO-1 style
-    
+    const counterNumber = settings?.nextPoNumber || 1;
+
+    const dbMaxNumber = await this.getMaxExistingPoNumber(prefix);
+    const nextNumber = dbMaxNumber > 0 ? dbMaxNumber + 1 : Math.max(counterNumber, 1);
+
+    const formattedNumber = prefix.includes('-')
+      ? `${prefix}-${String(nextNumber).padStart(3, '0')}`
+      : `${prefix}-${nextNumber}`;
+
     return formattedNumber;
   }
 
