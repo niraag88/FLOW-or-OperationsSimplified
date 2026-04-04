@@ -502,7 +502,7 @@ export const goodsReceipts = pgTable("goods_receipts", {
   poId: integer("po_id").references(() => purchaseOrders.id).notNull(),
   supplierId: integer("supplier_id").references(() => suppliers.id),
   receivedDate: timestamp("received_date").defaultNow().notNull(),
-  status: text("status").notNull().default("pending"), // pending, confirmed, cancelled
+  status: text("status").notNull().default("confirmed"), // confirmed | cancelled
   notes: text("notes"),
   scanKey1: text("scan_key_1"),
   scanKey2: text("scan_key_2"),

@@ -1748,6 +1748,14 @@ export async function registerRoutes(app: Express): Promise<Server> {
       if (!po) {
         return res.status(404).json({ error: 'Purchase order not found' });
       }
+      // Block deletion if any GRNs have been raised against this PO
+      const [grnCount] = await db.select({ count: sql<number>`count(*)::int` })
+        .from(goodsReceipts)
+        .where(eq(goodsReceipts.poId, poId));
+      if ((grnCount?.count ?? 0) > 0) {
+        return res.status(400).json({ error: `Cannot delete PO #${po.poNumber} — it has ${grnCount.count} goods receipt(s). Delete the GRN(s) first.` });
+      }
+
       const items = await db.select().from(purchaseOrderItems).where(eq(purchaseOrderItems.poId, poId));
 
       // Atomically save to recycle bin and delete
@@ -3139,8 +3147,9 @@ export async function registerRoutes(app: Express): Promise<Server> {
         .where(poIdFilter ? eq(goodsReceipts.poId, poIdFilter) : undefined)
         .orderBy(desc(goodsReceipts.createdAt));
 
-      // Single bulk query for all GRN items (avoids N+1 per-receipt calls)
-      const allItems = await db.select({
+      // Bulk query for GRN items — scoped to the receipt IDs returned above (avoids full-table scan)
+      const receiptIds = receipts.map(r => r.id);
+      const allItems = receiptIds.length === 0 ? [] : await db.select({
         receiptId: goodsReceiptItems.receiptId,
         id: goodsReceiptItems.id,
         productId: goodsReceiptItems.productId,
@@ -3149,7 +3158,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
         receivedQuantity: goodsReceiptItems.receivedQuantity,
         unitPrice: goodsReceiptItems.unitPrice,
       }).from(goodsReceiptItems)
-        .leftJoin(products, eq(products.id, goodsReceiptItems.productId));
+        .leftJoin(products, eq(products.id, goodsReceiptItems.productId))
+        .where(inArray(goodsReceiptItems.receiptId, receiptIds));
 
       // Group items by receiptId
       const itemsByReceipt: Record<number, typeof allItems> = {};
@@ -3232,7 +3242,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   // Create goods receipt from purchase order
   app.post('/api/goods-receipts', requireAuth(['Admin', 'Manager']), async (req: AuthenticatedRequest, res) => {
     try {
-      const { poId, items, notes, forceClose } = req.body;
+      const { poId, items, notes, forceClose, receivedDate } = req.body;
       
       if (!poId || !items || !Array.isArray(items)) {
         return res.status(400).json({ error: 'Purchase Order ID and items are required' });
@@ -3257,7 +3267,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
           receiptNumber,
           poId,
           supplierId: po.supplierId,
-          receivedDate: new Date(),
+          receivedDate: receivedDate ? new Date(receivedDate) : new Date(),
           status: 'confirmed',
           notes: notes || '',
           createdBy: req.user!.id
@@ -3289,12 +3299,11 @@ export async function registerRoutes(app: Express): Promise<Server> {
               req.user!.id,
               tx
             );
+            // Atomic PO item received-quantity increment (skip if nothing received)
+            await tx.update(purchaseOrderItems)
+              .set({ receivedQuantity: sql`COALESCE(received_quantity, 0) + ${item.receivedQuantity}` })
+              .where(eq(purchaseOrderItems.id, item.poItemId));
           }
-
-          // Atomic PO item received-quantity increment
-          await tx.update(purchaseOrderItems)
-            .set({ receivedQuantity: sql`COALESCE(received_quantity, 0) + ${item.receivedQuantity}` })
-            .where(eq(purchaseOrderItems.id, item.poItemId));
         }
 
         // Check PO status within same transaction to see updated received quantities

@@ -1,0 +1,1 @@
+ALTER TABLE "goods_receipts" ALTER COLUMN "status" SET DEFAULT 'confirmed';

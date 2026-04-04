@@ -25,16 +25,10 @@ import { Label } from "@/components/ui/label";
 import ExportDropdown from "../common/ExportDropdown";
 import { printPOGRNSummary, exportPODetailToXLSX } from "../utils/export";
 import { format } from "date-fns";
-import { PurchaseOrder } from "@/api/entities";
-import { GoodsReceipt } from "@/api/entities";
-import { InventoryLot } from "@/api/entities";
-import { InventoryAudit } from "@/api/entities";
 import { useToast } from "@/hooks/use-toast";
-import { logStatusChange, logAuditAction } from "../utils/auditLogger";
 import SimpleConfirmDialog from "../common/SimpleConfirmDialog";
 import { RecycleBin } from "@/api/entities";
 import { AuditLog } from "@/api/entities";
-import { User } from "@/api/entities";
 
 export default function GoodsReceiptsTab({ 
   purchaseOrders, 
@@ -55,6 +49,7 @@ export default function GoodsReceiptsTab({
   const [selectedPOForReceive, setSelectedPOForReceive] = useState(null);
   const [receiveQuantities, setReceiveQuantities] = useState({});
   const [receiveNotes, setReceiveNotes] = useState('');
+  const [receiveDate, setReceiveDate] = useState(() => new Date().toISOString().slice(0, 10));
   // State is now managed by parent component for context-aware export
   const [showDeleteDialog, setShowDeleteDialog] = useState(false);
   const [deletingPO, setDeletingPO] = useState(null);
@@ -475,7 +470,8 @@ export default function GoodsReceiptsTab({
           poId: selectedPOForReceive.id,
           items: items,
           notes: receiveNotes,
-          forceClose: forceClose
+          forceClose: forceClose,
+          receivedDate: receiveDate,
         }),
       });
 
@@ -511,6 +507,7 @@ export default function GoodsReceiptsTab({
       setSelectedPOForReceive(null);
       setReceiveQuantities({});
       setReceiveNotes('');
+      setReceiveDate(new Date().toISOString().slice(0, 10));
       
       // Refresh the data
       if (onRefresh) {
@@ -548,143 +545,9 @@ export default function GoodsReceiptsTab({
     if (!po.items || po.items.length === 0) return false;
     
     return po.items.every(item => {
-      const totalReceived = getReceivedQuantityForItem(po.id, item.product_id);
+      const totalReceived = getReceivedQuantityForItem(po.id, item.productId);
       return totalReceived >= item.quantity;
     });
-  };
-
-  const handleReceiveItems = async (po) => {
-    if (!canEdit) return;
-    
-    setProcessingPO(po.id);
-    
-    try {
-      // Generate GRN number
-      const timestamp = Date.now().toString().slice(-6);
-      const grnNumber = `GRN-${timestamp}`;
-      
-      // Prepare items to receive
-      const itemsToReceive = po.items?.map((item, index) => {
-        const receivingQty = receivingQuantities[`${po.id}-${index}`] || 0;
-        return {
-          product_id: item.product_id,
-          ordered_quantity: item.quantity,
-          received_quantity: receivingQty,
-          unit_price: item.unit_price,
-          batch_no: `BATCH-${Date.now()}-${index}`,
-          location: "Warehouse A"
-        };
-      }).filter(item => item.received_quantity > 0) || [];
-
-      if (itemsToReceive.length === 0) {
-        toast({
-          title: "No items to receive",
-          description: "Please enter quantities for items to receive",
-          variant: "destructive"
-        });
-        setProcessingPO(null);
-        return;
-      }
-
-      // Create GRN
-      const grnData = {
-        grn_number: grnNumber,
-        purchase_order_id: po.id,
-        supplier_id: po.supplierId,
-        receipt_date: new Date().toISOString().split('T')[0],
-        received_by: currentUser.email,
-        notes: `Received via goods receipt tab`,
-        items: itemsToReceive
-      };
-
-      const newGRN = await GoodsReceipt.create(grnData);
-      await logAuditAction("GoodsReceipt", newGRN.id, "create", currentUser.email, { grn_number: newGRN.grn_number });
-
-      // Create inventory lots and audit entries
-      for (const item of itemsToReceive) {
-        // Create inventory lot
-        const lotData = {
-          product_id: item.product_id,
-          batch_no: item.batch_no,
-          location: item.location,
-          qty_on_hand: item.received_quantity,
-          cost_per_unit: item.unit_price,
-          currency: po.currency || 'GBP',
-          notes: `Received via GRN ${grnNumber}`,
-          is_active: true
-        };
-
-        const newLot = await InventoryLot.create(lotData);
-
-        // Create inventory audit entry
-        await InventoryAudit.create({
-          inventory_lot_id: newLot.id,
-          product_id: item.product_id,
-          adjustment_type: "increase",
-          previous_qty: 0,
-          adjusted_qty: item.received_quantity,
-          difference: item.received_quantity,
-          reason: `Goods received via PO ${po.poNumber}`,
-          reference_document: po.poNumber,
-          adjusted_by: currentUser.email,
-          adjustment_date: new Date().toISOString()
-        });
-      }
-
-      // Check if PO should be closed
-      const updatedPO = { ...po };
-      let shouldClose = true;
-      
-      updatedPO.items = po.items?.map(item => {
-        const totalReceived = getReceivedQuantityForItem(po.id, item.product_id) + 
-          (itemsToReceive.find(i => i.product_id === item.product_id)?.received_quantity || 0);
-        
-        if (totalReceived < item.quantity) {
-          shouldClose = false;
-        }
-        
-        return {
-          ...item,
-          received_quantity: totalReceived
-        };
-      });
-
-      // Update PO status if all items are received
-      if (shouldClose && po.status !== 'closed') {
-        await PurchaseOrder.update(po.id, { status: 'closed' });
-        await logStatusChange("PurchaseOrder", po.id, currentUser.email, po.status, 'closed', { reason: 'All items received' });
-
-        toast({
-          title: "Purchase Order Closed",
-          description: `${po.poNumber} has been automatically closed as all items are received.`
-        });
-      } else {
-        toast({
-          title: "Items Received",
-          description: `${itemsToReceive.length} item(s) received via GRN ${grnNumber}`
-        });
-      }
-
-      // Clear receiving quantities
-      setReceivingQuantities(prev => {
-        const newQuantities = { ...prev };
-        po.items?.forEach((_, index) => {
-          delete newQuantities[`${po.id}-${index}`];
-        });
-        return newQuantities;
-      });
-
-      onRefresh();
-    } catch (error) {
-      console.error("Error receiving items:", error);
-      toast({
-        title: "Error",
-        description: "Failed to receive items. Please try again.",
-        variant: "destructive"
-      });
-    } finally {
-      setProcessingPO(null);
-    }
   };
 
   const handleForceCloseClick = (po) => {
@@ -696,15 +559,14 @@ export default function GoodsReceiptsTab({
     if (!closingPO || !canEdit) return;
     setProcessingPO(closingPO.id);
     try {
-      await PurchaseOrder.update(closingPO.id, { status: 'closed' });
-      await logStatusChange(
-        "PurchaseOrder",
-        closingPO.id,
-        currentUser.email,
-        closingPO.status,
-        'closed',
-        { reason: 'Manual force close by user.' }
-      );
+      const response = await fetch(`/api/purchase-orders/${closingPO.id}/status`, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ status: 'closed' }),
+      });
+      if (!response.ok) {
+        throw new Error('Failed to close purchase order');
+      }
       toast({ title: "Success", description: `${closingPO.poNumber} has been closed.` });
       onRefresh();
     } catch (error) {
@@ -1260,6 +1122,7 @@ export default function GoodsReceiptsTab({
         setSelectedPOForReceive(null);
         setReceiveQuantities({});
         setReceiveNotes('');
+        setReceiveDate(new Date().toISOString().slice(0, 10));
         setPendingDocs([null, null, null]);
       }}>
         <DialogContent className="max-w-4xl max-h-[80vh] overflow-y-auto">
@@ -1324,15 +1187,27 @@ export default function GoodsReceiptsTab({
               </TableBody>
             </Table>
 
-            <div className="space-y-2">
-              <Label htmlFor="receive-notes">Notes (optional)</Label>
-              <Textarea
-                id="receive-notes"
-                placeholder="Add any notes about this goods receipt..."
-                value={receiveNotes}
-                onChange={(e) => setReceiveNotes(e.target.value)}
-                rows={3}
-              />
+            <div className="grid grid-cols-2 gap-4">
+              <div className="space-y-2">
+                <Label htmlFor="receive-date">Received Date</Label>
+                <Input
+                  id="receive-date"
+                  type="date"
+                  value={receiveDate}
+                  max={new Date().toISOString().slice(0, 10)}
+                  onChange={(e) => setReceiveDate(e.target.value)}
+                />
+              </div>
+              <div className="space-y-2">
+                <Label htmlFor="receive-notes">Notes (optional)</Label>
+                <Textarea
+                  id="receive-notes"
+                  placeholder="Add any notes about this goods receipt..."
+                  value={receiveNotes}
+                  onChange={(e) => setReceiveNotes(e.target.value)}
+                  rows={2}
+                />
+              </div>
             </div>
 
             <div className="space-y-2 border-t pt-3">
@@ -1375,6 +1250,7 @@ export default function GoodsReceiptsTab({
               setSelectedPOForReceive(null);
               setReceiveQuantities({});
               setReceiveNotes('');
+              setReceiveDate(new Date().toISOString().slice(0, 10));
               setPendingDocs([null, null, null]);
             }}>
               Cancel
