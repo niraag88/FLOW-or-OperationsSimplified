@@ -8,7 +8,7 @@ import {
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
 import { Button } from "@/components/ui/button";
-import { MoreHorizontal, Edit2, Download, Trash2, Eye, CheckCircle, RotateCcw, Upload, Paperclip, X, Printer } from "lucide-react";
+import { MoreHorizontal, Edit2, Download, Trash2, Eye, CheckCircle, RotateCcw, Upload, Printer } from "lucide-react";
 import { useToast } from "@/components/ui/use-toast";
 import { exportPODetailToXLSX, printPOGRNSummary } from "../utils/export";
 import { PurchaseOrder } from "@/api/entities";
@@ -21,7 +21,6 @@ export default function POActionsDropdown({ po, canEdit, onEdit, onRefresh, curr
   const [showDeleteDialog, setShowDeleteDialog] = useState(false);
   const [showMarkPaidDialog, setShowMarkPaidDialog] = useState(false);
   const [showUploadDialog, setShowUploadDialog] = useState(false);
-  const [showRemoveFileDialog, setShowRemoveFileDialog] = useState(false);
 
   const handleExportXLSX = async () => {
     try {
@@ -104,46 +103,7 @@ export default function POActionsDropdown({ po, canEdit, onEdit, onRefresh, curr
     }
   };
 
-  const handleViewFile = async () => {
-    const scanKey = po.supplierScanKey;
-    if (!scanKey) return;
-    try {
-      const res = await fetch(`/api/storage/signed-get?key=${encodeURIComponent(scanKey)}`, {
-        credentials: 'include',
-      });
-      const data = await res.json();
-      if (!res.ok) throw new Error(data.error || 'Failed to get download link');
-      window.open(data.url, '_blank');
-    } catch (error) {
-      console.error('Error viewing file:', error);
-      toast({
-        title: 'Error',
-        description: 'Could not retrieve the file. Please try again.',
-        variant: 'destructive'
-      });
-    }
-  };
-
-  const handleRemoveFile = async () => {
-    try {
-      const res = await fetch(`/api/purchase-orders/${po.id}/scan-key`, {
-        method: 'DELETE',
-        credentials: 'include',
-      });
-      if (!res.ok) {
-        const data = await res.json().catch(() => ({}));
-        throw new Error(data.error || 'Failed to remove file');
-      }
-      toast({ title: 'File Removed', description: 'The document has been removed.' });
-      onRefresh();
-    } catch (error) {
-      console.error('Error removing file:', error);
-      toast({ title: 'Error', description: 'Could not remove the file. Please try again.', variant: 'destructive' });
-    }
-  };
-
   const poNumber = po.poNumber || po.po_number || `po-${po.id}`;
-  const hasSupplierScanKey = !!po.supplierScanKey;
 
   return (
     <>
@@ -191,21 +151,6 @@ export default function POActionsDropdown({ po, canEdit, onEdit, onRefresh, curr
             <Upload className="w-4 h-4 mr-2" />
             Upload Document
           </DropdownMenuItem>
-          {hasSupplierScanKey && (
-            <>
-              <DropdownMenuItem onClick={handleViewFile}>
-                <Paperclip className="w-4 h-4 mr-2" />
-                View Document
-              </DropdownMenuItem>
-              <DropdownMenuItem
-                onClick={() => setShowRemoveFileDialog(true)}
-                className="text-orange-600 focus:text-orange-600"
-              >
-                <X className="w-4 h-4 mr-2" />
-                Remove Document
-              </DropdownMenuItem>
-            </>
-          )}
           <DropdownMenuSeparator />
           <DropdownMenuItem 
             onClick={() => setShowDeleteDialog(true)}
@@ -230,15 +175,6 @@ export default function POActionsDropdown({ po, canEdit, onEdit, onRefresh, curr
         title="Confirm Deletion"
         description={`Do you wish to confirm deleting Purchase Order "${poNumber}"? It will be moved to the recycle bin.`}
         confirmText="Yes, Delete"
-        confirmVariant="destructive"
-      />
-      <SimpleConfirmDialog
-        open={showRemoveFileDialog}
-        onClose={() => setShowRemoveFileDialog(false)}
-        onConfirm={handleRemoveFile}
-        title="Remove Document"
-        description={`Remove the uploaded document from PO "${poNumber}"? The file will be permanently deleted.`}
-        confirmText="Yes, Remove"
         confirmVariant="destructive"
       />
       <UploadFileDialog

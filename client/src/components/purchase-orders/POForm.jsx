@@ -85,6 +85,24 @@ export default function POForm({ open, onClose, editingPO, currentUser, onSucces
     }
   };
 
+  const handleDeletePoDoc = async () => {
+    if (!window.confirm('Remove this document from the purchase order? The file will be permanently deleted.')) return;
+    try {
+      const res = await fetch(`/api/purchase-orders/${editingPO.id}/scan-key`, {
+        method: 'DELETE',
+        credentials: 'include',
+      });
+      if (!res.ok) {
+        const data = await res.json().catch(() => ({}));
+        throw new Error(data.error || 'Failed to remove document');
+      }
+      toast({ title: 'Document Removed', description: 'The document has been removed from this purchase order.' });
+      if (onRefresh) onRefresh();
+    } catch (e) {
+      toast({ title: 'Error', description: 'Could not remove the document. Please try again.', variant: 'destructive' });
+    }
+  };
+
   const loadInitialData = async () => {
     try {
       const settled = await Promise.allSettled([
@@ -755,12 +773,12 @@ export default function POForm({ open, onClose, editingPO, currentUser, onSucces
                           ) : editingPO.supplierScanKey ? (
                             /* Consolidated invoice shown as fallback when no per-delivery invoices exist */
                             <div className="space-y-1.5">
-                              <p className="text-xs font-medium text-gray-600">Consolidated Invoice</p>
+                              <p className="text-xs font-medium text-gray-600">Uploaded Document</p>
                               <div className="flex items-center gap-3 bg-white border border-blue-100 rounded px-3 py-2">
                                 <FileText className="w-4 h-4 text-blue-600 flex-shrink-0" />
                                 <div className="flex-1 min-w-0">
                                   <p className="text-xs font-medium text-gray-800 truncate">{editingPO.poNumber}</p>
-                                  <p className="text-xs text-gray-500">PO-level consolidated invoice</p>
+                                  <p className="text-xs text-gray-500">PO-level document</p>
                                 </div>
                                 <Button
                                   type="button"
@@ -772,10 +790,19 @@ export default function POForm({ open, onClose, editingPO, currentUser, onSucces
                                   <ExternalLink className="w-3.5 h-3.5 mr-1" />
                                   View
                                 </Button>
+                                <Button
+                                  type="button"
+                                  variant="ghost"
+                                  size="sm"
+                                  className="h-7 px-2 text-red-500 hover:text-red-700"
+                                  onClick={handleDeletePoDoc}
+                                >
+                                  <Trash2 className="w-3.5 h-3.5" />
+                                </Button>
                               </div>
                             </div>
                           ) : (
-                            <p className="text-xs text-gray-500 italic">No supplier invoices attached yet. Use the Goods Receipts tab to attach a per-delivery invoice, or use the ⋮ menu on the PO to attach a consolidated invoice.</p>
+                            <p className="text-xs text-gray-500 italic">No supplier invoices attached yet. Use the Goods Receipts tab to attach a per-delivery invoice, or use the ⋮ menu on the PO to upload a document.</p>
                           )}
 
                           {/* Supporting docs from GRNs (slots 2 & 3) */}
