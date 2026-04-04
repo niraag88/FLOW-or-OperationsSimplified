@@ -3244,9 +3244,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
         return res.status(404).json({ error: 'Purchase order not found' });
       }
 
-      // Generate receipt number (COUNT-based; will be replaced by sequence in task #139)
-      const receiptCount = await db.select().from(goodsReceipts).then(rows => rows.length);
-      const receiptNumber = `GR${String(receiptCount + 1).padStart(4, '0')}`;
+      // Generate receipt number from company settings sequence (avoids duplicates on concurrent creates or deletions)
+      const receiptNumber = await businessStorage.generateGrnNumber();
 
       // All writes are wrapped in a single transaction — rollback on any failure.
       let receipt!: typeof goodsReceipts.$inferSelect;

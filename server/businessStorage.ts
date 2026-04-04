@@ -648,6 +648,25 @@ export class BusinessStorage {
     return formattedNumber;
   }
 
+  async generateGrnNumber() {
+    // Use the company-settings sequence — prevents duplicates on concurrent creates or after deletions.
+    const settings = await this.getCompanySettings();
+    const prefix = settings?.grnNumberPrefix || 'GRN';
+    const nextNumber = settings?.nextGrnNumber || 1;
+
+    // Format: PREFIX + 4-digit zero-padded counter (e.g. GRN0001)
+    const receiptNumber = `${prefix}${String(nextNumber).padStart(4, '0')}`;
+
+    if (settings) {
+      await this.updateCompanySettings({
+        ...settings,
+        nextGrnNumber: nextNumber + 1,
+      });
+    }
+
+    return receiptNumber;
+  }
+
   // Helper function to compute next available number for a given prefix
   private async computeNextNumberForPrefix(prefix: string): Promise<number> {
     // Create regex to match current prefix format exactly
