@@ -3523,6 +3523,38 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  // Retention settings (stored in company_settings table)
+  app.get('/api/settings/retention', requireAuth(['Admin']), async (req: AuthenticatedRequest, res) => {
+    try {
+      const settings = await businessStorage.getCompanySettings();
+      res.json({
+        retention_exports_days: settings?.retentionExportsDays ?? 60,
+        retention_audit_logs_days: settings?.retentionAuditLogsDays ?? 730,
+        lifecycle_cold_storage_after_days: settings?.retentionColdStorageDays ?? 30,
+      });
+    } catch (error) {
+      console.error('Error fetching retention settings:', error);
+      res.status(500).json({ error: 'Failed to fetch retention settings' });
+    }
+  });
+
+  app.post('/api/settings/retention', requireAuth(['Admin']), async (req: AuthenticatedRequest, res) => {
+    try {
+      const { retention_exports_days, retention_audit_logs_days, lifecycle_cold_storage_after_days } = req.body;
+      await businessStorage.updateCompanySettings({
+        retentionExportsDays: parseInt(retention_exports_days) || 60,
+        retentionAuditLogsDays: parseInt(retention_audit_logs_days) || 730,
+        retentionColdStorageDays: parseInt(lifecycle_cold_storage_after_days) || 30,
+        updatedBy: req.user!.id,
+      });
+      writeAuditLog({ actor: req.user!.id, actorName: req.user?.username || String(req.user!.id), targetId: 'company', targetType: 'company_settings', action: 'UPDATE', details: 'Retention settings updated' });
+      res.json({ success: true });
+    } catch (error) {
+      console.error('Error saving retention settings:', error);
+      res.status(500).json({ error: 'Failed to save retention settings' });
+    }
+  });
+
   // POST /api/storage/sign-upload
   // Generate a signed token for uploading files (since Replit doesn't support native signed URLs)
   app.post('/api/storage/sign-upload', requireAuth(['Admin', 'Staff', 'Manager']), async (req: AuthenticatedRequest, res) => {

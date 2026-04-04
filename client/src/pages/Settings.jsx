@@ -11,6 +11,7 @@ import CustomerManagement from "../components/settings/CustomerManagement";
 import BookClosingManager from "../components/settings/BookClosingManager";
 import StorageUsage from "../components/settings/StorageUsage";
 import SettingsStorage from "./SettingsStorage";
+import RetentionSettings from "../components/settings/RetentionSettings";
 import RecycleBin from "../components/settings/RecycleBin";
 import InventorySettings from "../components/settings/InventorySettings";
 
@@ -90,7 +91,10 @@ export default function Settings() {
         </TabsContent>
 
         <TabsContent value="storage" className="mt-4 sm:mt-6">
-          <SettingsStorage />
+          <div className="space-y-6">
+            <SettingsStorage />
+            <RetentionSettings />
+          </div>
         </TabsContent>
 
         <TabsContent value="recycle" className="mt-4 sm:mt-6">

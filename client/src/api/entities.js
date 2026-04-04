@@ -121,7 +121,6 @@ export const Invoice = new ApiEntity('invoices');
 export const DeliveryOrder = new ApiEntity('delivery-orders');
 
 // Fallback entities for features not yet implemented
-export const GoodsReceipt = new FallbackEntity('GoodsReceipt');
 export const InventoryLot = new FallbackEntity('InventoryLot');
 export const StockCount = new ApiEntity('stock-counts');
 export const CompanySettings = {
@@ -162,9 +161,6 @@ export const CompanySettings = {
     return await response.json();
   }
 };
-export const Books = new ApiEntity('books');
-export const StorageSettings = new FallbackEntity('StorageSettings');
-export const StorageUsage = new FallbackEntity('StorageUsage');
 const _recycleBinEntity = new ApiEntity('recycle-bin');
 _recycleBinEntity.restore = async function(id) {
   const response = await fetch(`/api/recycle-bin/${id}/restore`, {
@@ -177,12 +173,13 @@ _recycleBinEntity.restore = async function(id) {
 };
 export const RecycleBin = _recycleBinEntity;
 export const AuditLog = new ApiEntity('audit-logs');
-export const InventoryAudit = new FallbackEntity('InventoryAudit');
 
 // User auth entity
 export const User = {
   async me() {
-    const response = await fetch('/api/auth/me');
+    const response = await fetch('/api/auth/me', {
+      credentials: 'include'
+    });
     if (!response.ok) {
       if (response.status === 401) return null;
       throw new Error('Failed to fetch user');

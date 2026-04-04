@@ -1,4 +1,5 @@
 import React, { useState } from "react";
+import { useNavigate } from "react-router-dom";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Button } from "@/components/ui/button";
@@ -40,13 +41,11 @@ export default function ProductsTab({
   startIndex,
   endIndex
 }) {
+  const navigate = useNavigate();
+
   // State variables for SimpleConfirmDialog
   const [dialogOpen, setDialogOpen] = useState(false);
   const [productToDelete, setProductToDelete] = useState(null);
-
-  // Override permission checks - allow all actions
-  const actualCanEdit = true;
-  const actualCanDelete = true;
 
   const handleDeleteClick = (product) => {
     setProductToDelete(product);
@@ -54,8 +53,7 @@ export default function ProductsTab({
   };
 
   const handleModifyClick = (product) => {
-    // Navigate to edit product page or open edit modal
-    window.location.href = `/products/edit/${product.id}`;
+    navigate(`/products/edit/${product.id}`);
   };
 
   const handleDeleteConfirm = async () => {
@@ -310,7 +308,7 @@ export default function ProductsTab({
                       <TableHead>Size</TableHead>
                       <TableHead>Cost Price</TableHead>
                       <TableHead>Sale Price</TableHead>
-                      {actualCanDelete && <TableHead>Actions</TableHead>}
+                      {canDelete && <TableHead>Actions</TableHead>}
                     </TableRow>
                   </TableHeader>
                   <TableBody>
@@ -327,8 +325,8 @@ export default function ProductsTab({
                         </TableCell>
                         <TableCell>{product.description || '-'}</TableCell>
                         <TableCell>{formatCurrency(product.costPrice, product.costPriceCurrency || 'GBP')}</TableCell>
-                        <TableCell>AED {product.unitPrice}</TableCell>
-                        {actualCanDelete && (
+                        <TableCell>AED {parseFloat(product.unitPrice || 0).toFixed(2)}</TableCell>
+                        {canDelete && (
                           <TableCell>
                             <DropdownMenu>
                               <DropdownMenuTrigger asChild>

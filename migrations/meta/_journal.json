@@ -36,6 +36,13 @@
       "when": 1775291415250,
       "tag": "0004_damp_diamondback",
       "breakpoints": true
+    },
+    {
+      "idx": 5,
+      "version": "7",
+      "when": 1775303664840,
+      "tag": "0005_glorious_veda",
+      "breakpoints": true
     }
   ]
 }

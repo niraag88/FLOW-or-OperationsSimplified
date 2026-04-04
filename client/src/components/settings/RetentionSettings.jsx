@@ -4,7 +4,6 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Save, Trash, Clock } from "lucide-react";
-import { StorageSettings } from "@/api/entities";
 import { logAuditAction } from "../utils/auditLogger";
 import { useToast } from "@/components/ui/use-toast";
 
@@ -26,12 +25,13 @@ export default function RetentionSettings({ currentUser }) {
   const loadSettings = async () => {
     setLoading(true);
     try {
-      const settingsList = await StorageSettings.list();
-      if (settingsList.length > 0) {
-        setSettings(prev => ({ ...prev, ...settingsList[0] }));
+      const response = await fetch('/api/settings/retention', { credentials: 'include' });
+      if (response.ok) {
+        const data = await response.json();
+        setSettings(prev => ({ ...prev, ...data }));
       }
     } catch (error) {
-      console.error("Error loading settings:", error);
+      console.error("Error loading retention settings:", error);
     } finally {
       setLoading(false);
     }
@@ -44,16 +44,17 @@ export default function RetentionSettings({ currentUser }) {
   const handleSave = async () => {
     setLoading(true);
     try {
-      const settingsList = await StorageSettings.list();
-      if (settingsList.length > 0) {
-        await StorageSettings.update(settingsList[0].id, settings);
-      } else {
-        await StorageSettings.create(settings);
-      }
-      await logAuditAction("StorageSettings", "singleton", "update_retention", currentUser.email, { settings });
+      const response = await fetch('/api/settings/retention', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        credentials: 'include',
+        body: JSON.stringify(settings),
+      });
+      if (!response.ok) throw new Error('Save failed');
+      await logAuditAction("StorageSettings", "singleton", "update_retention", currentUser?.email, { settings });
       toast({ title: "Retention settings saved" });
     } catch (error) {
-      console.error("Error saving settings:", error);
+      console.error("Error saving retention settings:", error);
       toast({ title: "Save failed", variant: "destructive" });
     } finally {
       setLoading(false);
@@ -62,20 +63,20 @@ export default function RetentionSettings({ currentUser }) {
 
   const handleRunRetention = async () => {
     setLoading(true);
-    await logAuditAction("StorageSettings", "singleton", "manual_retention_run", currentUser.email);
+    await logAuditAction("StorageSettings", "singleton", "manual_retention_run", currentUser?.email);
     toast({
       title: "Manual Retention Job Started",
       description: "The backend is now processing data according to retention policies.",
     });
     setTimeout(() => {
       setLoading(false);
-       toast({
+      toast({
         title: "Retention Job In Progress",
       });
     }, 2000);
   };
-  
-  if (loading && !settings) return <div>Loading...</div>;
+
+  if (loading && settings === initialSettings) return <div>Loading...</div>;
 
   return (
     <Card className="border-0 shadow-lg">
@@ -105,7 +106,7 @@ export default function RetentionSettings({ currentUser }) {
               value={settings.retention_audit_logs_days}
               onChange={(e) => handleInputChange('retention_audit_logs_days', e.target.value)}
             />
-             <p className="text-xs text-gray-500">Purges old audit trail records.</p>
+            <p className="text-xs text-gray-500">Purges old audit trail records.</p>
           </div>
           <div className="space-y-2">
             <Label htmlFor="lifecycle_cold">Move to Cold Storage After (days)</Label>
@@ -115,22 +116,22 @@ export default function RetentionSettings({ currentUser }) {
               value={settings.lifecycle_cold_storage_after_days}
               onChange={(e) => handleInputChange('lifecycle_cold_storage_after_days', e.target.value)}
             />
-             <p className="text-xs text-gray-500">Tags files for infrequent-access storage class.</p>
+            <p className="text-xs text-gray-500">Tags files for infrequent-access storage class.</p>
           </div>
         </div>
         <div>
-           <Button onClick={handleRunRetention} variant="destructive" disabled={loading}>
-             <Trash className="w-4 h-4 mr-2"/>
-             Run Retention & Purge Now
-           </Button>
+          <Button onClick={handleRunRetention} variant="destructive" disabled={loading}>
+            <Trash className="w-4 h-4 mr-2"/>
+            Run Retention & Purge Now
+          </Button>
         </div>
       </CardContent>
       <CardFooter className="border-t pt-6">
         <div className="flex justify-end w-full">
-            <Button onClick={handleSave} disabled={loading} className="bg-emerald-600 hover:bg-emerald-700">
-                <Save className="w-4 h-4 mr-2"/>
-                Save Retention Settings
-            </Button>
+          <Button onClick={handleSave} disabled={loading} className="bg-emerald-600 hover:bg-emerald-700">
+            <Save className="w-4 h-4 mr-2"/>
+            Save Retention Settings
+          </Button>
         </div>
       </CardFooter>
     </Card>

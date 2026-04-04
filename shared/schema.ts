@@ -434,6 +434,9 @@ export const companySettings = pgTable("company_settings", {
   updatedAt: timestamp("updated_at").defaultNow().notNull(),
   warnAtPercent: integer("warn_at_percent").default(80),
   criticalAtPercent: integer("critical_at_percent").default(90),
+  retentionExportsDays: integer("retention_exports_days").default(60),
+  retentionAuditLogsDays: integer("retention_audit_logs_days").default(730),
+  retentionColdStorageDays: integer("retention_cold_storage_days").default(30),
 });
 
 // Signed URL tokens — persisted to DB so they survive restarts and work across instances
