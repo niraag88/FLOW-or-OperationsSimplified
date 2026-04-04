@@ -6,6 +6,11 @@ import {
   DialogHeader,
   DialogTitle,
 } from "@/components/ui/dialog";
+import {
+  AlertDialog, AlertDialogAction, AlertDialogCancel,
+  AlertDialogContent, AlertDialogDescription, AlertDialogFooter,
+  AlertDialogHeader, AlertDialogTitle,
+} from "@/components/ui/alert-dialog";
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
@@ -35,6 +40,7 @@ export default function POForm({ open, onClose, editingPO, currentUser, onSucces
   const [loadingGrnDocs, setLoadingGrnDocs] = useState(false);
   const [supplierDocsOpen, setSupplierDocsOpen] = useState(true);
   const [poScanKey, setPoScanKey] = useState(null);
+  const [confirmPoDocDeleteOpen, setConfirmPoDocDeleteOpen] = useState(false);
   const { toast } = useToast();
   
   const [formData, setFormData] = useState({
@@ -88,8 +94,12 @@ export default function POForm({ open, onClose, editingPO, currentUser, onSucces
     }
   };
 
-  const handleDeletePoDoc = async () => {
-    if (!window.confirm('Remove this document from the purchase order? The file will be permanently deleted.')) return;
+  const handleDeletePoDoc = () => {
+    setConfirmPoDocDeleteOpen(true);
+  };
+
+  const handleConfirmPoDocDelete = async () => {
+    setConfirmPoDocDeleteOpen(false);
     try {
       const res = await fetch(`/api/purchase-orders/${editingPO.id}/scan-key`, {
         method: 'DELETE',
@@ -378,6 +388,7 @@ export default function POForm({ open, onClose, editingPO, currentUser, onSucces
   const isShortDelivery = recon.isShortDelivery;
 
   return (
+    <>
     <Dialog open={open} onOpenChange={onClose}>
       <DialogContent className="w-full sm:max-w-6xl max-h-[90vh] overflow-y-auto">
         <DialogHeader>
@@ -882,5 +893,26 @@ export default function POForm({ open, onClose, editingPO, currentUser, onSucces
         </form>
       </DialogContent>
     </Dialog>
+
+    <AlertDialog open={confirmPoDocDeleteOpen} onOpenChange={setConfirmPoDocDeleteOpen}>
+      <AlertDialogContent>
+        <AlertDialogHeader>
+          <AlertDialogTitle>Remove Document</AlertDialogTitle>
+          <AlertDialogDescription>
+            This will permanently remove the document from this purchase order. This action cannot be undone.
+          </AlertDialogDescription>
+        </AlertDialogHeader>
+        <AlertDialogFooter>
+          <AlertDialogCancel>Cancel</AlertDialogCancel>
+          <AlertDialogAction
+            className="bg-red-600 hover:bg-red-700 text-white"
+            onClick={handleConfirmPoDocDelete}
+          >
+            Remove
+          </AlertDialogAction>
+        </AlertDialogFooter>
+      </AlertDialogContent>
+    </AlertDialog>
+    </>
   );
 }

@@ -1,5 +1,10 @@
 import React, { useState, useEffect } from "react";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
+import {
+  AlertDialog, AlertDialogAction, AlertDialogCancel,
+  AlertDialogContent, AlertDialogDescription, AlertDialogFooter,
+  AlertDialogHeader, AlertDialogTitle,
+} from "@/components/ui/alert-dialog";
 import { Badge } from "@/components/ui/badge";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Separator } from "@/components/ui/separator";
@@ -46,6 +51,7 @@ function DocLink({ label, scanKey, onView }) {
 export default function POQuickViewModal({ poId, open, onClose }) {
   const [detail, setDetail] = useState(null);
   const [loading, setLoading] = useState(false);
+  const [confirmDeleteOpen, setConfirmDeleteOpen] = useState(false);
   const { toast } = useToast();
 
   useEffect(() => {
@@ -72,8 +78,12 @@ export default function POQuickViewModal({ poId, open, onClose }) {
     }
   };
 
-  const handleDeletePoDoc = async () => {
-    if (!window.confirm('Remove this document from the purchase order? This cannot be undone.')) return;
+  const handleDeletePoDoc = () => {
+    setConfirmDeleteOpen(true);
+  };
+
+  const handleConfirmDelete = async () => {
+    setConfirmDeleteOpen(false);
     try {
       const res = await fetch(`/api/purchase-orders/${poId}/scan-key`, {
         method: 'DELETE',
@@ -111,6 +121,7 @@ export default function POQuickViewModal({ poId, open, onClose }) {
   }
 
   return (
+    <>
     <Dialog open={open} onOpenChange={(v) => !v && onClose()}>
       <DialogContent className="max-w-3xl max-h-[90vh] overflow-y-auto">
         <DialogHeader>
@@ -443,5 +454,26 @@ export default function POQuickViewModal({ poId, open, onClose }) {
         )}
       </DialogContent>
     </Dialog>
+
+    <AlertDialog open={confirmDeleteOpen} onOpenChange={setConfirmDeleteOpen}>
+      <AlertDialogContent>
+        <AlertDialogHeader>
+          <AlertDialogTitle>Remove Document</AlertDialogTitle>
+          <AlertDialogDescription>
+            This will permanently remove the document from this purchase order. This action cannot be undone.
+          </AlertDialogDescription>
+        </AlertDialogHeader>
+        <AlertDialogFooter>
+          <AlertDialogCancel>Cancel</AlertDialogCancel>
+          <AlertDialogAction
+            className="bg-red-600 hover:bg-red-700 text-white"
+            onClick={handleConfirmDelete}
+          >
+            Remove
+          </AlertDialogAction>
+        </AlertDialogFooter>
+      </AlertDialogContent>
+    </AlertDialog>
+    </>
   );
 }

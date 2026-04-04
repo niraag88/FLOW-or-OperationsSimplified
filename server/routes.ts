@@ -3633,7 +3633,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
       }
 
       // Validate storage key format (allow pdf, jpg, jpeg, png extensions)
-      if (!storageKey.match(/^(invoices|delivery|purchase-orders|goods-receipts)\/\d{4}\/[^\/]+\.(pdf|jpg|jpeg|png)$/)) {
+      // Accepts both legacy 3-segment keys (type/year/filename.ext) and new 4-segment keys (type/year/docnum/timestamp-filename.ext)
+      if (!storageKey.match(/^(invoices|delivery|purchase-orders|goods-receipts)\/\d{4}\/([^\/]+\.(pdf|jpg|jpeg|png)|[^\/]+\/\d{10,}-[^\/]+\.(pdf|jpg|jpeg|png))$/)) {
         return res.status(400).json({ error: 'Invalid storage key format' });
       }
 
