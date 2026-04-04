@@ -3059,18 +3059,22 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
   // === AUTOMATED INVENTORY MANAGEMENT ===
 
+  // Type alias for either the global db or a Drizzle transaction — both expose the same query API.
+  type DbClient = typeof db | Parameters<Parameters<typeof db.transaction>[0]>[0];
+
   // Helper function to update product stock and create movement record.
   // Accepts an optional `tx` (Drizzle transaction) so it can run atomically inside
   // a larger transaction. Without `tx` it uses the global `db` connection.
-  async function updateProductStock(productId: number, quantityChange: number, movementType: string, referenceId: number, referenceType: string, unitCost: number, notes: string, userId: string, tx?: any) {
-    const dbClient = tx ?? db;
+  async function updateProductStock(productId: number, quantityChange: number, movementType: string, referenceId: number, referenceType: string, unitCost: number, notes: string, userId: string, tx?: DbClient) {
+    const dbClient: DbClient = tx ?? db;
 
     // Atomic increment — avoids the read-modify-write race condition.
+    // COALESCE handles the rare NULL stock_quantity case (schema allows null).
     // RETURNING gives us the NEW stock value; previousStock is derived from it.
     const [updated] = await dbClient
       .update(products)
       .set({ 
-        stockQuantity: sql`stock_quantity + ${quantityChange}`,
+        stockQuantity: sql`COALESCE(stock_quantity, 0) + ${quantityChange}`,
         updatedAt: new Date()
       })
       .where(eq(products.id, productId))
@@ -3242,7 +3246,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
       // All writes are wrapped in a single transaction for atomicity.
       // If any step fails the entire GRN is rolled back cleanly.
-      let receipt: any;
+      let receipt!: typeof goodsReceipts.$inferSelect;
       let allReceived = false;
 
       await db.transaction(async (tx) => {
@@ -3307,7 +3311,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
         id: receipt.id,
         receiptNumber: receipt.receiptNumber,
         poStatus: (allReceived || forceClose) ? 'closed' : 'submitted',
-        message: `Goods receipt ${receipt.receiptNumber} created and stock updated for ${items.filter((i: any) => i.receivedQuantity > 0).length} products`
+        message: `Goods receipt ${receipt.receiptNumber} created and stock updated for ${items.filter(i => i.receivedQuantity > 0).length} products`
       });
       
     } catch (error) {
