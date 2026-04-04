@@ -308,7 +308,7 @@ export default function ProductsTab({
                       <TableHead>Size</TableHead>
                       <TableHead>Cost Price</TableHead>
                       <TableHead>Sale Price</TableHead>
-                      {canDelete && <TableHead>Actions</TableHead>}
+                      {(canEdit || canDelete) && <TableHead>Actions</TableHead>}
                     </TableRow>
                   </TableHeader>
                   <TableBody>
@@ -326,7 +326,7 @@ export default function ProductsTab({
                         <TableCell>{product.description || '-'}</TableCell>
                         <TableCell>{formatCurrency(product.costPrice, product.costPriceCurrency || 'GBP')}</TableCell>
                         <TableCell>AED {parseFloat(product.unitPrice || 0).toFixed(2)}</TableCell>
-                        {canDelete && (
+                        {(canEdit || canDelete) && (
                           <TableCell>
                             <DropdownMenu>
                               <DropdownMenuTrigger asChild>
@@ -339,17 +339,21 @@ export default function ProductsTab({
                                 </Button>
                               </DropdownMenuTrigger>
                               <DropdownMenuContent align="end">
-                                <DropdownMenuItem onClick={() => handleModifyClick(product)}>
-                                  <Edit className="mr-2 h-4 w-4" />
-                                  Modify
-                                </DropdownMenuItem>
-                                <DropdownMenuItem 
-                                  onClick={() => handleDeleteClick(product)}
-                                  className="text-red-600"
-                                >
-                                  <Trash2 className="mr-2 h-4 w-4" />
-                                  Delete
-                                </DropdownMenuItem>
+                                {canEdit && (
+                                  <DropdownMenuItem onClick={() => handleModifyClick(product)}>
+                                    <Edit className="mr-2 h-4 w-4" />
+                                    Modify
+                                  </DropdownMenuItem>
+                                )}
+                                {canDelete && (
+                                  <DropdownMenuItem 
+                                    onClick={() => handleDeleteClick(product)}
+                                    className="text-red-600"
+                                  >
+                                    <Trash2 className="mr-2 h-4 w-4" />
+                                    Delete
+                                  </DropdownMenuItem>
+                                )}
                               </DropdownMenuContent>
                             </DropdownMenu>
                           </TableCell>
