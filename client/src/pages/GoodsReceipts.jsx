@@ -32,6 +32,7 @@ export default function GoodsReceipts() {
       return r.json();
     },
     staleTime: STALE_3MIN,
+    refetchOnWindowFocus: true,
   });
 
   useEffect(() => {
@@ -49,10 +50,11 @@ export default function GoodsReceipts() {
       return Array.isArray(result) ? result : (result.data || []);
     },
     staleTime: STALE_3MIN,
+    refetchOnWindowFocus: true,
   });
 
   const purchaseOrders = (allPOs || []).filter(po =>
-    po.status === 'confirmed' || po.status === 'sent'
+    po.status === 'submitted'
   );
 
   const handlePOSelection = async (poId) => {

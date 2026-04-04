@@ -151,6 +151,7 @@ export default function PurchaseOrders() {
 
   const handleRefresh = () => {
     queryClient.invalidateQueries({ queryKey: ['/api/purchase-orders'] });
+    queryClient.invalidateQueries({ queryKey: ['/api/goods-receipts'] });
     setGrnRefreshCount(prev => prev + 1);
   };
 
