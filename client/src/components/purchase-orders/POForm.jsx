@@ -263,7 +263,7 @@ export default function POForm({ open, onClose, editingPO, currentUser, onSucces
       if (product) {
         newItems[index].productSku = product.sku;
         newItems[index].productName = product.name;
-        newItems[index].size = product.description || '';
+        newItems[index].size = product.size || '';
         newItems[index].unitPrice = parseFloat(product.costPrice) || 0;
         newItems[index].lineTotal = newItems[index].quantity * (parseFloat(product.costPrice) || 0);
 
@@ -346,6 +346,11 @@ export default function POForm({ open, onClose, editingPO, currentUser, onSucces
       resetForm();
     } catch (error) {
       console.error("Error saving purchase order:", error);
+      toast({
+        title: "Save Failed",
+        description: error?.message || "Could not save the purchase order. Please try again.",
+        variant: "destructive",
+      });
     } finally {
       setLoading(false);
     }

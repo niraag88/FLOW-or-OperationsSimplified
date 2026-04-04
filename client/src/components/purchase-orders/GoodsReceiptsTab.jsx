@@ -27,6 +27,7 @@ import { printPOGRNSummary, exportPODetailToXLSX } from "../utils/export";
 import { format } from "date-fns";
 import { useToast } from "@/hooks/use-toast";
 import SimpleConfirmDialog from "../common/SimpleConfirmDialog";
+import { formatCurrency } from "@/utils/currency";
 
 export default function GoodsReceiptsTab({ 
   purchaseOrders, 
@@ -219,11 +220,14 @@ export default function GoodsReceiptsTab({
         credentials: 'include',
         body: JSON.stringify({ status: 'submitted' }),
       });
-      if (!res.ok) throw new Error('Failed to re-open purchase order');
+      if (!res.ok) {
+        const body = await res.json().catch(() => ({}));
+        throw new Error(body.error || 'Failed to re-open purchase order');
+      }
       toast({ title: 'PO Re-opened', description: `${po.poNumber} has been moved back to Open.` });
       onRefresh();
-    } catch {
-      toast({ title: 'Error', description: 'Could not re-open the purchase order.', variant: 'destructive' });
+    } catch (error) {
+      toast({ title: 'Error', description: error.message || 'Could not re-open the purchase order.', variant: 'destructive' });
     }
   };
 
@@ -295,8 +299,8 @@ export default function GoodsReceiptsTab({
                 '-'
               }
             </TableCell>
-            <TableCell className="w-[110px]">{po.currency || 'GBP'} {parseFloat(po.totalAmount || 0).toFixed(2)}</TableCell>
-            <TableCell className="w-[110px]">{getAedStr(po)}</TableCell>
+            <TableCell className="w-[110px]">{formatCurrency(po.totalAmount || 0, po.currency || 'GBP')}</TableCell>
+            <TableCell className="w-[110px]">{formatCurrency(getAedEquivalent(po), 'AED')}</TableCell>
             <TableCell className="w-[80px]">{getLineItemsCount(po)}</TableCell>
             <TableCell className="w-[70px]">{ordQty}</TableCell>
             <TableCell className="w-[70px]">{recQty}</TableCell>
@@ -377,7 +381,7 @@ export default function GoodsReceiptsTab({
   const openReceiveDialog = async (po) => {
     try {
       // Fetch the purchase order items only when opening the dialog
-      const response = await fetch(`/api/purchase-orders/${po.id}/items`);
+      const response = await fetch(`/api/purchase-orders/${po.id}/items`, { credentials: 'include' });
       if (!response.ok) {
         throw new Error('Failed to fetch purchase order items');
       }
@@ -437,6 +441,7 @@ export default function GoodsReceiptsTab({
         headers: {
           'Content-Type': 'application/json',
         },
+        credentials: 'include',
         body: JSON.stringify({
           poId: selectedPOForReceive.id,
           items: items,
@@ -497,10 +502,10 @@ export default function GoodsReceiptsTab({
     }
   };
 
+
   const getReceivedQuantityForItem = (poId, productId) => {
     const relatedGRNs = goodsReceipts.filter(grn => (grn.poId ?? grn.purchase_order_id) === poId);
     let totalReceived = 0;
-    
     relatedGRNs.forEach(grn => {
       grn.items?.forEach(item => {
         if ((item.productId ?? item.product_id) === productId) {
@@ -508,17 +513,7 @@ export default function GoodsReceiptsTab({
         }
       });
     });
-    
     return totalReceived;
-  };
-
-  const canClosePO = (po) => {
-    if (!po.items || po.items.length === 0) return false;
-    
-    return po.items.every(item => {
-      const totalReceived = getReceivedQuantityForItem(po.id, item.productId);
-      return totalReceived >= item.quantity;
-    });
   };
 
   const handleForceCloseClick = (po) => {
@@ -533,6 +528,7 @@ export default function GoodsReceiptsTab({
       const response = await fetch(`/api/purchase-orders/${closingPO.id}/status`, {
         method: 'PATCH',
         headers: { 'Content-Type': 'application/json' },
+        credentials: 'include',
         body: JSON.stringify({ status: 'closed' }),
       });
       if (!response.ok) {
@@ -631,8 +627,7 @@ export default function GoodsReceiptsTab({
     const rate = parseFloat(po.fxRateToAed) || 4.85;
     return amount * rate;
   };
-  const getAedStr = (po) => `AED ${getAedEquivalent(po).toFixed(2)}`;
-  const aedTransform = (_, row) => getAedStr(row);
+  const aedTransform = (_, row) => `AED ${getAedEquivalent(row).toFixed(2)}`;
   const deliveryTransform = (_, row) => {
     const ordQty = getTotalOrderedQuantity(row);
     const recQty = getTotalReceivedQuantity(row);
@@ -825,8 +820,8 @@ export default function GoodsReceiptsTab({
                                 '-'
                               }
                             </td>
-                            <td className="p-2 align-middle" style={{width: '110px'}}>{po.currency || 'GBP'} {parseFloat(po.totalAmount || 0).toFixed(2)}</td>
-                            <td className="p-2 align-middle" style={{width: '110px'}}>{getAedStr(po)}</td>
+                            <td className="p-2 align-middle" style={{width: '110px'}}>{formatCurrency(po.totalAmount || 0, po.currency || 'GBP')}</td>
+                            <td className="p-2 align-middle" style={{width: '110px'}}>{formatCurrency(getAedEquivalent(po), 'AED')}</td>
                             <td className="p-2 align-middle" style={{width: '90px'}}>{getLineItemsCount(po)}</td>
                             <td className="p-2 align-middle" style={{width: '80px'}}>{getTotalOrderedQuantity(po)}</td>
                             <td className="p-2 align-middle" style={{width: '80px'}}>{getTotalReceivedQuantity(po)}</td>
@@ -989,8 +984,8 @@ export default function GoodsReceiptsTab({
                                   '-'
                                 }
                               </td>
-                              <td className="p-2 align-middle" style={{width: '110px'}}>{po.currency || 'GBP'} {parseFloat(po.totalAmount || 0).toFixed(2)}</td>
-                              <td className="p-2 align-middle" style={{width: '110px'}}>{getAedStr(po)}</td>
+                              <td className="p-2 align-middle" style={{width: '110px'}}>{formatCurrency(po.totalAmount || 0, po.currency || 'GBP')}</td>
+                              <td className="p-2 align-middle" style={{width: '110px'}}>{formatCurrency(getAedEquivalent(po), 'AED')}</td>
                               <td className="p-2 align-middle" style={{width: '70px'}}>{getLineItemsCount(po)}</td>
                               <td className="p-2 align-middle" style={{width: '70px'}}>{ordQty}</td>
                               <td className="p-2 align-middle" style={{width: '70px'}}>{recQty}</td>
