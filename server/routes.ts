@@ -3059,27 +3059,32 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
   // === AUTOMATED INVENTORY MANAGEMENT ===
 
-  // Helper function to update product stock and create movement record
-  async function updateProductStock(productId: number, quantityChange: number, movementType: string, referenceId: number, referenceType: string, unitCost: number, notes: string, userId: string) {
-    // Get current product stock
-    const [product] = await db.select().from(products).where(eq(products.id, productId));
-    if (!product) {
+  // Helper function to update product stock and create movement record.
+  // Accepts an optional `tx` (Drizzle transaction) so it can run atomically inside
+  // a larger transaction. Without `tx` it uses the global `db` connection.
+  async function updateProductStock(productId: number, quantityChange: number, movementType: string, referenceId: number, referenceType: string, unitCost: number, notes: string, userId: string, tx?: any) {
+    const dbClient = tx ?? db;
+
+    // Atomic increment — avoids the read-modify-write race condition.
+    // RETURNING gives us the NEW stock value; previousStock is derived from it.
+    const [updated] = await dbClient
+      .update(products)
+      .set({ 
+        stockQuantity: sql`stock_quantity + ${quantityChange}`,
+        updatedAt: new Date()
+      })
+      .where(eq(products.id, productId))
+      .returning({ newStock: products.stockQuantity });
+
+    if (!updated) {
       throw new Error(`Product with ID ${productId} not found`);
     }
 
-    const previousStock = product.stockQuantity || 0;
-    const newStock = previousStock + quantityChange;
-
-    // Update product stock quantity
-    await db.update(products)
-      .set({ 
-        stockQuantity: newStock,
-        updatedAt: new Date()
-      })
-      .where(eq(products.id, productId));
+    const newStock = updated.newStock ?? 0;
+    const previousStock = newStock - quantityChange;
 
     // Create stock movement record
-    await db.insert(stockMovements).values({
+    await dbClient.insert(stockMovements).values({
       productId,
       movementType,
       referenceId,
@@ -3231,72 +3236,78 @@ export async function registerRoutes(app: Express): Promise<Server> {
         return res.status(404).json({ error: 'Purchase order not found' });
       }
 
-      // Generate receipt number
+      // Generate receipt number (COUNT-based; will be replaced by sequence in task #139)
       const receiptCount = await db.select().from(goodsReceipts).then(rows => rows.length);
       const receiptNumber = `GR${String(receiptCount + 1).padStart(4, '0')}`;
 
-      // Create goods receipt
-      const [receipt] = await db.insert(goodsReceipts).values({
-        receiptNumber,
-        poId,
-        supplierId: po.supplierId,
-        receivedDate: new Date(),
-        status: 'confirmed',
-        notes: notes || '',
-        createdBy: req.user!.id
-      }).returning();
+      // All writes are wrapped in a single transaction for atomicity.
+      // If any step fails the entire GRN is rolled back cleanly.
+      let receipt: any;
+      let allReceived = false;
 
-      // Process each item and update stock
-      for (const item of items) {
-        if (item.receivedQuantity > 0) { // Only process items with received quantity
-          // Create receipt item
-          await db.insert(goodsReceiptItems).values({
-            receiptId: receipt.id,
-            poItemId: item.poItemId,
-            productId: item.productId,
-            orderedQuantity: item.orderedQuantity,
-            receivedQuantity: item.receivedQuantity,
-            unitPrice: item.unitPrice.toString()
-          });
+      await db.transaction(async (tx) => {
+        // Create goods receipt
+        const [newReceipt] = await tx.insert(goodsReceipts).values({
+          receiptNumber,
+          poId,
+          supplierId: po.supplierId,
+          receivedDate: new Date(),
+          status: 'confirmed',
+          notes: notes || '',
+          createdBy: req.user!.id
+        }).returning();
+        receipt = newReceipt;
 
-          // Update product stock automatically
-          await updateProductStock(
-            item.productId,
-            item.receivedQuantity, // Add to stock
-            'goods_receipt',
-            receipt.id,
-            'goods_receipt',
-            parseFloat(item.unitPrice),
-            `Goods received from PO ${po.poNumber}`,
-            req.user!.id
-          );
+        // Process each item and update stock
+        for (const item of items) {
+          if (item.receivedQuantity > 0) { // Only process items with received quantity
+            // Create receipt item
+            await tx.insert(goodsReceiptItems).values({
+              receiptId: receipt.id,
+              poItemId: item.poItemId,
+              productId: item.productId,
+              orderedQuantity: item.orderedQuantity,
+              receivedQuantity: item.receivedQuantity,
+              unitPrice: item.unitPrice.toString()
+            });
+
+            // Atomic stock update (race-condition-free, runs inside transaction)
+            await updateProductStock(
+              item.productId,
+              item.receivedQuantity,
+              'goods_receipt',
+              receipt.id,
+              'goods_receipt',
+              parseFloat(item.unitPrice),
+              `Goods received from PO ${po.poNumber}`,
+              req.user!.id,
+              tx
+            );
+          }
+
+          // Atomic PO item received-quantity increment (no separate SELECT needed)
+          await tx.update(purchaseOrderItems)
+            .set({ receivedQuantity: sql`received_quantity + ${item.receivedQuantity}` })
+            .where(eq(purchaseOrderItems.id, item.poItemId));
         }
 
-        // Update PO item received quantity (cumulative)
-        const currentItem = await db.select().from(purchaseOrderItems).where(eq(purchaseOrderItems.id, item.poItemId)).limit(1);
-        const newReceivedQuantity = (currentItem[0]?.receivedQuantity || 0) + item.receivedQuantity;
-        
-        await db.update(purchaseOrderItems)
-          .set({ receivedQuantity: newReceivedQuantity })
-          .where(eq(purchaseOrderItems.id, item.poItemId));
-      }
+        // Check PO status using updated values visible within this transaction
+        const poItems = await tx.select().from(purchaseOrderItems).where(eq(purchaseOrderItems.poId, poId));
+        allReceived = poItems.every(item => (item.receivedQuantity ?? 0) >= item.quantity);
 
-      // Update PO status logic
-      const poItems = await db.select().from(purchaseOrderItems).where(eq(purchaseOrderItems.poId, poId));
-      const allReceived = poItems.every(item => (item.receivedQuantity ?? 0) >= item.quantity);
-      
-      if (allReceived || forceClose) {
-        await db.update(purchaseOrders)
-          .set({ status: 'closed', updatedAt: new Date() })
-          .where(eq(purchaseOrders.id, poId));
-      }
+        if (allReceived || forceClose) {
+          await tx.update(purchaseOrders)
+            .set({ status: 'closed', updatedAt: new Date() })
+            .where(eq(purchaseOrders.id, poId));
+        }
+      });
 
       writeAuditLog({ actor: req.user!.id, actorName: req.user?.username || String(req.user!.id), targetId: String(receipt.id), targetType: 'goods_receipt', action: 'CREATE', details: `Goods receipt ${receipt.receiptNumber} from PO #${po.poNumber}` });
       res.status(201).json({
         id: receipt.id,
         receiptNumber: receipt.receiptNumber,
         poStatus: (allReceived || forceClose) ? 'closed' : 'submitted',
-        message: `Goods receipt ${receipt.receiptNumber} created and stock updated for ${items.filter(i => i.receivedQuantity > 0).length} products`
+        message: `Goods receipt ${receipt.receiptNumber} created and stock updated for ${items.filter((i: any) => i.receivedQuantity > 0).length} products`
       });
       
     } catch (error) {
