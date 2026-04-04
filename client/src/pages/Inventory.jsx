@@ -139,7 +139,7 @@ export default function Inventory() {
           {activeTab === "stock" && canEdit && (
             <Button
               className="bg-emerald-600 hover:bg-emerald-700 text-white"
-              onClick={() => navigate('/stock-count')}
+              onClick={() => navigate('/StockCountNew')}
             >
               <ClipboardList className="w-4 h-4 mr-2" />
               New Stock Count
