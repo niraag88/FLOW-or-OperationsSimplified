@@ -829,7 +829,7 @@ export const printPOGRNSummary = async (poId) => {
   <meta charset="utf-8"/>
   <title>GRN Summary - ${d.poNumber}</title>
   <style>
-    @page { size: A4 portrait; margin: 15mm; }
+    @page { size: A4 portrait; margin: 15mm 15mm 22mm 15mm; @bottom-center { content: "Page " counter(page); font-size: 8pt; color: #888; } }
     body { font-family: Arial, sans-serif; font-size: 11pt; color: #111; margin: 24px 40px; }
     @media print { body { margin: 0; } }
     .doc-header { text-align: center; margin-bottom: 24px; border-bottom: 2px solid #111; padding-bottom: 12px; }
@@ -845,6 +845,7 @@ export const printPOGRNSummary = async (poId) => {
     .data-table { width: 100%; border-collapse: collapse; font-size: 10pt; }
     .data-table th { background: #f5f5f5; border: 1px solid #ccc; padding: 6px 8px; text-align: left; font-size: 9pt; }
     .data-table td { border: 1px solid #ccc; padding: 5px 8px; }
+    .data-table tr { page-break-inside: avoid; }
     .data-table .num { text-align: right; }
     .data-table .num-label { text-align: right; font-style: italic; color: #555; }
     .footer-row td { background: #f9f9f9; font-weight: 600; }
