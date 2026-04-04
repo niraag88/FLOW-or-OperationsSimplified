@@ -95,7 +95,8 @@ export default function POQuickViewModal({ poId, open, onClose }) {
   const allDocs = [];
   if (detail?.supplierScanKey) {
     const last = detail.supplierScanKey.split('/').pop() || '';
-    const filename = last.replace(/^\d{10,}-/, '') || 'Consolidated Invoice';
+    const stripped = last.replace(/^\d{10,}-/, '');
+    const filename = (stripped && stripped.includes('.')) ? stripped : 'Consolidated Invoice';
     allDocs.push({ label: filename, key: detail.supplierScanKey, isPOLevel: true });
   }
   if (detail?.grns) {
