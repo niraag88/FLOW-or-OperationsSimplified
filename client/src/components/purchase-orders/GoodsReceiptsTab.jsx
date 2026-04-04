@@ -619,7 +619,7 @@ export default function GoodsReceiptsTab({
 
   // Shared column transforms
   const dateTransform = (date) => date && !isNaN(new Date(date)) ? format(new Date(date), 'dd/MM/yy') : '';
-  const totalTransform = (amount, row) => `${row?.currency || 'GBP'} ${parseFloat(amount || 0).toFixed(2)}`;
+  const totalTransform = (amount, row) => formatCurrency(amount || 0, row?.currency || 'GBP');
   const getAedEquivalent = (po) => {
     const amount = parseFloat(po.totalAmount) || 0;
     const currency = po.currency || 'GBP';
