@@ -28,9 +28,9 @@ export default function SettingsStorage() {
       setLoading(true);
 
       const [dbRes, objectRes, appRes] = await Promise.all([
-        fetch('/api/db/size'),
-        fetch('/api/storage/total-size'),
-        fetch('/api/system/app-size'),
+        fetch('/api/db/size', { credentials: 'include' }),
+        fetch('/api/storage/total-size', { credentials: 'include' }),
+        fetch('/api/system/app-size', { credentials: 'include' }),
       ]);
 
       if (!dbRes.ok) throw new Error('Failed to fetch database size');

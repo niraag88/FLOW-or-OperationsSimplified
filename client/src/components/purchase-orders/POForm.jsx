@@ -122,7 +122,7 @@ export default function POForm({ open, onClose, editingPO, currentUser, onSucces
       const settled = await Promise.allSettled([
         Brand.list(),
         Product.list(),
-        fetch('/api/company-settings'),
+        fetch('/api/company-settings', { credentials: 'include' }),
         editingPO ? Promise.resolve(null) : fetch('/api/purchase-orders/next-number', { credentials: 'include' })
       ]);
 
@@ -197,7 +197,7 @@ export default function POForm({ open, onClose, editingPO, currentUser, onSucces
       setFormData(prev => ({ ...prev, brandId: editingPO.brandId?.toString() || "" }));
       
       if (editingPO.id) {
-        const response = await fetch(`/api/purchase-orders/${editingPO.id}/items`);
+        const response = await fetch(`/api/purchase-orders/${editingPO.id}/items`, { credentials: 'include' });
         if (response.ok) {
           const items = await response.json();
           const formattedItems = items.map(item => ({
@@ -620,7 +620,7 @@ export default function POForm({ open, onClose, editingPO, currentUser, onSucces
                             className="w-24"
                           />
                         </TableCell>
-                        <TableCell>{currency} {item.lineTotal.toFixed(2)}</TableCell>
+                        <TableCell>{item.lineTotal.toFixed(2)}</TableCell>
                         {canEdit && (
                           <TableCell>
                             <Button

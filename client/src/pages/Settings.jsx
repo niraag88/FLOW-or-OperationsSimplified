@@ -10,7 +10,6 @@ import CompanySettings from "../components/settings/CompanySettings";
 import BrandManagement from "../components/settings/BrandManagement";
 import CustomerManagement from "../components/settings/CustomerManagement";
 import BookClosingManager from "../components/settings/BookClosingManager";
-import StorageUsage from "../components/settings/StorageUsage";
 import SettingsStorage from "./SettingsStorage";
 import RetentionSettings from "../components/settings/RetentionSettings";
 import RecycleBin from "../components/settings/RecycleBin";
