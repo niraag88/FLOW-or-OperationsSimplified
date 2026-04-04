@@ -3082,6 +3082,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
       throw new Error(`Product with ID ${productId} not found`);
     }
 
+    // RETURNING gives the post-update value; previousStock is derived algebraically.
+    // This is equivalent to RETURNING stock_quantity - qty AS previous_stock.
     const newStock = updated.newStock ?? 0;
     const previousStock = newStock - quantityChange;
 
