@@ -4,10 +4,11 @@ import { Badge } from "@/components/ui/badge";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Separator } from "@/components/ui/separator";
 import { Skeleton } from "@/components/ui/skeleton";
-import { CheckCircle2, AlertTriangle, FileText, ExternalLink, Paperclip, Package } from "lucide-react";
+import { CheckCircle2, AlertTriangle, FileText, ExternalLink, Paperclip, Package, Trash2 } from "lucide-react";
 import { formatDate } from "@/utils/dateUtils";
 import { formatCurrency } from "@/utils/currency";
 import { useToast } from "@/hooks/use-toast";
+import { queryClient } from "@/lib/queryClient";
 
 const STATUS_COLORS = {
   draft: "bg-gray-100 text-gray-800",
@@ -71,13 +72,31 @@ export default function POQuickViewModal({ poId, open, onClose }) {
     }
   };
 
+  const handleDeletePoDoc = async () => {
+    if (!window.confirm('Remove this document from the purchase order? This cannot be undone.')) return;
+    try {
+      const res = await fetch(`/api/purchase-orders/${poId}/scan-key`, {
+        method: 'DELETE',
+        credentials: 'include',
+      });
+      if (!res.ok) throw new Error('Failed to remove document');
+      setDetail(prev => prev ? { ...prev, supplierScanKey: null } : prev);
+      queryClient.invalidateQueries({ queryKey: ['/api/purchase-orders'] });
+      toast({ title: 'Document Removed', description: 'The document has been removed from the purchase order.' });
+    } catch {
+      toast({ title: 'Error', description: 'Could not remove the document.', variant: 'destructive' });
+    }
+  };
+
   const currency = detail?.currency || "GBP";
   const recon = detail?.reconciliation;
 
   // Collect all documents in one list
   const allDocs = [];
   if (detail?.supplierScanKey) {
-    allDocs.push({ label: "Consolidated Invoice", key: detail.supplierScanKey });
+    const last = detail.supplierScanKey.split('/').pop() || '';
+    const filename = last.replace(/^\d{10,}-/, '') || 'Consolidated Invoice';
+    allDocs.push({ label: filename, key: detail.supplierScanKey, isPOLevel: true });
   }
   if (detail?.grns) {
     for (const grn of detail.grns) {
@@ -402,6 +421,15 @@ export default function POQuickViewModal({ poId, open, onClose }) {
                     <div key={idx} className="flex items-center gap-2 p-2.5 rounded-md border bg-gray-50 hover:bg-gray-100 transition-colors">
                       <Paperclip className="w-3.5 h-3.5 text-gray-400 shrink-0" />
                       <DocLink label={doc.label} scanKey={doc.key} onView={handleViewDoc} />
+                      {doc.isPOLevel && (
+                        <button
+                          onClick={handleDeletePoDoc}
+                          className="ml-auto p-1 text-red-400 hover:text-red-600 transition-colors"
+                          title="Remove document"
+                        >
+                          <Trash2 className="w-3.5 h-3.5" />
+                        </button>
+                      )}
                     </div>
                   ))}
                 </div>
