@@ -22,6 +22,7 @@ import { formatDate } from "@/utils/dateUtils";
 import { getRateToAed, formatCurrency, SUPPORTED_CURRENCIES } from "@/utils/currency";
 import { computeReconciliation } from "@/utils/poReconciliation";
 import { useToast } from "@/hooks/use-toast";
+import { queryClient } from "@/lib/queryClient";
 import { format } from "date-fns";
 
 export default function POForm({ open, onClose, editingPO, currentUser, onSuccess }) {
@@ -99,6 +100,7 @@ export default function POForm({ open, onClose, editingPO, currentUser, onSucces
         throw new Error(data.error || 'Failed to remove document');
       }
       setPoScanKey(null);
+      queryClient.invalidateQueries({ queryKey: ['/api/purchase-orders'] });
       toast({ title: 'Document Removed', description: 'The document has been removed from this purchase order.' });
     } catch (e) {
       toast({ title: 'Error', description: 'Could not remove the document. Please try again.', variant: 'destructive' });
