@@ -116,7 +116,7 @@ export default function AddProduct() {
         sku: formData.product_code.trim().toUpperCase(),
         brandId: parseInt(formData.brand_id),
         name: formData.product_name.trim(),
-        description: formData.size.trim() || null,
+        size: formData.size.trim() || null,
         costPrice: formData.purchase_price || "0",
         costPriceCurrency: formData.purchase_price_currency || "GBP",
         unitPrice: formData.sale_price || "0",

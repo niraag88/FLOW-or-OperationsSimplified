@@ -323,7 +323,7 @@ export default function ProductsTab({
                         <TableCell>
                           <div>{product.name}</div>
                         </TableCell>
-                        <TableCell>{product.description || '-'}</TableCell>
+                        <TableCell>{product.size || '-'}</TableCell>
                         <TableCell>{formatCurrency(product.costPrice, product.costPriceCurrency || 'GBP')}</TableCell>
                         <TableCell>AED {parseFloat(product.unitPrice || 0).toFixed(2)}</TableCell>
                         {(canEdit || canDelete) && (

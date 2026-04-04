@@ -1334,7 +1334,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
           sku,
           brandId,
           name,
-          description: (row.size || '').trim() || null,
+          size: (row.size || '').trim() || null,
           costPrice: row.purchasePrice || '0',
           costPriceCurrency: row.purchasePriceCurrency || 'GBP',
           unitPrice: salePrice,

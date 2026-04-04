@@ -606,6 +606,7 @@ export const insertProductSchema = createInsertSchema(products).pick({
   sku: true,
   name: true,
   description: true,
+  size: true,
   brandId: true,
   category: true,
   unitPrice: true,
