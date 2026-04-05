@@ -480,7 +480,7 @@ export default function StockTab({ products, loading, canEdit, currentUser, onRe
           <CardContent className="p-4">
             <div className="flex items-center justify-between">
               <div className="flex-1 min-w-0">
-                <p className="text-xs font-medium text-gray-500 uppercase tracking-wide truncate">Stock Value</p>
+                <p className="text-xs font-medium text-gray-500 uppercase tracking-wide truncate">Stock Value (at cost)</p>
                 <p className="text-lg font-bold text-gray-900 mt-1 truncate" title={`AED ${stockSummary.totalValue.toLocaleString('en-AE', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`}>
                   AED {stockSummary.totalValue > 999999 
                     ? `${(stockSummary.totalValue / 1000000).toFixed(1)}M`
@@ -542,7 +542,7 @@ export default function StockTab({ products, loading, canEdit, currentUser, onRe
           <Card>
             <CardHeader>
               <CardTitle>Current Stock Levels</CardTitle>
-              <p className="text-sm text-gray-600">Real-time stock quantities updated automatically</p>
+              <p className="text-sm text-gray-600">Stock quantities reflect goods received. Sales deductions applied on delivery.</p>
             </CardHeader>
             <CardContent>
               {/* Search and Filters */}
@@ -1085,7 +1085,7 @@ export default function StockTab({ products, loading, canEdit, currentUser, onRe
                     {paginatedMovements.data.map((movement) => (
                       <TableRow key={movement.id}>
                         <TableCell className="text-sm">
-                          {format(new Date(movement.createdAt), 'dd/MM/yy HH:mm')}
+                          {format(new Date(movement.createdAt), 'dd/MM/yy')}
                         </TableCell>
                         <TableCell>{movement.brandName || '-'}</TableCell>
                         <TableCell>
@@ -1305,7 +1305,8 @@ export default function StockTab({ products, loading, canEdit, currentUser, onRe
                 </TableHeader>
                 <TableBody>
                   {paginatedLowStock.data.map((product) => {
-                    const reorderQty = (product.maxStockLevel || 50) - (product.stockQuantity || 0);
+                    const hasMaxLevel = product.maxStockLevel != null;
+                    const reorderQty = hasMaxLevel ? product.maxStockLevel - (product.stockQuantity || 0) : null;
                     return (
                       <TableRow key={product.id}>
                         <TableCell>{product.brandName || '-'}</TableCell>
@@ -1318,9 +1319,13 @@ export default function StockTab({ products, loading, canEdit, currentUser, onRe
                           </Badge>
                         </TableCell>
                         <TableCell>
-                          <Badge variant="outline">
-                            {reorderQty} units
-                          </Badge>
+                          {reorderQty != null ? (
+                            <Badge variant="outline">
+                              {reorderQty} units
+                            </Badge>
+                          ) : (
+                            <span className="text-gray-400">—</span>
+                          )}
                         </TableCell>
                       </TableRow>
                     );

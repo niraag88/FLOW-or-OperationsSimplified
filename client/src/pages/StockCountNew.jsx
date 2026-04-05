@@ -59,7 +59,7 @@ export default function StockCountNew() {
         product_code: product.sku,
         brand_name: product.brandName,
         product_name: product.name,
-        size: product.description || '',
+        size: product.size || '',
         quantity: quantities[product.id] || 0
       }));
 
@@ -199,7 +199,7 @@ export default function StockCountNew() {
                   <TableCell>{product.brandName || '-'}</TableCell>
                   <TableCell>{product.sku}</TableCell>
                   <TableCell>{product.name}</TableCell>
-                  <TableCell>{product.description || '-'}</TableCell>
+                  <TableCell>{product.size || '-'}</TableCell>
                   <TableCell>
                     <Input
                       type="number"
