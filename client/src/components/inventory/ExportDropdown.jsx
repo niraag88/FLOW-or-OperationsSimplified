@@ -219,7 +219,7 @@ export default function ExportDropdown({
       "Product Name": p.name,
       "Current Stock": p.stockQuantity || 0,
       "Min Stock Level": p.minStockLevel || "-",
-      "Reorder Needed": p.maxStockLevel != null ? Math.max(0, p.maxStockLevel - (p.stockQuantity || 0)) : "N/A",
+      "Reorder Needed": p.maxStockLevel != null ? Math.max(0, p.maxStockLevel - (p.stockQuantity || 0)) : "",
       "Cost Price": p.costPrice || 0,
       "Stock Value": ((p.stockQuantity || 0) * (parseFloat(p.costPrice) || 0)).toFixed(2),
     }));

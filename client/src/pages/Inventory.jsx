@@ -54,7 +54,7 @@ export default function Inventory() {
 
     fetch('/api/company-settings', { credentials: 'include' })
       .then(r => r.ok ? r.json() : null)
-      .then(data => { if (data?.lowStockThreshold) setLowStockThreshold(data.lowStockThreshold); })
+      .then(data => { setLowStockThreshold(data?.lowStockThreshold ?? 6); })
       .catch(() => {});
   }, []);
 
