@@ -120,7 +120,7 @@ export default function RecentActivity({ data }) {
                     {activity.status?.replace(/_/g, ' ')}
                   </Badge>
                   <p className="text-xs text-gray-400 mt-1">
-                    {format(activity.date, 'dd/MM HH:mm')}
+                    {format(activity.date, 'dd/MM/yy')}
                   </p>
                 </div>
               </div>

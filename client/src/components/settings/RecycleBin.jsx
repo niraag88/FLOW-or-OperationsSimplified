@@ -342,7 +342,7 @@ export default function RecycleBinComponent() {
                       </TableCell>
                       <TableCell className="text-sm">{item.deleted_by}</TableCell>
                       <TableCell className="text-sm">
-                        {format(new Date(item.deleted_date), 'dd/MM/yy HH:mm')}
+                        {format(new Date(item.deleted_date), 'dd/MM/yy')}
                       </TableCell>
                       <TableCell className="text-sm max-w-xs truncate">
                         {item.reason || '-'}
