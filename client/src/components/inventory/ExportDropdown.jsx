@@ -141,16 +141,26 @@ export default function ExportDropdown({
     return fxRates?.gbpToAed ?? 4.85;
   };
 
-  const formatCostWithAed = (costPrice, currency) => {
+  const formatOrigCost = (costPrice, currency) => {
     const cost = parseFloat(costPrice) || 0;
     const curr = String(currency || "GBP").toUpperCase();
-    const rate = getFxRate(curr);
-    const aed = (cost * rate).toFixed(2);
-    if (curr === "AED") return `AED ${cost.toFixed(2)}`;
-    return `${curr} ${cost.toFixed(2)} (AED ${aed})`;
+    return `${curr} ${cost.toFixed(2)}`;
   };
 
-  const getStockValueAed = (stock, costPrice, currency) => {
+  const formatAedCost = (costPrice, currency) => {
+    const cost = parseFloat(costPrice) || 0;
+    const rate = getFxRate(currency);
+    return `AED ${(cost * rate).toFixed(2)}`;
+  };
+
+  const formatOrigStockValue = (stock, costPrice, currency) => {
+    const qty = stock || 0;
+    const cost = parseFloat(costPrice) || 0;
+    const curr = String(currency || "GBP").toUpperCase();
+    return `${curr} ${(qty * cost).toFixed(2)}`;
+  };
+
+  const formatAedStockValue = (stock, costPrice, currency) => {
     const qty = stock || 0;
     const cost = parseFloat(costPrice) || 0;
     const rate = getFxRate(currency);
@@ -169,8 +179,10 @@ export default function ExportDropdown({
         Size: p.size || "-",
         "Current Stock": stock,
         Status: status,
-        "Cost Price": formatCostWithAed(p.costPrice, p.costPriceCurrency),
-        "Stock Value (AED)": getStockValueAed(stock, p.costPrice, p.costPriceCurrency),
+        "Cost Price": formatOrigCost(p.costPrice, p.costPriceCurrency),
+        "Cost Price (AED)": formatAedCost(p.costPrice, p.costPriceCurrency),
+        "Stock Value": formatOrigStockValue(stock, p.costPrice, p.costPriceCurrency),
+        "Stock Value (AED)": formatAedStockValue(stock, p.costPrice, p.costPriceCurrency),
       };
     });
 
@@ -187,7 +199,7 @@ export default function ExportDropdown({
       if (exportFmt === "xlsx") {
         exportToXLSX(rows, filename, "Current Stock");
       } else {
-        const headers = ["Brand", "SKU", "Product Name", "Size", "Current Stock", "Status", "Cost Price", "Stock Value (AED)"];
+        const headers = ["Brand", "SKU", "Product Name", "Size", "Current Stock", "Status", "Cost Price", "Cost Price (AED)", "Stock Value", "Stock Value (AED)"];
         writePrintContent(pw, "Current Stock Levels", headers, rows, allProducts.length);
       }
     } catch (err) {
@@ -243,8 +255,10 @@ export default function ExportDropdown({
       "Product Name": p.name,
       "Current Stock": p.stockQuantity || 0,
       "Reorder Needed": p.maxStockLevel != null ? Math.max(0, p.maxStockLevel - (p.stockQuantity || 0)) : "",
-      "Cost Price": formatCostWithAed(p.costPrice, p.costPriceCurrency),
-      "Stock Value (AED)": getStockValueAed(p.stockQuantity, p.costPrice, p.costPriceCurrency),
+      "Cost Price": formatOrigCost(p.costPrice, p.costPriceCurrency),
+      "Cost Price (AED)": formatAedCost(p.costPrice, p.costPriceCurrency),
+      "Stock Value": formatOrigStockValue(p.stockQuantity, p.costPrice, p.costPriceCurrency),
+      "Stock Value (AED)": formatAedStockValue(p.stockQuantity, p.costPrice, p.costPriceCurrency),
     }));
 
   const exportLowStock = async (exportFmt) => {
@@ -259,7 +273,7 @@ export default function ExportDropdown({
       if (exportFmt === "xlsx") {
         exportToXLSX(rows, filename, "Low Stock Alerts");
       } else {
-        const headers = ["SKU", "Product Name", "Current Stock", "Reorder Needed", "Cost Price", "Stock Value (AED)"];
+        const headers = ["SKU", "Product Name", "Current Stock", "Reorder Needed", "Cost Price", "Cost Price (AED)", "Stock Value", "Stock Value (AED)"];
         writePrintContent(pw, "Low Stock Alerts", headers, rows, rows.length);
       }
     } catch (err) {
