@@ -19,11 +19,14 @@ export default function StockOnHandReport({ products, lots, canExport }) {
         const product = products.find(p => p.id === lot.product_id);
         if (!product) return null;
         
+        const LOW_STOCK_THRESHOLD = 6;
+        const isLowStock = (product.stockQuantity || 0) > 0 && (product.stockQuantity || 0) <= LOW_STOCK_THRESHOLD;
+
         return {
           ...lot,
           product_name: product.name,
           product_sku: product.sku,
-          is_low_stock: false,
+          is_low_stock: isLowStock,
         };
       })
       .filter(Boolean); // Remove null entries
