@@ -1300,6 +1300,7 @@ export default function StockTab({ products, loading, canEdit, currentUser, onRe
                     <TableHead>Product Name</TableHead>
                     <TableHead>Size</TableHead>
                     <TableHead>Current Stock</TableHead>
+                    <TableHead>Min Level</TableHead>
                     <TableHead>Reorder Needed</TableHead>
                   </TableRow>
                 </TableHeader>
@@ -1317,6 +1318,9 @@ export default function StockTab({ products, loading, canEdit, currentUser, onRe
                           <Badge variant="secondary" className="text-amber-600">
                             {(product.stockQuantity || 0).toLocaleString()}
                           </Badge>
+                        </TableCell>
+                        <TableCell>
+                          {product.minStockLevel != null ? product.minStockLevel : '—'}
                         </TableCell>
                         <TableCell>
                           {reorderQty != null ? (

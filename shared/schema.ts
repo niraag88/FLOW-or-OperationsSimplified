@@ -68,6 +68,7 @@ export const invoices = pgTable("invoices", {
   paymentStatus: text("payment_status").notNull().default("outstanding"),
   paymentReceivedDate: date("payment_received_date"),
   paymentRemarks: text("payment_remarks"),
+  stockDeducted: boolean("stock_deducted").notNull().default(false),
 }, (table) => ({
   invoicesStatusCustomerIdx: index("invoices_status_customer_idx").on(table.status, table.customerId),
   invoicesCreatedAtIdx: index("invoices_created_at_idx").on(table.createdAt),

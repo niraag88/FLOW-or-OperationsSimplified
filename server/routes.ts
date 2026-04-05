@@ -2119,7 +2119,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const invoice = await businessStorage.createInvoiceFromQuotation(
         parseInt(quotationId),
         nextNumber,
-        req.user!.id,
+        parseInt(req.user!.id),
       );
 
       writeAuditLog({
@@ -2230,13 +2230,24 @@ export async function registerRoutes(app: Express): Promise<Server> {
         }
       }
 
+      // Snapshot current invoice state BEFORE the update (needed for deduction logic)
+      const [existingInvoice] = await db.select({
+        status: invoices.status,
+        stockDeducted: invoices.stockDeducted,
+        invoiceNumber: invoices.invoiceNumber,
+      }).from(invoices).where(eq(invoices.id, id));
+
+      const newStatus = body.status || 'draft';
+      const becomingDelivered = newStatus === 'delivered' && existingInvoice?.status !== 'delivered';
+      const needsStockDeduction = becomingDelivered && !existingInvoice?.stockDeducted;
+
       // Update the invoice record
       await db.update(invoices).set({
         customerName,
         customerId: customerId || null,
         amount: body.total_amount ? body.total_amount.toString() : '0',
         vatAmount: body.tax_amount ? body.tax_amount.toString() : '0',
-        status: body.status || 'draft',
+        status: newStatus,
         invoiceDate: body.invoice_date || null,
         reference: body.reference || null,
         referenceDate: body.reference_date || null,
@@ -2264,8 +2275,32 @@ export async function registerRoutes(app: Express): Promise<Server> {
         }
       }
 
+      // Auto-deduct stock when invoice is first marked as delivered (idempotent guard)
+      if (needsStockDeduction) {
+        await db.transaction(async (tx) => {
+          const items = await tx.select().from(invoiceLineItems).where(eq(invoiceLineItems.invoiceId, id));
+          const invoiceNum = existingInvoice?.invoiceNumber || String(id);
+          for (const item of items) {
+            if (item.productId) {
+              await updateProductStock(
+                item.productId,
+                -item.quantity,
+                'sale',
+                id,
+                'invoice',
+                parseFloat(item.unitPrice.toString()),
+                `Sale from Invoice #${invoiceNum}`,
+                req.user!.id,
+                tx
+              );
+            }
+          }
+          await tx.update(invoices).set({ stockDeducted: true }).where(eq(invoices.id, id));
+        });
+      }
+
       const [updated] = await db.select().from(invoices).where(eq(invoices.id, id));
-      writeAuditLog({ actor: req.user!.id, actorName: req.user?.username || String(req.user!.id), targetId: String(id), targetType: 'invoice', action: 'UPDATE', details: `Invoice #${updated.invoiceNumber} updated (status: ${updated.status})` });
+      writeAuditLog({ actor: req.user!.id, actorName: req.user?.username || String(req.user!.id), targetId: String(id), targetType: 'invoice', action: 'UPDATE', details: `Invoice #${updated.invoiceNumber} updated (status: ${updated.status})${needsStockDeduction ? ' — stock deducted' : ''}` });
       res.json({ ...updated, items: body.items || [] });
     } catch (error) {
       console.error('Error updating invoice:', error);
@@ -3007,41 +3042,82 @@ export async function registerRoutes(app: Express): Promise<Server> {
         return res.status(400).json({ error: 'Items array is required and cannot be empty' });
       }
       
-      // Filter items with quantity > 0
-      const validItems = items.filter(item => item.quantity > 0);
+      // Filter items with quantity >= 0 (allow zero counted quantities — they correct overstock)
+      const validItems = items.filter(item => parseInt(item.quantity) >= 0 && item.product_id);
       if (validItems.length === 0) {
-        return res.status(400).json({ error: 'At least one item must have a quantity greater than 0' });
+        return res.status(400).json({ error: 'At least one item with a valid product is required' });
       }
       
       // Calculate totals
       const totalProducts = validItems.length;
       const totalQuantity = validItems.reduce((sum, item) => sum + (parseInt(item.quantity) || 0), 0);
-      
-      // Create stock count header
-      const [stockCount] = await db.insert(stockCounts).values({
-        countDate: new Date(),
-        totalProducts,
-        totalQuantity,
-        createdBy: req.user.id
-      }).returning();
-      
-      // Create stock count items
-      const stockCountItemsData = validItems.map(item => ({
-        stockCountId: stockCount.id,
-        productId: item.product_id,
-        productCode: item.product_code,
-        brandName: item.brand_name || '',
-        productName: item.product_name,
-        size: item.size || '',
-        quantity: parseInt(item.quantity) || 0
-      }));
-      
-      await db.insert(stockCountItems).values(stockCountItemsData);
-      
-      writeAuditLog({ actor: req.user!.id, actorName: req.user?.username || String(req.user!.id), targetId: String(stockCount.id), targetType: 'stock_count', action: 'CREATE', details: `Stock count created: ${totalProducts} products, ${totalQuantity} total qty` });
+
+      let stockCount: typeof stockCounts.$inferSelect;
+      let correctionsApplied = 0;
+
+      await db.transaction(async (tx) => {
+        // Create stock count header
+        const [sc] = await tx.insert(stockCounts).values({
+          countDate: new Date(),
+          totalProducts,
+          totalQuantity,
+          createdBy: req.user!.id
+        }).returning();
+        stockCount = sc;
+
+        // Create stock count items and apply live corrections
+        const stockCountItemsData = validItems.map(item => ({
+          stockCountId: sc.id,
+          productId: item.product_id,
+          productCode: item.product_code,
+          brandName: item.brand_name || '',
+          productName: item.product_name,
+          size: item.size || '',
+          quantity: parseInt(item.quantity) || 0
+        }));
+
+        await tx.insert(stockCountItems).values(stockCountItemsData);
+
+        // Apply stock corrections: delta = counted - current stock
+        const productIds: number[] = validItems
+          .filter(i => i.product_id)
+          .map(i => parseInt(i.product_id));
+
+        if (productIds.length > 0) {
+          const currentStocks = await tx
+            .select({ id: products.id, stockQuantity: products.stockQuantity })
+            .from(products)
+            .where(inArray(products.id, productIds));
+
+          const stockMap = new Map(currentStocks.map(p => [p.id, p.stockQuantity ?? 0]));
+
+          for (const item of validItems) {
+            const pid = parseInt(item.product_id);
+            const counted = parseInt(item.quantity) || 0;
+            const current = Number(stockMap.get(pid) ?? 0);
+            const delta = counted - current;
+            if (delta !== 0) {
+              await updateProductStock(
+                pid,
+                delta,
+                'stock_count',
+                sc.id,
+                'stock_count',
+                0,
+                `Stock count correction: counted ${counted}, was ${current}`,
+                req.user!.id,
+                tx
+              );
+              correctionsApplied++;
+            }
+          }
+        }
+      });
+
+      writeAuditLog({ actor: req.user!.id, actorName: req.user?.username || String(req.user!.id), targetId: String(stockCount!.id), targetType: 'stock_count', action: 'CREATE', details: `Stock count created: ${totalProducts} products, ${totalQuantity} total qty, ${correctionsApplied} corrections applied` });
       res.status(201).json({ 
-        id: stockCount.id,
-        message: `Stock count created with ${totalProducts} products and ${totalQuantity} total quantity` 
+        id: stockCount!.id,
+        message: `Stock count saved. ${correctionsApplied} product${correctionsApplied !== 1 ? 's' : ''} adjusted to match physical count.`
       });
     } catch (error) {
       console.error('Error creating stock count:', error);
@@ -3335,6 +3411,15 @@ export async function registerRoutes(app: Express): Promise<Server> {
   app.post('/api/invoices/:id/process-sale', requireAuth(), async (req: AuthenticatedRequest, res) => {
     try {
       const invoiceId = parseInt(req.params.id);
+
+      // Idempotency guard: reject if stock was already deducted for this invoice
+      const [invoice] = await db.select({ stockDeducted: invoices.stockDeducted, invoiceNumber: invoices.invoiceNumber }).from(invoices).where(eq(invoices.id, invoiceId));
+      if (!invoice) {
+        return res.status(404).json({ error: 'Invoice not found' });
+      }
+      if (invoice.stockDeducted) {
+        return res.status(409).json({ error: `Stock already deducted for Invoice #${invoice.invoiceNumber}` });
+      }
       
       // Get invoice items (from invoiceLineItems table)
       const items = await db.select().from(invoiceLineItems).where(eq(invoiceLineItems.invoiceId, invoiceId));
@@ -3343,30 +3428,27 @@ export async function registerRoutes(app: Express): Promise<Server> {
         return res.status(400).json({ error: 'No items found for this invoice' });
       }
 
-      // Process each item and deduct from stock
-      for (const item of items) {
-        if (!item.productId) continue;
-        await updateProductStock(
-          item.productId,
-          -item.quantity, // Deduct from stock (negative quantity)
-          'sale',
-          invoiceId,
-          'invoice',
-          parseFloat(item.unitPrice.toString()),
-          `Sale from Invoice #${invoiceId}`,
-          req.user!.id
-        );
-      }
+      await db.transaction(async (tx) => {
+        for (const item of items) {
+          if (!item.productId) continue;
+          await updateProductStock(
+            item.productId,
+            -item.quantity,
+            'sale',
+            invoiceId,
+            'invoice',
+            parseFloat(item.unitPrice.toString()),
+            `Sale from Invoice #${invoice.invoiceNumber}`,
+            req.user!.id,
+            tx
+          );
+        }
+        await tx.update(invoices).set({ stockDeducted: true }).where(eq(invoices.id, invoiceId));
+      });
 
-      // Update invoice status to mark as stock-processed (on basic invoices table)
-      await db.update(invoices)
-        .set({ status: 'confirmed' })
-        .where(eq(invoices.id, invoiceId));
-
-      const [processedInvoice] = await db.select({ invoiceNumber: invoices.invoiceNumber }).from(invoices).where(eq(invoices.id, invoiceId));
-      writeAuditLog({ actor: req.user!.id, actorName: req.user?.username || String(req.user!.id), targetId: String(invoiceId), targetType: 'invoice', action: 'UPDATE', details: `Invoice #${processedInvoice?.invoiceNumber || invoiceId} processed: stock deducted for ${items.length} products` });
+      writeAuditLog({ actor: req.user!.id, actorName: req.user?.username || String(req.user!.id), targetId: String(invoiceId), targetType: 'invoice', action: 'UPDATE', details: `Invoice #${invoice.invoiceNumber} processed: stock deducted for ${items.length} products` });
       res.json({
-        message: `Stock deducted for ${items.length} products from invoice #${invoiceId}`
+        message: `Stock deducted for ${items.length} products from Invoice #${invoice.invoiceNumber}`
       });
       
     } catch (error) {
@@ -3413,7 +3495,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
       .from(stockMovements)
       .leftJoin(products, eq(stockMovements.productId, products.id))
       .leftJoin(brands, eq(products.brandId, brands.id))
-      .orderBy(desc(stockMovements.createdAt));
+      .orderBy(desc(stockMovements.createdAt))
+      .limit(500);
       
       res.json(movements);
     } catch (error) {
