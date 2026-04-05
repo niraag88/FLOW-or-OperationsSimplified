@@ -253,7 +253,6 @@ export default function ExportDropdown({
       SKU: p.sku,
       "Product Name": p.name,
       "Current Stock": p.stockQuantity || 0,
-      "Reorder Needed": p.maxStockLevel != null ? Math.max(0, p.maxStockLevel - (p.stockQuantity || 0)) : "",
       "Cost Price": formatOrigCost(p.costPrice, p.costPriceCurrency),
       "Cost Price (AED)": formatAedCost(p.costPrice, p.costPriceCurrency),
       "Stock Value": formatOrigStockValue(p.stockQuantity, p.costPrice, p.costPriceCurrency),
@@ -272,7 +271,7 @@ export default function ExportDropdown({
       if (exportFmt === "xlsx") {
         exportToXLSX(rows, filename, "Low Stock Alerts");
       } else {
-        const headers = ["SKU", "Product Name", "Current Stock", "Reorder Needed", "Cost Price", "Cost Price (AED)", "Stock Value", "Stock Value (AED)"];
+        const headers = ["SKU", "Product Name", "Current Stock", "Cost Price", "Cost Price (AED)", "Stock Value", "Stock Value (AED)"];
         writePrintContent(pw, "Low Stock Alerts", headers, rows, rows.length);
       }
     } catch (err) {

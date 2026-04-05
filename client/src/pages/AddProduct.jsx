@@ -120,8 +120,7 @@ export default function AddProduct() {
         costPrice: formData.purchase_price || "0",
         costPriceCurrency: formData.purchase_price_currency || "GBP",
         unitPrice: formData.sale_price || "0",
-        stockQuantity: 0, // Default initial stock
-        minStockLevel: 10 // Default reorder level
+        stockQuantity: 0
       };
 
       const newProduct = await Product.create(productData);

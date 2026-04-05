@@ -40,6 +40,7 @@ export default function StockTab({ products, loading, onStockSubTabChange }) {
   // Advanced filter states for low stock  
   const [selectedLowStockBrands, setSelectedLowStockBrands] = useState([]);
   const [selectedLowStockSizes, setSelectedLowStockSizes] = useState([]);
+  const [lowStockRange, setLowStockRange] = useState({ min: "", max: "" });
 
   // Advanced filter states for out of stock
   const [selectedOutOfStockBrands, setSelectedOutOfStockBrands] = useState([]);
@@ -132,6 +133,8 @@ export default function StockTab({ products, loading, onStockSubTabChange }) {
   // Get unique values for filters from server data
   const uniqueStockBrands = [...new Set(allProducts.map(p => p.brandName).filter(Boolean))].sort();
   const uniqueStockSizes = [...new Set(allProducts.map(p => p.size).filter(Boolean))].sort();
+  const uniqueLowStockBrands = [...new Set(lowStockProducts.map(p => p.brandName).filter(Boolean))].sort();
+  const uniqueLowStockSizes = [...new Set(lowStockProducts.map(p => p.size).filter(Boolean))].sort();
   const uniqueMovementBrands = [...new Set(stockMovements.map(m => m.brandName).filter(Boolean))].sort();
   const uniqueMovementTypes = [...new Set(stockMovements.map(m => m.movementType).filter(Boolean))].sort();
 
@@ -248,7 +251,7 @@ export default function StockTab({ products, loading, onStockSubTabChange }) {
     selectedLowStockBrands, 
     selectedLowStockSizes, 
     [], 
-    { min: "", max: "" }
+    lowStockRange
   );
   const filteredOutOfStockProducts = applyAdvancedStockFilters(
     outOfStockProducts, 
@@ -1168,7 +1171,7 @@ export default function StockTab({ products, loading, onStockSubTabChange }) {
                 <AlertTriangle className="w-5 h-5" />
                 Low Stock Products ({paginatedLowStock.totalItems})
               </CardTitle>
-              <p className="text-sm text-gray-600">Products at or below minimum stock level</p>
+              <p className="text-sm text-gray-600">Products with stock below the low stock threshold</p>
             </CardHeader>
             <CardContent>
               {/* Search and Filters */}
@@ -1203,7 +1206,7 @@ export default function StockTab({ products, loading, onStockSubTabChange }) {
                       <div className="space-y-3">
                         <h4 className="font-medium leading-none">Select Brands</h4>
                         <div className="space-y-2 max-h-60 overflow-y-auto">
-                          {uniqueStockBrands.map(brand => (
+                          {uniqueLowStockBrands.map(brand => (
                             <div key={brand} className="flex items-center space-x-2">
                               <Checkbox
                                 id={`low-stock-brand-${brand}`}
@@ -1242,7 +1245,7 @@ export default function StockTab({ products, loading, onStockSubTabChange }) {
                       <div className="space-y-3">
                         <h4 className="font-medium leading-none">Select Sizes</h4>
                         <div className="space-y-2 max-h-60 overflow-y-auto">
-                          {uniqueStockSizes.map(size => (
+                          {uniqueLowStockSizes.map(size => (
                             <div key={size} className="flex items-center space-x-2">
                               <Checkbox
                                 id={`low-stock-size-${size}`}
@@ -1269,14 +1272,58 @@ export default function StockTab({ products, loading, onStockSubTabChange }) {
                     </PopoverContent>
                   </Popover>
                   
+                  {/* Current Stock Range */}
+                  <Popover>
+                    <PopoverTrigger asChild>
+                      <Button variant="outline" className="justify-between w-44">
+                        {lowStockRange.min || lowStockRange.max ? 
+                          `${lowStockRange.min || '0'} - ${lowStockRange.max || '∞'}` : 
+                          "Current Stock"
+                        }
+                        <ChevronDown className="ml-2 h-4 w-4" />
+                      </Button>
+                    </PopoverTrigger>
+                    <PopoverContent className="w-60 p-4">
+                      <div className="space-y-3">
+                        <h4 className="font-medium leading-none">Current Stock Range</h4>
+                        <div className="flex items-center gap-2">
+                          <Input
+                            placeholder="Min"
+                            type="number"
+                            min="0"
+                            value={lowStockRange.min}
+                            onChange={(e) => {
+                              setLowStockRange(prev => ({ ...prev, min: e.target.value }));
+                              resetPagination('low-stock');
+                            }}
+                            className="w-20"
+                          />
+                          <span className="text-gray-500">to</span>
+                          <Input
+                            placeholder="Max"
+                            type="number"
+                            min="0"
+                            value={lowStockRange.max}
+                            onChange={(e) => {
+                              setLowStockRange(prev => ({ ...prev, max: e.target.value }));
+                              resetPagination('low-stock');
+                            }}
+                            className="w-20"
+                          />
+                        </div>
+                      </div>
+                    </PopoverContent>
+                  </Popover>
+
                   {/* Clear Filters Button */}
-                  {(selectedLowStockBrands.length > 0 || selectedLowStockSizes.length > 0) && (
+                  {(selectedLowStockBrands.length > 0 || selectedLowStockSizes.length > 0 || lowStockRange.min || lowStockRange.max) && (
                     <Button 
                       variant="ghost" 
                       size="sm" 
                       onClick={() => {
                         setSelectedLowStockBrands([]);
                         setSelectedLowStockSizes([]);
+                        setLowStockRange({ min: "", max: "" });
                         resetPagination('low-stock');
                       }}
                     >
@@ -1286,7 +1333,7 @@ export default function StockTab({ products, loading, onStockSubTabChange }) {
                 </div>
 
                 {/* Active Filter Badges */}
-                {(selectedLowStockBrands.length > 0 || selectedLowStockSizes.length > 0) && (
+                {(selectedLowStockBrands.length > 0 || selectedLowStockSizes.length > 0 || lowStockRange.min || lowStockRange.max) && (
                   <div className="flex items-center gap-2 flex-wrap">
                     <span className="text-sm text-gray-600">Active filters:</span>
                     {selectedLowStockBrands.map(brand => (
@@ -1313,6 +1360,18 @@ export default function StockTab({ products, loading, onStockSubTabChange }) {
                         />
                       </Badge>
                     ))}
+                    {(lowStockRange.min || lowStockRange.max) && (
+                      <Badge variant="secondary" className="gap-1">
+                        Stock: {lowStockRange.min || '0'} – {lowStockRange.max || '∞'}
+                        <X 
+                          className="h-3 w-3 cursor-pointer" 
+                          onClick={() => {
+                            setLowStockRange({ min: "", max: "" });
+                            resetPagination('low-stock');
+                          }}
+                        />
+                      </Badge>
+                    )}
                   </div>
                 )}
               </div>
@@ -1324,40 +1383,22 @@ export default function StockTab({ products, loading, onStockSubTabChange }) {
                     <TableHead>Product Name</TableHead>
                     <TableHead>Size</TableHead>
                     <TableHead>Current Stock</TableHead>
-                    <TableHead>Min Level</TableHead>
-                    <TableHead>Reorder Needed</TableHead>
                   </TableRow>
                 </TableHeader>
                 <TableBody>
-                  {paginatedLowStock.data.map((product) => {
-                    const hasMaxLevel = product.maxStockLevel != null;
-                    const reorderQty = hasMaxLevel ? product.maxStockLevel - (product.stockQuantity || 0) : null;
-                    return (
-                      <TableRow key={product.id}>
-                        <TableCell>{product.brandName || '-'}</TableCell>
-                        <TableCell>{product.sku}</TableCell>
-                        <TableCell>{product.name}</TableCell>
-                        <TableCell>{product.size || '-'}</TableCell>
-                        <TableCell>
-                          <Badge variant="secondary" className="text-amber-600">
-                            {(product.stockQuantity || 0).toLocaleString()}
-                          </Badge>
-                        </TableCell>
-                        <TableCell>
-                          {product.minStockLevel != null ? product.minStockLevel : '—'}
-                        </TableCell>
-                        <TableCell>
-                          {reorderQty != null ? (
-                            <Badge variant="outline">
-                              {reorderQty} units
-                            </Badge>
-                          ) : (
-                            <span className="text-gray-400">—</span>
-                          )}
-                        </TableCell>
-                      </TableRow>
-                    );
-                  })}
+                  {paginatedLowStock.data.map((product) => (
+                    <TableRow key={product.id}>
+                      <TableCell>{product.brandName || '-'}</TableCell>
+                      <TableCell>{product.sku}</TableCell>
+                      <TableCell>{product.name}</TableCell>
+                      <TableCell>{product.size || '-'}</TableCell>
+                      <TableCell>
+                        <Badge variant="secondary" className="text-amber-600">
+                          {(product.stockQuantity || 0).toLocaleString()}
+                        </Badge>
+                      </TableCell>
+                    </TableRow>
+                  ))}
                 </TableBody>
               </Table>
 
@@ -1365,7 +1406,7 @@ export default function StockTab({ products, loading, onStockSubTabChange }) {
                 <div className="text-center py-12 text-gray-500">
                   <Package className="w-12 h-12 mx-auto mb-4 opacity-50" />
                   <p>No products with low stock</p>
-                  <p className="text-sm mt-2">All products are above minimum stock levels</p>
+                  <p className="text-sm mt-2">All products are above the low stock threshold</p>
                 </div>
               )}
               
