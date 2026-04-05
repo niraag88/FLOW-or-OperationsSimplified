@@ -67,7 +67,7 @@ export default function ExportDropdown({
   };
 
   const writePrintContent = (pw, subtitle, headers, rows, total) => {
-    const now = format(new Date(), "dd/MM/yy HH:mm");
+    const now = format(new Date(), "dd/MM/yy");
     const headerCells = headers.map((h) => `<th>${h}</th>`).join("");
     const bodyRows = rows
       .map((row) => `<tr>${headers.map((h) => `<td>${String(row[h] ?? "-")}</td>`).join("")}</tr>`)
@@ -214,7 +214,6 @@ export default function ExportDropdown({
   const buildMovementRows = (list) =>
     list.map((m) => ({
       Date: format(new Date(m.createdAt), "dd/MM/yy"),
-      Time: format(new Date(m.createdAt), "HH:mm"),
       "Product SKU": m.productSku,
       "Product Name": m.productName,
       "Movement Type": m.movementType,
@@ -237,7 +236,7 @@ export default function ExportDropdown({
       if (exportFmt === "xlsx") {
         exportToXLSX(rows, filename, "Stock Movements");
       } else {
-        const headers = ["Date", "Time", "Product SKU", "Product Name", "Movement Type", "Quantity", "Previous Stock", "New Stock", "Unit Cost", "Notes"];
+        const headers = ["Date", "Product SKU", "Product Name", "Movement Type", "Quantity", "Previous Stock", "New Stock", "Unit Cost", "Notes"];
         writePrintContent(pw, "Stock Movements", headers, rows, rows.length);
       }
     } catch (err) {
