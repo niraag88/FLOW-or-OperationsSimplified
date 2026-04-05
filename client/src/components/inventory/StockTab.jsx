@@ -400,7 +400,7 @@ export default function StockTab({ products, loading, onStockSubTabChange }) {
     if (onStockSubTabChange && !loadingMovements && stockData) {
       onStockSubTabChange(activeStockTab, filteredStockMovements, lowStockProducts, outOfStockProducts);
     }
-  }, [activeStockTab, stockMovements, stockData, loadingMovements]);
+  }, [activeStockTab, stockMovements, stockData, loadingMovements, movementsFilter, selectedMovementBrands, selectedMovementTypes, movementDateFilter]);
 
   const getMovementIcon = (type) => {
     switch (type) {
