@@ -6,7 +6,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { TrendingUp, TrendingDown, Package, Activity, AlertTriangle, History, Search, Filter, ChevronDown, X } from "lucide-react";
+import { TrendingUp, TrendingDown, Package, Activity, AlertTriangle, History, Search, Filter, ChevronDown, X, RefreshCw } from "lucide-react";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { Checkbox } from "@/components/ui/checkbox";
@@ -220,15 +220,12 @@ export default function StockTab({ products, loading, onStockSubTabChange }) {
       filtered = filtered.filter(movement => selectedTypes.includes(movement.movementType));
     }
 
-    // Date range filter
+    // Date range filter — compare by date string (YYYY-MM-DD) to avoid timezone offsets
     if (dateRange.start || dateRange.end) {
       filtered = filtered.filter(movement => {
-        const movementDate = new Date(movement.createdAt);
-        const startDate = dateRange.start ? new Date(dateRange.start) : null;
-        const endDate = dateRange.end ? new Date(`${dateRange.end}T23:59:59`) : null;
-        
-        if (startDate && movementDate < startDate) return false;
-        if (endDate && movementDate > endDate) return false;
+        const movementDateStr = (movement.createdAt || '').slice(0, 10);
+        if (dateRange.start && movementDateStr < dateRange.start) return false;
+        if (dateRange.end && movementDateStr > dateRange.end) return false;
         return true;
       });
     }
@@ -407,6 +404,7 @@ export default function StockTab({ products, loading, onStockSubTabChange }) {
       case 'goods_receipt': return <TrendingUp className="w-4 h-4 text-green-600" />;
       case 'sale': return <TrendingDown className="w-4 h-4 text-red-600" />;
       case 'adjustment': return <Activity className="w-4 h-4 text-blue-600" />;
+      case 'initial': return <Package className="w-4 h-4 text-blue-600" />;
       default: return <Activity className="w-4 h-4 text-gray-600" />;
     }
   };
@@ -416,7 +414,19 @@ export default function StockTab({ products, loading, onStockSubTabChange }) {
       case 'goods_receipt': return 'Stock In';
       case 'sale': return 'Sale';
       case 'adjustment': return 'Adjustment';
-      default: return type;
+      case 'initial': return 'Opening Stock';
+      default: return type || '-';
+    }
+  };
+
+  const formatMovementSource = (referenceType, referenceId) => {
+    if (!referenceType || !referenceId) return '-';
+    switch (referenceType) {
+      case 'goods_receipt': return `GRN #${referenceId}`;
+      case 'invoice': return `INV #${referenceId}`;
+      case 'stock_count': return `Count #${referenceId}`;
+      case 'manual': return '-';
+      default: return `${referenceType} #${referenceId}`;
     }
   };
 
@@ -857,11 +867,20 @@ export default function StockTab({ products, loading, onStockSubTabChange }) {
         <TabsContent value="movements" className="space-y-4">
           <Card>
             <CardHeader>
-              <CardTitle className="flex items-center gap-2">
-                <History className="w-5 h-5" />
-                Recent Stock Movements
-              </CardTitle>
-              <p className="text-sm text-gray-600">Automatic stock changes from goods receipts and sales</p>
+              <div className="flex items-center justify-between">
+                <CardTitle className="flex items-center gap-2">
+                  <History className="w-5 h-5" />
+                  Recent Stock Movements ({paginatedMovements.totalItems})
+                </CardTitle>
+                <Button variant="outline" size="sm" onClick={loadStockMovements} disabled={loadingMovements}>
+                  <RefreshCw className={`w-4 h-4 mr-1 ${loadingMovements ? 'animate-spin' : ''}`} />
+                  Refresh
+                </Button>
+              </div>
+              <p className="text-sm text-gray-600">Full history of stock changes — goods receipts, sales, adjustments and corrections</p>
+              {stockMovements.length >= 500 && (
+                <p className="text-xs text-amber-600 mt-1">Showing the latest 500 movements</p>
+              )}
             </CardHeader>
             <CardContent>
               {/* Search and Filters */}
@@ -1074,6 +1093,7 @@ export default function StockTab({ products, loading, onStockSubTabChange }) {
                       <TableHead>Brand</TableHead>
                       <TableHead>Product</TableHead>
                       <TableHead>Type</TableHead>
+                      <TableHead>Source</TableHead>
                       <TableHead>Quantity</TableHead>
                       <TableHead>Previous</TableHead>
                       <TableHead>New Stock</TableHead>
@@ -1099,6 +1119,9 @@ export default function StockTab({ products, loading, onStockSubTabChange }) {
                             <span className="text-sm">{getMovementTypeLabel(movement.movementType)}</span>
                           </div>
                         </TableCell>
+                        <TableCell className="text-sm text-gray-600">
+                          {formatMovementSource(movement.referenceType, movement.referenceId)}
+                        </TableCell>
                         <TableCell>
                           {formatMovementQuantity(movement.quantity)}
                         </TableCell>
@@ -1107,7 +1130,7 @@ export default function StockTab({ products, loading, onStockSubTabChange }) {
                           <Badge variant="outline">{movement.newStock}</Badge>
                         </TableCell>
                         <TableCell className="text-sm text-gray-600">
-                          {movement.notes}
+                          {movement.notes || '-'}
                         </TableCell>
                       </TableRow>
                     ))}
