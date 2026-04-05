@@ -491,12 +491,8 @@ export default function StockTab({ products, loading, onStockSubTabChange }) {
             <div className="flex items-center justify-between">
               <div className="flex-1 min-w-0">
                 <p className="text-xs font-medium text-gray-500 uppercase tracking-wide truncate">Stock Value (at cost)</p>
-                <p className="text-lg font-bold text-gray-900 mt-1 truncate" title={`AED ${stockSummary.totalValue.toLocaleString('en-AE', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`}>
-                  AED {stockSummary.totalValue > 999999 
-                    ? `${(stockSummary.totalValue / 1000000).toFixed(1)}M`
-                    : stockSummary.totalValue > 9999 
-                    ? `${(stockSummary.totalValue / 1000).toFixed(1)}K`
-                    : stockSummary.totalValue.toLocaleString('en-AE', { minimumFractionDigits: 0, maximumFractionDigits: 0 })}
+                <p className="text-lg font-bold text-gray-900 mt-1 truncate">
+                  AED {stockSummary.totalValue.toLocaleString('en-AE', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
                 </p>
               </div>
               <div className="h-6 w-6 bg-green-100 rounded-full flex items-center justify-center flex-shrink-0 ml-2">
