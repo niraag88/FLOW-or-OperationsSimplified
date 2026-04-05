@@ -879,7 +879,7 @@ export default function StockTab({ products, loading, onStockSubTabChange }) {
               </div>
               <p className="text-sm text-gray-600">Full history of stock changes — goods receipts, sales, adjustments and corrections</p>
               {stockMovements.length >= 500 && (
-                <p className="text-xs text-amber-600 mt-1">Showing the latest 500 movements</p>
+                <p className="text-xs text-gray-500 mt-1">Showing the latest 500 movements</p>
               )}
             </CardHeader>
             <CardContent>
