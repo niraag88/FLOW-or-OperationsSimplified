@@ -3100,7 +3100,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
               await updateProductStock(
                 pid,
                 delta,
-                'stock_count',
+                'adjustment',
                 sc.id,
                 'stock_count',
                 0,
