@@ -37,6 +37,7 @@ export default function Inventory() {
     outOfStockProducts: []
   });
   const [lowStockThreshold, setLowStockThreshold] = useState(6);
+  const [fxRates, setFxRates] = useState({ gbpToAed: 4.85, usdToAed: 3.6725, inrToAed: 0.044 });
 
   const { user: currentUser } = useAuth();
   const canEdit = ['Admin', 'Manager', 'Staff'].includes(currentUser?.role);
@@ -54,7 +55,15 @@ export default function Inventory() {
 
     fetch('/api/company-settings', { credentials: 'include' })
       .then(r => r.ok ? r.json() : null)
-      .then(data => { setLowStockThreshold(data?.lowStockThreshold ?? 6); })
+      .then(data => {
+        if (!data) return;
+        setLowStockThreshold(data.lowStockThreshold ?? 6);
+        setFxRates({
+          gbpToAed: parseFloat(data.fxGbpToAed) || 4.85,
+          usdToAed: parseFloat(data.fxUsdToAed) || 3.6725,
+          inrToAed: parseFloat(data.fxInrToAed) || 0.044,
+        });
+      })
       .catch(() => {});
   }, []);
 
@@ -119,6 +128,7 @@ export default function Inventory() {
             selectedBrands={selectedBrands}
             selectedSizes={selectedSizes}
             lowStockThreshold={lowStockThreshold}
+            fxRates={fxRates}
           />
           
           {activeTab === "products" && canEdit && (
