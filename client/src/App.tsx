@@ -131,11 +131,6 @@ function PagesContent() {
             <Layout currentPageName="Stock Count"><StockCountNew /></Layout>
           </ProtectedRoute>
         } />
-        <Route path="/StockCountNew" element={
-          <ProtectedRoute>
-            <Layout currentPageName="Stock Count"><StockCountNew /></Layout>
-          </ProtectedRoute>
-        } />
         <Route path="/goods-receipts" element={
           <ProtectedRoute>
             <Layout currentPageName="Goods Receipts"><GoodsReceipts /></Layout>

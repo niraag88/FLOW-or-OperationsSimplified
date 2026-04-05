@@ -63,13 +63,14 @@ export default function StockCountNew() {
         quantity: quantities[product.id] || 0
       }));
 
-      // Filter out items with zero quantity
-      const itemsWithStock = items.filter(item => item.quantity > 0);
+      // Only include products the user explicitly entered a quantity for
+      // (quantities[id] !== undefined means the user touched that row)
+      const itemsWithStock = items.filter(item => quantities[item.product_id] !== undefined);
       
       if (itemsWithStock.length === 0) {
         toast({
           title: "No Items",
-          description: "Please enter quantities for at least one product.",
+          description: "Please enter a counted quantity for at least one product.",
           variant: "destructive",
         });
         setLoading(false);
@@ -121,8 +122,8 @@ export default function StockCountNew() {
     product.name?.toLowerCase().includes(searchTerm.toLowerCase())
   );
 
-  // Calculate totals
-  const totalProductsWithStock = Object.values(quantities).filter(qty => qty > 0).length;
+  // Calculate totals — count all products the user has explicitly entered a quantity for (including zero)
+  const totalProductsWithStock = Object.keys(quantities).length;
   const totalQuantity = Object.values(quantities).reduce((sum, qty) => sum + (qty || 0), 0);
 
   if (loadingProducts) {

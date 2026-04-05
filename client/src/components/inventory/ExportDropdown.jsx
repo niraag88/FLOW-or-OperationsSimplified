@@ -23,6 +23,7 @@ export default function ExportDropdown({
   searchTerm,
   selectedBrands,
   selectedSizes,
+  lowStockThreshold,
 }) {
   const [isExporting, setIsExporting] = useState(false);
 
@@ -43,7 +44,7 @@ export default function ExportDropdown({
       Brand: p.brandName || "-",
       "Product Code": p.sku || "-",
       "Product Name": p.name || "-",
-      Size: p.description || "-",
+      Size: p.size || "-",
       "Cost Price": formatCurrency(p.costPrice, p.costPriceCurrency || "GBP"),
       "Sale Price (AED)": `AED ${parseFloat(p.unitPrice || 0).toFixed(2)}`,
       Status: p.isActive ? "Active" : "Inactive",
@@ -134,12 +135,15 @@ export default function ExportDropdown({
   const buildCurrentStockRows = (list) =>
     list.map((p) => {
       const stock = p.stockQuantity || 0;
-      const status = stock === 0 ? "Out of Stock" : stock <= (p.minStockLevel || 10) ? "Low Stock" : "In Stock";
+      const threshold = lowStockThreshold || 6;
+      const status = stock === 0 ? "Out of Stock" : stock <= threshold ? "Low Stock" : "In Stock";
       return {
+        Brand: p.brandName || "-",
         SKU: p.sku,
         "Product Name": p.name,
+        Size: p.size || "-",
         "Current Stock": stock,
-        "Min Stock Level": p.minStockLevel || 10,
+        "Min Stock Level": p.minStockLevel || "-",
         Status: status,
         "Cost Price": p.costPrice || 0,
         "Stock Value": (stock * (parseFloat(p.costPrice) || 0)).toFixed(2),
@@ -159,7 +163,7 @@ export default function ExportDropdown({
       if (exportFmt === "xlsx") {
         exportToXLSX(rows, filename, "Current Stock");
       } else {
-        const headers = ["SKU", "Product Name", "Current Stock", "Min Stock Level", "Status", "Cost Price", "Stock Value"];
+        const headers = ["Brand", "SKU", "Product Name", "Size", "Current Stock", "Min Stock Level", "Status", "Cost Price", "Stock Value"];
         writePrintContent(pw, "Current Stock Levels", headers, rows, allProducts.length);
       }
     } catch (err) {
@@ -203,6 +207,7 @@ export default function ExportDropdown({
     } catch (err) {
       console.error("Export error:", err);
       if (pw) pw.close();
+      alert("Export failed. Please try again.");
     } finally {
       setIsExporting(false);
     }
@@ -213,8 +218,8 @@ export default function ExportDropdown({
       SKU: p.sku,
       "Product Name": p.name,
       "Current Stock": p.stockQuantity || 0,
-      "Min Stock Level": p.minStockLevel || 10,
-      "Reorder Needed": Math.max(0, (p.maxStockLevel || 50) - (p.stockQuantity || 0)),
+      "Min Stock Level": p.minStockLevel || "-",
+      "Reorder Needed": p.maxStockLevel != null ? Math.max(0, p.maxStockLevel - (p.stockQuantity || 0)) : "N/A",
       "Cost Price": p.costPrice || 0,
       "Stock Value": ((p.stockQuantity || 0) * (parseFloat(p.costPrice) || 0)).toFixed(2),
     }));
@@ -247,7 +252,7 @@ export default function ExportDropdown({
       SKU: p.sku,
       "Product Name": p.name,
       Brand: p.brandName || "",
-      Size: p.description || "",
+      Size: p.size || "",
       "Current Stock": 0,
       Status: "Out of Stock",
     }));

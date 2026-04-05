@@ -12,7 +12,7 @@ import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover
 import { Checkbox } from "@/components/ui/checkbox";
 import { format } from "date-fns";
 
-export default function StockTab({ products, loading, canEdit, currentUser, onRefresh, onStockSubTabChange }) {
+export default function StockTab({ products, loading, onStockSubTabChange }) {
   const [stockData, setStockData] = useState(null);
   const [stockMovements, setStockMovements] = useState([]);
   const [loadingStock, setLoadingStock] = useState(true);
@@ -45,12 +45,15 @@ export default function StockTab({ products, loading, canEdit, currentUser, onRe
   const [selectedOutOfStockBrands, setSelectedOutOfStockBrands] = useState([]);
   const [selectedOutOfStockSizes, setSelectedOutOfStockSizes] = useState([]);
 
-  // Pagination states for each tab
+  // Pagination states for each tab (independent per-tab)
   const [currentStockPage, setCurrentStockPage] = useState(1);
   const [movementsPage, setMovementsPage] = useState(1);
   const [lowStockPage, setLowStockPage] = useState(1);
   const [outOfStockPage, setOutOfStockPage] = useState(1);
-  const [itemsPerPage, setItemsPerPage] = useState(50);
+  const [stockLevelsPerPage, setStockLevelsPerPage] = useState(50);
+  const [movementsPerPage, setMovementsPerPage] = useState(50);
+  const [lowStockPerPage, setLowStockPerPage] = useState(50);
+  const [outOfStockPerPage, setOutOfStockPerPage] = useState(50);
 
   useEffect(() => {
     loadStockMovements();
@@ -280,10 +283,10 @@ export default function StockTab({ products, loading, canEdit, currentUser, onRe
   };
 
   // Paginated data for each tab
-  const paginatedCurrentStock = paginateData(filteredProducts, currentStockPage, itemsPerPage);
-  const paginatedMovements = paginateData(filteredStockMovements, movementsPage, itemsPerPage);
-  const paginatedLowStock = paginateData(filteredLowStockProducts, lowStockPage, itemsPerPage);
-  const paginatedOutOfStock = paginateData(filteredOutOfStockProducts, outOfStockPage, itemsPerPage);
+  const paginatedCurrentStock = paginateData(filteredProducts, currentStockPage, stockLevelsPerPage);
+  const paginatedMovements = paginateData(filteredStockMovements, movementsPage, movementsPerPage);
+  const paginatedLowStock = paginateData(filteredLowStockProducts, lowStockPage, lowStockPerPage);
+  const paginatedOutOfStock = paginateData(filteredOutOfStockProducts, outOfStockPage, outOfStockPerPage);
 
   // Reset pagination when filters change
   const resetPagination = (type) => {
@@ -304,7 +307,7 @@ export default function StockTab({ products, loading, canEdit, currentUser, onRe
   };
 
   // Reusable pagination controls component
-  const PaginationControls = ({ paginationData, currentPage, setPage, type, itemName }) => {
+  const PaginationControls = ({ paginationData, currentPage, setPage, perPage, setPerPage, type, itemName }) => {
     if (paginationData.totalItems === 0) return null;
 
     return (
@@ -320,9 +323,9 @@ export default function StockTab({ products, loading, canEdit, currentUser, onRe
           <div className="flex items-center gap-2">
             <span className="text-sm text-gray-700">Show:</span>
             <Select
-              value={itemsPerPage >= paginationData.totalItems ? "all" : itemsPerPage.toString()}
+              value={perPage >= paginationData.totalItems ? "all" : perPage.toString()}
               onValueChange={(value) => {
-                setItemsPerPage(value === "all" ? paginationData.totalItems : Number(value));
+                setPerPage(value === "all" ? paginationData.totalItems : Number(value));
                 setPage(1);
               }}
             >
@@ -394,16 +397,10 @@ export default function StockTab({ products, loading, canEdit, currentUser, onRe
 
   // Initialize stock sub-tab data after computed values are available
   useEffect(() => {
-    if (onStockSubTabChange && !loading) {
-      const currentLowStock = products.filter(p => {
-        const lowStockThreshold = companySettings?.lowStockThreshold || 6;
-        return (p.stockQuantity || 0) > 0 && (p.stockQuantity || 0) <= lowStockThreshold;
-      });
-      const currentOutOfStock = products.filter(p => (p.stockQuantity || 0) === 0);
-      
-      onStockSubTabChange(activeStockTab, stockMovements, currentLowStock, currentOutOfStock);
+    if (onStockSubTabChange && !loadingMovements && stockData) {
+      onStockSubTabChange(activeStockTab, filteredStockMovements, lowStockProducts, outOfStockProducts);
     }
-  }, [activeStockTab]); // Only trigger when activeStockTab changes
+  }, [activeStockTab, stockMovements, stockData, loadingMovements]);
 
   const getMovementIcon = (type) => {
     switch (type) {
@@ -423,7 +420,7 @@ export default function StockTab({ products, loading, canEdit, currentUser, onRe
     }
   };
 
-  const formatMovementQuantity = (quantity, type) => {
+  const formatMovementQuantity = (quantity) => {
     const isPositive = quantity > 0;
     const sign = isPositive ? '+' : '';
     const color = isPositive ? 'text-green-600' : 'text-red-600';
@@ -528,7 +525,7 @@ export default function StockTab({ products, loading, canEdit, currentUser, onRe
       <Tabs defaultValue="stock-levels" className="w-full" onValueChange={(value) => {
         setActiveStockTab(value);
         if (onStockSubTabChange) {
-          onStockSubTabChange(value, stockMovements, lowStockProducts, outOfStockProducts);
+          onStockSubTabChange(value, filteredStockMovements, lowStockProducts, outOfStockProducts);
         }
       }}>
         <TabsList className="grid w-full grid-cols-4">
@@ -848,6 +845,8 @@ export default function StockTab({ products, loading, canEdit, currentUser, onRe
                 paginationData={paginatedCurrentStock}
                 currentPage={currentStockPage}
                 setPage={setCurrentStockPage}
+                perPage={stockLevelsPerPage}
+                setPerPage={setStockLevelsPerPage}
                 type="current-stock"
                 itemName="products"
               />
@@ -1101,7 +1100,7 @@ export default function StockTab({ products, loading, canEdit, currentUser, onRe
                           </div>
                         </TableCell>
                         <TableCell>
-                          {formatMovementQuantity(movement.quantity, movement.movementType)}
+                          {formatMovementQuantity(movement.quantity)}
                         </TableCell>
                         <TableCell>{movement.previousStock}</TableCell>
                         <TableCell>
@@ -1129,6 +1128,8 @@ export default function StockTab({ products, loading, canEdit, currentUser, onRe
                   paginationData={paginatedMovements}
                   currentPage={movementsPage}
                   setPage={setMovementsPage}
+                  perPage={movementsPerPage}
+                  setPerPage={setMovementsPerPage}
                   type="movements"
                   itemName="movements"
                 />
@@ -1349,6 +1350,8 @@ export default function StockTab({ products, loading, canEdit, currentUser, onRe
                 paginationData={paginatedLowStock}
                 currentPage={lowStockPage}
                 setPage={setLowStockPage}
+                perPage={lowStockPerPage}
+                setPerPage={setLowStockPerPage}
                 type="low-stock"
                 itemName="products"
               />
@@ -1556,6 +1559,8 @@ export default function StockTab({ products, loading, canEdit, currentUser, onRe
                 paginationData={paginatedOutOfStock}
                 currentPage={outOfStockPage}
                 setPage={setOutOfStockPage}
+                perPage={outOfStockPerPage}
+                setPerPage={setOutOfStockPerPage}
                 type="out-of-stock"
                 itemName="products"
               />

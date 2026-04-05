@@ -3000,7 +3000,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
         totalQuantity: stockCounts.totalQuantity,
         createdBy: stockCounts.createdBy,
         createdAt: stockCounts.createdAt
-      }).from(stockCounts).orderBy(desc(stockCounts.createdAt));
+      }).from(stockCounts).orderBy(desc(stockCounts.createdAt)).limit(100);
       
       res.json(stockCountsList);
     } catch (error) {

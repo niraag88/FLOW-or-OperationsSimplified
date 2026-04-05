@@ -36,12 +36,13 @@ export default function Inventory() {
     lowStockProducts: [],
     outOfStockProducts: []
   });
+  const [lowStockThreshold, setLowStockThreshold] = useState(6);
 
   const { user: currentUser } = useAuth();
   const canEdit = ['Admin', 'Manager', 'Staff'].includes(currentUser?.role);
   const canDelete = ['Admin', 'Manager', 'Staff'].includes(currentUser?.role);
 
-  // Load filter options (brands + sizes) once on mount
+  // Load filter options (brands + sizes) and company settings once on mount
   useEffect(() => {
     fetch('/api/products/filter-options', { credentials: 'include' })
       .then(r => r.ok ? r.json() : { brands: [], sizes: [] })
@@ -49,6 +50,11 @@ export default function Inventory() {
         setUniqueBrands(data.brands || []);
         setUniqueSizes(data.sizes || []);
       })
+      .catch(() => {});
+
+    fetch('/api/company-settings', { credentials: 'include' })
+      .then(r => r.ok ? r.json() : null)
+      .then(data => { if (data?.lowStockThreshold) setLowStockThreshold(data.lowStockThreshold); })
       .catch(() => {});
   }, []);
 
@@ -112,6 +118,7 @@ export default function Inventory() {
             searchTerm={searchTerm}
             selectedBrands={selectedBrands}
             selectedSizes={selectedSizes}
+            lowStockThreshold={lowStockThreshold}
           />
           
           {activeTab === "products" && canEdit && (
@@ -139,7 +146,7 @@ export default function Inventory() {
           {activeTab === "stock" && canEdit && (
             <Button
               className="bg-emerald-600 hover:bg-emerald-700 text-white"
-              onClick={() => navigate('/StockCountNew')}
+              onClick={() => navigate('/stock-count')}
             >
               <ClipboardList className="w-4 h-4 mr-2" />
               New Stock Count
