@@ -61,7 +61,7 @@ async function main() {
 
   // 1a. Delivery order items → delivery orders linked to non-user customers
   const doItemsFromCustomer = `do_id IN (
-    SELECT do_id FROM delivery_orders WHERE customer_id IN (
+    SELECT id FROM delivery_orders WHERE customer_id IN (
       SELECT id FROM customers WHERE data_source IN ${DUMMY}
     )
   )`;
@@ -99,17 +99,15 @@ async function main() {
   const n1g = await del('customers', `data_source IN ${DUMMY}`, 'customers');
 
   // ── 2. SUPPLIERS (data_source != 'user') ──────────────────────────────────
-  // Non-user suppliers' POs (SEED-tagged) and GRNs must be removed first.
-  // Only delete POs that reference non-user suppliers — this preserves user POs
-  // even if they hypothetically referenced a seeded supplier.
-  // Extra safety: also require notes LIKE '[SEED-%' to ensure we never touch user POs.
+  // Delete all POs (and their child rows) that reference a non-user supplier.
+  // User-entered POs use brand_id rather than supplier_id, so they are not
+  // affected. The sole protection is data_source on the supplier row.
 
   // 2a. Stock movements linked to GRNs of non-user suppliers' POs
   const movFromSupplier = `reference_type = 'goods_receipt' AND reference_id IN (
     SELECT gr.id FROM goods_receipts gr
     JOIN purchase_orders po ON gr.po_id = po.id
     WHERE po.supplier_id IN (SELECT id FROM suppliers WHERE data_source IN ${DUMMY})
-      AND po.notes LIKE '[SEED-%'
   )`;
   const n2a = await del('stock_movements', movFromSupplier, 'stock_movements (via supplier PO)');
 
@@ -118,7 +116,6 @@ async function main() {
     SELECT gr.id FROM goods_receipts gr
     JOIN purchase_orders po ON gr.po_id = po.id
     WHERE po.supplier_id IN (SELECT id FROM suppliers WHERE data_source IN ${DUMMY})
-      AND po.notes LIKE '[SEED-%'
   )`;
   const n2b = await del('goods_receipt_items', grnItemsFromSupplier, 'goods_receipt_items (via supplier)');
 
@@ -126,7 +123,6 @@ async function main() {
   const grnsFromSupplier = `po_id IN (
     SELECT id FROM purchase_orders
     WHERE supplier_id IN (SELECT id FROM suppliers WHERE data_source IN ${DUMMY})
-      AND notes LIKE '[SEED-%'
   )`;
   const n2c = await del('goods_receipts', grnsFromSupplier, 'goods_receipts (via supplier)');
 
@@ -134,13 +130,11 @@ async function main() {
   const poItemsFromSupplier = `po_id IN (
     SELECT id FROM purchase_orders
     WHERE supplier_id IN (SELECT id FROM suppliers WHERE data_source IN ${DUMMY})
-      AND notes LIKE '[SEED-%'
   )`;
   const n2d = await del('purchase_order_items', poItemsFromSupplier, 'purchase_order_items (via supplier)');
 
-  // 2e. POs themselves (only SEED-tagged, extra safety)
-  const posFromSupplier = `supplier_id IN (SELECT id FROM suppliers WHERE data_source IN ${DUMMY})
-    AND notes LIKE '[SEED-%'`;
+  // 2e. POs referencing non-user suppliers
+  const posFromSupplier = `supplier_id IN (SELECT id FROM suppliers WHERE data_source IN ${DUMMY})`;
   const n2e = await del('purchase_orders', posFromSupplier, 'purchase_orders (via supplier)');
 
   // 2f. Suppliers themselves

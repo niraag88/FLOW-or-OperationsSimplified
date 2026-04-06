@@ -26,8 +26,23 @@ The backend is an Express.js application written in TypeScript. It interacts wit
 ## Database Layer
 PostgreSQL is the chosen database, managed by Drizzle ORM. Schema definitions are centralized in `/shared/schema.ts`. Versioned Drizzle migrations are used for schema evolution, with an automated post-merge script ensuring `npm install && npm run db:migrate` runs on every task merge. The connection utilizes Neon Database for serverless PostgreSQL.
 
-### Data Provenance
-A `data_source` column (`user`, `seed`, `e2e_test`) is implemented across key entity tables (`products`, `customers`, `suppliers`, `brands`) to track data origin, with a cleanup script available to remove non-user data.
+### Data Provenance Convention (Task #171)
+A `data_source` text column (default `'user'`) is present on four entity tables: `products`, `customers`, `suppliers`, `brands`.
+
+| Value | Meaning | Set by |
+|-------|---------|--------|
+| `user` | Real data entered via the app UI | Column default — set automatically |
+| `seed` | Demo/population data from seed scripts | `seed-foundation.ts`, `populate-customers-api.ts` |
+| `e2e_test` | Temporary Playwright test data | E2E spec `beforeAll` hooks |
+
+**Cleanup script** (always check `--dry-run` first):
+```bash
+npx tsx scripts/delete-dummy-data.ts --dry-run   # preview only
+npx tsx scripts/delete-dummy-data.ts              # live delete
+```
+The script deletes in child-before-parent order and never touches `data_source = 'user'` records.
+
+**Rule**: seed scripts must include `dataSource: 'seed'` in POST bodies; E2E `beforeAll` hooks must include `dataSource: 'e2e_test'`. The app UI never needs to set this field.
 
 ## Authentication & Authorization
 The system employs session-based authentication with a PostgreSQL session store. User management is standard username/password. A demo mode is available via the Base44 SDK shim for UI-only operation.
