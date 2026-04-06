@@ -1,0 +1,20 @@
+What remains is mostly cleanup, consistency, and a few operational gotchas. In order of importance:
+
+Invoice and PO PDF helpers still contain hardcoded placeholder company details.
+The invoice PDF helper still prints Company Name, Company Address, Tel: Company Phone, and company@email.com, and the PO PDF helper still prints SUPERNATURE LLC with placeholder contact details. If those code paths are used in production, you can generate the wrong official documents.
+You now have two database pools plus a legacy in-memory storage layer still hanging around.
+server/db.ts exports a Postgres pool and Drizzle client, but server/routes.ts also creates a second new Pool(...). On top of that, server/routes.ts imports both storage and businessStorage, while server/storage.ts is still just a MemStorage in-memory user store. That is not necessarily breaking anything today, but it is exactly the kind of leftover architecture that causes future bugs because people edit the wrong layer.
+Some schema work still happens outside the migration system.
+Your migrations are now set up properly and the migrations README explicitly says to use db:generate + db:migrate and not db:push, but server/index.ts still performs startup DDL for storage_objects and signed_tokens. That split is workable, but it creates a “two ways to change schema” situation, which is a long-term maintenance risk.
+The admin-init message points to a script that does not exist.
+server/adminInit.ts tells you to run npm run create-admin, but package.json only shows dev, build, start, check, db:push, db:generate, and db:migrate. That is a small but real setup trap.
+There are still likely duplicate / legacy frontend files.
+Your pages folder contains both Dashboard.jsx and Dashboard.tsx, and your hooks folder contains both use-mobile.jsx and use-mobile.tsx. App.tsx explicitly lazy-loads Dashboard.jsx, which makes the .tsx version look like a likely leftover unless something else uses it. The same folder also still contains client/src/api/base44Client.js, entities.js, and integrations.js, which look like older Base44-era artifacts worth verifying. I can’t prove all of these are unused from this review alone, but they are strong dead-code candidates.
+Routing is still inconsistent in casing.
+App.tsx uses lowercase for routes like /purchase-orders, /delivery-orders, and /invoices, but uppercase for /Reports, /Settings, /Dashboard, /Inventory, /UserManagement, /BackupDrill, /Print, and /Quotations. That is not a crash risk, but it is sloppy and makes links/bookmarks/navigation conventions less predictable.
+Uploads still use memory storage.
+multer.memoryStorage() is still being used, and the repo README still documents PDF uploads up to 25 MB. For your current usage this is probably acceptable, but it does mean large or simultaneous uploads hit app memory directly instead of streaming through disk/object-storage staging.
+The default idle session is still only 1 hour.
+Sessions are secure and rolling, which is good, but the default SESSION_MAX_AGE remains 3600000 ms. For your real office workflow, where people may leave the app open and come back to it, that may be shorter than you want. It is more an operational setting than a bug.
+Repo and docs cleanup is still worth doing.
+The repo root still contains .canvas/assets and attached_assets, and .gitignore does not ignore .canvas. The README still describes the project as a “Replit Storage API Server” designed for the “Base44 operations management suite,” which no longer reflects the full current app. None of this breaks production, but it makes the repo noisier and less professional.
