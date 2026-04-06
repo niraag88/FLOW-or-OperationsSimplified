@@ -531,7 +531,7 @@ export class BusinessStorage {
   async createInvoiceFromQuotation(quotationId: number, invoiceNumber: string, userId: number) {
     const quote = await this.getQuotationWithItems(quotationId);
     if (!quote) throw new Error(`Quotation with id ${quotationId} not found`);
-    if (quote.status === 'Converted') throw new Error(`Quotation ${quote.quoteNumber} has already been converted to an invoice`);
+    if (quote.status === 'converted') throw new Error(`Quotation ${quote.quoteNumber} has already been converted to an invoice`);
     if (!quote.customerId) throw new Error(`Quotation ${quote.quoteNumber} has no customer assigned`);
 
     const invoiceData: InsertInvoice = {
@@ -563,7 +563,7 @@ export class BusinessStorage {
       }
     }
 
-    await this.updateQuotation(quotationId, { status: 'Converted' });
+    await this.updateQuotation(quotationId, { status: 'converted' });
 
     return { ...invoice, items: quote.items ?? [] };
   }

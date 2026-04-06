@@ -459,6 +459,7 @@ export default function QuotationForm({ open, onClose, editingQuotation, current
                 </SelectTrigger>
                 <SelectContent>
                   <SelectItem value="draft">Draft</SelectItem>
+                  <SelectItem value="sent">Sent</SelectItem>
                   <SelectItem value="submitted">Submitted</SelectItem>
                 </SelectContent>
               </Select>

@@ -32,25 +32,31 @@ export default function CreateInvoiceFromQuotationDialog({ open, onClose, onQuot
   const loadSubmittedQuotations = async () => {
     setLoading(true);
     try {
-      // Load all submitted quotations with customer data
-      const [quotationsData, customersData] = await Promise.all([
-        Quotation.filter({ status: 'submitted' }, '-updated_date'),
+      // Load submitted and accepted quotations (both are eligible for invoice conversion)
+      const [submittedData, acceptedData, customersData] = await Promise.all([
+        Quotation.filter({ status: 'submitted' }),
+        Quotation.filter({ status: 'accepted' }),
         Customer.list()
       ]);
+
+      // Merge and deduplicate by id
+      const quotationsData = [...submittedData, ...acceptedData].filter(
+        (q, idx, arr) => arr.findIndex(x => x.id === q.id) === idx
+      );
 
       // Create a map for quick customer lookup
       const customerMap = {};
       customersData.forEach(customer => {
-        customerMap[customer.id] = customer.customer_name || customer.name;
+        customerMap[customer.id] = customer.name || customer.customer_name;
       });
 
       // Combine quotations with customer names and sort by date (newest first)
       const enrichedQuotations = quotationsData
         .map(quotation => ({
           ...quotation,
-          customerName: customerMap[quotation.customer_id] || 'Unknown Customer'
+          customerName: customerMap[quotation.customerId] || 'Unknown Customer'
         }))
-        .sort((a, b) => new Date(b.updated_date || b.updatedDate) - new Date(a.updated_date || a.updatedDate));
+        .sort((a, b) => new Date(b.updatedAt || b.createdAt) - new Date(a.updatedAt || a.createdAt));
 
       setSubmittedQuotations(enrichedQuotations);
     } catch (error) {
@@ -102,7 +108,7 @@ export default function CreateInvoiceFromQuotationDialog({ open, onClose, onQuot
         <DialogHeader>
           <DialogTitle>Create Invoice from Quotation</DialogTitle>
           <DialogDescription>
-            Select a submitted quotation to create a new invoice. All quotation details will be copied to the new invoice.
+            Select a submitted or accepted quotation to create a new invoice. All quotation details will be copied to the new invoice.
           </DialogDescription>
         </DialogHeader>
 
@@ -136,7 +142,7 @@ export default function CreateInvoiceFromQuotationDialog({ open, onClose, onQuot
             </Select>
             {submittedQuotations.length === 0 && !loading && (
               <p className="text-sm text-muted-foreground">
-                No submitted quotations found. Create and submit a quotation first.
+                No submitted or accepted quotations found. Create and submit a quotation first.
               </p>
             )}
           </div>

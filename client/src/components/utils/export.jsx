@@ -147,35 +147,48 @@ export const exportQuotationToXLSX = async (quotation) => {
       console.warn('Error fetching complete quotation:', err);
     }
     
-    // Get company settings dynamically
+    // Get company info — use snapshot captured at creation time; fall back to live settings for older quotations
     let companyInfo = {
       companyName: 'SUPERNATURE LLC',
       address: 'Al Rukhaimi Building\nSheikh Zayed Road\nDubai\nU.A.E.',
       phone: '+971 4 4582211',
       email: 'info@supernaturellc.com',
       website: '',
-      vatNumber: '100042339000003',
+      taxNumber: '100042339000003',
       currency: 'AED'
     };
 
-    try {
-      const settingsResponse = await fetch('/api/company-settings', { credentials: 'include' });
-      if (settingsResponse.ok) {
-        const settings = await settingsResponse.json();
-        if (settings) {
-          companyInfo = {
-            companyName: settings.companyName || companyInfo.companyName,
-            address: settings.address || companyInfo.address,
-            phone: settings.phone || companyInfo.phone,
-            email: settings.email || companyInfo.email,
-            website: settings.website || companyInfo.website,
-            vatNumber: settings.vatNumber || companyInfo.vatNumber,
-            currency: 'AED'
-          };
+    const snapshot = fullQuotation.companySnapshot || quotation.companySnapshot;
+    if (snapshot) {
+      companyInfo = {
+        companyName: snapshot.companyName || companyInfo.companyName,
+        address: snapshot.address || companyInfo.address,
+        phone: snapshot.phone || companyInfo.phone,
+        email: snapshot.email || companyInfo.email,
+        website: snapshot.website || companyInfo.website,
+        taxNumber: snapshot.taxNumber || snapshot.vatNumber || companyInfo.taxNumber,
+        currency: 'AED'
+      };
+    } else {
+      try {
+        const settingsResponse = await fetch('/api/company-settings', { credentials: 'include' });
+        if (settingsResponse.ok) {
+          const settings = await settingsResponse.json();
+          if (settings) {
+            companyInfo = {
+              companyName: settings.companyName || companyInfo.companyName,
+              address: settings.address || companyInfo.address,
+              phone: settings.phone || companyInfo.phone,
+              email: settings.email || companyInfo.email,
+              website: settings.website || companyInfo.website,
+              taxNumber: settings.taxNumber || settings.vatNumber || companyInfo.taxNumber,
+              currency: 'AED'
+            };
+          }
         }
+      } catch (err) {
+        console.warn('Could not fetch company settings, using defaults:', err);
       }
-    } catch (err) {
-      console.warn('Could not fetch company settings, using defaults:', err);
     }
 
     console.log('Creating XLSX workbook...');
@@ -224,8 +237,8 @@ export const exportQuotationToXLSX = async (quotation) => {
       exportData.push([`Email: ${companyInfo.email}`, '', '', '', '', '', '']);
     }
     
-    if (companyInfo.vatNumber) {
-      exportData.push([`TRN: ${companyInfo.vatNumber}`, '', '', '', '', '', '']);
+    if (companyInfo.taxNumber) {
+      exportData.push([`TRN: ${companyInfo.taxNumber}`, '', '', '', '', '', '']);
     }
     
     exportData.push([]); // Empty row

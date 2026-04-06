@@ -123,6 +123,12 @@ export default function QuotationPrintView() {
               <span className="po-label">Quote Date</span>
               <span className="po-value">{formatDate(quotation.quoteDate)}</span>
             </div>
+            {quotation.validUntil && (
+              <div className="po-info-row">
+                <span className="po-label">Valid Until</span>
+                <span className="po-value">{formatDate(quotation.validUntil)}</span>
+              </div>
+            )}
           </div>
         </div>
 

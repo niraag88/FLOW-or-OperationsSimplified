@@ -2798,15 +2798,20 @@ export async function registerRoutes(app: Express): Promise<Server> {
       
       // Convert date strings to Date objects if present (strip companySnapshot — immutable after creation)
       const { companySnapshot: _ignoredQUOSnapshot, ...bodyWithoutSnapshot } = req.body;
-      const processedData = { ...bodyWithoutSnapshot };
+      const processedData = {
+        ...bodyWithoutSnapshot,
+        // Map snake_case reference_date from frontend to camelCase (same as POST route)
+        referenceDate: bodyWithoutSnapshot.reference_date
+          ? new Date(bodyWithoutSnapshot.reference_date)
+          : bodyWithoutSnapshot.referenceDate
+            ? new Date(bodyWithoutSnapshot.referenceDate)
+            : undefined,
+      };
       if (processedData.quoteDate && typeof processedData.quoteDate === 'string') {
         processedData.quoteDate = new Date(processedData.quoteDate);
       }
       if (processedData.validUntil && typeof processedData.validUntil === 'string') {
         processedData.validUntil = new Date(processedData.validUntil);
-      }
-      if (processedData.referenceDate && typeof processedData.referenceDate === 'string') {
-        processedData.referenceDate = new Date(processedData.referenceDate);
       }
       
       const validatedData = insertQuotationSchema.partial().parse(processedData);

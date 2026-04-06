@@ -45,7 +45,7 @@ export default function QuotationActionsDropdown({ quotation, canEdit, canCreate
       await exportQuotationToXLSX(quotation);
       toast({
         title: 'Export Successful',
-        description: `Quotation ${quotation.quotation_number} exported to Excel.`
+        description: `Quotation ${quotation.quoteNumber} exported to Excel.`
       });
     } catch (error) {
       console.error('XLSX export error:', error);

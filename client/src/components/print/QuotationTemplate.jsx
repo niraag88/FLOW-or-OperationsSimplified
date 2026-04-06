@@ -40,7 +40,7 @@ export default function QuotationTemplate({ data, customer, settings }) {
         companyAddress={settings?.address}
         companyPhone={settings?.phone}
         companyEmail={settings?.email}
-        companyTrn={settings?.trn}
+        companyTrn={settings?.taxNumber || settings?.vatNumber}
       />
 
       {/* Customer and Quote Details */}
