@@ -26,6 +26,12 @@ The backend is an Express.js application written in TypeScript. It interacts wit
 ## Database Layer
 PostgreSQL is the chosen database, managed by Drizzle ORM. Schema definitions are centralized in `/shared/schema.ts`. Versioned Drizzle migrations are used for schema evolution, with an automated post-merge script ensuring `npm install && npm run db:migrate` runs on every task merge. The connection utilizes Neon Database for serverless PostgreSQL.
 
+### Migration Infrastructure (Task #89)
+- **Versioned migrations adopted**: `migrations/0000_baseline.sql` created from full current schema. `drizzle.__drizzle_migrations` table seeded — baseline marked applied, live data untouched.
+- **Scripts**: `npm run db:generate` (create migration file), `npm run db:migrate` (apply pending migrations). **`db:push` hangs in this project — do not use it.**
+- **Post-merge automation**: `scripts/post-merge.sh` runs `npm install && npm run db:migrate` on every task merge.
+- **Workflow for schema changes**: Edit `shared/schema.ts` → `npm run db:generate` → commit the SQL file → `npm run db:migrate`.
+
 ### Data Provenance Convention (Task #171)
 A `data_source` text column (default `'user'`) is present on four entity tables: `products`, `customers`, `suppliers`, `brands`.
 
