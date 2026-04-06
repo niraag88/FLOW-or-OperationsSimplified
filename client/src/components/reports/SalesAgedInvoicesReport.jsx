@@ -15,11 +15,10 @@ const EXCLUDED_STATUSES = new Set(["cancelled"]);
 const fmt = (value) =>
   new Intl.NumberFormat("en-US", { minimumFractionDigits: 2, maximumFractionDigits: 2 }).format(value);
 
-function isUAECustomer(customer) {
+function isLocalCustomer(customer) {
   if (!customer) return true;
-  const country = (customer.country || '').trim();
-  if (!country) return true;
-  return country.toUpperCase() === 'UAE' || country.toLowerCase() === 'united arab emirates';
+  const vat = (customer.vatTreatment || '').toLowerCase();
+  return vat !== 'international';
 }
 
 function getPeriodBounds(period, customFrom, customTo) {
@@ -160,16 +159,16 @@ export default function SalesAgedInvoicesReport({ invoices, customers, canExport
 
   const regionSplit = useMemo(() => {
     const customerMap = new Map(customers.map((c) => [c.id, c]));
-    let uae = 0;
+    let local = 0;
     let international = 0;
     filteredInvoices.forEach((inv) => {
       const total = Number(inv.total_amount || inv.totalAmount || inv.amount || 0);
       const custId = inv.customer_id ?? inv.customerId;
       const customer = customerMap.get(custId);
-      if (isUAECustomer(customer)) uae += total;
+      if (isLocalCustomer(customer)) local += total;
       else international += total;
     });
-    return { uae, international, total: uae + international };
+    return { local, international, total: local + international };
   }, [filteredInvoices, customers]);
 
   const agingExportData = Object.entries(agingData).map(([bucket, values]) => ({
@@ -406,19 +405,19 @@ export default function SalesAgedInvoicesReport({ invoices, customers, canExport
           <CardHeader>
             <CardTitle className="flex items-center gap-2">
               <Globe className="w-5 h-5" />
-              UAE vs International Revenue
+              Local vs International Revenue
             </CardTitle>
             <p className="text-sm text-gray-500">
-              Based on customer billing address &amp; VAT number — {periodLabel}
+              Based on customer VAT treatment — {periodLabel}
             </p>
           </CardHeader>
           <CardContent>
             <div className="space-y-5 pt-2">
               <div>
                 <div className="flex justify-between mb-1">
-                  <span className="text-sm font-medium text-gray-700">UAE</span>
+                  <span className="text-sm font-medium text-gray-700">Local</span>
                   <span className="text-sm font-semibold text-blue-700">
-                    AED {fmt(regionSplit.uae)}
+                    AED {fmt(regionSplit.local)}
                   </span>
                 </div>
                 <div className="w-full bg-gray-100 rounded-full h-3">
@@ -427,14 +426,14 @@ export default function SalesAgedInvoicesReport({ invoices, customers, canExport
                     style={{
                       width:
                         regionSplit.total > 0
-                          ? `${(regionSplit.uae / regionSplit.total) * 100}%`
+                          ? `${(regionSplit.local / regionSplit.total) * 100}%`
                           : "0%",
                     }}
                   />
                 </div>
                 <p className="text-xs text-gray-500 mt-0.5">
                   {regionSplit.total > 0
-                    ? `${((regionSplit.uae / regionSplit.total) * 100).toFixed(1)}% of total`
+                    ? `${((regionSplit.local / regionSplit.total) * 100).toFixed(1)}% of total`
                     : "—"}
                 </p>
               </div>
