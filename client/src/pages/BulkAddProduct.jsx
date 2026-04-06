@@ -207,6 +207,7 @@ export default function BulkAddProduct() {
       }
 
       queryClient.invalidateQueries({ queryKey: ["/api/products"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/dashboard"] });
       setResult(data);
       setParsedRows(null);
       setFileName("");

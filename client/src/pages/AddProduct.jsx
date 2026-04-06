@@ -128,8 +128,9 @@ export default function AddProduct() {
       // currentUser is guaranteed to be set by useEffect now
       await logAuditAction("Product", newProduct.id, "create", currentUser.email, { product: newProduct });
 
-      // Invalidate the products list and filter-options so Inventory shows the new product immediately
+      // Invalidate the products list and dashboard so counts update immediately
       queryClient.invalidateQueries({ queryKey: ['/api/products'] });
+      queryClient.invalidateQueries({ queryKey: ['/api/dashboard'] });
       
       toast({
         title: "Success",

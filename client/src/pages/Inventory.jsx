@@ -90,6 +90,7 @@ export default function Inventory() {
 
   const handleRefresh = () => {
     queryClient.invalidateQueries({ queryKey: ['/api/products'] });
+    queryClient.invalidateQueries({ queryKey: ['/api/dashboard'] });
   };
 
   const handleStockSubTabChange = (subTab, stockMovements, lowStockProducts, outOfStockProducts) => {
