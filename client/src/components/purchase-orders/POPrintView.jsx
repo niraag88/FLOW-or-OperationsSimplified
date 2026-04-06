@@ -97,9 +97,6 @@ export default function POPrintView() {
           {/* Left Column - Company Info */}
           <div className="print-company-info">
             <div className="company-name">{companyData?.companyName}</div>
-            {companyData?.vatNumber && (
-              <div className="company-contact">TRN: {companyData.vatNumber}</div>
-            )}
             {companyData?.address && (
               <div className="company-address">{companyData.address}</div>
             )}
@@ -108,6 +105,9 @@ export default function POPrintView() {
             )}
             {companyData?.email && (
               <div className="company-contact">Email: {companyData.email}</div>
+            )}
+            {companyData?.vatNumber && (
+              <div className="company-contact">TRN: {companyData.vatNumber}</div>
             )}
           </div>
 
