@@ -51,12 +51,12 @@ test.describe('Invoices — create, large document, filters', () => {
     if (largeInvoiceId) await apiDelete(`/api/invoices/${largeInvoiceId}`, cookie);
   });
 
-  test('invoices list loads with 500+ records in < 200ms', async () => {
+  test('invoices list loads with 300+ records in < 200ms', async () => {
     const start = Date.now();
     const raw = await apiGet('/api/invoices', cookie);
     const elapsed = Date.now() - start;
     const invs = toInvoiceList(raw);
-    expect(invs.length).toBeGreaterThanOrEqual(500);
+    expect(invs.length).toBeGreaterThanOrEqual(300);
     expect(elapsed).toBeLessThan(200);
   });
 

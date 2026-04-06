@@ -81,24 +81,24 @@ export default function OverviewReport({ invoices, purchaseOrders, companySettin
       .forEach((inv) => {
         const dateVal = inv.invoice_date || inv.invoiceDate;
         if (!dateVal) return;
-        try {
-          const m = format(new Date(dateVal), "yyyy-MM");
-          if (!salesMap[m]) salesMap[m] = 0;
-          salesMap[m] += Number(inv.total_amount || inv.totalAmount || inv.amount || 0);
-        } catch {}
+        const d = new Date(dateVal);
+        if (isNaN(d.getTime())) return;
+        const m = format(d, "yyyy-MM");
+        if (!salesMap[m]) salesMap[m] = 0;
+        salesMap[m] += Number(inv.total_amount || inv.totalAmount || inv.amount || 0);
       });
 
     const purchasesMap = {};
     purchaseOrders.forEach((po) => {
       const dateVal = po.orderDate || po.order_date;
       if (!dateVal) return;
-      try {
-        const m = format(new Date(dateVal), "yyyy-MM");
-        if (!purchasesMap[m]) purchasesMap[m] = 0;
-        const amt = Number(po.totalAmount || po.total_amount || 0);
-        const cur = po.currency || "GBP";
-        purchasesMap[m] += cur === "AED" ? amt : amt * getFxRate(po);
-      } catch {}
+      const d = new Date(dateVal);
+      if (isNaN(d.getTime())) return;
+      const m = format(d, "yyyy-MM");
+      if (!purchasesMap[m]) purchasesMap[m] = 0;
+      const amt = Number(po.totalAmount || po.total_amount || 0);
+      const cur = po.currency || "GBP";
+      purchasesMap[m] += cur === "AED" ? amt : amt * getFxRate(po);
     });
 
     return months.map((m) => ({

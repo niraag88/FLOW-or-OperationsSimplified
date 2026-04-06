@@ -94,12 +94,12 @@ export default function PurchasesReport({ purchaseOrders, suppliers, companySett
     filteredPOs.forEach((po) => {
       const dateValue = po.orderDate || po.order_date;
       if (!dateValue) return;
-      try {
-        const month = format(new Date(dateValue), "yyyy-MM");
-        if (!purchases[month]) purchases[month] = { totalAED: 0, count: 0 };
-        purchases[month].totalAED += getAedAmount(po);
-        purchases[month].count += 1;
-      } catch {}
+      const d = new Date(dateValue);
+      if (isNaN(d.getTime())) return;
+      const month = format(d, "yyyy-MM");
+      if (!purchases[month]) purchases[month] = { totalAED: 0, count: 0 };
+      purchases[month].totalAED += getAedAmount(po);
+      purchases[month].count += 1;
     });
     return Object.entries(purchases).sort(([a], [b]) => b.localeCompare(a)).slice(0, 12);
   }, [filteredPOs, companySettings]);

@@ -109,7 +109,7 @@ test.describe('UI Flows — page loads, dialogs, navigation', () => {
   test('purchase orders page loads within 4s at full scale (307+ records in DB)', async ({ page }) => {
     await login(page);
     const start = Date.now();
-    await page.goto(`${BASE_URL}/PurchaseOrders`);
+    await page.goto(`${BASE_URL}/purchase-orders`);
     await page.waitForLoadState('domcontentloaded', { timeout: 15000 });
     await page.waitForTimeout(2000);
     const elapsed = Date.now() - start;
