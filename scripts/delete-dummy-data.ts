@@ -155,9 +155,8 @@ async function main() {
   // 3c. GRN items for non-user products
   const n3c = await del('goods_receipt_items', nonUserProd, 'goods_receipt_items (via product)');
 
-  // 3d. PO items for non-user products (only on SEED-tagged POs for safety)
-  const poItemsFromProd = `product_id IN (SELECT id FROM products WHERE data_source IN ${DUMMY})
-    AND po_id IN (SELECT id FROM purchase_orders WHERE notes LIKE '[SEED-%')`;
+  // 3d. PO items for non-user products (any PO — product itself is being deleted)
+  const poItemsFromProd = `product_id IN (SELECT id FROM products WHERE data_source IN ${DUMMY})`;
   const n3d = await del('purchase_order_items', poItemsFromProd, 'purchase_order_items (via product)');
 
   // 3e. Invoice line items for non-user products (only on non-user customers' invoices)
@@ -191,24 +190,22 @@ async function main() {
   const n3h = await del('products', `data_source IN ${DUMMY}`, 'products');
 
   // ── 4. BRANDS (data_source != 'user') ─────────────────────────────────────
-  // Only delete a brand if no products or POs still reference it.
-  // This prevents accidentally breaking user data that references a seeded brand.
+  // Nullify brand_id on any user products/POs that still reference a seed/e2e brand,
+  // then delete all non-user brands unconditionally.
 
-  const brandCheck = await pool.query(`
-    SELECT b.id, b.name
-    FROM brands b
-    WHERE b.data_source IN ('seed', 'e2e_test')
-      AND b.id NOT IN (SELECT DISTINCT brand_id FROM products WHERE brand_id IS NOT NULL)
-      AND b.id NOT IN (SELECT DISTINCT brand_id FROM purchase_orders WHERE brand_id IS NOT NULL)
-  `);
-  const safeToDeleteBrandIds = brandCheck.rows.map((r: { id: number }) => r.id);
-
-  let n4 = 0;
-  if (safeToDeleteBrandIds.length > 0) {
-    n4 = await del('brands', `id IN (${safeToDeleteBrandIds.join(',')})`, 'brands');
+  if (!DRY_RUN) {
+    await pool.query(`
+      UPDATE products SET brand_id = NULL
+      WHERE data_source = 'user'
+        AND brand_id IN (SELECT id FROM brands WHERE data_source IN ('seed', 'e2e_test'))
+    `);
+    await pool.query(`
+      UPDATE purchase_orders SET brand_id = NULL
+      WHERE brand_id IN (SELECT id FROM brands WHERE data_source IN ('seed', 'e2e_test'))
+    `);
   }
 
-  const skippedBrands = await count('brands', `data_source IN ${DUMMY}`) - (DRY_RUN ? 0 : 0);
+  const n4 = await del('brands', `data_source IN ${DUMMY}`, 'brands');
 
   total = n1a + n1b + n1c + n1d + n1e + n1f + n1g
         + n2a + n2b + n2c + n2d + n2e + n2f
@@ -225,7 +222,7 @@ async function main() {
                   + await count('brands', `data_source IN ${DUMMY}`);
 
   if (!DRY_RUN && remaining > 0) {
-    console.warn(`\n⚠  ${remaining} dummy records remain (likely brands still referenced by user products or POs).`);
+    console.warn(`\n⚠  ${remaining} dummy records remain — manual investigation required.`);
   } else if (!DRY_RUN) {
     console.log('\n✓ All dummy data removed. Only user data remains.');
   }
