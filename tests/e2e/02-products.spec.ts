@@ -13,7 +13,10 @@ test.describe('Products CRUD', () => {
   test.beforeAll(async () => {
     cookie = await apiLogin();
     const brands = await apiGet('/api/brands', cookie) as { id: number }[];
-    firstBrandId = Array.isArray(brands) && brands.length > 0 ? brands[0].id : 62;
+    if (!Array.isArray(brands) || brands.length === 0) {
+      throw new Error('No brands found in database — seed data is missing. Run seed-foundation.ts before running tests.');
+    }
+    firstBrandId = brands[0].id;
   });
 
   test('products list loads with 490+ items', async () => {
