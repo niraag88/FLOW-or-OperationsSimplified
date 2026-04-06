@@ -21,18 +21,19 @@ export default function QuotationPrintView() {
 
     const loadData = async () => {
       try {
-        // Load quotation data and company settings (same pattern as POPrintView)
-        const [quotationResponse, companyResponse] = await Promise.all([
-          fetch(`/api/export/quotation?quotationId=${quotationId}`),
-          fetch('/api/company-settings')
-        ]);
-        
+        const quotationResponse = await fetch(`/api/export/quotation?quotationId=${quotationId}`);
         const quotationResult = await quotationResponse.json();
-        const companyResult = await companyResponse.json();
         
         if (quotationResult.success) {
-          setQuotation(quotationResult.data);
-          setCompanySettings(companyResult);
+          const quotationData = quotationResult.data;
+          setQuotation(quotationData);
+          // Use the snapshot captured at creation time; fall back to live settings for older quotations
+          if (quotationData.companySnapshot) {
+            setCompanySettings(quotationData.companySnapshot);
+          } else {
+            const companyResponse = await fetch('/api/company-settings');
+            setCompanySettings(await companyResponse.json());
+          }
         } else {
           console.error('Error loading quotation:', quotationResult.error);
           navigate('/Quotations');

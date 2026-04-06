@@ -13,12 +13,15 @@ export default function DOPrintView() {
   useEffect(() => {
     const loadData = async () => {
       try {
-        const [doData, companyResponse] = await Promise.all([
-          DeliveryOrder.getById(id),
-          fetch('/api/company-settings', { credentials: 'include' }).then(r => r.json())
-        ]);
+        const doData = await DeliveryOrder.getById(id);
         setDeliveryOrder(doData);
-        setCompanySettings(companyResponse);
+        // Use the snapshot captured at creation time; fall back to live settings for older DOs
+        if (doData?.company_snapshot) {
+          setCompanySettings(doData.company_snapshot);
+        } else {
+          const companyResponse = await fetch('/api/company-settings', { credentials: 'include' });
+          setCompanySettings(await companyResponse.json());
+        }
       } catch (error) {
         console.error('Error loading data:', error);
       } finally {

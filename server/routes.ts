@@ -1387,7 +1387,19 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
   app.post('/api/purchase-orders', requireAuth(['Admin', 'Manager']), async (req: AuthenticatedRequest, res) => {
     try {
-      const poNumber = await businessStorage.generatePoNumber();
+      const [poNumber, settingsRow] = await Promise.all([
+        businessStorage.generatePoNumber(),
+        db.select().from(companySettings).limit(1),
+      ]);
+      const companySnapshotData = settingsRow[0] ? {
+        companyName: settingsRow[0].companyName,
+        address: settingsRow[0].address,
+        phone: settingsRow[0].phone,
+        email: settingsRow[0].email,
+        vatNumber: settingsRow[0].vatNumber,
+        taxNumber: settingsRow[0].taxNumber,
+        logo: settingsRow[0].logo,
+      } : null;
       
       // Transform date strings to Date objects for validation
       const transformedBody = {
@@ -1428,10 +1440,14 @@ export async function registerRoutes(app: Express): Promise<Server> {
         const poCurrency = purchaseOrder.currency || 'GBP';
         const computedGrandTotal = poCurrency === 'AED' ? computedTotal : computedTotal * poFxRate;
         await db.update(purchaseOrders)
-          .set({ totalAmount: computedTotal.toFixed(2), grandTotal: computedGrandTotal.toFixed(2) })
+          .set({ totalAmount: computedTotal.toFixed(2), grandTotal: computedGrandTotal.toFixed(2), companySnapshot: companySnapshotData })
           .where(eq(purchaseOrders.id, purchaseOrder.id));
         purchaseOrder.totalAmount = computedTotal.toFixed(2);
         purchaseOrder.grandTotal = computedGrandTotal.toFixed(2);
+      } else if (companySnapshotData) {
+        await db.update(purchaseOrders)
+          .set({ companySnapshot: companySnapshotData })
+          .where(eq(purchaseOrders.id, purchaseOrder.id));
       }
       
       writeAuditLog({ actor: req.user!.id, actorName: req.user?.username || String(req.user!.id), targetId: String(purchaseOrder.id), targetType: 'purchase_order', action: 'CREATE', details: `PO #${purchaseOrder.poNumber} created` });
@@ -1937,17 +1953,25 @@ export async function registerRoutes(app: Express): Promise<Server> {
         return res.status(400).json({ error: 'customer_id is required' });
       }
 
-      const nextNumber = await businessStorage.generateInvoiceNumber();
-
-      // Look up customer name from customer_id
-      let customerName = body.customer_name || 'Unknown Customer';
-      let customerId: number | undefined = undefined;
-      const customer = await businessStorage.getCustomerById(parseInt(body.customer_id));
+      const [nextNumber, invSettingsRow, customer] = await Promise.all([
+        businessStorage.generateInvoiceNumber(),
+        db.select().from(companySettings).limit(1),
+        businessStorage.getCustomerById(parseInt(body.customer_id)),
+      ]);
       if (!customer) {
         return res.status(400).json({ error: `Customer with id ${body.customer_id} not found` });
       }
-      customerName = customer.name;
-      customerId = customer.id;
+      const customerName = customer.name;
+      const customerId = customer.id;
+      const invCompanySnapshot = invSettingsRow[0] ? {
+        companyName: invSettingsRow[0].companyName,
+        address: invSettingsRow[0].address,
+        phone: invSettingsRow[0].phone,
+        email: invSettingsRow[0].email,
+        vatNumber: invSettingsRow[0].vatNumber,
+        taxNumber: invSettingsRow[0].taxNumber,
+        logo: invSettingsRow[0].logo,
+      } : null;
 
       const invoiceData: InsertInvoice = {
         invoiceNumber: nextNumber,
@@ -1984,6 +2008,10 @@ export async function registerRoutes(app: Express): Promise<Server> {
             });
           }
         }
+      }
+
+      if (invCompanySnapshot) {
+        await db.update(invoices).set({ companySnapshot: invCompanySnapshot }).where(eq(invoices.id, invoice.id));
       }
 
       writeAuditLog({ actor: req.user!.id, actorName: req.user?.username || String(req.user!.id), targetId: String(invoice.id), targetType: 'invoice', action: 'CREATE', details: `Invoice #${invoice.invoiceNumber} created for ${customerName}` });
@@ -2350,6 +2378,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
         notes: deliveryOrders.notes,
         taxRate: deliveryOrders.taxRate,
         status: deliveryOrders.status,
+        companySnapshot: deliveryOrders.companySnapshot,
         customerVatTreatment: customers.vatTreatment,
       }).from(deliveryOrders)
         .leftJoin(customers, eq(customers.id, deliveryOrders.customerId))
@@ -2403,6 +2432,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
           return localTreatments.includes(doRecord.customerVatTreatment || '') ? 'StandardRated' : 'ZeroRated';
         })(),
         status: doRecord.status,
+        company_snapshot: doRecord.companySnapshot || null,
         attachments: [],
         items: lineItems.map(item => ({
           id: item.id,
@@ -2427,8 +2457,20 @@ export async function registerRoutes(app: Express): Promise<Server> {
   // POST /api/delivery-orders - Create new delivery order
   app.post('/api/delivery-orders', requireAuth(), async (req: AuthenticatedRequest, res) => {
     try {
-      const nextNumber = await businessStorage.generateDoNumber();
+      const [nextNumber, doSettingsRow] = await Promise.all([
+        businessStorage.generateDoNumber(),
+        db.select().from(companySettings).limit(1),
+      ]);
       const body = req.body;
+      const doCompanySnapshot = doSettingsRow[0] ? {
+        companyName: doSettingsRow[0].companyName,
+        address: doSettingsRow[0].address,
+        phone: doSettingsRow[0].phone,
+        email: doSettingsRow[0].email,
+        vatNumber: doSettingsRow[0].vatNumber,
+        taxNumber: doSettingsRow[0].taxNumber,
+        logo: doSettingsRow[0].logo,
+      } : null;
 
       let customerName = body.customer_name || 'Unknown Customer';
       let customerId: number | undefined = undefined;
@@ -2455,6 +2497,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
         currency: body.currency || 'AED',
         notes: body.remarks || body.notes || null,
         taxRate: body.tax_rate ? body.tax_rate.toString() : '0.05',
+        companySnapshot: doCompanySnapshot,
       }).returning();
 
       if (body.items && Array.isArray(body.items) && body.items.length > 0) {
@@ -2594,7 +2637,19 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
   app.post('/api/quotations', requireAuth(['Admin', 'Manager', 'Staff']), async (req: AuthenticatedRequest, res) => {
     try {
-      const quoteNumber = await businessStorage.generateQuotationNumber();
+      const [quoteNumber, quoteSettingsRow] = await Promise.all([
+        businessStorage.generateQuotationNumber(),
+        db.select().from(companySettings).limit(1),
+      ]);
+      const quoteCompanySnapshot = quoteSettingsRow[0] ? {
+        companyName: quoteSettingsRow[0].companyName,
+        address: quoteSettingsRow[0].address,
+        phone: quoteSettingsRow[0].phone,
+        email: quoteSettingsRow[0].email,
+        vatNumber: quoteSettingsRow[0].vatNumber,
+        taxNumber: quoteSettingsRow[0].taxNumber,
+        logo: quoteSettingsRow[0].logo,
+      } : null;
       
       // Convert string dates back to Date objects for validation
       const requestData = {
@@ -2624,6 +2679,10 @@ export async function registerRoutes(app: Express): Promise<Server> {
             });
           }
         }
+      }
+      
+      if (quoteCompanySnapshot) {
+        await db.update(quotations).set({ companySnapshot: quoteCompanySnapshot }).where(eq(quotations.id, quotation.id));
       }
       
       const quoteCustomerName = req.body.customerName || `Customer ID ${req.body.customerId || 'unknown'}`;
@@ -4301,6 +4360,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
         paymentStatus: invoices.paymentStatus,
         paymentReceivedDate: invoices.paymentReceivedDate,
         paymentRemarks: invoices.paymentRemarks,
+        companySnapshot: invoices.companySnapshot,
         customerContactPerson: customers.contactPerson,
         customerEmail: customers.email,
         customerPhone: customers.phone,
@@ -4377,6 +4437,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
         total_amount: totalAmount,
         status: invoice.status,
         remarks: invoice.notes || '',
+        companySnapshot: invoice.companySnapshot || null,
         customer: {
           name: invoice.customerName,
           contact_name: invoice.customerContactPerson || '',
@@ -4511,6 +4572,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
         paymentStatus: purchaseOrders.paymentStatus,
         paymentMadeDate: purchaseOrders.paymentMadeDate,
         paymentRemarks: purchaseOrders.paymentRemarks,
+        companySnapshot: purchaseOrders.companySnapshot,
         supplierName: suppliers.name,
         supplierAddress: suppliers.address,
         supplierContactPerson: suppliers.contactPerson,
@@ -4605,6 +4667,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
         terms: quotations.terms,
         reference: quotations.reference,
         referenceDate: quotations.referenceDate,
+        companySnapshot: quotations.companySnapshot,
         customerName: customers.name,
         customerBillingAddress: customers.billingAddress,
         customerShippingAddress: customers.shippingAddress,

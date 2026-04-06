@@ -1,5 +1,5 @@
 import { sql } from "drizzle-orm";
-import { pgTable, text, varchar, timestamp, boolean, serial, decimal, integer, bigint, date, index } from "drizzle-orm/pg-core";
+import { pgTable, text, varchar, timestamp, boolean, serial, decimal, integer, bigint, date, index, jsonb } from "drizzle-orm/pg-core";
 import { createInsertSchema } from "drizzle-zod";
 import { z } from "zod";
 
@@ -69,6 +69,7 @@ export const invoices = pgTable("invoices", {
   paymentReceivedDate: date("payment_received_date"),
   paymentRemarks: text("payment_remarks"),
   stockDeducted: boolean("stock_deducted").notNull().default(false),
+  companySnapshot: jsonb("company_snapshot"),
 }, (table) => ({
   invoicesStatusCustomerIdx: index("invoices_status_customer_idx").on(table.status, table.customerId),
   invoicesCreatedAtIdx: index("invoices_created_at_idx").on(table.createdAt),
@@ -97,6 +98,7 @@ export const deliveryOrders = pgTable("delivery_orders", {
   scanKey: text("scan_key"),
   createdAt: timestamp("created_at").defaultNow().notNull(),
   legalHold: boolean("legal_hold").default(false).notNull(),
+  companySnapshot: jsonb("company_snapshot"),
 }, (table) => ({
   doStatusCustomerIdx: index("delivery_orders_status_customer_idx").on(table.status, table.customerId),
 }));
@@ -324,6 +326,7 @@ export const purchaseOrders = pgTable("purchase_orders", {
   paymentStatus: text("payment_status").notNull().default("outstanding"),
   paymentMadeDate: date("payment_made_date"),
   paymentRemarks: text("payment_remarks"),
+  companySnapshot: jsonb("company_snapshot"),
 }, (table) => ({
   poStatusIdx: index("purchase_orders_status_idx").on(table.status),
   poOrderDateIdx: index("purchase_orders_order_date_idx").on(table.orderDate),
@@ -368,6 +371,7 @@ export const quotations = pgTable("quotations", {
   createdBy: varchar("created_by").references(() => users.id).notNull(),
   createdAt: timestamp("created_at").defaultNow().notNull(),
   updatedAt: timestamp("updated_at").defaultNow().notNull(),
+  companySnapshot: jsonb("company_snapshot"),
 }, (table) => ({
   quotationsStatusCustomerIdx: index("quotations_status_customer_idx").on(table.status, table.customerId),
   quotationsCustomerIdx: index("quotations_customer_id_idx").on(table.customerId),

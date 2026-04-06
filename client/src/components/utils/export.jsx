@@ -924,13 +924,15 @@ export const printPOGRNSummary = async (poId) => {
 };
 
 export const exportPODetailToXLSX = async (poId, poNumber) => {
-  const [res, companyRes] = await Promise.all([
-    fetch(`/api/purchase-orders/${poId}/detail`, { credentials: 'include' }),
-    fetch('/api/company-settings', { credentials: 'include' }),
-  ]);
+  const res = await fetch(`/api/purchase-orders/${poId}/detail`, { credentials: 'include' });
   if (!res.ok) throw new Error('Failed to load PO detail');
   const d = await res.json();
-  const company = companyRes.ok ? await companyRes.json() : null;
+  // Use the snapshot captured at creation time; fall back to live settings for older POs
+  let company = d.companySnapshot || null;
+  if (!company) {
+    const companyRes = await fetch('/api/company-settings', { credentials: 'include' });
+    company = companyRes.ok ? await companyRes.json() : null;
+  }
   const currency = d.currency || 'GBP';
   const fmtDate = (s) => fmtShort(s);
   const fmtNum = (n) => parseFloat(n || 0).toFixed(2);

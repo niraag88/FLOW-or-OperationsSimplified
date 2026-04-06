@@ -23,17 +23,19 @@ export default function POPrintView() {
 
   const loadPrintData = async (poId) => {
     try {
-      const [poResponse, companyResponse] = await Promise.all([
-        fetch(`/api/export/po?poId=${poId}`),
-        fetch('/api/company-settings')
-      ]);
-
+      const poResponse = await fetch(`/api/export/po?poId=${poId}`);
       const poResult = await poResponse.json();
-      const companyResult = await companyResponse.json();
 
       if (poResult.success) {
-        setPOData(poResult.data);
-        setCompanyData(companyResult);
+        const poData = poResult.data;
+        setPOData(poData);
+        // Use the snapshot captured at creation time; fall back to live settings for older POs
+        if (poData.companySnapshot) {
+          setCompanyData(poData.companySnapshot);
+        } else {
+          const companyResponse = await fetch('/api/company-settings');
+          setCompanyData(await companyResponse.json());
+        }
       } else {
         console.error('Error loading PO data:', poResult.error);
         navigate('/PurchaseOrders');

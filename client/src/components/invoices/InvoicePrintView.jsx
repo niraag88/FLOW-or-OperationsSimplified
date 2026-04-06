@@ -18,18 +18,19 @@ export default function InvoicePrintView() {
 
     const loadData = async () => {
       try {
-        // Load invoice data and company settings (same pattern as QuotationPrintView)
-        const [invoiceResponse, companyResponse] = await Promise.all([
-          fetch(`/api/export/invoice?invoiceId=${id}`),
-          fetch('/api/company-settings')
-        ]);
-        
+        const invoiceResponse = await fetch(`/api/export/invoice?invoiceId=${id}`);
         const invoiceResult = await invoiceResponse.json();
-        const companyResult = await companyResponse.json();
         
         if (invoiceResult.success) {
-          setInvoice(invoiceResult.data);
-          setCompanySettings(companyResult);
+          const invoiceData = invoiceResult.data;
+          setInvoice(invoiceData);
+          // Use the snapshot captured at creation time; fall back to live settings for older invoices
+          if (invoiceData.companySnapshot) {
+            setCompanySettings(invoiceData.companySnapshot);
+          } else {
+            const companyResponse = await fetch('/api/company-settings');
+            setCompanySettings(await companyResponse.json());
+          }
         } else {
           console.error('Error loading invoice:', invoiceResult.error);
           navigate('/Invoices');
