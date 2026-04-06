@@ -1886,6 +1886,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
           trn_number: invoice.customerVatNumber || '',
           vat_treatment: invoice.customerVatTreatment || 'Local',
         } : null,
+        companySnapshot: invoice.companySnapshot || null,
         items: lineItems.map(item => ({
           id: item.id,
           product_id: item.productId,
