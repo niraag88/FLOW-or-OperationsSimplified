@@ -12,6 +12,7 @@ test.describe('Purchase Orders', () => {
   let brandId: number;
   let productId: number;
   let lifecyclePoId: number;
+  let lifecycleGrnId: number;
   let simplePOId: number;
 
   test.beforeAll(async () => {
@@ -28,6 +29,7 @@ test.describe('Purchase Orders', () => {
 
   test.afterAll(async () => {
     if (simplePOId) await apiDelete(`/api/purchase-orders/${simplePOId}`, cookie);
+    if (lifecycleGrnId) await apiDelete(`/api/goods-receipts/${lifecycleGrnId}`, cookie);
     if (lifecyclePoId) await apiDelete(`/api/purchase-orders/${lifecyclePoId}`, cookie);
   });
 
@@ -131,6 +133,7 @@ test.describe('Purchase Orders', () => {
     const grn = await grnResp.json() as { id: number; receiptNumber: string; poStatus: string };
     expect(grnResp.status).toBe(201);
     expect(grn.id).toBeTruthy();
+    lifecycleGrnId = grn.id;
     expect(grn.receiptNumber).toMatch(/GRN\d+/);
     expect(grn.poStatus).toBe('closed');
   });

@@ -9,7 +9,7 @@ import { insertBrandSchema, insertSupplierSchema, insertCustomerSchema, insertPr
 import * as XLSX from 'xlsx';
 import ExcelJS from 'exceljs';
 import { db, pool } from "./db";
-import { eq, desc, sum, inArray, sql } from "drizzle-orm";
+import { eq, desc, sum, inArray, sql, and } from "drizzle-orm";
 import crypto from 'crypto';
 import multer from 'multer';
 import bcrypt from 'bcrypt';
@@ -3097,6 +3097,29 @@ export async function registerRoutes(app: Express): Promise<Server> {
     } catch (error) {
       console.error('Error removing GRN scan key:', error);
       res.status(500).json({ error: 'Failed to remove document' });
+    }
+  });
+
+  // DELETE /api/goods-receipts/:id — delete a GRN and its child rows, then re-open the PO
+  app.delete('/api/goods-receipts/:id', requireAuth(['Admin', 'Manager']), async (req: AuthenticatedRequest, res) => {
+    try {
+      const grnId = parseInt(req.params.id);
+      const [grn] = await db.select().from(goodsReceipts).where(eq(goodsReceipts.id, grnId));
+      if (!grn) return res.status(404).json({ error: 'Goods receipt not found' });
+
+      await db.transaction(async (tx) => {
+        await tx.delete(stockMovements).where(
+          and(eq(stockMovements.referenceType, 'goods_receipt'), eq(stockMovements.referenceId, grnId)),
+        );
+        await tx.delete(goodsReceiptItems).where(eq(goodsReceiptItems.receiptId, grnId));
+        await tx.delete(goodsReceipts).where(eq(goodsReceipts.id, grnId));
+        await tx.update(purchaseOrders).set({ status: 'submitted' }).where(eq(purchaseOrders.id, grn.poId));
+      });
+
+      res.json({ success: true, grnId });
+    } catch (error) {
+      console.error('Error deleting goods receipt:', error);
+      res.status(500).json({ error: 'Failed to delete goods receipt' });
     }
   });
 
