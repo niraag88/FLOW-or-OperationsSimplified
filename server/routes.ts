@@ -3100,20 +3100,44 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  // DELETE /api/goods-receipts/:id — delete a GRN and its child rows, then re-open the PO
+  // DELETE /api/goods-receipts/:id — fully reverse a GRN: restore stock, reset PO item received qtys, re-open PO
   app.delete('/api/goods-receipts/:id', requireAuth(['Admin', 'Manager']), async (req: AuthenticatedRequest, res) => {
     try {
       const grnId = parseInt(req.params.id);
       const [grn] = await db.select().from(goodsReceipts).where(eq(goodsReceipts.id, grnId));
       if (!grn) return res.status(404).json({ error: 'Goods receipt not found' });
 
+      const items = await db.select().from(goodsReceiptItems).where(eq(goodsReceiptItems.receiptId, grnId));
+
       await db.transaction(async (tx) => {
+        for (const item of items) {
+          // Reverse the stock increase caused by this GRN item
+          await tx.update(products)
+            .set({
+              stockQuantity: sql`GREATEST(0, COALESCE(stock_quantity, 0) - ${item.receivedQuantity})`,
+              updatedAt: new Date(),
+            })
+            .where(eq(products.id, item.productId));
+
+          // Reverse the PO item received-quantity increment
+          await tx.update(purchaseOrderItems)
+            .set({ receivedQuantity: sql`GREATEST(0, COALESCE(received_quantity, 0) - ${item.receivedQuantity})` })
+            .where(eq(purchaseOrderItems.id, item.poItemId));
+        }
+
+        // Remove stock movement records linked to this GRN
         await tx.delete(stockMovements).where(
           and(eq(stockMovements.referenceType, 'goods_receipt'), eq(stockMovements.referenceId, grnId)),
         );
+
+        // Remove GRN items and the GRN itself
         await tx.delete(goodsReceiptItems).where(eq(goodsReceiptItems.receiptId, grnId));
         await tx.delete(goodsReceipts).where(eq(goodsReceipts.id, grnId));
-        await tx.update(purchaseOrders).set({ status: 'submitted' }).where(eq(purchaseOrders.id, grn.poId));
+
+        // Re-open the PO so it can be deleted or re-received
+        await tx.update(purchaseOrders)
+          .set({ status: 'submitted', updatedAt: new Date() })
+          .where(eq(purchaseOrders.id, grn.poId));
       });
 
       res.json({ success: true, grnId });
