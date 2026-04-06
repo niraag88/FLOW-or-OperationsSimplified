@@ -105,6 +105,12 @@ export default function Print() {
         
         setData(doc);
         setRelatedData(related);
+
+        // Prefer snapshot captured at creation time; fall back to live settings
+        const snapshot = doc?.companySnapshot || doc?.company_snapshot || null;
+        if (snapshot) {
+          setSettings(snapshot);
+        }
       } catch (err) {
         console.error('Error loading document:', err);
         setError(`Failed to load document. Please check the ID and try again. Error: ${err.message}`);

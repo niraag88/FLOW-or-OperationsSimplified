@@ -354,6 +354,7 @@ export class BusinessStorage {
       paymentStatus: purchaseOrders.paymentStatus,
       paymentMadeDate: purchaseOrders.paymentMadeDate,
       paymentRemarks: purchaseOrders.paymentRemarks,
+      companySnapshot: purchaseOrders.companySnapshot,
       brandName: brands.name,
     }).from(purchaseOrders)
       .leftJoin(brands, eq(purchaseOrders.brandId, brands.id))
@@ -476,6 +477,7 @@ export class BusinessStorage {
       createdBy: quotations.createdBy,
       createdAt: quotations.createdAt,
       updatedAt: quotations.updatedAt,
+      companySnapshot: quotations.companySnapshot,
       customerName: customers.name,
     }).from(quotations)
       .leftJoin(customers, eq(quotations.customerId, customers.id))

@@ -1462,8 +1462,9 @@ export async function registerRoutes(app: Express): Promise<Server> {
     try {
       const poId = parseInt(req.params.id);
       
+      const { companySnapshot: _ignoredPOSnapshot, ...bodyWithoutSnapshot } = req.body;
       const transformedBody = {
-        ...req.body,
+        ...bodyWithoutSnapshot,
         supplierId: req.body.supplierId ? parseInt(req.body.supplierId) : undefined,
         orderDate: req.body.orderDate ? new Date(req.body.orderDate) : undefined,
         expectedDelivery: req.body.expectedDelivery ? new Date(req.body.expectedDelivery) : undefined
@@ -1808,6 +1809,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
         customerBillingAddress: customers.billingAddress,
         customerVatNumber: customers.vatNumber,
         customerVatTreatment: customers.vatTreatment,
+        companySnapshot: invoices.companySnapshot,
       }).from(invoices)
         .leftJoin(customers, eq(customers.id, invoices.customerId))
         .where(eq(invoices.id, id));
@@ -1915,13 +1917,31 @@ export async function registerRoutes(app: Express): Promise<Server> {
         return res.status(400).json({ error: 'quotationId is required' });
       }
 
-      const nextNumber = await businessStorage.generateInvoiceNumber();
+      const [nextNumber, companySettingsForSnapshot] = await Promise.all([
+        businessStorage.generateInvoiceNumber(),
+        db.select().from(companySettings).limit(1),
+      ]);
 
       const invoice = await businessStorage.createInvoiceFromQuotation(
         parseInt(quotationId),
         nextNumber,
         parseInt(req.user!.id),
       );
+
+      // Persist company snapshot on the new invoice
+      if (companySettingsForSnapshot[0]) {
+        const cs = companySettingsForSnapshot[0];
+        const snapshot = {
+          companyName: cs.companyName,
+          address: cs.address,
+          phone: cs.phone,
+          email: cs.email,
+          vatNumber: cs.vatNumber,
+          taxNumber: cs.taxNumber,
+          logo: cs.logo,
+        };
+        await db.update(invoices).set({ companySnapshot: snapshot }).where(eq(invoices.id, invoice.id));
+      }
 
       writeAuditLog({
         actor: req.user!.id,
@@ -2775,8 +2795,9 @@ export async function registerRoutes(app: Express): Promise<Server> {
     try {
       const id = parseInt(req.params.id);
       
-      // Convert date strings to Date objects if present
-      const processedData = { ...req.body };
+      // Convert date strings to Date objects if present (strip companySnapshot — immutable after creation)
+      const { companySnapshot: _ignoredQUOSnapshot, ...bodyWithoutSnapshot } = req.body;
+      const processedData = { ...bodyWithoutSnapshot };
       if (processedData.quoteDate && typeof processedData.quoteDate === 'string') {
         processedData.quoteDate = new Date(processedData.quoteDate);
       }
