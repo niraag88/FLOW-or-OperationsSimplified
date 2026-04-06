@@ -8,23 +8,18 @@ import { invoices, deliveryOrders, auditLog, users, recycleBin, type InsertAudit
 import { insertBrandSchema, insertSupplierSchema, insertCustomerSchema, insertProductSchema, insertPurchaseOrderSchema, insertQuotationSchema, insertInvoiceSchema, insertDeliveryOrderSchema, stockCounts, stockCountItems, goodsReceipts, goodsReceiptItems, stockMovements, products, purchaseOrders, purchaseOrderItems, invoiceLineItems, deliveryOrderItems, suppliers, brands, quotations, quotationItems, customers, companySettings, financialYears, insertFinancialYearSchema, storageObjects } from "@shared/schema";
 import * as XLSX from 'xlsx';
 import ExcelJS from 'exceljs';
-import { db } from "./db";
+import { db, pool } from "./db";
 import { eq, desc, sum, inArray, sql } from "drizzle-orm";
-import pkg from 'pg';
 import crypto from 'crypto';
 import multer from 'multer';
 import bcrypt from 'bcrypt';
 import session from 'express-session';
 import connectPg from 'connect-pg-simple';
 import { execSync } from 'child_process';
-const { Pool } = pkg;
 
 // Initialize clients with the bucket ID from environment
 const objectStorageClient = new Client({
   bucketId: process.env.DEFAULT_OBJECT_STORAGE_BUCKET_ID
-});
-const pool = new Pool({
-  connectionString: process.env.DATABASE_URL
 });
 
 // Cleanup expired signed tokens from DB every hour
@@ -35,216 +30,6 @@ setInterval(async () => {
     console.error('Failed to clean up expired signed tokens:', err);
   }
 }, 60 * 60 * 1000);
-
-// PDF generation helper functions
-async function generateInvoicePDF(invoice: any): Promise<string> {
-  const formatDate = (dateString: string | Date) => {
-    if (!dateString) return '';
-    const date = new Date(dateString);
-    return date.toLocaleDateString('en-GB');
-  };
-
-  return `
-    <!DOCTYPE html>
-    <html>
-    <head>
-      <meta charset="utf-8">
-      <title>Invoice ${invoice.invoiceNumber}</title>
-      <style>
-        body { font-family: Arial, sans-serif; margin: 0; padding: 20px; }
-        .header { display: flex; justify-content: space-between; margin-bottom: 30px; border-bottom: 2px solid #333; padding-bottom: 20px; }
-        .invoice-title { font-size: 32px; font-weight: bold; color: #333; }
-        .invoice-details { margin-top: 10px; }
-        .company-info { text-align: right; }
-        .section { margin-bottom: 20px; }
-        .grid { display: grid; grid-template-columns: 1fr 1fr; gap: 30px; }
-        .totals { text-align: right; margin-top: 20px; }
-        .total-line { margin: 5px 0; }
-        .final-total { font-size: 18px; font-weight: bold; border-top: 2px solid #333; padding-top: 10px; }
-        table { width: 100%; border-collapse: collapse; margin-top: 20px; }
-        th, td { border: 1px solid #ddd; padding: 12px; text-align: left; }
-        th { background-color: #f5f5f5; font-weight: bold; }
-        .text-right { text-align: right; }
-        .signature-section { margin-top: 50px; display: grid; grid-template-columns: 1fr 1fr; gap: 50px; }
-        .signature-box { text-align: center; border-top: 1px solid #333; padding-top: 10px; }
-      </style>
-    </head>
-    <body>
-      <div class="header">
-        <div>
-          <h1 class="invoice-title">TAX INVOICE</h1>
-          <div class="invoice-details">
-            <p>Invoice Number: <strong>${invoice.invoiceNumber}</strong></p>
-            <p>Invoice Date: <strong>${formatDate(invoice.createdAt)}</strong></p>
-          </div>
-        </div>
-        <div class="company-info">
-          <h2>Company Name</h2>
-          <p>Company Address</p>
-          <p>Tel: Company Phone</p>
-          <p>Email: company@email.com</p>
-        </div>
-      </div>
-
-      <div class="section grid">
-        <div>
-          <h3>Bill To:</h3>
-          <p><strong>${invoice.customerName}</strong></p>
-        </div>
-        <div>
-          <h3>Invoice Details:</h3>
-          <p>Status: ${invoice.status}</p>
-        </div>
-      </div>
-
-      <table>
-        <thead>
-          <tr>
-            <th>Description</th>
-            <th class="text-right">Amount</th>
-          </tr>
-        </thead>
-        <tbody>
-          <tr>
-            <td>Service/Product</td>
-            <td class="text-right">$${invoice.amount}</td>
-          </tr>
-        </tbody>
-      </table>
-
-      <div class="totals">
-        <div class="total-line final-total">Total: $${invoice.amount}</div>
-      </div>
-
-      <div class="signature-section">
-        <div class="signature-box">
-          <p>Authorized Signature</p>
-        </div>
-        <div class="signature-box">
-          <p>Customer Signature</p>
-        </div>
-      </div>
-    </body>
-    </html>
-  `;
-}
-
-async function generatePOPDF(purchaseOrder: any): Promise<string> {
-  const formatDate = (dateString: string | Date) => {
-    if (!dateString) return '';
-    const date = new Date(dateString);
-    return date.toLocaleDateString('en-GB');
-  };
-
-  return `
-    <!DOCTYPE html>
-    <html>
-    <head>
-      <meta charset="utf-8">
-      <title>Purchase Order ${purchaseOrder.poNumber}</title>
-      <style>
-        body { font-family: Arial, sans-serif; margin: 0; padding: 20px; }
-        .header { display: flex; justify-content: space-between; margin-bottom: 30px; border-bottom: 2px solid #333; padding-bottom: 20px; }
-        .po-title { font-size: 32px; font-weight: bold; color: #333; }
-        .po-details { margin-top: 10px; }
-        .company-info { text-align: right; }
-        .section { margin-bottom: 20px; }
-        .grid { display: grid; grid-template-columns: 1fr 1fr; gap: 30px; }
-        .totals { text-align: right; margin-top: 20px; }
-        .total-line { margin: 5px 0; }
-        .final-total { font-size: 18px; font-weight: bold; border-top: 2px solid #333; padding-top: 10px; }
-        table { width: 100%; border-collapse: collapse; margin-top: 20px; }
-        th, td { border: 1px solid #ddd; padding: 12px; text-align: left; }
-        th { background-color: #f5f5f5; font-weight: bold; }
-        .text-right { text-align: right; }
-        .signature-section { margin-top: 50px; display: grid; grid-template-columns: 1fr 1fr; gap: 50px; }
-        .signature-box { text-align: center; border-top: 1px solid #333; padding-top: 10px; }
-      </style>
-    </head>
-    <body>
-      <div class="header">
-        <div>
-          <h1 class="po-title">PURCHASE ORDER</h1>
-          <div class="po-details">
-            <p>PO Number: <strong>${purchaseOrder.poNumber}</strong></p>
-            <p>Order Date: <strong>${formatDate(purchaseOrder.orderDate)}</strong></p>
-            ${purchaseOrder.expectedDelivery ? `<p>Expected Delivery: <strong>${formatDate(purchaseOrder.expectedDelivery)}</strong></p>` : ''}
-          </div>
-        </div>
-        <div class="company-info">
-          <h2>SUPERNATURE LLC</h2>
-          <p>Company Address</p>
-          <p>Tel: Company Phone</p>
-          <p>Email: company@email.com</p>
-        </div>
-      </div>
-
-      <div class="section grid">
-        <div>
-          <h3>Brand:</h3>
-          <p><strong>${purchaseOrder.brandName || 'Unknown Brand'}</strong></p>
-        </div>
-        <div>
-          <h3>Order Details:</h3>
-          <p>Status: <strong>${purchaseOrder.status}</strong></p>
-          <p>Currency: <strong>${purchaseOrder.currency || 'GBP'}</strong></p>
-        </div>
-      </div>
-
-      <table>
-        <thead>
-          <tr>
-            <th>Product Code</th>
-            <th>Description</th>
-            <th>Quantity</th>
-            <th>Unit Price (${purchaseOrder.currency || 'GBP'})</th>
-            <th>Line Total (${purchaseOrder.currency || 'GBP'})</th>
-          </tr>
-        </thead>
-        <tbody>
-          ${purchaseOrder.items && purchaseOrder.items.length > 0 ? 
-            purchaseOrder.items.map((item: any) => `
-              <tr>
-                <td>${item.product_code || ''}</td>
-                <td>${item.description || ''}</td>
-                <td class="text-right">${item.quantity || 0}</td>
-                <td class="text-right">${(parseFloat(item.unit_price) || 0).toFixed(2)}</td>
-                <td class="text-right">${(parseFloat(item.line_total) || 0).toFixed(2)}</td>
-              </tr>
-            `).join('') : 
-            '<tr><td colspan="5" style="text-align: center; color: #666;">No line items added</td></tr>'
-          }
-        </tbody>
-      </table>
-
-      <div class="totals">
-        <div class="total-line">
-          <span>Total (${purchaseOrder.currency || 'GBP'}): <strong>${parseFloat(purchaseOrder.totalAmount || 0).toFixed(2)}</strong></span>
-        </div>
-        <div class="total-line">
-          <span>Total (AED): <strong>${(parseFloat(purchaseOrder.totalAmount || 0) * parseFloat(purchaseOrder.fxRateToAed || 4.85)).toFixed(2)}</strong></span>
-        </div>
-      </div>
-
-      ${purchaseOrder.notes ? `
-        <div class="section" style="margin-top: 30px;">
-          <h3>Notes:</h3>
-          <p>${purchaseOrder.notes}</p>
-        </div>
-      ` : ''}
-
-      <div class="signature-section">
-        <div class="signature-box">
-          <p>Prepared By</p>
-        </div>
-        <div class="signature-box">
-          <p>Approved By</p>
-        </div>
-      </div>
-    </body>
-    </html>
-  `;
-}
 
 async function generateDOPDF(
   deliveryOrder: any,
@@ -582,7 +367,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       secure: process.env.NODE_ENV === 'production', // Only send over HTTPS in production
       httpOnly: true, // Prevent JavaScript access to cookies
       sameSite: 'lax', // CSRF protection
-      maxAge: parseInt(process.env.SESSION_MAX_AGE || '3600000'), // Default 1 hour (configurable)
+      maxAge: parseInt(process.env.SESSION_MAX_AGE || '28800000'), // Default 8 hours (configurable via SESSION_MAX_AGE env var)
     }
   }));
   // Rate limiters
