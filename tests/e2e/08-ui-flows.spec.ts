@@ -101,7 +101,7 @@ test.describe('UI Flows — page loads, dialogs, navigation', () => {
   });
 
   // ── Page-level performance checks at full data scale ──────────────────────
-  // Database contains: POs 307+, Invoices 511+, Products 545+, Customers 190+
+  // Database contains: POs 307+, Invoices 300+, Products 545+, Customers 190+
   // These pages load data from a large DB; noticeably slow (>2s) would indicate
   // a missing pagination, an N+1 query, or an absent DB index.
   // Threshold: domcontentloaded + 2s render buffer must complete within 4s total.
@@ -120,7 +120,7 @@ test.describe('UI Flows — page loads, dialogs, navigation', () => {
     expect(elapsed).toBeLessThan(4000);
   });
 
-  test('invoices page loads within 4s at full scale (511+ records in DB)', async ({ page }) => {
+  test('invoices page loads within 4s at full scale (300+ records in DB)', async ({ page }) => {
     await login(page);
     const start = Date.now();
     await page.goto(`${BASE_URL}/Invoices`);

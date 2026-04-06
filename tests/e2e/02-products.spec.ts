@@ -7,10 +7,13 @@ import {
 test.describe('Products CRUD', () => {
   let cookie: string;
   let testProductId: number;
+  let firstBrandId: number;
   const testSku = `TEST-E2E-${Date.now()}`;
 
   test.beforeAll(async () => {
     cookie = await apiLogin();
+    const brands = await apiGet('/api/brands', cookie) as { id: number }[];
+    firstBrandId = Array.isArray(brands) && brands.length > 0 ? brands[0].id : 62;
   });
 
   test('products list loads with 490+ items', async () => {
@@ -44,7 +47,7 @@ test.describe('Products CRUD', () => {
       unit: 'Bottle',
       stockQuantity: 10,
       minStockLevel: 2,
-      brandId: 1,
+      brandId: firstBrandId,
     }, cookie);
     expect(status).toBe(201);
     const created = data as { id: number };
