@@ -310,7 +310,7 @@ async function main() {
       skipped++;
       continue;
     }
-    const { status, data } = await post('/api/customers', customer, cookie);
+    const { status, data } = await post('/api/customers', { ...customer, dataSource: 'seed' }, cookie);
     if (status === 201) {
       created++;
       console.log(`  ✓ Created: ${customer.name} (ID ${data.id})`);

@@ -193,6 +193,7 @@ export const brands = pgTable("brands", {
   contactPhone: text("contact_phone"),
   sortOrder: integer("sort_order").default(0),
   isActive: boolean("is_active").notNull().default(true),
+  dataSource: text("data_source").default("user"),
   createdAt: timestamp("created_at").defaultNow().notNull(),
   updatedAt: timestamp("updated_at").defaultNow().notNull(),
 });
@@ -208,6 +209,7 @@ export const suppliers = pgTable("suppliers", {
   vatNumber: text("vat_number"),
   paymentTerms: text("payment_terms").default("30"),
   isActive: boolean("is_active").notNull().default(true),
+  dataSource: text("data_source").default("user"),
   createdAt: timestamp("created_at").defaultNow().notNull(),
   updatedAt: timestamp("updated_at").defaultNow().notNull(),
 });
@@ -226,6 +228,7 @@ export const customers = pgTable("customers", {
   paymentTerms: text("payment_terms").default("30"),
   creditLimit: decimal("credit_limit", { precision: 10, scale: 2 }),
   isActive: boolean("is_active").notNull().default(true),
+  dataSource: text("data_source").default("user"),
   createdAt: timestamp("created_at").defaultNow().notNull(),
   updatedAt: timestamp("updated_at").defaultNow().notNull(),
 }, (table) => ({
@@ -250,6 +253,7 @@ export const products = pgTable("products", {
   minStockLevel: integer("min_stock_level").default(10),
   maxStockLevel: integer("max_stock_level"),
   isActive: boolean("is_active").notNull().default(true),
+  dataSource: text("data_source").default("user"),
   createdAt: timestamp("created_at").defaultNow().notNull(),
   updatedAt: timestamp("updated_at").defaultNow().notNull(),
 }, (table) => ({
@@ -576,6 +580,7 @@ export const insertBrandSchema = createInsertSchema(brands).pick({
   contactPhone: true,
   sortOrder: true,
   isActive: true,
+  dataSource: true,
 });
 
 export const insertSupplierSchema = createInsertSchema(suppliers).pick({
@@ -587,6 +592,7 @@ export const insertSupplierSchema = createInsertSchema(suppliers).pick({
   vatNumber: true,
   paymentTerms: true,
   isActive: true,
+  dataSource: true,
 });
 
 export const insertCustomerSchema = createInsertSchema(customers).pick({
@@ -601,6 +607,7 @@ export const insertCustomerSchema = createInsertSchema(customers).pick({
   paymentTerms: true,
   creditLimit: true,
   isActive: true,
+  dataSource: true,
 });
 
 export const insertProductSchema = createInsertSchema(products).pick({
@@ -619,6 +626,7 @@ export const insertProductSchema = createInsertSchema(products).pick({
   minStockLevel: true,
   maxStockLevel: true,
   isActive: true,
+  dataSource: true,
 });
 
 export const insertPurchaseOrderSchema = createInsertSchema(purchaseOrders).pick({

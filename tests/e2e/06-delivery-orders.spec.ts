@@ -14,7 +14,7 @@ test.describe('Delivery Orders', () => {
     cookie = await apiLogin();
 
     // Create a dedicated test customer so tests are self-contained
-    const { data: cData } = await apiPost('/api/customers', { name: 'E2E Test Customer (DOs)' }, cookie);
+    const { data: cData } = await apiPost('/api/customers', { name: 'E2E Test Customer (DOs)', dataSource: 'e2e_test' }, cookie);
     testCustomerId = (cData as { id: number }).id;
     customerId = testCustomerId;
   });

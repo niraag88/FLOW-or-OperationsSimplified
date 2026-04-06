@@ -52,6 +52,7 @@ test.describe('Products CRUD', () => {
       stockQuantity: 10,
       minStockLevel: 2,
       brandId: firstBrandId,
+      dataSource: 'e2e_test',
     }, cookie);
     expect(status).toBe(201);
     const created = data as { id: number };

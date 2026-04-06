@@ -12,7 +12,7 @@ test.describe('UI Flows — page loads, dialogs, navigation', () => {
     testCookie = await apiLogin();
 
     // Create test customer + a submitted invoice so the "Create from Existing" DO test can work
-    const { data: cData } = await apiPost('/api/customers', { name: 'E2E UI Test Customer' }, testCookie);
+    const { data: cData } = await apiPost('/api/customers', { name: 'E2E UI Test Customer', dataSource: 'e2e_test' }, testCookie);
     testCustomerId = (cData as { id: number }).id;
 
     const prodsRaw = await apiGet('/api/products?pageSize=2', testCookie);

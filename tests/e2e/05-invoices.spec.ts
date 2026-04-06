@@ -15,7 +15,7 @@ test.describe('Invoices — create, large document, filters', () => {
     cookie = await apiLogin();
 
     // Create a dedicated test customer so tests are self-contained
-    const { data: cData } = await apiPost('/api/customers', { name: 'E2E Test Customer (Invoices)' }, cookie);
+    const { data: cData } = await apiPost('/api/customers', { name: 'E2E Test Customer (Invoices)', dataSource: 'e2e_test' }, cookie);
     testCustomerId = (cData as { id: number }).id;
     customerId = testCustomerId;
 

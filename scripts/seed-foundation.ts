@@ -104,7 +104,7 @@ async function seedBrands(cookie: string): Promise<Record<string, number>> {
   let created = 0;
   for (const name of BRANDS) {
     if (brandMap[name]) continue;
-    const { status, data } = await apiPost('/api/brands', { name }, cookie);
+    const { status, data } = await apiPost('/api/brands', { name, dataSource: 'seed' }, cookie);
     if (status === 201) { brandMap[name] = data.id; created++; console.log(`  ✓ ${name}`); }
     else console.error(`  ✗ ${name}: ${JSON.stringify(data).substring(0, 60)}`);
   }
@@ -232,6 +232,7 @@ async function seedSuppliers(cookie: string) {
       phone: sup.phone,
       address: fullAddress,
       paymentTerms: sup.payment_terms,
+      dataSource: 'seed',
     };
     const existing = existingMap.get(sup.name);
     if (existing) {
@@ -747,6 +748,7 @@ async function seedProducts(cookie: string, brandMap: Record<string, number>) {
       brandId,
       stockQuantity: prod.stock,
       minStockLevel: Math.max(2, Math.floor(prod.stock * 0.15)),
+      dataSource: 'seed',
     };
 
     const existing = existingMap.get(prod.sku);

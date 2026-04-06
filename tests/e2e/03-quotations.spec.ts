@@ -26,7 +26,7 @@ test.describe('Quotations — create, view, convert to invoice', () => {
     productId = prods[0]?.id ?? 1;
 
     // Create a dedicated test customer so tests are self-contained
-    const { data: cData } = await apiPost('/api/customers', { name: 'E2E Test Customer (Quotations)' }, cookie);
+    const { data: cData } = await apiPost('/api/customers', { name: 'E2E Test Customer (Quotations)', dataSource: 'e2e_test' }, cookie);
     testCustomerId = (cData as { id: number }).id;
     customerId = testCustomerId;
 
