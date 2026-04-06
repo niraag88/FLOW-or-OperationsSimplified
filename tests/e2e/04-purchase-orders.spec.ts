@@ -123,7 +123,7 @@ test.describe('Purchase Orders', () => {
     const grn = await grnResp.json() as { id: number; receiptNumber: string; poStatus: string };
     expect(grnResp.status).toBe(201);
     expect(grn.id).toBeTruthy();
-    expect(grn.receiptNumber).toMatch(/GR[N]?\d+/);
+    expect(grn.receiptNumber).toMatch(/GR\d+/);
     expect(grn.poStatus).toBe('closed');
   });
 

@@ -86,6 +86,7 @@ function PagesContent() {
             <Layout currentPageName="Purchase Orders"><PurchaseOrders /></Layout>
           </ProtectedRoute>
         } />
+        <Route path="/PurchaseOrders" element={<Navigate to="/purchase-orders" replace />} />
         <Route path="/delivery-orders" element={
           <ProtectedRoute>
             <Layout currentPageName="Delivery Orders"><DeliveryOrders /></Layout>
