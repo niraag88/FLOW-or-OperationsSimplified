@@ -15,11 +15,22 @@ const EXCLUDED_STATUSES = new Set(["cancelled"]);
 const fmt = (value) =>
   new Intl.NumberFormat("en-US", { minimumFractionDigits: 2, maximumFractionDigits: 2 }).format(value);
 
+const UAE_ADDRESS_KEYWORDS = [
+  'uae', 'u.a.e', 'united arab emirates', 'dubai', 'abu dhabi',
+  'sharjah', 'ajman', 'fujairah', 'ras al khaimah', 'umm al quwain',
+];
+
 function isUAECustomer(customer) {
   if (!customer) return true;
-  const country = (customer.country || '').trim();
-  if (!country) return true;
-  return country.toUpperCase() === 'UAE' || country.toLowerCase() === 'united arab emirates';
+  const vat = customer.vatNumber || customer.vat_number || '';
+  if (vat && /^10\d{13}$/.test(vat.replace(/\s/g, ''))) return true;
+  const addr = (
+    (customer.billingAddress || customer.billing_address || '') +
+    ' ' +
+    (customer.shippingAddress || customer.shipping_address || '')
+  ).toLowerCase().trim();
+  if (!addr) return true;
+  return UAE_ADDRESS_KEYWORDS.some((kw) => addr.includes(kw));
 }
 
 function getPeriodBounds(period, customFrom, customTo) {
