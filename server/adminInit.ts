@@ -10,8 +10,7 @@ export async function initializeAdminUser() {
 
     if (!adminUsername || !adminPassword) {
       console.log('Admin credentials not found in environment variables.');
-      console.log('To create an admin user, set ADMIN_USERNAME and ADMIN_PASSWORD environment variables');
-      console.log('or run the admin creation script: npm run create-admin');
+      console.log('To create an admin user, set ADMIN_USERNAME and ADMIN_PASSWORD environment variables.');
       return;
     }
 
