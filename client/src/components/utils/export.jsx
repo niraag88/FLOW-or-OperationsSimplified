@@ -924,9 +924,13 @@ export const printPOGRNSummary = async (poId) => {
 };
 
 export const exportPODetailToXLSX = async (poId, poNumber) => {
-  const res = await fetch(`/api/purchase-orders/${poId}/detail`, { credentials: 'include' });
+  const [res, companyRes] = await Promise.all([
+    fetch(`/api/purchase-orders/${poId}/detail`, { credentials: 'include' }),
+    fetch('/api/company-settings', { credentials: 'include' }),
+  ]);
   if (!res.ok) throw new Error('Failed to load PO detail');
   const d = await res.json();
+  const company = companyRes.ok ? await companyRes.json() : null;
   const currency = d.currency || 'GBP';
   const fmtDate = (s) => fmtShort(s);
   const fmtNum = (n) => parseFloat(n || 0).toFixed(2);
@@ -934,6 +938,11 @@ export const exportPODetailToXLSX = async (poId, poNumber) => {
   const rows = [];
 
   rows.push(['PURCHASE ORDER', '', '', '']);
+  if (company?.companyName) rows.push([company.companyName, '', '', '']);
+  if (company?.vatNumber) rows.push([`TRN: ${company.vatNumber}`, '', '', '']);
+  if (company?.address) rows.push([company.address.replace(/\n/g, ', '), '', '', '']);
+  if (company?.phone) rows.push([`Tel: ${company.phone}`, '', '', '']);
+  if (company?.email) rows.push([`Email: ${company.email}`, '', '', '']);
   rows.push([]);
   rows.push(['PO Number:', d.poNumber || '', '', '']);
   rows.push(['Supplier:', d.supplierName || '', '', '']);

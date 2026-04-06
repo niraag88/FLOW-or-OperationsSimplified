@@ -81,7 +81,14 @@
   color: #1a1a1a;
 }
 
-.company-address, .company-contact {
+.company-address {
+  font-size: 11px;
+  margin-bottom: 2px;
+  color: #333;
+  white-space: pre-wrap;
+}
+
+.company-contact {
   font-size: 11px;
   margin-bottom: 2px;
   color: #333;
