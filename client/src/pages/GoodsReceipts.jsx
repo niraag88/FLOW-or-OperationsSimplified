@@ -145,6 +145,7 @@ export default function GoodsReceipts() {
 
       queryClient.invalidateQueries({ queryKey: ['/api/goods-receipts'] });
       queryClient.invalidateQueries({ queryKey: ['/api/purchase-orders'] });
+      queryClient.invalidateQueries({ queryKey: ['/api/dashboard'] });
 
     } catch (error) {
       console.error("Error creating goods receipt:", error);
