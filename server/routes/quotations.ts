@@ -1,5 +1,5 @@
 import type { Express } from "express";
-import { quotations, quotationItems, products, recycleBin } from "@shared/schema";
+import { quotations, quotationItems, products, recycleBin, companySettings } from "@shared/schema";
 import { insertQuotationSchema } from "@shared/schema";
 import { db } from "../db";
 import { eq } from "drizzle-orm";
@@ -31,7 +31,7 @@ export function registerQuotationRoutes(app: Express) {
     try {
       const [quoteNumber, quoteSettingsRow] = await Promise.all([
         businessStorage.generateQuotationNumber(),
-        db.select().from(require('@shared/schema').companySettings).limit(1),
+        db.select().from(companySettings).limit(1),
       ]);
       const quoteCompanySnapshot = quoteSettingsRow[0] ? {
         companyName: quoteSettingsRow[0].companyName,
