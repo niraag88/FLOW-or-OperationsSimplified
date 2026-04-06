@@ -8,15 +8,17 @@ import {
   Package,
   ShoppingCart,
   BarChart3,
-  Wallet
+  Wallet,
+  LayoutDashboard
 } from "lucide-react";
 
-// Import Report Components
+import OverviewReport from "../components/reports/OverviewReport";
 import PoGrnReport from "../components/reports/PoGrnReport";
 import SalesAgedInvoicesReport from "../components/reports/SalesAgedInvoicesReport";
 import PurchasesReport from "../components/reports/PurchasesReport";
 import VATReportTab from "../components/reports/VATReportTab";
 import PaymentsLedger from "../components/reports/PaymentsLedger";
+import StockOnHandReport from "../components/reports/StockOnHandReport";
 
 function normalizeTaxTreatment(raw) {
   if (!raw) return 'StandardRated';
@@ -109,7 +111,6 @@ export default function Reports() {
   };
 
   const companySettings = data.companySettings;
-
   const canEdit = currentUser && (currentUser.role === 'Admin' || currentUser.role === 'Manager');
 
   if (loading) {
@@ -143,29 +144,47 @@ export default function Reports() {
         </div>
       </div>
 
-      <Tabs defaultValue="po_vs_grn" className="w-full">
-        <TabsList className="grid w-full max-w-4xl grid-cols-5">
-          <TabsTrigger value="po_vs_grn">
-            <ShoppingCart className="w-4 h-4 mr-2" />
-            PO vs GRN
-          </TabsTrigger>
-          <TabsTrigger value="sales_and_aging">
-            <FileText className="w-4 h-4 mr-2" />
-            Sales & Invoices
-          </TabsTrigger>
-          <TabsTrigger value="purchases">
-            <ShoppingCart className="w-4 h-4 mr-2" />
-            Purchases
-          </TabsTrigger>
-          <TabsTrigger value="vat_report">
-            <FileText className="w-4 h-4 mr-2" />
-            VAT Report
-          </TabsTrigger>
-          <TabsTrigger value="payments">
-            <Wallet className="w-4 h-4 mr-2" />
-            Payments
-          </TabsTrigger>
-        </TabsList>
+      <Tabs defaultValue="overview" className="w-full">
+        <div className="overflow-x-auto">
+          <TabsList className="inline-flex min-w-max w-full">
+            <TabsTrigger value="overview" className="flex items-center gap-1.5">
+              <LayoutDashboard className="w-4 h-4" />
+              Overview
+            </TabsTrigger>
+            <TabsTrigger value="po_vs_grn" className="flex items-center gap-1.5">
+              <ShoppingCart className="w-4 h-4" />
+              PO vs GRN
+            </TabsTrigger>
+            <TabsTrigger value="sales_and_aging" className="flex items-center gap-1.5">
+              <FileText className="w-4 h-4" />
+              Sales
+            </TabsTrigger>
+            <TabsTrigger value="purchases" className="flex items-center gap-1.5">
+              <ShoppingCart className="w-4 h-4" />
+              Purchases
+            </TabsTrigger>
+            <TabsTrigger value="vat_report" className="flex items-center gap-1.5">
+              <FileText className="w-4 h-4" />
+              VAT Report
+            </TabsTrigger>
+            <TabsTrigger value="payments" className="flex items-center gap-1.5">
+              <Wallet className="w-4 h-4" />
+              Payments
+            </TabsTrigger>
+            <TabsTrigger value="stock" className="flex items-center gap-1.5">
+              <Package className="w-4 h-4" />
+              Stock
+            </TabsTrigger>
+          </TabsList>
+        </div>
+
+        <TabsContent value="overview" className="mt-6">
+          <OverviewReport
+            invoices={data.invoices}
+            purchaseOrders={data.purchaseOrders}
+            companySettings={companySettings}
+          />
+        </TabsContent>
         <TabsContent value="po_vs_grn" className="mt-6">
           <PoGrnReport
             purchaseOrders={data.purchaseOrders}
@@ -206,6 +225,13 @@ export default function Reports() {
             purchaseOrders={data.purchaseOrders}
             suppliers={data.suppliers}
             companySettings={data.companySettings}
+            canExport={!!currentUser}
+          />
+        </TabsContent>
+        <TabsContent value="stock" className="mt-6">
+          <StockOnHandReport
+            products={data.products}
+            lots={data.lots}
             canExport={!!currentUser}
           />
         </TabsContent>

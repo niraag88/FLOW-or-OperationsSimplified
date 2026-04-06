@@ -105,6 +105,37 @@ export default function PoGrnReport({ purchaseOrders, goodsReceipts, suppliers =
     return true;
   };
 
+  // GRN-specific date filter using receivedDate
+  const applyGrnDateFilter = (grn, dateRange) => {
+    if (dateRange === "all") return true;
+    const dateValue = grn.receivedDate || grn.received_date;
+    if (!dateValue) return false;
+    const grnDate = new Date(dateValue);
+    const today = new Date();
+
+    if (dateRange === "today") {
+      const start = new Date(today.getFullYear(), today.getMonth(), today.getDate());
+      const end = new Date(today.getFullYear(), today.getMonth(), today.getDate(), 23, 59, 59);
+      return grnDate >= start && grnDate <= end;
+    } else if (dateRange === "week") {
+      const startOfWeek = new Date(today);
+      startOfWeek.setDate(today.getDate() - today.getDay());
+      startOfWeek.setHours(0, 0, 0, 0);
+      return grnDate >= startOfWeek;
+    } else if (dateRange === "month") {
+      return grnDate >= new Date(today.getFullYear(), today.getMonth(), 1);
+    } else if (dateRange === "quarter") {
+      const quarter = Math.floor(today.getMonth() / 3);
+      return grnDate >= new Date(today.getFullYear(), quarter * 3, 1);
+    } else if (typeof dateRange === "object" && dateRange.type === "custom") {
+      const startDate = new Date(dateRange.startDate);
+      const endDate = new Date(dateRange.endDate);
+      endDate.setHours(23, 59, 59, 999);
+      return grnDate >= startDate && grnDate <= endDate;
+    }
+    return true;
+  };
+
   // PO filter helpers
   const clearPoFilters = () => {
     setPoSelectedStatuses([]);
@@ -177,13 +208,15 @@ export default function PoGrnReport({ purchaseOrders, goodsReceipts, suppliers =
   }, [purchaseOrders, poSelectedStatuses, poSelectedSuppliers, poDateRange]);
 
   const filteredGRNs = useMemo(() => {
-    const grnPOs = purchaseOrders.filter(po => po.status === 'submitted' || po.status === 'closed');
-    return grnPOs.filter(po => {
-      const suppId = po.supplierId || po.supplier_id;
-      const matchesSupplier = grnSelectedSuppliers.length === 0 || grnSelectedSuppliers.includes(suppId);
-      return matchesSupplier && applyDateFilter(po, grnDateRange);
+    const activeGRNs = (goodsReceipts || []).filter(grn => grn.status !== 'cancelled');
+    return activeGRNs.filter(grn => {
+      const grnSuppId = grn.supplierId || grn.supplier_id;
+      const linkedPo = purchaseOrders.find(p => p.id === (grn.poId || grn.po_id));
+      const effectiveSuppId = grnSuppId || linkedPo?.supplierId || linkedPo?.supplier_id;
+      const matchesSupplier = grnSelectedSuppliers.length === 0 || grnSelectedSuppliers.includes(effectiveSuppId);
+      return matchesSupplier && applyGrnDateFilter(grn, grnDateRange);
     });
-  }, [purchaseOrders, grnSelectedSuppliers, grnDateRange]);
+  }, [goodsReceipts, purchaseOrders, grnSelectedSuppliers, grnDateRange]);
 
   const totals = useMemo(() => {
     return filteredPOs.reduce((acc, po) => {
@@ -219,18 +252,18 @@ export default function PoGrnReport({ purchaseOrders, goodsReceipts, suppliers =
         status: po.status
       };
     }),
-    ...filteredGRNs.map(po => {
-      const originalAmount = Number(po.totalAmount || po.total_amount || 0);
-      const aedAmount = calculateAEDAmount(po);
+    ...filteredGRNs.map(grn => {
+      const linkedPo = purchaseOrders.find(p => p.id === (grn.poId || grn.po_id));
+      const suppId = grn.supplierId || grn.supplier_id || linkedPo?.supplierId || linkedPo?.supplier_id;
+      const poAed = linkedPo ? calculateAEDAmount(linkedPo) : 0;
       return {
         type: 'Goods Receipt',
-        document_number: `GRN-${po.poNumber || po.po_number}`,
-        date: po.status === 'closed' ? formatDate(po.updatedAt || po.updated_at) : '-',
-        supplier: getSupplierName(po.supplierId || po.supplier_id),
-        currency: po.currency || 'GBP',
-        total_original: originalAmount.toFixed(2),
-        total_aed: aedAmount.toFixed(2),
-        status: po.status
+        document_number: grn.receiptNumber || grn.receipt_number || `GRN-${grn.id}`,
+        date: formatDate(grn.receivedDate || grn.received_date),
+        supplier: getSupplierName(suppId),
+        po_reference: linkedPo?.poNumber || linkedPo?.po_number || '-',
+        po_value_aed: poAed.toFixed(2),
+        status: grn.status
       };
     })
   ];
@@ -588,26 +621,29 @@ export default function PoGrnReport({ purchaseOrders, goodsReceipts, suppliers =
                 <TableRow>
                   <TableHead>GRN Number</TableHead>
                   <TableHead>Supplier</TableHead>
-                  <TableHead>Receipt Date</TableHead>
+                  <TableHead>Received Date</TableHead>
                   <TableHead>PO Reference</TableHead>
+                  <TableHead>PO Value (AED)</TableHead>
                   <TableHead>Status</TableHead>
                 </TableRow>
               </TableHeader>
               <TableBody>
-                {paginatedGRNs.map((po) => {
-                  const suppId = po.supplierId || po.supplier_id;
+                {paginatedGRNs.map((grn) => {
+                  const linkedPo = purchaseOrders.find(p => p.id === (grn.poId || grn.po_id));
+                  const suppId = grn.supplierId || grn.supplier_id || linkedPo?.supplierId || linkedPo?.supplier_id;
+                  const poAed = linkedPo ? calculateAEDAmount(linkedPo) : 0;
                   return (
-                    <TableRow key={po.id}>
-                      <TableCell className="font-medium">GRN-{po.poNumber || po.po_number}</TableCell>
+                    <TableRow key={grn.id}>
+                      <TableCell className="font-medium">{grn.receiptNumber || grn.receipt_number || `GRN-${grn.id}`}</TableCell>
                       <TableCell>{getSupplierName(suppId)}</TableCell>
-                      <TableCell>{po.status === 'closed' ? formatDate(po.updatedAt || po.updated_at) : '-'}</TableCell>
-                      <TableCell><Badge variant="outline">{po.poNumber || po.po_number}</Badge></TableCell>
+                      <TableCell>{formatDate(grn.receivedDate || grn.received_date)}</TableCell>
                       <TableCell>
-                        <Badge variant="outline" className={
-                          po.status === 'closed' ? 'border-green-300 text-green-800 bg-green-50' :
-                          'border-blue-300 text-blue-800 bg-blue-50'
-                        }>
-                          {po.status === 'submitted' ? 'SUBMITTED' : po.status?.toUpperCase()}
+                        <Badge variant="outline">{linkedPo?.poNumber || linkedPo?.po_number || '-'}</Badge>
+                      </TableCell>
+                      <TableCell>{poAed > 0 ? formatCurrency(poAed, 'AED') : '-'}</TableCell>
+                      <TableCell>
+                        <Badge variant="outline" className="border-green-300 text-green-800 bg-green-50">
+                          {grn.status?.toUpperCase() || 'CONFIRMED'}
                         </Badge>
                       </TableCell>
                     </TableRow>
