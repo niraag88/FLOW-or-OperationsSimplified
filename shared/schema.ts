@@ -222,6 +222,7 @@ export const customers = pgTable("customers", {
   billingAddress: text("billing_address"),
   shippingAddress: text("shipping_address"),
   vatNumber: text("vat_number"),
+  country: text("country").default("UAE"),
   vatTreatment: text("vat_treatment").default("standard"), // standard, exempt, reverse_charge
   paymentTerms: text("payment_terms").default("30"),
   creditLimit: decimal("credit_limit", { precision: 10, scale: 2 }),

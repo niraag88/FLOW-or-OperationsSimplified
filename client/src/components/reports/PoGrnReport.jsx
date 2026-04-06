@@ -249,6 +249,9 @@ export default function PoGrnReport({ purchaseOrders, goodsReceipts, suppliers =
         currency: po.currency || 'GBP',
         total_original: originalAmount.toFixed(2),
         total_aed: aedAmount.toFixed(2),
+        po_reference: '',
+        ordered_qty: '',
+        received_qty: '',
         status: po.status
       };
     }),
@@ -256,15 +259,19 @@ export default function PoGrnReport({ purchaseOrders, goodsReceipts, suppliers =
       const linkedPo = purchaseOrders.find(p => p.id === (grn.poId || grn.po_id));
       const suppId = grn.supplierId || grn.supplier_id || linkedPo?.supplierId || linkedPo?.supplier_id;
       const poAed = linkedPo ? calculateAEDAmount(linkedPo) : 0;
+      const poCurrency = linkedPo?.currency || '';
+      const poOriginal = Number(linkedPo?.totalAmount || linkedPo?.total_amount || 0);
       return {
         type: 'Goods Receipt',
         document_number: grn.receiptNumber || grn.receipt_number || `GRN-${grn.id}`,
         date: formatDate(grn.receivedDate || grn.received_date),
         supplier: getSupplierName(suppId),
+        currency: poCurrency,
+        total_original: poOriginal.toFixed(2),
+        total_aed: poAed.toFixed(2),
         po_reference: linkedPo?.poNumber || linkedPo?.po_number || '-',
         ordered_qty: grn.totalOrdered ?? 0,
         received_qty: grn.totalReceived ?? 0,
-        po_value_aed: poAed.toFixed(2),
         status: grn.status
       };
     })
@@ -376,6 +383,9 @@ export default function PoGrnReport({ purchaseOrders, goodsReceipts, suppliers =
                 currency: 'Currency',
                 total_original: 'Total (original currency)',
                 total_aed: 'Total (AED)',
+                po_reference: 'PO Reference',
+                ordered_qty: 'Ordered Qty',
+                received_qty: 'Received Qty',
                 status: 'Status'
               }}
             />
