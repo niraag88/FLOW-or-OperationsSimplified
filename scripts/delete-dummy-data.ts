@@ -190,22 +190,27 @@ async function main() {
   const n3h = await del('products', `data_source IN ${DUMMY}`, 'products');
 
   // ── 4. BRANDS (data_source != 'user') ─────────────────────────────────────
-  // Nullify brand_id on any user products/POs that still reference a seed/e2e brand,
-  // then delete all non-user brands unconditionally.
+  // Only delete seed/e2e brands that are no longer referenced by user products or
+  // user POs, to ensure we never touch or break user data.
+  // Brands still referenced by user records are skipped with a warning.
 
-  if (!DRY_RUN) {
-    await pool.query(`
-      UPDATE products SET brand_id = NULL
-      WHERE data_source = 'user'
-        AND brand_id IN (SELECT id FROM brands WHERE data_source IN ('seed', 'e2e_test'))
-    `);
-    await pool.query(`
-      UPDATE purchase_orders SET brand_id = NULL
-      WHERE brand_id IN (SELECT id FROM brands WHERE data_source IN ('seed', 'e2e_test'))
-    `);
+  const unreferencedBrands = await pool.query(`
+    SELECT id FROM brands
+    WHERE data_source IN ('seed', 'e2e_test')
+      AND id NOT IN (SELECT brand_id FROM products WHERE brand_id IS NOT NULL AND data_source = 'user')
+      AND id NOT IN (SELECT brand_id FROM purchase_orders WHERE brand_id IS NOT NULL)
+  `);
+  const deletableBrandIds: number[] = unreferencedBrands.rows.map((r: { id: number }) => r.id);
+  const allDummyBrandCount = await count('brands', `data_source IN ${DUMMY}`);
+  const skippedCount = allDummyBrandCount - deletableBrandIds.length;
+
+  let n4 = 0;
+  if (deletableBrandIds.length > 0) {
+    n4 = await del('brands', `id IN (${deletableBrandIds.join(',')})`, 'brands');
   }
-
-  const n4 = await del('brands', `data_source IN ${DUMMY}`, 'brands');
+  if (skippedCount > 0) {
+    console.warn(`  ⚠  ${skippedCount} seed/e2e brand(s) skipped — still referenced by user products or POs.`);
+  }
 
   total = n1a + n1b + n1c + n1d + n1e + n1f + n1g
         + n2a + n2b + n2c + n2d + n2e + n2f
