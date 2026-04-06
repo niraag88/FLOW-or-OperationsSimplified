@@ -142,7 +142,7 @@ export default function CreateInvoiceFromQuotationDialog({ open, onClose, onQuot
             </Select>
             {submittedQuotations.length === 0 && !loading && (
               <p className="text-sm text-muted-foreground">
-                No submitted or accepted quotations found. Create and submit a quotation first.
+                No eligible quotations found. Create a quotation and set its status to submitted or accepted.
               </p>
             )}
           </div>
