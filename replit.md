@@ -23,6 +23,20 @@ The frontend is built with React and TypeScript, using Vite for fast development
 ## Backend Architecture
 The backend is an Express.js application written in TypeScript. It interacts with a PostgreSQL database via Drizzle ORM for type-safe operations. Session management uses PostgreSQL-based storage. The server is bundled with ESBuild for production.
 
+### Route Modularization (Task #178)
+`server/routes.ts` was refactored from a monolithic 5000-line file into a thin orchestrator that delegates to domain modules under `server/routes/`:
+- `auth.ts` — login, logout, session, user management
+- `products.ts` — products, brands, bulk import/export
+- `suppliers.ts` — suppliers, customers
+- `purchase-orders.ts` — POs, PO items, payment, scan keys
+- `quotations.ts` — quotations and items
+- `invoices.ts` — invoices, line items, scan keys, payment
+- `delivery-orders.ts` — DOs, line items, scan keys
+- `goods-receipts.ts` — GRNs, stock counts
+- `inventory.ts` — dashboard, stock movements, exports (invoice/DO/PO/quotation PDF)
+- `settings.ts` — company settings, retention settings
+- `system.ts` — health check, storage (upload/download), audit logs, recycle bin, backups, financial years (books)
+
 ## Database Layer
 PostgreSQL is the chosen database, managed by Drizzle ORM. Schema definitions are centralized in `/shared/schema.ts`. Versioned Drizzle migrations are used for schema evolution, with an automated post-merge script ensuring `npm install && npm run db:migrate` runs on every task merge. The connection utilizes Neon Database for serverless PostgreSQL.
 
