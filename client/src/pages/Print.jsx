@@ -41,15 +41,6 @@ export default function Print() {
         let doc;
         let related = {};
 
-        // Load company settings
-        try {
-          const settingsList = await CompanySettings.list();
-          setSettings(settingsList[0] || {});
-        } catch (err) {
-          console.warn('Could not load company settings:', err);
-          setSettings({});
-        }
-
         switch (type) {
           case 'po':
             doc = await PurchaseOrder.getById(id);
@@ -106,10 +97,18 @@ export default function Print() {
         setData(doc);
         setRelatedData(related);
 
-        // Prefer snapshot captured at creation time; fall back to live settings
+        // Prefer snapshot captured at creation time — only fetch live settings when absent
         const snapshot = doc?.companySnapshot || doc?.company_snapshot || null;
         if (snapshot) {
           setSettings(snapshot);
+        } else {
+          try {
+            const settingsList = await CompanySettings.list();
+            setSettings(settingsList[0] || {});
+          } catch (err) {
+            console.warn('Could not load company settings:', err);
+            setSettings({});
+          }
         }
       } catch (err) {
         console.error('Error loading document:', err);

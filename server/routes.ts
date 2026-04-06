@@ -4512,14 +4512,25 @@ export async function registerRoutes(app: Express): Promise<Server> {
         .leftJoin(products, eq(products.id, deliveryOrderItems.productId))
         .where(eq(deliveryOrderItems.doId, deliveryOrder.id));
 
-      // Load company settings
-      const [companySetting] = await db.select().from(companySettings).limit(1);
-      const company = companySetting ? {
-        name: companySetting.companyName || '',
-        address: companySetting.address || '',
-        phone: companySetting.phone || '',
-        email: companySetting.email || '',
-      } : null;
+      // Prefer snapshot captured at creation; fall back to live settings for legacy DOs
+      let company: { name: string; address: string; phone: string; email: string } | null = null;
+      if (deliveryOrder.companySnapshot) {
+        const snap = deliveryOrder.companySnapshot as Record<string, string>;
+        company = {
+          name: snap.companyName || '',
+          address: snap.address || '',
+          phone: snap.phone || '',
+          email: snap.email || '',
+        };
+      } else {
+        const [companySetting] = await db.select().from(companySettings).limit(1);
+        company = companySetting ? {
+          name: companySetting.companyName || '',
+          address: companySetting.address || '',
+          phone: companySetting.phone || '',
+          email: companySetting.email || '',
+        } : null;
+      }
 
       // Generate PDF using puppeteer
       const puppeteer = await import('puppeteer');
