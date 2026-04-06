@@ -3134,9 +3134,25 @@ export async function registerRoutes(app: Express): Promise<Server> {
         await tx.delete(goodsReceiptItems).where(eq(goodsReceiptItems.receiptId, grnId));
         await tx.delete(goodsReceipts).where(eq(goodsReceipts.id, grnId));
 
-        // Re-open the PO so it can be deleted or re-received
+        // Recompute PO status: check remaining GRNs and received quantities
+        const [remainingGrns] = await tx
+          .select({ count: sql<number>`count(*)::int` })
+          .from(goodsReceipts)
+          .where(eq(goodsReceipts.poId, grn.poId));
+        const hasMoreGrns = (remainingGrns?.count ?? 0) > 0;
+
+        let newPoStatus: string;
+        if (hasMoreGrns) {
+          // Check if remaining received quantities still cover all ordered quantities
+          const poItems = await tx.select().from(purchaseOrderItems).where(eq(purchaseOrderItems.poId, grn.poId));
+          const allStillReceived = poItems.every(it => (it.receivedQuantity ?? 0) >= it.quantity);
+          newPoStatus = allStillReceived ? 'closed' : 'submitted';
+        } else {
+          newPoStatus = 'submitted';
+        }
+
         await tx.update(purchaseOrders)
-          .set({ status: 'submitted', updatedAt: new Date() })
+          .set({ status: newPoStatus, updatedAt: new Date() })
           .where(eq(purchaseOrders.id, grn.poId));
       });
 
