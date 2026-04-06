@@ -10,8 +10,8 @@ async function _uploadFile({ file }) {
 
 export const UploadFile = _uploadFile;
 
-export const InvokeLLM = () => Promise.resolve({});
-export const SendEmail = () => Promise.resolve({});
+export const InvokeLLM = () => Promise.resolve({ success: true });
+export const SendEmail = () => Promise.resolve({ success: true });
 export const GenerateImage = () => Promise.resolve({ success: true, url: '#' });
 export const ExtractDataFromUploadedFile = () => Promise.resolve({ success: true, data: {} });
 export const Core = { InvokeLLM, SendEmail, UploadFile, GenerateImage, ExtractDataFromUploadedFile };
