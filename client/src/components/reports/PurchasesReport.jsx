@@ -1,6 +1,7 @@
 import React, { useState, useMemo } from "react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { Input } from "@/components/ui/input";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { ShoppingCart, BarChart2, Building2 } from "lucide-react";
 import ExportDropdown from "../common/ExportDropdown";
@@ -13,7 +14,7 @@ import { getRateToAed } from "@/utils/currency";
 const fmt = (value) =>
   new Intl.NumberFormat("en-US", { minimumFractionDigits: 2, maximumFractionDigits: 2 }).format(value);
 
-function getPeriodBounds(period) {
+function getPeriodBounds(period, customFrom, customTo) {
   const now = new Date();
   if (period === "this_month") return { from: startOfMonth(now), to: endOfMonth(now) };
   if (period === "last_3") return { from: startOfMonth(subMonths(now, 2)), to: endOfMonth(now) };
@@ -22,6 +23,10 @@ function getPeriodBounds(period) {
   if (period === "last_year") {
     const ly = subYears(now, 1);
     return { from: startOfYear(ly), to: new Date(ly.getFullYear(), 11, 31, 23, 59, 59) };
+  }
+  if (period === "custom") {
+    if (!customFrom || !customTo) return null;
+    return { from: new Date(customFrom), to: new Date(customTo + "T23:59:59") };
   }
   return null;
 }
@@ -38,6 +43,8 @@ function SummaryTile({ label, value, sub, color }) {
 
 export default function PurchasesReport({ purchaseOrders, suppliers, companySettings, canExport }) {
   const [period, setPeriod] = useState("all");
+  const [customFrom, setCustomFrom] = useState("");
+  const [customTo, setCustomTo] = useState("");
 
   const getSupplierName = (supplierId) => {
     const supplier = (suppliers || []).find(
@@ -60,13 +67,13 @@ export default function PurchasesReport({ purchaseOrders, suppliers, companySett
   };
 
   const filteredPOs = useMemo(() => {
-    const bounds = getPeriodBounds(period);
+    const bounds = getPeriodBounds(period, customFrom, customTo);
     if (!bounds) return purchaseOrders;
     return purchaseOrders.filter((po) => {
       const d = new Date(po.orderDate || po.order_date);
       return d >= bounds.from && d <= bounds.to;
     });
-  }, [purchaseOrders, period]);
+  }, [purchaseOrders, period, customFrom, customTo]);
 
   const summary = useMemo(() => {
     let totalAED = 0;
@@ -148,7 +155,11 @@ export default function PurchasesReport({ purchaseOrders, suppliers, companySett
       ? "Last 6 Months"
       : period === "this_year"
       ? "This Year"
-      : "Last Year";
+      : period === "last_year"
+      ? "Last Year"
+      : customFrom && customTo
+      ? `${customFrom} to ${customTo}`
+      : "Custom Range";
 
   return (
     <div className="space-y-6">
@@ -165,8 +176,31 @@ export default function PurchasesReport({ purchaseOrders, suppliers, companySett
             <SelectItem value="last_6">Last 6 Months</SelectItem>
             <SelectItem value="this_year">This Year</SelectItem>
             <SelectItem value="last_year">Last Year</SelectItem>
+            <SelectItem value="custom">Custom Range</SelectItem>
           </SelectContent>
         </Select>
+        {period === "custom" && (
+          <>
+            <div className="flex items-center gap-2">
+              <label className="text-sm text-gray-500 whitespace-nowrap">From</label>
+              <Input
+                type="date"
+                value={customFrom}
+                onChange={(e) => setCustomFrom(e.target.value)}
+                className="w-40"
+              />
+            </div>
+            <div className="flex items-center gap-2">
+              <label className="text-sm text-gray-500 whitespace-nowrap">To</label>
+              <Input
+                type="date"
+                value={customTo}
+                onChange={(e) => setCustomTo(e.target.value)}
+                className="w-40"
+              />
+            </div>
+          </>
+        )}
         <span className="text-sm text-gray-500">
           {filteredPOs.length} purchase orders — {periodLabel}
         </span>

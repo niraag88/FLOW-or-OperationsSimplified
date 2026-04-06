@@ -157,7 +157,7 @@ export default function Reports() {
             </TabsTrigger>
             <TabsTrigger value="sales_and_aging" className="flex items-center gap-1.5">
               <FileText className="w-4 h-4" />
-              Sales
+              Sales &amp; Invoices
             </TabsTrigger>
             <TabsTrigger value="purchases" className="flex items-center gap-1.5">
               <ShoppingCart className="w-4 h-4" />

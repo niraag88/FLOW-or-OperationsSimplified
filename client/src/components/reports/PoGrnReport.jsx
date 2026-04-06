@@ -262,6 +262,8 @@ export default function PoGrnReport({ purchaseOrders, goodsReceipts, suppliers =
         date: formatDate(grn.receivedDate || grn.received_date),
         supplier: getSupplierName(suppId),
         po_reference: linkedPo?.poNumber || linkedPo?.po_number || '-',
+        ordered_qty: grn.totalOrdered ?? 0,
+        received_qty: grn.totalReceived ?? 0,
         po_value_aed: poAed.toFixed(2),
         status: grn.status
       };
@@ -623,6 +625,8 @@ export default function PoGrnReport({ purchaseOrders, goodsReceipts, suppliers =
                   <TableHead>Supplier</TableHead>
                   <TableHead>Received Date</TableHead>
                   <TableHead>PO Reference</TableHead>
+                  <TableHead>Ordered Qty</TableHead>
+                  <TableHead>Received Qty</TableHead>
                   <TableHead>PO Value (AED)</TableHead>
                   <TableHead>Status</TableHead>
                 </TableRow>
@@ -632,6 +636,9 @@ export default function PoGrnReport({ purchaseOrders, goodsReceipts, suppliers =
                   const linkedPo = purchaseOrders.find(p => p.id === (grn.poId || grn.po_id));
                   const suppId = grn.supplierId || grn.supplier_id || linkedPo?.supplierId || linkedPo?.supplier_id;
                   const poAed = linkedPo ? calculateAEDAmount(linkedPo) : 0;
+                  const totalOrdered = grn.totalOrdered ?? 0;
+                  const totalReceived = grn.totalReceived ?? 0;
+                  const isShort = totalOrdered > 0 && totalReceived < totalOrdered;
                   return (
                     <TableRow key={grn.id}>
                       <TableCell className="font-medium">{grn.receiptNumber || grn.receipt_number || `GRN-${grn.id}`}</TableCell>
@@ -639,6 +646,11 @@ export default function PoGrnReport({ purchaseOrders, goodsReceipts, suppliers =
                       <TableCell>{formatDate(grn.receivedDate || grn.received_date)}</TableCell>
                       <TableCell>
                         <Badge variant="outline">{linkedPo?.poNumber || linkedPo?.po_number || '-'}</Badge>
+                      </TableCell>
+                      <TableCell>{totalOrdered > 0 ? totalOrdered : '-'}</TableCell>
+                      <TableCell className={isShort ? 'text-amber-600 font-medium' : ''}>
+                        {totalReceived > 0 ? totalReceived : '-'}
+                        {isShort && <span className="ml-1 text-xs">(short)</span>}
                       </TableCell>
                       <TableCell>{poAed > 0 ? formatCurrency(poAed, 'AED') : '-'}</TableCell>
                       <TableCell>

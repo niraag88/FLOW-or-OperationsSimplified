@@ -1,6 +1,7 @@
 import React, { useState, useMemo } from "react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { Input } from "@/components/ui/input";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { FileText, BarChart2, TrendingUp, Globe, Users } from "lucide-react";
 import ExportDropdown from "../common/ExportDropdown";
@@ -14,7 +15,25 @@ const EXCLUDED_STATUSES = new Set(["cancelled"]);
 const fmt = (value) =>
   new Intl.NumberFormat("en-US", { minimumFractionDigits: 2, maximumFractionDigits: 2 }).format(value);
 
-function getPeriodBounds(period) {
+const UAE_ADDRESS_KEYWORDS = [
+  'uae', 'u.a.e', 'united arab emirates', 'dubai', 'abu dhabi',
+  'sharjah', 'ajman', 'fujairah', 'ras al khaimah', 'umm al quwain',
+];
+
+function isUAECustomer(customer) {
+  if (!customer) return true;
+  const vat = customer.vatNumber || customer.vat_number || '';
+  if (vat && /^10\d{13}$/.test(vat.replace(/\s/g, ''))) return true;
+  const addr = (
+    (customer.billingAddress || customer.billing_address || '') +
+    ' ' +
+    (customer.shippingAddress || customer.shipping_address || '')
+  ).toLowerCase().trim();
+  if (!addr) return true;
+  return UAE_ADDRESS_KEYWORDS.some((kw) => addr.includes(kw));
+}
+
+function getPeriodBounds(period, customFrom, customTo) {
   const now = new Date();
   if (period === "this_month") return { from: startOfMonth(now), to: endOfMonth(now) };
   if (period === "last_3") return { from: startOfMonth(subMonths(now, 2)), to: endOfMonth(now) };
@@ -23,6 +42,10 @@ function getPeriodBounds(period) {
   if (period === "last_year") {
     const ly = subYears(now, 1);
     return { from: startOfYear(ly), to: new Date(ly.getFullYear(), 11, 31, 23, 59, 59) };
+  }
+  if (period === "custom") {
+    if (!customFrom || !customTo) return null;
+    return { from: new Date(customFrom), to: new Date(customTo + "T23:59:59") };
   }
   return null;
 }
@@ -38,6 +61,8 @@ function SummaryTile({ label, value, color }) {
 
 export default function SalesAgedInvoicesReport({ invoices, customers, canExport }) {
   const [period, setPeriod] = useState("all");
+  const [customFrom, setCustomFrom] = useState("");
+  const [customTo, setCustomTo] = useState("");
 
   const activeInvoices = useMemo(
     () => invoices.filter((inv) => !EXCLUDED_STATUSES.has(inv.status)),
@@ -45,13 +70,13 @@ export default function SalesAgedInvoicesReport({ invoices, customers, canExport
   );
 
   const filteredInvoices = useMemo(() => {
-    const bounds = getPeriodBounds(period);
+    const bounds = getPeriodBounds(period, customFrom, customTo);
     if (!bounds) return activeInvoices;
     return activeInvoices.filter((inv) => {
       const d = new Date(inv.invoice_date || inv.invoiceDate);
       return d >= bounds.from && d <= bounds.to;
     });
-  }, [activeInvoices, period]);
+  }, [activeInvoices, period, customFrom, customTo]);
 
   const isSettled = (inv) => {
     const ps = (inv.paymentStatus || inv.payment_status || "").toLowerCase();
@@ -145,17 +170,18 @@ export default function SalesAgedInvoicesReport({ invoices, customers, canExport
   }, [filteredInvoices, customers]);
 
   const regionSplit = useMemo(() => {
+    const customerMap = new Map(customers.map((c) => [c.id, c]));
     let uae = 0;
     let international = 0;
     filteredInvoices.forEach((inv) => {
       const total = Number(inv.total_amount || inv.totalAmount || inv.amount || 0);
-      const currency = (inv.currency || "AED").toUpperCase();
-      if (currency === "AED") uae += total;
+      const custId = inv.customer_id ?? inv.customerId;
+      const customer = customerMap.get(custId);
+      if (isUAECustomer(customer)) uae += total;
       else international += total;
     });
-    const total = uae + international;
-    return { uae, international, total };
-  }, [filteredInvoices]);
+    return { uae, international, total: uae + international };
+  }, [filteredInvoices, customers]);
 
   const agingExportData = Object.entries(agingData).map(([bucket, values]) => ({
     aging_bucket: bucket,
@@ -181,7 +207,11 @@ export default function SalesAgedInvoicesReport({ invoices, customers, canExport
       ? "Last 6 Months"
       : period === "this_year"
       ? "This Year"
-      : "Last Year";
+      : period === "last_year"
+      ? "Last Year"
+      : customFrom && customTo
+      ? `${customFrom} to ${customTo}`
+      : "Custom Range";
 
   return (
     <div className="space-y-6">
@@ -198,8 +228,31 @@ export default function SalesAgedInvoicesReport({ invoices, customers, canExport
             <SelectItem value="last_6">Last 6 Months</SelectItem>
             <SelectItem value="this_year">This Year</SelectItem>
             <SelectItem value="last_year">Last Year</SelectItem>
+            <SelectItem value="custom">Custom Range</SelectItem>
           </SelectContent>
         </Select>
+        {period === "custom" && (
+          <>
+            <div className="flex items-center gap-2">
+              <label className="text-sm text-gray-500 whitespace-nowrap">From</label>
+              <Input
+                type="date"
+                value={customFrom}
+                onChange={(e) => setCustomFrom(e.target.value)}
+                className="w-40"
+              />
+            </div>
+            <div className="flex items-center gap-2">
+              <label className="text-sm text-gray-500 whitespace-nowrap">To</label>
+              <Input
+                type="date"
+                value={customTo}
+                onChange={(e) => setCustomTo(e.target.value)}
+                className="w-40"
+              />
+            </div>
+          </>
+        )}
         <span className="text-sm text-gray-500">
           {filteredInvoices.length} invoices — {periodLabel}
         </span>
@@ -367,14 +420,14 @@ export default function SalesAgedInvoicesReport({ invoices, customers, canExport
               UAE vs International Revenue
             </CardTitle>
             <p className="text-sm text-gray-500">
-              AED invoices = UAE &bull; Other currencies = International — {periodLabel}
+              Based on customer billing address &amp; VAT number — {periodLabel}
             </p>
           </CardHeader>
           <CardContent>
             <div className="space-y-5 pt-2">
               <div>
                 <div className="flex justify-between mb-1">
-                  <span className="text-sm font-medium text-gray-700">UAE (AED)</span>
+                  <span className="text-sm font-medium text-gray-700">UAE</span>
                   <span className="text-sm font-semibold text-blue-700">
                     AED {fmt(regionSplit.uae)}
                   </span>

@@ -944,7 +944,8 @@ export class BusinessStorage {
         suppliersData,
         settingsData,
         invoicePaymentStats,
-        poPaymentStats
+        poPaymentStats,
+        grnQuantities,
       ] = await Promise.all([
         this.getProducts(),
         this.getStockCounts(),
@@ -965,7 +966,25 @@ export class BusinessStorage {
           paymentStatus: purchaseOrders.paymentStatus,
           count: sql<number>`count(*)::integer`,
         }).from(purchaseOrders).groupBy(purchaseOrders.paymentStatus),
+        // GRN quantity totals per receipt
+        db.select({
+          receiptId: goodsReceiptItems.receiptId,
+          totalOrdered: sql<number>`SUM(${goodsReceiptItems.orderedQuantity})::integer`,
+          totalReceived: sql<number>`SUM(${goodsReceiptItems.receivedQuantity})::integer`,
+        }).from(goodsReceiptItems).groupBy(goodsReceiptItems.receiptId),
       ]);
+
+      // Build a map of receiptId → { totalOrdered, totalReceived }
+      const grnQtyMap = new Map<number, { totalOrdered: number; totalReceived: number }>();
+      for (const row of grnQuantities) {
+        grnQtyMap.set(row.receiptId, { totalOrdered: row.totalOrdered, totalReceived: row.totalReceived });
+      }
+      // Enrich GRN records with quantity information
+      const enrichedGrns = grnsData.map(grn => ({
+        ...grn,
+        totalOrdered: grnQtyMap.get(grn.id)?.totalOrdered ?? 0,
+        totalReceived: grnQtyMap.get(grn.id)?.totalReceived ?? 0,
+      }));
 
       const invoicePaymentSummary = {
         outstanding: 0,
@@ -989,7 +1008,7 @@ export class BusinessStorage {
         products: productsData,
         lots: lotsData,
         purchaseOrders: posData,
-        goodsReceipts: grnsData,
+        goodsReceipts: enrichedGrns,
         invoices: invoicesData,
         customers: customersData,
         suppliers: suppliersData,
