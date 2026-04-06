@@ -1,8 +1,49 @@
 import { test, expect } from '@playwright/test';
-import { login, apiLogin, apiGet, apiPost, apiDelete, BASE_URL, toCustomerList, toProductList, productPrice } from './helpers';
+import { login, apiLogin, apiGet, apiPost, apiDelete, BASE_URL, toProductList, productPrice, ApiProduct } from './helpers';
 
 test.describe('UI Flows — page loads, dialogs, navigation', () => {
   test.setTimeout(60000);
+
+  let testCookie: string;
+  let testCustomerId: number;
+  let testInvoiceId: number;
+
+  test.beforeAll(async () => {
+    testCookie = await apiLogin();
+
+    // Create test customer + a submitted invoice so the "Create from Existing" DO test can work
+    const { data: cData } = await apiPost('/api/customers', { name: 'E2E UI Test Customer' }, testCookie);
+    testCustomerId = (cData as { id: number }).id;
+
+    const prodsRaw = await apiGet('/api/products?pageSize=2', testCookie);
+    const prods = toProductList(prodsRaw) as ApiProduct[];
+    if (prods.length > 0) {
+      const items = prods.slice(0, 2).map((p, i) => ({
+        product_id: p.id,
+        description: p.name,
+        product_code: p.sku,
+        quantity: i + 1,
+        unit_price: productPrice(p),
+        line_total: (i + 1) * productPrice(p),
+      }));
+      const subtotal = items.reduce((s, it) => s + it.line_total, 0);
+      const vat = subtotal * 0.05;
+      const { data: invData } = await apiPost('/api/invoices', {
+        customer_id: testCustomerId,
+        invoice_date: '2026-03-23',
+        status: 'submitted',
+        tax_amount: vat.toFixed(2),
+        total_amount: (subtotal + vat).toFixed(2),
+        items,
+      }, testCookie);
+      testInvoiceId = (invData as { id: number }).id;
+    }
+  });
+
+  test.afterAll(async () => {
+    if (testInvoiceId) await apiDelete(`/api/invoices/${testInvoiceId}`, testCookie);
+    if (testCustomerId) await apiDelete(`/api/customers/${testCustomerId}`, testCookie);
+  });
 
   test('dashboard page loads with sidebar and main content', async ({ page }) => {
     await login(page);
@@ -100,13 +141,11 @@ test.describe('UI Flows — page loads, dialogs, navigation', () => {
     expect(text).toMatch(/\d+/);
   });
 
-  // ── Page-level performance checks at full data scale ──────────────────────
-  // Database contains: POs 307+, Invoices 300+, Products 545+, Customers 190+
-  // These pages load data from a large DB; noticeably slow (>2s) would indicate
-  // a missing pagination, an N+1 query, or an absent DB index.
+  // ── Page-level performance checks ──────────────────────────────────────────
+  // These pages must load and render within 4s regardless of DB size.
   // Threshold: domcontentloaded + 2s render buffer must complete within 4s total.
 
-  test('purchase orders page loads within 4s at full scale (307+ records in DB)', async ({ page }) => {
+  test('purchase orders page loads within 4s', async ({ page }) => {
     await login(page);
     const start = Date.now();
     await page.goto(`${BASE_URL}/PurchaseOrders`);
@@ -120,7 +159,7 @@ test.describe('UI Flows — page loads, dialogs, navigation', () => {
     expect(elapsed).toBeLessThan(4000);
   });
 
-  test('invoices page loads within 4s at full scale (300+ records in DB)', async ({ page }) => {
+  test('invoices page loads within 4s', async ({ page }) => {
     await login(page);
     const start = Date.now();
     await page.goto(`${BASE_URL}/Invoices`);
@@ -132,7 +171,7 @@ test.describe('UI Flows — page loads, dialogs, navigation', () => {
     expect(elapsed).toBeLessThan(4000);
   });
 
-  test('inventory page loads within 4s at full scale (545+ products in DB)', async ({ page }) => {
+  test('inventory page loads within 4s', async ({ page }) => {
     await login(page);
     const start = Date.now();
     await page.goto(`${BASE_URL}/Inventory`);
