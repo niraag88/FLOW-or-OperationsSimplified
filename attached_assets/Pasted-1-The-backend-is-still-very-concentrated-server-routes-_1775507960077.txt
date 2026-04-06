@@ -1,0 +1,20 @@
+1. The backend is still very concentrated.
+server/routes.ts is now extremely large at 5,053 lines / 4,503 LOC, which means the app can still become fragile as features keep getting added. It is not broken, but it is the clearest architectural weak spot left.
+
+2. There are still legacy / duplicate files that look like dead-code candidates.
+In the frontend you still have both Dashboard.jsx and Dashboard.tsx, both use-mobile.jsx and use-mobile.tsx, plus old Base44-era files in client/src/api like base44Client.js, entities.js, and integrations.js. Your current app entry imports Dashboard.jsx, not Dashboard.tsx, so at least some of this is likely leftover baggage.
+
+3. You still have two different backend storage ideas living side by side.
+server/routes.ts imports both storage and businessStorage, while server/storage.ts is still just a simple in-memory MemStorage user store. Even if that no longer causes a bug, it is not clean architecture and can confuse future edits.
+
+4. Part of your schema management is still outside the migration system.
+You now have proper migration scripts and SQL migration files, which is good, but server/index.ts still creates or alters storage_objects and signed_tokens at app startup. That works, but it means database change logic is split between migrations and runtime boot code.
+
+5. Upload handling is still memory-based.
+multer.memoryStorage() is still being used, and the README still documents PDF uploads up to 25 MB. For your real usage this is probably fine, but it is still a soft spot if you ever get larger files or multiple uploads at once.
+
+6. There is still a small setup/docs mismatch.
+server/adminInit.ts still tells you to run npm run create-admin, but that script is not present in package.json. Not serious, but it is exactly the kind of thing that trips you up later.
+
+7. The repo still contains some older identity/docs clutter.
+The repo root still includes .canvas/assets, attached_assets, and scripts, while the README still describes the project as a “Replit Storage API Server” for the “Base44 operations management suite,” which no longer reflects the full app you now have.
