@@ -251,10 +251,12 @@ export default function POQuickViewModal({ poId, open, onClose }) {
                       <TableBody>
                         {detail.items.map((item) => {
                           const receivedQty = parseFloat(item.receivedQuantity) || 0;
+                          const orderedQty = parseFloat(item.quantity) || 0;
+                          const isShort = orderedQty > 0 && receivedQty < orderedQty;
                           const unitPrice = parseFloat(item.unitPrice) || 0;
                           const receivedLineTotal = receivedQty * unitPrice;
                           return (
-                            <TableRow key={item.id}>
+                            <TableRow key={item.id} className={isShort ? "bg-amber-50" : ""}>
                               <TableCell>
                                 <div className="font-medium text-sm">{item.productName || "—"}</div>
                                 {item.size && <div className="text-xs text-gray-500">{item.size}</div>}
@@ -262,7 +264,9 @@ export default function POQuickViewModal({ poId, open, onClose }) {
                                   <div className="text-xs text-gray-400">{item.productSku}</div>
                                 )}
                               </TableCell>
-                              <TableCell className="text-right text-sm">{receivedQty}</TableCell>
+                              <TableCell className={`text-right text-sm ${isShort ? "text-amber-700 font-medium" : ""}`}>
+                                {receivedQty}{isShort ? " ⚠" : ""}
+                              </TableCell>
                               <TableCell className="text-right text-sm">
                                 {formatCurrency(unitPrice, currency)}
                               </TableCell>
