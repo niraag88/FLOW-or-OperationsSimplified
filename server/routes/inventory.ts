@@ -516,4 +516,33 @@ export function registerInventoryRoutes(app: Express) {
       res.status(500).json({ error: 'Failed to export quotation' });
     }
   });
+
+  app.get('/api/export/quotations-list', requireAuth(), async (req: AuthenticatedRequest, res) => {
+    try {
+      const { search, status, customerId, dateFrom, dateTo, excludeYears } = req.query as Record<string, string>;
+
+      const allQuotations = await businessStorage.getQuotations({
+        search: search || undefined,
+        status: status || undefined,
+        customerId: customerId || undefined,
+        dateFrom: dateFrom || undefined,
+        dateTo: dateTo || undefined,
+        excludeYears: excludeYears || undefined,
+      });
+
+      const [companyRow] = await db.select().from(companySettings).limit(1);
+      const company = companyRow ? {
+        companyName: companyRow.companyName,
+        address: companyRow.address,
+        phone: companyRow.phone,
+        email: companyRow.email,
+        vatNumber: companyRow.vatNumber,
+      } : {};
+
+      res.json({ quotations: allQuotations, company });
+    } catch (error) {
+      console.error('Error exporting quotations list:', error);
+      res.status(500).json({ error: 'Failed to export quotations list' });
+    }
+  });
 }

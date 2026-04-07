@@ -138,6 +138,25 @@ export default function Quotations() {
   const endIndex = Math.min(startIndex + itemsPerPage, totalCount);
   const resetPagination = () => setCurrentPage(1);
 
+  const handleViewAndPrint = () => {
+    const params = new URLSearchParams();
+    if (debouncedSearch) params.set('search', debouncedSearch);
+    if (selectedStatuses.length) params.set('status', selectedStatuses.join(','));
+    if (selectedCustomers.length) params.set('customerId', selectedCustomers.join(','));
+    const today = new Date();
+    const toStr = (d) => d.toISOString().split('T')[0];
+    if (dateRange && dateRange !== 'all') {
+      if (dateRange === 'today') { const d = toStr(today); params.set('dateFrom', d); params.set('dateTo', d); }
+      else if (dateRange === 'week') { const s = new Date(today); s.setDate(today.getDate() - today.getDay()); s.setHours(0,0,0,0); params.set('dateFrom', toStr(s)); }
+      else if (dateRange === 'month') params.set('dateFrom', toStr(new Date(today.getFullYear(), today.getMonth(), 1)));
+      else if (dateRange === 'quarter') { const q = Math.floor(today.getMonth() / 3); params.set('dateFrom', toStr(new Date(today.getFullYear(), q * 3, 1))); }
+      else if (typeof dateRange === 'object' && dateRange.type === 'custom') { params.set('dateFrom', toStr(new Date(dateRange.startDate))); params.set('dateTo', toStr(new Date(dateRange.endDate))); }
+    }
+    const closedYears = financialYears.filter(y => y.status === 'Closed');
+    if (closedYears.length > 0) params.set('excludeYears', closedYears.map(cy => `${cy.startDate},${cy.endDate}`).join(';'));
+    window.open(`/quotations-list-print?${params}`, '_blank');
+  };
+
   const fetchAllForExport = async () => {
     const params = new URLSearchParams();
     if (debouncedSearch) params.set('search', debouncedSearch);
@@ -186,6 +205,7 @@ export default function Quotations() {
               grandTotal: { label: 'Total (AED)', transform: (val) => `${val || 0}` }
             }}
             isLoading={loading}
+            onViewAndPrint={handleViewAndPrint}
           />
           
           {canCreate && (

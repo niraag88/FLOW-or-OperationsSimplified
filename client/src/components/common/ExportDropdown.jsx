@@ -22,7 +22,8 @@ export default function ExportDropdown({
   showExternalDocument = false,
   onExternalDocumentClick = null,
   fetchAllData = null,
-  totalCount = null
+  totalCount = null,
+  onViewAndPrint = null,
 }) {
   const [isExporting, setIsExporting] = useState(false);
 
@@ -52,6 +53,11 @@ export default function ExportDropdown({
   };
 
   const handleExport = async (format = 'xlsx') => {
+    if (format === 'pdf' && onViewAndPrint) {
+      onViewAndPrint();
+      return;
+    }
+
     setIsExporting(true);
     try {
       let exportSource = data;
