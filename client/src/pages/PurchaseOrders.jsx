@@ -271,7 +271,7 @@ export default function PurchaseOrders() {
               orderDate: { label: 'Order Date', transform: (date) => date ? format(new Date(date), 'dd/MM/yy') : '' },
               status: { label: 'Status', transform: (val) => val ? val.toUpperCase() : '' },
               currency: 'Currency',
-              totalAmount: { label: 'Subtotal', transform: (val, row) => `${row?.currency || 'GBP'} ${parseFloat(val || 0).toFixed(2)}` },
+              totalAmount: { label: 'Total', transform: (val, row) => `${row?.currency || 'GBP'} ${parseFloat(val || 0).toFixed(2)}` },
               grandTotal: { label: 'Total (AED)', transform: (val, row) => {
                 const amt = parseFloat(row?.totalAmount || 0);
                 const cur = row?.currency || 'GBP';
