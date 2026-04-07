@@ -267,13 +267,11 @@ export default function PurchaseOrders() {
             filename={activeTab === 'purchase-orders' ? 'purchase-orders' : 'goods-receipts'}
             columns={activeTab === 'purchase-orders' ? {
               poNumber: 'PO Number',
-              supplierName: 'Supplier',
+              brandName: 'Brand',
               orderDate: { label: 'Order Date', transform: (date) => date ? format(new Date(date), 'dd/MM/yy') : '' },
               status: { label: 'Status', transform: (val) => val ? val.toUpperCase() : '' },
               currency: 'Currency',
-              fxRateToAed: { label: 'FX Rate (to AED)', transform: (val) => val ? parseFloat(val).toFixed(4) : '' },
               totalAmount: { label: 'Subtotal', transform: (val, row) => `${row?.currency || 'GBP'} ${parseFloat(val || 0).toFixed(2)}` },
-              vatAmount: { label: 'VAT', transform: (val, row) => `${row?.currency || 'GBP'} ${parseFloat(val || 0).toFixed(2)}` },
               grandTotal: { label: 'Total (AED)', transform: (val, row) => {
                 const amt = parseFloat(row?.totalAmount || 0);
                 const cur = row?.currency || 'GBP';
