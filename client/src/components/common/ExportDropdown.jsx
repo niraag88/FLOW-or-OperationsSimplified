@@ -8,9 +8,7 @@ import {
 } from "@/components/ui/dropdown-menu";
 import { Button } from "@/components/ui/button";
 import { Download, Eye } from "lucide-react";
-import { exportToCsv, exportToXLSX, exportToPDF } from "../utils/export";
-import { createRoot } from 'react-dom/client';
-import QuotationTemplate from '../print/QuotationTemplate';
+import { exportToXLSX } from "../utils/export";
 import { format } from 'date-fns';
 
 export default function ExportDropdown({ 
@@ -19,7 +17,6 @@ export default function ExportDropdown({
   filename = "export",
   columns = {},
   isLoading = false,
-  showExternalDocument = false,
   onExternalDocumentClick = null,
   fetchAllData = null,
   totalCount = null,
@@ -30,7 +27,6 @@ export default function ExportDropdown({
   const getExportData = (sourceData) => {
     const src = sourceData || data;
     if (!src || src.length === 0) return [];
-    
     return src.map(item => {
       const exportItem = {};
       Object.keys(columns).forEach(key => {
@@ -46,17 +42,67 @@ export default function ExportDropdown({
     });
   };
 
-  const handleViewExternalDocument = async (item) => {
-    if (onExternalDocumentClick) {
-      onExternalDocumentClick(item);
+  const openPrintWindow = () => {
+    const pw = window.open('', '_blank');
+    if (!pw) {
+      alert('Please allow popups in your browser to use View & Print.');
+      return null;
     }
+    pw.document.write('<!DOCTYPE html><html><head><style>body{font-family:Arial,sans-serif;margin:20px;font-size:12px;color:#333;}</style></head><body><p style="color:#888">Loading&hellip;</p></body></html>');
+    pw.document.close();
+    return pw;
   };
 
-  const handleExport = async (format = 'xlsx') => {
-    if (format === 'pdf' && onViewAndPrint) {
+  const writePrintContent = (pw, subtitle, headers, rows, total) => {
+    const now = format(new Date(), 'dd/MM/yy HH:mm');
+    const headerCells = headers.map(h => `<th>${h}</th>`).join('');
+    const bodyRows = rows
+      .map(row => `<tr>${headers.map(h => `<td>${String(row[h] ?? '')}</td>`).join('')}</tr>`)
+      .join('');
+
+    pw.document.open();
+    pw.document.write(`<!DOCTYPE html>
+<html>
+<head>
+  <title>${subtitle}</title>
+  <style>
+    body { font-family: Arial, sans-serif; margin: 20px; }
+    .print-header { text-align: center; margin-bottom: 30px; }
+    .print-header h1 { font-size: 24px; margin-bottom: 5px; }
+    .print-header h2 { font-size: 18px; color: #666; margin-top: 0; font-weight: normal; }
+    table { width: 100%; border-collapse: collapse; margin-bottom: 30px; }
+    th, td { border: 1px solid #ddd; padding: 8px; text-align: left; }
+    th { background: #f5f5f5; font-weight: bold; }
+    td { font-size: 12px; }
+    .print-footer { margin-top: 30px; font-size: 10px; color: #666; text-align: center; }
+    @media print { body { margin: 0; } table { font-size: 10px; } }
+  </style>
+</head>
+<body>
+  <div class="print-header">
+    <h1>Business Operations</h1>
+    <h2>${subtitle}</h2>
+  </div>
+  <table>
+    <thead><tr>${headerCells}</tr></thead>
+    <tbody>${bodyRows}</tbody>
+  </table>
+  <div class="print-footer">
+    <p>Generated: ${now} &nbsp;|&nbsp; Total records: ${total}</p>
+  </div>
+</body>
+</html>`);
+    pw.document.close();
+  };
+
+  const handleExport = async (exportFormat = 'xlsx') => {
+    if (exportFormat === 'pdf' && onViewAndPrint) {
       onViewAndPrint();
       return;
     }
+
+    const pw = exportFormat === 'pdf' ? openPrintWindow() : null;
+    if (exportFormat === 'pdf' && !pw) return;
 
     setIsExporting(true);
     try {
@@ -64,92 +110,28 @@ export default function ExportDropdown({
       if (fetchAllData) {
         exportSource = await fetchAllData();
       }
-      
+
       if (!exportSource || exportSource.length === 0) {
         alert('No data available to export');
+        if (pw) pw.close();
         return;
       }
-      
+
       const exportData = getExportData(exportSource);
       const timestamp = new Date().toISOString().split('T')[0];
       const exportFilename = `${filename}-${timestamp}`;
-      
-      if (format === 'xlsx') {
+
+      if (exportFormat === 'xlsx') {
         exportToXLSX(exportData, exportFilename, type);
-      } else if (format === 'pdf') {
-        // Create a simple print view for PDF following inventory format
-        const printWindow = window.open('', '_blank');
-        if (!printWindow) {
-          alert('Please allow popups to view the PDF export');
-          return;
-        }
-        
-        const tableHeaders = Object.values(columns).map(col => 
+      } else {
+        const headers = Object.values(columns).map(col =>
           typeof col === 'string' ? col : col.label
         );
-        
-        // Generate table rows
-        const tableRows = exportData.map(item => {
-          const cells = tableHeaders.map(header => {
-            const value = item[header] || '';
-            return `<td>${value}</td>`;
-          }).join('');
-          return `<tr>${cells}</tr>`;
-        }).join('');
-        
-        // Generate complete HTML document
-        printWindow.document.write(`
-          <!DOCTYPE html>
-          <html>
-          <head>
-            <title>${type} Report</title>
-            <style>
-              body { font-family: Arial, sans-serif; margin: 20px; }
-              .print-header { text-align: center; margin-bottom: 30px; }
-              .print-header h1 { font-size: 24px; margin-bottom: 5px; }
-              .print-header h2 { font-size: 18px; color: #666; margin-top: 0; }
-              .print-table { width: 100%; border-collapse: collapse; margin-bottom: 30px; }
-              .print-table th, .print-table td { border: 1px solid #ddd; padding: 8px; text-align: left; }
-              .print-table th { background-color: #f5f5f5; font-weight: bold; }
-              .print-table td { font-size: 12px; }
-              .print-footer { margin-top: 30px; font-size: 10px; color: #666; text-align: center; }
-              @media print {
-                body { margin: 0; }
-                .print-table { font-size: 10px; }
-              }
-            </style>
-          </head>
-          <body>
-            <div class="print-header">
-              <h1>FLOW</h1>
-              <h2>${type}</h2>
-            </div>
-            
-            <table class="print-table">
-              <thead>
-                <tr>
-                  ${tableHeaders.map(header => `<th>${header}</th>`).join('')}
-                </tr>
-              </thead>
-              <tbody>
-                ${tableRows}
-              </tbody>
-            </table>
-            
-            <div class="print-footer">
-              <p>Generated on: ${format(new Date(), 'dd/MM/yy HH:mm')}</p>
-              <p>Total Records: ${exportData.length}</p>
-            </div>
-          </body>
-          </html>
-        `);
-        printWindow.document.close();
-      } else {
-        exportToCsv(exportData, exportFilename);
+        writePrintContent(pw, type, headers, exportData, exportData.length);
       }
-      
     } catch (error) {
       console.error('Export error:', error);
+      if (pw) pw.close();
     } finally {
       setIsExporting(false);
     }
@@ -170,16 +152,16 @@ export default function ExportDropdown({
         <div className="px-3 py-2 text-sm font-medium text-gray-700 border-b">
           Export {type} ({exportCount} records)
         </div>
-        
-        <DropdownMenuItem 
+
+        <DropdownMenuItem
           onClick={() => handleExport('pdf')}
           disabled={disabled}
         >
           <Eye className="w-4 h-4 mr-2" />
           View & Print
         </DropdownMenuItem>
-        
-        <DropdownMenuItem 
+
+        <DropdownMenuItem
           onClick={() => handleExport('xlsx')}
           disabled={disabled}
         >
@@ -187,9 +169,8 @@ export default function ExportDropdown({
           Export to XLSX
         </DropdownMenuItem>
 
-        
         <DropdownMenuSeparator />
-        
+
         <div className="px-3 py-2 text-xs text-gray-500">
           {fetchAllData ? `All ${exportCount} filtered records across all pages` : `${exportCount} records currently shown`}
         </div>
