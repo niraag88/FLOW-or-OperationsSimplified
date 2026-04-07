@@ -17,8 +17,6 @@ import QuotationForm from "../components/quotations/QuotationForm";
 import QuotationFilters from "../components/quotations/QuotationFilters";
 import ExportDropdown from "../components/common/ExportDropdown";
 
-import QuotationTemplate from "../components/print/QuotationTemplate";
-import { createRoot } from 'react-dom/client';
 
 const STALE_3MIN = 3 * 60 * 1000;
 
@@ -199,10 +197,10 @@ export default function Quotations() {
               customerName: 'Customer',
               quoteDate: { label: 'Quotation Date', transform: (date) => date ? format(new Date(date), 'dd/MM/yy') : '' },
               reference: 'Reference',
-              status: 'Status',
               totalAmount: { label: 'Subtotal (AED)', transform: (val) => `${val || 0}` },
               vatAmount: { label: 'VAT (AED)', transform: (val) => `${val || 0}` },
-              grandTotal: { label: 'Total (AED)', transform: (val) => `${val || 0}` }
+              grandTotal: { label: 'Total (AED)', transform: (val) => `${val || 0}` },
+              status: 'Status'
             }}
             isLoading={loading}
             onViewAndPrint={handleViewAndPrint}
