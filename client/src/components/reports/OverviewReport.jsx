@@ -4,7 +4,7 @@ import { TrendingUp, TrendingDown, DollarSign, AlertCircle } from "lucide-react"
 import {
   ComposedChart, Bar, Line, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, Legend
 } from "recharts";
-import { format, subMonths, startOfMonth } from "date-fns";
+import { format } from "date-fns";
 import { getRateToAed } from "@/utils/currency";
 
 const fmt = (v) =>
@@ -70,11 +70,6 @@ export default function OverviewReport({ invoices, purchaseOrders, companySettin
   }, [invoices, purchaseOrders, companySettings]);
 
   const chartData = useMemo(() => {
-    const months = Array.from({ length: 12 }, (_, i) => {
-      const d = subMonths(new Date(), 11 - i);
-      return format(startOfMonth(d), "yyyy-MM");
-    });
-
     const salesMap = {};
     invoices
       .filter((inv) => !["cancelled", "draft"].includes((inv.status || "").toLowerCase()))
@@ -84,8 +79,7 @@ export default function OverviewReport({ invoices, purchaseOrders, companySettin
         const d = new Date(dateVal);
         if (isNaN(d.getTime())) return;
         const m = format(d, "yyyy-MM");
-        if (!salesMap[m]) salesMap[m] = 0;
-        salesMap[m] += Number(inv.total_amount || inv.totalAmount || inv.amount || 0);
+        salesMap[m] = (salesMap[m] || 0) + Number(inv.total_amount || inv.totalAmount || inv.amount || 0);
       });
 
     const purchasesMap = {};
@@ -95,11 +89,22 @@ export default function OverviewReport({ invoices, purchaseOrders, companySettin
       const d = new Date(dateVal);
       if (isNaN(d.getTime())) return;
       const m = format(d, "yyyy-MM");
-      if (!purchasesMap[m]) purchasesMap[m] = 0;
       const amt = Number(po.totalAmount || po.total_amount || 0);
       const cur = po.currency || "GBP";
-      purchasesMap[m] += cur === "AED" ? amt : amt * getFxRate(po);
+      purchasesMap[m] = (purchasesMap[m] || 0) + (cur === "AED" ? amt : amt * getFxRate(po));
     });
+
+    const allKeys = [...new Set([...Object.keys(salesMap), ...Object.keys(purchasesMap)])].sort();
+    const today = format(new Date(), "yyyy-MM");
+    const minMonth = allKeys.length > 0 ? allKeys[0] : today;
+
+    const months = [];
+    let cursor = new Date(minMonth + "-01");
+    const end = new Date(today + "-01");
+    while (cursor <= end) {
+      months.push(format(cursor, "yyyy-MM"));
+      cursor = new Date(cursor.getFullYear(), cursor.getMonth() + 1, 1);
+    }
 
     return months.map((m) => ({
       month: format(new Date(m + "-01"), "MMM yy"),
