@@ -118,8 +118,7 @@ export default function ExportDropdown({
       }
 
       const exportData = getExportData(exportSource);
-      const timestamp = new Date().toISOString().split('T')[0];
-      const exportFilename = `${filename}-${timestamp}`;
+      const exportFilename = `${filename}-${format(new Date(), 'dd-MM-yy')}`;
 
       if (exportFormat === 'xlsx') {
         exportToXLSX(exportData, exportFilename, type);

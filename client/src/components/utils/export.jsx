@@ -56,11 +56,8 @@ export const exportToXLSX = (data, filename, sheetName = 'Sheet1') => {
   // Add worksheet to workbook
   XLSX.utils.book_append_sheet(workbook, worksheet, sheetName);
   
-  // Generate filename with timestamp
-  const timestampedFilename = `${filename}_${new Date().toISOString().split('T')[0]}.xlsx`;
-  
   // Write and download the file
-  XLSX.writeFile(workbook, timestampedFilename);
+  XLSX.writeFile(workbook, `${filename}.xlsx`);
 };
 
 export const exportToPDF = (data, filename, title = 'Export', columns = null) => {

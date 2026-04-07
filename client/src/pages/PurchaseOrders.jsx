@@ -269,8 +269,6 @@ export default function PurchaseOrders() {
               poNumber: 'PO Number',
               brandName: 'Brand',
               orderDate: { label: 'Order Date', transform: (date) => date ? format(new Date(date), 'dd/MM/yy') : '' },
-              status: { label: 'Status', transform: (val) => val ? val.toUpperCase() : '' },
-              currency: 'Currency',
               totalAmount: { label: 'Total', transform: (val, row) => `${row?.currency || 'GBP'} ${parseFloat(val || 0).toFixed(2)}` },
               grandTotal: { label: 'Total (AED)', transform: (val, row) => {
                 const amt = parseFloat(row?.totalAmount || 0);
@@ -279,6 +277,7 @@ export default function PurchaseOrders() {
                 const aed = cur === 'AED' ? amt : amt * rate;
                 return `AED ${aed.toFixed(2)}`;
               }},
+              status: { label: 'Status', transform: (val) => val ? val.toUpperCase() : '' },
               paymentStatus: { label: 'Payment Status', transform: (val) => val ? val.charAt(0).toUpperCase() + val.slice(1) : 'Outstanding' },
               paymentMadeDate: { label: 'Payment Date', transform: (val) => val ? format(new Date(val), 'dd/MM/yy') : '' },
               paymentRemarks: { label: 'Payment Remarks', transform: (val) => val || '' }
