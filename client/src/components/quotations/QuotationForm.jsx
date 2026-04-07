@@ -64,7 +64,7 @@ export default function QuotationForm({ open, onClose, editingQuotation, current
       // Use preloaded data if available, otherwise fetch from API (fallback)
       let customersData, productsData, brandsData;
       
-      if (preloadedCustomers && preloadedProducts && preloadedBrands) {
+      if (preloadedCustomers?.length > 0 && preloadedProducts?.length > 0 && preloadedBrands?.length > 0) {
         // Use preloaded data for better performance
         customersData = preloadedCustomers;
         productsData = preloadedProducts;
@@ -459,7 +459,6 @@ export default function QuotationForm({ open, onClose, editingQuotation, current
                 </SelectTrigger>
                 <SelectContent>
                   <SelectItem value="draft">Draft</SelectItem>
-                  <SelectItem value="sent">Sent</SelectItem>
                   <SelectItem value="submitted">Submitted</SelectItem>
                 </SelectContent>
               </Select>
