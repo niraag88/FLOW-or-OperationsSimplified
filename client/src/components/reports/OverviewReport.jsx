@@ -147,7 +147,7 @@ export default function OverviewReport({ invoices, purchaseOrders, companySettin
 
       <Card className="border-0 shadow-lg">
         <CardHeader>
-          <CardTitle>Sales vs Purchases — Last 12 Months</CardTitle>
+          <CardTitle>Sales vs Purchases</CardTitle>
           <p className="text-sm text-gray-500">
             Monthly revenue (invoiced) compared to purchase order spend (AED)
           </p>
