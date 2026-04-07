@@ -69,7 +69,12 @@ export default function QuotationsListPrintView() {
   const totGrand    = quotations.reduce((s, q) => s + (parseFloat(q.grandTotal) || 0), 0);
 
   const urlParams = new URLSearchParams(window.location.search);
-  const hasFilters = ['search', 'status', 'customerId', 'dateFrom', 'dateTo'].some(k => urlParams.get(k));
+  const filterParts = [];
+  if (urlParams.get('search'))     filterParts.push(`Search: "${urlParams.get('search')}"`);
+  if (urlParams.get('status'))     filterParts.push(`Status: ${urlParams.get('status').split(',').map(s => s.charAt(0).toUpperCase() + s.slice(1)).join(', ')}`);
+  if (urlParams.get('dateFrom'))   filterParts.push(`From: ${urlParams.get('dateFrom')}`);
+  if (urlParams.get('dateTo'))     filterParts.push(`To: ${urlParams.get('dateTo')}`);
+  const filterSummary = filterParts.join('  |  ');
 
   return (
     <div className="print-container">
@@ -96,7 +101,7 @@ export default function QuotationsListPrintView() {
             </h1>
           </div>
           <div style={{ marginTop: '6px', fontSize: '10px', color: '#555' }}>
-            {hasFilters ? 'Filtered results' : 'All quotations'} &nbsp;|&nbsp; Generated: {format(new Date(), 'dd/MM/yy HH:mm')}
+            {filterSummary || 'All quotations'} &nbsp;|&nbsp; Generated: {format(new Date(), 'dd/MM/yy HH:mm')}
           </div>
         </div>
 
