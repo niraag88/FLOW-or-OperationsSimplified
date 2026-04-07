@@ -20,8 +20,6 @@ import { getDerivedInvoiceStatus } from "../components/invoices/invoiceUtils";
 import ExportDropdown from "../components/common/ExportDropdown";
 import { format } from "date-fns";
 
-import InvoiceTemplate from "../components/print/InvoiceTemplate";
-import { createRoot } from 'react-dom/client';
 import { useToast } from '@/hooks/use-toast';
 
 const STALE_3MIN = 3 * 60 * 1000;
@@ -35,7 +33,6 @@ export default function Invoices() {
   const [editingInvoice, setEditingInvoice] = useState(null);
   const [selectedStatuses, setSelectedStatuses] = useState([]);
   const [selectedCustomers, setSelectedCustomers] = useState([]);
-  const [selectedTaxTreatments, setSelectedTaxTreatments] = useState([]);
   const [dateRange, setDateRange] = useState("all");
   const [paymentStatusFilter, setPaymentStatusFilter] = useState('all');
   const [showCreateFromExistingDialog, setShowCreateFromExistingDialog] = useState(false);
@@ -85,7 +82,7 @@ export default function Invoices() {
     .join(';');
 
   const { data: invoiceResult, isLoading: loading } = useQuery({
-    queryKey: ['/api/invoices', currentPage, itemsPerPage, debouncedSearch, selectedStatuses, selectedCustomers, selectedTaxTreatments, dateRange, excludeYearsKey, paymentStatusFilter],
+    queryKey: ['/api/invoices', currentPage, itemsPerPage, debouncedSearch, selectedStatuses, selectedCustomers, dateRange, excludeYearsKey, paymentStatusFilter],
     queryFn: async () => {
       const params = new URLSearchParams();
       const isAll = itemsPerPage === 9999;
@@ -96,7 +93,6 @@ export default function Invoices() {
       if (debouncedSearch) params.set('search', debouncedSearch);
       if (selectedStatuses.length) params.set('status', selectedStatuses.join(','));
       if (selectedCustomers.length) params.set('customerId', selectedCustomers.join(','));
-      if (selectedTaxTreatments.length) params.set('taxTreatment', selectedTaxTreatments.join(','));
       if (paymentStatusFilter && paymentStatusFilter !== 'all') params.set('paymentStatus', paymentStatusFilter);
       const today = new Date();
       const toStr = (d) => d.toISOString().split('T')[0];
@@ -354,6 +350,26 @@ export default function Invoices() {
     }
   };
 
+  const handleViewAndPrint = () => {
+    const params = new URLSearchParams();
+    if (debouncedSearch) params.set('search', debouncedSearch);
+    if (selectedStatuses.length) params.set('status', selectedStatuses.join(','));
+    if (selectedCustomers.length) params.set('customerId', selectedCustomers.join(','));
+    if (paymentStatusFilter && paymentStatusFilter !== 'all') params.set('paymentStatus', paymentStatusFilter);
+    const today = new Date();
+    const toStr = (d) => d.toISOString().split('T')[0];
+    if (dateRange && dateRange !== 'all') {
+      if (dateRange === 'today') { const d = toStr(today); params.set('dateFrom', d); params.set('dateTo', d); }
+      else if (dateRange === 'week') { const s = new Date(today); s.setDate(today.getDate() - today.getDay()); s.setHours(0,0,0,0); params.set('dateFrom', toStr(s)); }
+      else if (dateRange === 'month') params.set('dateFrom', toStr(new Date(today.getFullYear(), today.getMonth(), 1)));
+      else if (dateRange === 'quarter') { const q = Math.floor(today.getMonth() / 3); params.set('dateFrom', toStr(new Date(today.getFullYear(), q * 3, 1))); }
+      else if (typeof dateRange === 'object' && dateRange.type === 'custom') { params.set('dateFrom', toStr(new Date(dateRange.startDate))); params.set('dateTo', toStr(new Date(dateRange.endDate))); }
+    }
+    const closedYears = financialYears.filter(y => y.status === 'Closed');
+    if (closedYears.length > 0) params.set('excludeYears', closedYears.map(cy => `${cy.startDate},${cy.endDate}`).join(';'));
+    window.open(`/invoices-list-print?${params}`, '_blank');
+  };
+
   const canEdit = ['Admin', 'Manager', 'Staff'].includes(currentUser?.role);
   const canOverride = true;
 
@@ -369,7 +385,7 @@ export default function Invoices() {
     if (debouncedSearch) params.set('search', debouncedSearch);
     if (selectedStatuses.length) params.set('status', selectedStatuses.join(','));
     if (selectedCustomers.length) params.set('customerId', selectedCustomers.join(','));
-    if (selectedTaxTreatments.length) params.set('taxTreatment', selectedTaxTreatments.join(','));
+    if (paymentStatusFilter && paymentStatusFilter !== 'all') params.set('paymentStatus', paymentStatusFilter);
     const closedYears = financialYears.filter(y => y.status === 'Closed');
     if (closedYears.length > 0) params.set('excludeYears', closedYears.map(cy => `${cy.startDate},${cy.endDate}`).join(';'));
     const today = new Date();
@@ -407,15 +423,16 @@ export default function Invoices() {
               customerName: 'Customer',
               invoiceDate: { label: 'Invoice Date', transform: (date) => date ? format(new Date(date), 'dd/MM/yy') : '' },
               reference: 'Reference',
-              status: { label: 'Status', transform: (val) => val ? val.toUpperCase() : '' },
-              vatAmount: { label: 'VAT (AED)', transform: (val, item) => `AED ${parseFloat(val || 0).toFixed(2)}` },
-              amount: { label: 'Total (AED)', transform: (val) => `AED ${parseFloat(val || 0).toFixed(2)}` },
-              currency: 'Currency',
+              subtotal: { label: 'Subtotal (AED)', transform: (val) => parseFloat(val || 0).toFixed(2) },
+              vatAmount: { label: 'VAT (AED)', transform: (val) => parseFloat(val || 0).toFixed(2) },
+              amount: { label: 'Total (AED)', transform: (val) => parseFloat(val || 0).toFixed(2) },
+              status: { label: 'Status', transform: (val) => val ? val.charAt(0).toUpperCase() + val.slice(1) : '' },
               paymentStatus: { label: 'Payment Status', transform: (val) => val ? val.charAt(0).toUpperCase() + val.slice(1) : 'Outstanding' },
               paymentReceivedDate: { label: 'Payment Date', transform: (val) => val ? format(new Date(val), 'dd/MM/yy') : '' },
               paymentRemarks: { label: 'Payment Remarks', transform: (val) => val || '' }
             }}
             isLoading={loading}
+            onViewAndPrint={handleViewAndPrint}
           />
           
           {canEdit && (
@@ -457,8 +474,6 @@ export default function Invoices() {
           setSelectedStatuses={setSelectedStatuses}
           selectedCustomers={selectedCustomers}
           setSelectedCustomers={setSelectedCustomers}
-          selectedTaxTreatments={selectedTaxTreatments}
-          setSelectedTaxTreatments={setSelectedTaxTreatments}
           dateRange={dateRange}
           setDateRange={setDateRange}
           resetPagination={resetPagination}

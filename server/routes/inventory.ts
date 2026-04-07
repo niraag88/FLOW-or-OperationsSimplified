@@ -517,6 +517,38 @@ export function registerInventoryRoutes(app: Express) {
     }
   });
 
+  app.get('/api/export/invoices-list', requireAuth(), async (req: AuthenticatedRequest, res) => {
+    try {
+      const { search, status, customerId, paymentStatus, dateFrom, dateTo, excludeYears } = req.query as Record<string, string>;
+
+      const allInvoices = await businessStorage.getInvoices({
+        search: search || undefined,
+        status: status || undefined,
+        customerId: customerId || undefined,
+        paymentStatus: paymentStatus || undefined,
+        dateFrom: dateFrom || undefined,
+        dateTo: dateTo || undefined,
+        excludeYears: excludeYears || undefined,
+      });
+
+      const data = Array.isArray(allInvoices) ? allInvoices : (allInvoices.data || []);
+
+      const [companyRow] = await db.select().from(companySettings).limit(1);
+      const company = companyRow ? {
+        companyName: companyRow.companyName,
+        address: companyRow.address,
+        phone: companyRow.phone,
+        email: companyRow.email,
+        vatNumber: companyRow.vatNumber,
+      } : {};
+
+      res.json({ invoices: data, company });
+    } catch (error) {
+      console.error('Error exporting invoices list:', error);
+      res.status(500).json({ error: 'Failed to export invoices list' });
+    }
+  });
+
   app.get('/api/export/quotations-list', requireAuth(), async (req: AuthenticatedRequest, res) => {
     try {
       const { search, status, customerId, dateFrom, dateTo, excludeYears } = req.query as Record<string, string>;

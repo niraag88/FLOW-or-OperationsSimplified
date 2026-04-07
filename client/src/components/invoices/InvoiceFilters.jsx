@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from "react";
+import React, { useState } from "react";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Button } from "@/components/ui/button";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
@@ -9,7 +9,7 @@ import { Badge } from "@/components/ui/badge";
 import { format } from "date-fns";
 import { cn } from "@/lib/utils";
 
-export default function InvoiceFilters({ selectedStatuses, setSelectedStatuses, selectedCustomers, setSelectedCustomers, selectedTaxTreatments, setSelectedTaxTreatments, dateRange, setDateRange, resetPagination, customers = [], paymentStatusFilter, setPaymentStatusFilter }) {
+export default function InvoiceFilters({ selectedStatuses, setSelectedStatuses, selectedCustomers, setSelectedCustomers, dateRange, setDateRange, resetPagination, customers = [], paymentStatusFilter, setPaymentStatusFilter }) {
   const [dateRangeOpen, setDateRangeOpen] = useState(false);
   const [customStartDate, setCustomStartDate] = useState(null);
   const [customEndDate, setCustomEndDate] = useState(null);
@@ -17,7 +17,6 @@ export default function InvoiceFilters({ selectedStatuses, setSelectedStatuses, 
   const clearFilters = () => {
     setSelectedStatuses([]);
     setSelectedCustomers([]);
-    setSelectedTaxTreatments([]);
     setDateRange("all");
     setCustomStartDate(null);
     setCustomEndDate(null);
@@ -25,13 +24,11 @@ export default function InvoiceFilters({ selectedStatuses, setSelectedStatuses, 
     resetPagination();
   };
 
-  const hasActiveFilters = selectedStatuses.length > 0 || selectedCustomers.length > 0 || 
-                          selectedTaxTreatments.length > 0 || dateRange !== "all" ||
+  const hasActiveFilters = selectedStatuses.length > 0 || selectedCustomers.length > 0 ||
+                          dateRange !== "all" ||
                           (paymentStatusFilter && paymentStatusFilter !== 'all');
 
-  // Get unique values
   const uniqueStatuses = ['draft', 'submitted', 'delivered'];
-  const uniqueTaxTreatments = ['standard', 'exempt', 'reverse_charge'];
 
   const handleDateRangeChange = (value) => {
     if (value !== 'custom') {
@@ -155,7 +152,7 @@ export default function InvoiceFilters({ selectedStatuses, setSelectedStatuses, 
                       htmlFor={`invoice-customer-${customer.id}`}
                       className="text-sm leading-none peer-disabled:cursor-not-allowed peer-disabled:opacity-70 cursor-pointer"
                     >
-                      {customer.customer_name}
+                      {customer.customer_name || customer.name}
                     </label>
                   </div>
                 ))}
@@ -164,113 +161,73 @@ export default function InvoiceFilters({ selectedStatuses, setSelectedStatuses, 
           </PopoverContent>
         </Popover>
 
+        <Select value={typeof dateRange === 'object' ? 'custom' : dateRange} onValueChange={handleDateRangeChange}>
+          <SelectTrigger className="w-32">
+            <SelectValue placeholder="Date" />
+          </SelectTrigger>
+          <SelectContent>
+            <SelectItem value="all">All Time</SelectItem>
+            <SelectItem value="today">Today</SelectItem>
+            <SelectItem value="week">This Week</SelectItem>
+            <SelectItem value="month">This Month</SelectItem>
+            <SelectItem value="quarter">This Quarter</SelectItem>
+            <SelectItem value="custom">Custom Range</SelectItem>
+          </SelectContent>
+        </Select>
 
-        {/* Tax Treatment Filter */}
-        <Popover>
-          <PopoverTrigger asChild>
-            <Button variant="outline" className="justify-between w-40">
-              {selectedTaxTreatments.length === 0 ? "All Tax" : `${selectedTaxTreatments.length} selected`}
-              <ChevronDown className="ml-2 h-4 w-4" />
-            </Button>
-          </PopoverTrigger>
-          <PopoverContent className="w-60 p-4">
-            <div className="space-y-3">
-              <h4 className="font-medium leading-none">Select Tax Treatment</h4>
-              <div className="space-y-2 max-h-60 overflow-y-auto">
-                {uniqueTaxTreatments.map(treatment => (
-                  <div key={treatment} className="flex items-center space-x-2">
-                    <Checkbox
-                      id={`invoice-tax-${treatment}`}
-                      checked={selectedTaxTreatments.includes(treatment)}
-                      onCheckedChange={(checked) => {
-                        if (checked) {
-                          setSelectedTaxTreatments(prev => [...prev, treatment]);
-                        } else {
-                          setSelectedTaxTreatments(prev => prev.filter(t => t !== treatment));
-                        }
-                        resetPagination();
-                      }}
+        {(dateRange === 'custom' || typeof dateRange === 'object') && (
+          <Popover open={dateRangeOpen} onOpenChange={setDateRangeOpen}>
+            <PopoverTrigger asChild>
+              <Button
+                variant="outline"
+                className={cn(
+                  "w-48 justify-start text-left font-normal",
+                  !customStartDate && !customEndDate && "text-muted-foreground"
+                )}
+              >
+                <CalendarIcon className="mr-2 h-4 w-4" />
+                {formatCustomDateRange()}
+              </Button>
+            </PopoverTrigger>
+            <PopoverContent className="w-auto p-4" align="start">
+              <div className="space-y-4">
+                <div className="text-sm font-medium">Select Date Range</div>
+                <div className="grid grid-cols-2 gap-4">
+                  <div>
+                    <div className="text-xs text-gray-500 mb-2">Start Date</div>
+                    <Calendar
+                      mode="single"
+                      selected={customStartDate}
+                      onSelect={setCustomStartDate}
+                      disabled={(date) => date > new Date() || (customEndDate && date > customEndDate)}
+                      initialFocus
                     />
-                    <label
-                      htmlFor={`invoice-tax-${treatment}`}
-                      className="text-sm leading-none peer-disabled:cursor-not-allowed peer-disabled:opacity-70 cursor-pointer capitalize"
-                    >
-                      {treatment.replace('_', ' ')}
-                    </label>
                   </div>
-                ))}
-              </div>
-            </div>
-          </PopoverContent>
-        </Popover>
-
-      <Select value={typeof dateRange === 'object' ? 'custom' : dateRange} onValueChange={handleDateRangeChange}>
-        <SelectTrigger className="w-32">
-          <SelectValue placeholder="Date" />
-        </SelectTrigger>
-        <SelectContent>
-          <SelectItem value="all">All Time</SelectItem>
-          <SelectItem value="today">Today</SelectItem>
-          <SelectItem value="week">This Week</SelectItem>
-          <SelectItem value="month">This Month</SelectItem>
-          <SelectItem value="quarter">This Quarter</SelectItem>
-          <SelectItem value="custom">Custom Range</SelectItem>
-        </SelectContent>
-      </Select>
-
-      {(dateRange === 'custom' || typeof dateRange === 'object') && (
-        <Popover open={dateRangeOpen} onOpenChange={setDateRangeOpen}>
-          <PopoverTrigger asChild>
-            <Button
-              variant="outline"
-              className={cn(
-                "w-48 justify-start text-left font-normal",
-                !customStartDate && !customEndDate && "text-muted-foreground"
-              )}
-            >
-              <CalendarIcon className="mr-2 h-4 w-4" />
-              {formatCustomDateRange()}
-            </Button>
-          </PopoverTrigger>
-          <PopoverContent className="w-auto p-4" align="start">
-            <div className="space-y-4">
-              <div className="text-sm font-medium">Select Date Range</div>
-              <div className="grid grid-cols-2 gap-4">
-                <div>
-                  <div className="text-xs text-gray-500 mb-2">Start Date</div>
-                  <Calendar
-                    mode="single"
-                    selected={customStartDate}
-                    onSelect={setCustomStartDate}
-                    disabled={(date) => date > new Date() || (customEndDate && date > customEndDate)}
-                    initialFocus
-                  />
+                  <div>
+                    <div className="text-xs text-gray-500 mb-2">End Date</div>
+                    <Calendar
+                      mode="single"
+                      selected={customEndDate}
+                      onSelect={setCustomEndDate}
+                      disabled={(date) => date > new Date() || (customStartDate && date < customStartDate)}
+                      initialFocus
+                    />
+                  </div>
                 </div>
-                <div>
-                  <div className="text-xs text-gray-500 mb-2">End Date</div>
-                  <Calendar
-                    mode="single"
-                    selected={customEndDate}
-                    onSelect={setCustomEndDate}
-                    disabled={(date) => date > new Date() || (customStartDate && date < customStartDate)}
-                    initialFocus
-                  />
+                <div className="flex justify-end gap-2 pt-2 border-t">
+                  <Button variant="outline" size="sm" onClick={() => setDateRangeOpen(false)}>Cancel</Button>
+                  <Button 
+                    size="sm" 
+                    onClick={handleCustomDateRange}
+                    disabled={!customStartDate || !customEndDate}
+                  >
+                    Apply
+                  </Button>
                 </div>
               </div>
-              <div className="flex justify-end gap-2 pt-2 border-t">
-                <Button variant="outline" size="sm" onClick={() => setDateRangeOpen(false)}>Cancel</Button>
-                <Button 
-                  size="sm" 
-                  onClick={handleCustomDateRange}
-                  disabled={!customStartDate || !customEndDate}
-                >
-                  Apply
-                </Button>
-              </div>
-            </div>
-          </PopoverContent>
-        </Popover>
-      )}
+            </PopoverContent>
+          </Popover>
+        )}
 
         {hasActiveFilters && (
           <Button variant="ghost" size="sm" onClick={clearFilters}>
@@ -280,7 +237,7 @@ export default function InvoiceFilters({ selectedStatuses, setSelectedStatuses, 
       </div>
       
       {/* Active filter badges */}
-      {(selectedStatuses.length > 0 || selectedCustomers.length > 0 || selectedTaxTreatments.length > 0) && (
+      {(selectedStatuses.length > 0 || selectedCustomers.length > 0) && (
         <div className="flex flex-wrap gap-2">
           {selectedStatuses.map(status => (
             <Badge key={status} variant="secondary" className="gap-1">
@@ -298,7 +255,7 @@ export default function InvoiceFilters({ selectedStatuses, setSelectedStatuses, 
             const customer = customers.find(c => c.id === customerId);
             return (
               <Badge key={customerId} variant="secondary" className="gap-1">
-                Customer: {customer?.customer_name}
+                Customer: {customer?.customer_name || customer?.name}
                 <X 
                   className="h-3 w-3 cursor-pointer" 
                   onClick={() => {
@@ -309,30 +266,6 @@ export default function InvoiceFilters({ selectedStatuses, setSelectedStatuses, 
               </Badge>
             );
           })}
-          {selectedCurrencies.map(currency => (
-            <Badge key={currency} variant="secondary" className="gap-1">
-              Currency: {currency}
-              <X 
-                className="h-3 w-3 cursor-pointer" 
-                onClick={() => {
-                  setSelectedCurrencies(prev => prev.filter(c => c !== currency));
-                  resetPagination();
-                }}
-              />
-            </Badge>
-          ))}
-          {selectedTaxTreatments.map(treatment => (
-            <Badge key={treatment} variant="secondary" className="gap-1">
-              Tax: {treatment.replace('_', ' ')}
-              <X 
-                className="h-3 w-3 cursor-pointer" 
-                onClick={() => {
-                  setSelectedTaxTreatments(prev => prev.filter(t => t !== treatment));
-                  resetPagination();
-                }}
-              />
-            </Badge>
-          ))}
         </div>
       )}
     </>

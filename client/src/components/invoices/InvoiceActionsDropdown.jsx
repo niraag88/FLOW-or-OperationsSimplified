@@ -15,16 +15,12 @@ import { format } from 'date-fns';
 import { Invoice } from "@/api/entities";
 import MarkPaidDialog from "./MarkPaidDialog";
 import SimpleConfirmDialog from "../common/SimpleConfirmDialog";
-import CreateInvoiceFromQuotationDialog from './CreateInvoiceFromQuotationDialog';
-import CreateFromExistingDialog from './CreateFromExistingDialog';
 import UploadFileDialog from "../common/UploadFileDialog";
 
 export default function InvoiceActionsDropdown({ invoice, canEdit, onEdit, onRefresh, currentUser }) {
   const { toast } = useToast();
   const [showDeleteDialog, setShowDeleteDialog] = useState(false);
   const [showMarkPaidDialog, setShowMarkPaidDialog] = useState(false);
-  const [showCreateInvoiceFromQuotationDialog, setShowCreateInvoiceFromQuotationDialog] = useState(false);
-  const [showCreateFromExistingDialog, setShowCreateFromExistingDialog] = useState(false);
   const [showUploadDialog, setShowUploadDialog] = useState(false);
   const [showRemoveFileDialog, setShowRemoveFileDialog] = useState(false);
 
@@ -243,18 +239,6 @@ export default function InvoiceActionsDropdown({ invoice, canEdit, onEdit, onRef
         description={`Remove the uploaded file from Invoice "${invoiceNumber}"? The file will be permanently deleted.`}
         confirmText="Yes, Remove"
         confirmVariant="destructive"
-      />
-      <CreateInvoiceFromQuotationDialog
-        open={showCreateInvoiceFromQuotationDialog}
-        onClose={() => setShowCreateInvoiceFromQuotationDialog(false)}
-        quotationId={null}
-        onInvoiceCreated={onRefresh}
-      />
-      <CreateFromExistingDialog
-        open={showCreateFromExistingDialog}
-        onClose={() => setShowCreateFromExistingDialog(false)}
-        existingDocument={invoice}
-        onDocumentCreated={onRefresh}
       />
       <UploadFileDialog
         open={showUploadDialog}

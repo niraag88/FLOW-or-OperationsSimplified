@@ -31,6 +31,7 @@ const POPrintView = lazy(() => import("@/components/purchase-orders/POPrintView.
 const QuotationPrintView = lazy(() => import("@/components/quotations/QuotationPrintView.jsx"));
 const QuotationsListPrintView = lazy(() => import("@/components/quotations/QuotationsListPrintView.jsx"));
 const InvoicePrintView = lazy(() => import("@/components/invoices/InvoicePrintView.jsx"));
+const InvoicesListPrintView = lazy(() => import("@/components/invoices/InvoicesListPrintView.jsx"));
 const DOPrintView = lazy(() => import("@/components/delivery-orders/DOPrintView.jsx"));
 const PrintSandboxPage = lazy(() => import("@/pages/PrintSandboxPage.jsx"));
 
@@ -176,6 +177,11 @@ function PagesContent() {
         <Route path="/quotations/:id/print" element={
           <ProtectedRoute>
             <QuotationPrintView />
+          </ProtectedRoute>
+        } />
+        <Route path="/invoices-list-print" element={
+          <ProtectedRoute>
+            <InvoicesListPrintView />
           </ProtectedRoute>
         } />
         <Route path="/invoices/:id/print" element={
