@@ -79,6 +79,7 @@ The project follows a monorepo layout with separate directories for client, serv
 - **Product & PO Currency Management**: `cost_price_currency` added to products. `purchase_orders` now include `currency` and `fxRateToAed` fields. PO currency defaults to the first selected product's `costPriceCurrency`.
 - **API Improvements**: `POST /api/recycle-bin` endpoint added with server-side `deleted_by` and `deleted_date` derivation. Invoice creation now validates `customer_id`.
 - **E2E Test Suite**: Comprehensive Playwright test suite covering authentication, CRUD operations, lifecycle flows (PO, Invoice, DO), stock counts, dashboard summaries, performance, and security.
+- **DO Bug Fixes (comprehensive review)**: Fixed 8 issues across all DO files: customer dropdown now shows `c.name` (was using wrong field `c.customer_name`); "Create from Existing" now correctly maps quotation item fields (camelCase→snake_case) and includes brandId; `show_remarks` column added to `delivery_orders` table and is now persisted, returned, and respected by DOPrintView; `isEditable` in DOForm now tracks live form status; Edit action hidden for delivered/cancelled DOs; dead imports/state/code removed from DeliveryOrders.jsx.
 
 # External Dependencies
 

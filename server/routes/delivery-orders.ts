@@ -57,6 +57,7 @@ export function registerDeliveryOrderRoutes(app: Express) {
         orderNumber: deliveryOrders.orderNumber,
         customerId: deliveryOrders.customerId,
         customerName: deliveryOrders.customerName,
+        showRemarks: deliveryOrders.showRemarks,
         orderDate: deliveryOrders.orderDate,
         reference: deliveryOrders.reference,
         referenceDate: deliveryOrders.referenceDate,
@@ -112,7 +113,7 @@ export function registerDeliveryOrderRoutes(app: Express) {
         total_amount: doTotal,
         currency: doRecord.currency || 'AED',
         remarks: doRecord.notes || '',
-        show_remarks: !!(doRecord.notes),
+        show_remarks: doRecord.showRemarks || false,
         tax_rate: taxRt,
         tax_treatment: (() => {
           if (taxAmt > 0) return 'StandardRated';
@@ -185,6 +186,7 @@ export function registerDeliveryOrderRoutes(app: Express) {
         currency: body.currency || 'AED',
         notes: body.remarks || body.notes || null,
         taxRate: body.tax_rate ? body.tax_rate.toString() : '0.05',
+        showRemarks: body.show_remarks || false,
         companySnapshot: doCompanySnapshot,
       }).returning();
 
@@ -245,6 +247,7 @@ export function registerDeliveryOrderRoutes(app: Express) {
         currency: body.currency || 'AED',
         notes: body.remarks || body.notes || null,
         taxRate: body.tax_rate ? body.tax_rate.toString() : '0.05',
+        showRemarks: body.show_remarks || false,
       }).where(eq(deliveryOrders.id, id));
 
       await db.delete(deliveryOrderItems).where(eq(deliveryOrderItems.doId, id));

@@ -1,0 +1,1 @@
+ALTER TABLE "delivery_orders" ADD COLUMN "show_remarks" boolean DEFAULT false;

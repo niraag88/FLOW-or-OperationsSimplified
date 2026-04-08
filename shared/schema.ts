@@ -96,6 +96,7 @@ export const deliveryOrders = pgTable("delivery_orders", {
   taxTreatment: text("tax_treatment").default("standard"),
   objectKey: text("object_key"),
   scanKey: text("scan_key"),
+  showRemarks: boolean("show_remarks").default(false),
   createdAt: timestamp("created_at").defaultNow().notNull(),
   legalHold: boolean("legal_hold").default(false).notNull(),
   companySnapshot: jsonb("company_snapshot"),

@@ -141,7 +141,7 @@ export default function DOActionsDropdown({ doOrder, canEdit, onEdit, onRefresh,
           </Button>
         </DropdownMenuTrigger>
         <DropdownMenuContent align="end">
-          {canEdit && (
+          {canEdit && !['delivered', 'cancelled'].includes(doOrder.status) && (
             <DropdownMenuItem onClick={() => onEdit(doOrder)}>
               <Edit2 className="w-4 h-4 mr-2" />
               Edit

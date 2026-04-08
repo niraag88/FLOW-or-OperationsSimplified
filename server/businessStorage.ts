@@ -489,6 +489,7 @@ export class BusinessStorage {
     const items = await db.select({
       id: quotationItems.id,
       productId: quotationItems.productId,
+      brandId: products.brandId,
       quantity: quotationItems.quantity,
       unitPrice: quotationItems.unitPrice,
       discount: quotationItems.discount,

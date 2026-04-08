@@ -10,9 +10,6 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Plus, Search, FileText } from "lucide-react";
 import { DeliveryOrder } from "@/api/entities";
 import { Customer } from "@/api/entities";
-import { Product } from "@/api/entities";
-import { Brand } from "@/api/entities";
-import { User } from "@/api/entities";
 import DOList from "../components/delivery-orders/DOList";
 import DOForm from "../components/delivery-orders/DOForm";
 import DOFilters from "../components/delivery-orders/DOFilters";
@@ -20,15 +17,10 @@ import DOQuickViewModal from "../components/delivery-orders/DOQuickViewModal";
 import CreateFromExistingDialog from "../components/delivery-orders/CreateFromExistingDialog";
 import ExportDropdown from "../components/common/ExportDropdown";
 
-import DOTemplate from "../components/print/DOTemplate";
-import { createRoot } from 'react-dom/client';
-
 const STALE_3MIN = 3 * 60 * 1000;
 
 export default function DeliveryOrders() {
   const [customers, setCustomers] = useState([]);
-  const [products, setProducts] = useState([]);
-  const [brands, setBrands] = useState([]);
   const [searchTerm, setSearchTerm] = useState("");
   const [showDOForm, setShowDOForm] = useState(false);
   const [editingDO, setEditingDO] = useState(null);
@@ -50,15 +42,11 @@ export default function DeliveryOrders() {
   useEffect(() => {
     const loadSupporting = async () => {
       try {
-        const [customersData, productsData, brandsData, booksData] = await Promise.all([
+        const [customersData, booksData] = await Promise.all([
           Customer.list().catch(() => []),
-          Product.list().catch(() => []),
-          Brand.list().catch(() => []),
           fetch('/api/books', { credentials: 'include' }).then(r => r.ok ? r.json() : []).catch(() => []),
         ]);
-        setCustomers(customersData.filter(c => c.is_active !== false));
-        setProducts(productsData);
-        setBrands(brandsData.filter(b => b.isActive !== false));
+        setCustomers(customersData.filter(c => c.isActive !== false));
         setFinancialYears(booksData);
       } catch (error) {
         console.error("Error loading supporting data:", error);
@@ -141,66 +129,48 @@ export default function DeliveryOrders() {
   };
 
   const handleDocumentSelect = async (document, documentType) => {
-    let doData;
-    
-    // Generate DO number first
-    const timestamp = Date.now().toString().slice(-6);
-    const doNumber = `DO-${timestamp}`;
-    
-    if (documentType === 'quotation') {
-      // Fetch the full quotation (with line items) since the list API omits items
-      let fullQuotation = document;
-      try {
-        const res = await fetch(`/api/quotations/${document.id}`, { credentials: 'include' });
-        if (res.ok) fullQuotation = await res.json();
-      } catch (_) { /* use list-level data as fallback */ }
+    if (documentType !== 'quotation') return;
 
-      // Transform quotation to delivery order
-      doData = {
-        do_number: doNumber,
-        customer_id: fullQuotation.customer_id ?? fullQuotation.customerId,
-        order_date: new Date().toISOString().split('T')[0],
-        reference: fullQuotation.reference,
-        reference_date: fullQuotation.reference_date ?? fullQuotation.referenceDate,
-        status: 'draft',
-        currency: fullQuotation.currency,
-        tax_treatment: fullQuotation.tax_treatment ?? fullQuotation.taxTreatment,
-        tax_rate: fullQuotation.tax_rate ?? fullQuotation.taxRate,
-        subtotal: fullQuotation.subtotal ?? fullQuotation.totalAmount,
-        tax_amount: fullQuotation.tax_amount ?? fullQuotation.vatAmount,
-        total_amount: fullQuotation.total_amount ?? fullQuotation.grandTotal,
-        remarks: `Based on Quotation #${fullQuotation.quotation_number || fullQuotation.quoteNumber}\n${fullQuotation.remarks || fullQuotation.notes || ''}`.trim(),
-        items: (fullQuotation.items || []).map(item => ({ ...item })),
-        attachments: []
-      };
-    } else if (documentType === 'invoice') {
-      // Fetch the full invoice (with line items) since the list API omits items
-      let fullInvoice = document;
-      try {
-        const res = await fetch(`/api/invoices/${document.id}`, { credentials: 'include' });
-        if (res.ok) fullInvoice = await res.json();
-      } catch (_) { /* use list-level data as fallback */ }
+    // Fetch the full quotation with line items
+    let fullQuotation = document;
+    try {
+      const res = await fetch(`/api/quotations/${document.id}`, { credentials: 'include' });
+      if (res.ok) fullQuotation = await res.json();
+    } catch (_) { /* use list-level data as fallback */ }
 
-      // Transform invoice to delivery order
-      doData = {
-        do_number: doNumber,
-        customer_id: fullInvoice.customer_id ?? fullInvoice.customerId,
-        order_date: new Date().toISOString().split('T')[0],
-        reference: fullInvoice.reference,
-        reference_date: fullInvoice.reference_date ?? fullInvoice.referenceDate,
-        status: 'draft',
-        currency: fullInvoice.currency,
-        tax_treatment: fullInvoice.tax_treatment ?? fullInvoice.taxTreatment,
-        tax_rate: fullInvoice.tax_rate ?? fullInvoice.taxRate,
-        subtotal: fullInvoice.subtotal,
-        tax_amount: fullInvoice.tax_amount ?? fullInvoice.vatAmount,
-        total_amount: fullInvoice.total_amount ?? fullInvoice.amount,
-        remarks: `Based on Invoice #${fullInvoice.invoice_number || fullInvoice.invoiceNumber}\n${fullInvoice.remarks || ''}`.trim(),
-        items: (fullInvoice.items || []).map(item => ({ ...item })),
-        attachments: []
-      };
-    }
-    
+    const vatAmount = parseFloat(fullQuotation.vatAmount || fullQuotation.vat_amount || 0);
+    const taxTreatment = vatAmount > 0 ? 'StandardRated' : 'ZeroRated';
+    const taxRate = vatAmount > 0 ? 0.05 : 0;
+
+    const doData = {
+      do_number: '',
+      customer_id: fullQuotation.customerId ?? fullQuotation.customer_id,
+      order_date: new Date().toISOString().split('T')[0],
+      reference: fullQuotation.reference || '',
+      reference_date: fullQuotation.referenceDate || fullQuotation.reference_date || '',
+      status: 'draft',
+      currency: fullQuotation.currency || 'AED',
+      tax_treatment: taxTreatment,
+      tax_rate: taxRate,
+      subtotal: parseFloat(fullQuotation.totalAmount || fullQuotation.subtotal || 0),
+      tax_amount: vatAmount,
+      total_amount: parseFloat(fullQuotation.grandTotal || fullQuotation.total_amount || 0),
+      remarks: `Based on Quotation #${fullQuotation.quoteNumber || fullQuotation.quotation_number || ''}\n${fullQuotation.notes || ''}`.trim(),
+      show_remarks: false,
+      items: (fullQuotation.items || []).map(item => ({
+        product_id: item.productId ?? item.product_id ?? null,
+        brand_id: item.brandId ?? item.brand_id ?? null,
+        brand_name: item.brandName || item.brand_name || '',
+        product_code: item.productCode || item.product_code || '',
+        description: item.description || '',
+        size: item.size || '',
+        quantity: Number(item.quantity) || 1,
+        unit_price: parseFloat(item.unitPrice ?? item.unit_price ?? 0),
+        line_total: parseFloat(item.lineTotal ?? item.line_total ?? 0),
+      })),
+      attachments: []
+    };
+
     setEditingDO(doData);
     setShowCreateFromExistingDialog(false);
     setShowDOForm(true);
@@ -212,7 +182,6 @@ export default function DeliveryOrders() {
 
   const totalPages = Math.ceil(totalCount / itemsPerPage);
   const startIndex = (currentPage - 1) * itemsPerPage;
-  const endIndex = Math.min(startIndex + itemsPerPage, totalCount);
   const resetPagination = () => setCurrentPage(1);
 
   const fetchAllForExport = async () => {

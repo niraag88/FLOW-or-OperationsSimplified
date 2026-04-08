@@ -289,7 +289,7 @@ export default function DOForm({ open, onClose, editingDO, currentUser, onSucces
     }
   };
 
-  const isEditable = !editingDO || !['delivered', 'cancelled'].includes(editingDO?.status);
+  const isEditable = !['delivered', 'cancelled'].includes(formData.status);
 
   return (
     <Dialog open={open} onOpenChange={onClose}>
@@ -324,7 +324,7 @@ export default function DOForm({ open, onClose, editingDO, currentUser, onSucces
                 <SelectContent>
                   {customers.map(c => (
                     <SelectItem key={c.id} value={c.id.toString()}>
-                      {c.customer_name} ({c.type})
+                      {c.name}
                     </SelectItem>
                   ))}
                 </SelectContent>

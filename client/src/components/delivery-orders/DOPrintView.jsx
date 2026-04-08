@@ -154,7 +154,7 @@ export default function DOPrintView() {
         </div>
 
         {/* Remarks */}
-        {deliveryOrder.remarks && (
+        {deliveryOrder.show_remarks && deliveryOrder.remarks && (
           <div className="print-remarks">
             <div className="print-section-title">Remarks:</div>
             <div className="print-remarks-content" style={{whiteSpace: 'pre-line'}}>{deliveryOrder.remarks}</div>

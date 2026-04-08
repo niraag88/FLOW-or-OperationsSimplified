@@ -64,6 +64,13 @@
       "when": 1775502862675,
       "tag": "0008_salty_revanche",
       "breakpoints": true
+    },
+    {
+      "idx": 9,
+      "version": "7",
+      "when": 1775658444785,
+      "tag": "0009_rich_inhumans",
+      "breakpoints": true
     }
   ]
 }
