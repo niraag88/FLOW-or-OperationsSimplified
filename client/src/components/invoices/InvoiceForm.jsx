@@ -56,6 +56,7 @@ export default function InvoiceForm({ open, onClose, editingInvoice, currentUser
     const loadFormData = async () => {
       try {
         setLoading(true);
+        setFormData(getInitialFormData(''));
 
         const isEditing = !!(editingInvoice && editingInvoice.id);
         const isNewFromDocument = !!(editingInvoice && !editingInvoice.id);
