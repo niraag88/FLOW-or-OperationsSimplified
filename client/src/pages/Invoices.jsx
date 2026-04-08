@@ -16,6 +16,7 @@ import InvoiceList from "../components/invoices/InvoiceList";
 import InvoiceForm from "../components/invoices/InvoiceForm";
 import InvoiceFilters from "../components/invoices/InvoiceFilters";
 import CreateFromExistingDialog from "../components/invoices/CreateFromExistingDialog";
+import InvoiceQuickViewModal from "../components/invoices/InvoiceQuickViewModal";
 import { getDerivedInvoiceStatus } from "../components/invoices/invoiceUtils";
 import ExportDropdown from "../components/common/ExportDropdown";
 import { format } from "date-fns";
@@ -36,6 +37,7 @@ export default function Invoices() {
   const [dateRange, setDateRange] = useState("all");
   const [paymentStatusFilter, setPaymentStatusFilter] = useState('all');
   const [showCreateFromExistingDialog, setShowCreateFromExistingDialog] = useState(false);
+  const [quickViewInvoiceId, setQuickViewInvoiceId] = useState(null);
   const [financialYears, setFinancialYears] = useState([]);
   const [sourceQuotationId, setSourceQuotationId] = useState(null);
 
@@ -493,6 +495,7 @@ export default function Invoices() {
         currentUser={currentUser}
         onEdit={handleEditInvoice}
         onRefresh={handleRefresh}
+        onQuickView={(id) => setQuickViewInvoiceId(id)}
       />
 
       {/* Pagination Controls */}
@@ -592,6 +595,18 @@ export default function Invoices() {
         open={showCreateFromExistingDialog}
         onClose={() => setShowCreateFromExistingDialog(false)}
         onDocumentSelected={handleDocumentSelect}
+      />
+
+      {/* Invoice Quick View Modal */}
+      <InvoiceQuickViewModal
+        invoiceId={quickViewInvoiceId}
+        open={!!quickViewInvoiceId}
+        onClose={() => setQuickViewInvoiceId(null)}
+        canEdit={canEdit}
+        onEdit={(invoice) => {
+          setQuickViewInvoiceId(null);
+          handleEditInvoice(invoice);
+        }}
       />
     </div>
   );

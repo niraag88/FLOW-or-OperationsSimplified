@@ -11,7 +11,7 @@ import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover
 import InvoiceActionsDropdown from "./InvoiceActionsDropdown";
 import MarkPaidDialog from "./MarkPaidDialog";
 
-export default function InvoiceList({ invoices, totalCount, loading, canEdit, canOverride, currentUser, onEdit, onRefresh }) {
+export default function InvoiceList({ invoices, totalCount, loading, canEdit, canOverride, currentUser, onEdit, onRefresh, onQuickView }) {
   const [showEditPaymentDialog, setShowEditPaymentDialog] = useState(false);
   const [editPaymentInvoice, setEditPaymentInvoice] = useState(null);
 
@@ -135,12 +135,17 @@ export default function InvoiceList({ invoices, totalCount, loading, canEdit, ca
                   return (
                     <TableRow key={invoice.id} className="hover:bg-gray-50">
                       <TableCell className="font-medium">
-                        <span className="flex items-center gap-1">
-                          {invoice.invoiceNumber || invoice.invoice_number || '-'}
+                        <div className="flex items-center gap-1.5">
+                          <button
+                            onClick={() => onQuickView && onQuickView(invoice.id)}
+                            className="text-blue-600 hover:text-blue-800 hover:underline font-medium text-left transition-colors"
+                          >
+                            {invoice.invoiceNumber || invoice.invoice_number || '-'}
+                          </button>
                           {(invoice.scanKey || invoice.scan_key) && (
                             <Paperclip className="w-3 h-3 text-blue-500 shrink-0" title="Attachment" />
                           )}
-                        </span>
+                        </div>
                       </TableCell>
                       <TableCell>{getCustomerName(invoice)}</TableCell>
                       <TableCell>{formatShortDate(invoice.invoiceDate || invoice.invoice_date || invoice.createdAt)}</TableCell>
