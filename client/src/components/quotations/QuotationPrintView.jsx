@@ -1,18 +1,19 @@
 import React, { useState, useEffect } from 'react';
 import { format } from 'date-fns';
-import { useNavigate } from 'react-router-dom';
+import { useParams, useNavigate } from 'react-router-dom';
 import "../../styles/print.css";
 
 export default function QuotationPrintView() {
+  const { id: routeId } = useParams();
   const navigate = useNavigate();
   const [quotation, setQuotation] = useState(null);
   const [companySettings, setCompanySettings] = useState(null);
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
-    // Get Quotation ID from URL params (same pattern as POPrintView)
+    // Support both /quotations/:id/print (route param) and /quotation-print?id= (legacy query param)
     const urlParams = new URLSearchParams(window.location.search);
-    const quotationId = urlParams.get('id');
+    const quotationId = routeId || urlParams.get('id');
     
     if (!quotationId) {
       navigate('/Quotations');
@@ -48,7 +49,7 @@ export default function QuotationPrintView() {
     };
 
     loadData();
-  }, [navigate]);
+  }, [navigate, routeId]);
 
   const formatDate = (dateString) => {
     if (!dateString) return '';
