@@ -28,7 +28,7 @@ function buildStorageKey(recordType, documentNumber, file) {
   return `${recordType}/${year}/${safeName}/${Date.now()}-${origName}`;
 }
 
-export default function UploadFileDialog({ open, onClose, onSuccess, recordType, recordId, documentNumber, maxSizeMB = 25 }) {
+export default function UploadFileDialog({ open, onClose, onSuccess, recordType, recordId, documentNumber, maxSizeMB = 2 }) {
   const { toast } = useToast();
   const [selectedFile, setSelectedFile] = useState(null);
   const [uploading, setUploading] = useState(false);
@@ -110,7 +110,7 @@ export default function UploadFileDialog({ open, onClose, onSuccess, recordType,
 
   return (
     <Dialog open={open} onOpenChange={(v) => { if (!v) handleClose(); }}>
-      <DialogContent className="sm:max-w-md">
+      <DialogContent className="sm:max-w-md flex flex-col max-h-[85vh]">
         <DialogHeader>
           <DialogTitle className="flex items-center gap-2">
             <Paperclip className="w-4 h-4" />
@@ -118,7 +118,7 @@ export default function UploadFileDialog({ open, onClose, onSuccess, recordType,
           </DialogTitle>
         </DialogHeader>
 
-        <div className="space-y-4 py-2">
+        <div className="flex-1 overflow-y-auto space-y-4 py-2">
           <div
             className="border-2 border-dashed border-gray-200 rounded-lg p-6 text-center cursor-pointer hover:border-gray-400 transition-colors"
             onClick={() => inputRef.current?.click()}

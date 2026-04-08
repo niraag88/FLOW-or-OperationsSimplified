@@ -208,8 +208,8 @@ export default function InvoiceQuickViewModal({ invoiceId, open, onClose, canEdi
                       {detail.items.map((item, idx) => (
                         <TableRow key={item.id || idx}>
                           <TableCell className="text-sm text-gray-600">{item.brand_name || '—'}</TableCell>
-                          <TableCell className="text-sm font-mono text-gray-600">{item.product_code || '—'}</TableCell>
-                          <TableCell className="text-sm font-medium">{item.product_name || item.description || '—'}</TableCell>
+                          <TableCell className="text-sm text-gray-600">{item.product_code || '—'}</TableCell>
+                          <TableCell className="text-sm text-gray-600">{item.product_name || item.description || '—'}</TableCell>
                           <TableCell className="text-sm text-gray-600">{item.size || '—'}</TableCell>
                           <TableCell className="text-right text-sm">{item.quantity}</TableCell>
                           <TableCell className="text-right text-sm">
