@@ -68,73 +68,77 @@ export default function DOForm({ open, onClose, editingDO, currentUser, onSucces
     try {
       setLoading(true);
       setFormData(getInitialDOFormData());
-      const [customersData, productsData, brandsData] = await Promise.all([
-        Customer.list().catch(() => []),
-        Product.list().catch(() => []),
-        Brand.list().catch(() => [])
+
+      const isEditing = !!(editingDO && editingDO.id);
+      const isNewFromDocument = !!(editingDO && !editingDO.id);
+      const isNew = !editingDO;
+      const needsNextNumber = isNew || isNewFromDocument;
+
+      const settled = await Promise.allSettled([
+        Customer.list(),
+        Product.list(),
+        Brand.list(),
+        needsNextNumber
+          ? fetch('/api/delivery-orders/next-number', { credentials: 'include' })
+          : Promise.resolve(null),
+        isEditing
+          ? fetch(`/api/delivery-orders/${editingDO.id}`, { credentials: 'include' })
+          : Promise.resolve(null),
       ]);
 
-      setCustomers(customersData.filter(c => c.isActive !== false));
-      setProducts(productsData);
-      setBrands(brandsData.filter(b => b.isActive !== false));
+      const customersData = settled[0].status === 'fulfilled' ? (settled[0].value || []) : [];
+      const productsData  = settled[1].status === 'fulfilled' ? (settled[1].value || []) : [];
+      const brandsData    = settled[2].status === 'fulfilled' ? (settled[2].value || []) : [];
+      const nextNumResp   = settled[3].status === 'fulfilled' ? settled[3].value : null;
+      const fullDOResp    = settled[4].status === 'fulfilled' ? settled[4].value : null;
 
-      if (editingDO) {
-        if (editingDO.id) {
-          // Fetch full DO with items from API
-          try {
-            const response = await fetch(`/api/delivery-orders/${editingDO.id}`, { credentials: 'include' });
-            if (response.ok) {
-              const fullDO = await response.json();
-              const customer = customersData.find(c => c.id === fullDO.customer_id);
-              setSelectedCustomer(customer);
-              setFormData(normalizeDoData({
-                ...getInitialDOFormData(),
-                ...fullDO,
-                items: fullDO.items || []
-              }));
-            } else {
-              // Fallback to passed data
-              const customer = customersData.find(c => c.id === editingDO.customer_id);
-              setSelectedCustomer(customer);
-              setFormData(normalizeDoData({ ...editingDO, items: editingDO.items || [] }));
-            }
-          } catch (err) {
-            console.error('Error fetching DO:', err);
-            const customer = customersData.find(c => c.id === editingDO.customer_id);
-            setSelectedCustomer(customer);
-            setFormData(normalizeDoData({ ...editingDO, items: editingDO.items || [] }));
-          }
-        } else {
-          // New DO created from existing document — fetch real next DO number
-          const customer = customersData.find(c => c.id === editingDO.customer_id);
-          setSelectedCustomer(customer);
-          setFormData(normalizeDoData({ ...editingDO, items: editingDO.items || [] }));
-          // Overwrite the client-generated placeholder number with the real server sequence
-          fetch('/api/delivery-orders/next-number', { credentials: 'include' })
-            .then(r => r.json())
-            .then(({ nextNumber }) => {
-              setFormData(prev => ({ ...prev, do_number: nextNumber }));
-            })
-            .catch(err => console.error('Error fetching next DO number:', err));
-        }
-      } else {
-        // Generate DO number for new DO - use timestamp as fallback
-        const timestamp = Date.now().toString().slice(-6);
-        setFormData(prev => ({ 
-          ...prev, 
-          do_number: `DO-${timestamp}` 
+      const filteredCustomers = customersData.filter(c => c.isActive !== false);
+      const filteredBrands    = brandsData.filter(b => b.isActive !== false);
+
+      setCustomers(filteredCustomers);
+      setProducts(productsData);
+      setBrands(filteredBrands);
+
+      let nextNumber = '';
+      if (needsNextNumber && nextNumResp && nextNumResp.ok) {
+        try {
+          const data = await nextNumResp.json();
+          nextNumber = data.nextNumber || '';
+        } catch {}
+      }
+
+      if (isNew) {
+        setFormData(prev => ({ ...prev, do_number: nextNumber }));
+      } else if (isNewFromDocument) {
+        // New DO created from existing document — customer_id already validated by handleDocumentSelect
+        const customer = filteredCustomers.find(c => c.id === editingDO.customer_id);
+        setSelectedCustomer(customer || null);
+        setFormData(normalizeDoData({
+          ...getInitialDOFormData(),
+          ...editingDO,
+          do_number: nextNumber,
+          items: editingDO.items || [],
         }));
-        
-        // Fetch next DO number from backend and update
-        fetch('/api/delivery-orders/next-number')
-          .then(response => response.json())
-          .then(({ nextNumber }) => {
-            setFormData(prev => ({ ...prev, do_number: nextNumber }));
-          })
-          .catch(error => {
-            console.error('Error fetching next DO number:', error);
-            // Keep the timestamp fallback
-          });
+      } else {
+        // Editing an existing DO — fetch full DO data
+        let full = null;
+        if (fullDOResp && fullDOResp.ok) {
+          try { full = await fullDOResp.json(); } catch {}
+        }
+        if (full) {
+          const customer = filteredCustomers.find(c => c.id === full.customer_id);
+          setSelectedCustomer(customer || null);
+          setFormData(normalizeDoData({
+            ...getInitialDOFormData(),
+            ...full,
+            items: full.items || []
+          }));
+        } else {
+          // Fallback to passed data
+          const customer = filteredCustomers.find(c => c.id === editingDO.customer_id);
+          setSelectedCustomer(customer || null);
+          setFormData(normalizeDoData({ ...getInitialDOFormData(), ...editingDO, items: editingDO.items || [] }));
+        }
       }
     } catch (error) {
       console.error("Error loading data:", error);

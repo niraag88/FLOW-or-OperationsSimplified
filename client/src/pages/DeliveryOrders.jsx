@@ -131,12 +131,26 @@ export default function DeliveryOrders() {
   const handleDocumentSelect = async (document, documentType) => {
     if (documentType !== 'quotation') return;
 
-    // Fetch the full quotation with line items
+    // Fetch the full quotation with line items, and the live customer list in parallel
     let fullQuotation = document;
+    let availableCustomers = [];
     try {
-      const res = await fetch(`/api/quotations/${document.id}`, { credentials: 'include' });
-      if (res.ok) fullQuotation = await res.json();
-    } catch (_) { /* use list-level data as fallback */ }
+      const [quotRes, customersData] = await Promise.all([
+        fetch(`/api/quotations/${document.id}`, { credentials: 'include' }),
+        Customer.list().catch(() => []),
+      ]);
+      if (quotRes.ok) fullQuotation = await quotRes.json();
+      availableCustomers = customersData;
+    } catch (_) { /* use list-level data and empty customer list as fallback */ }
+
+    // Validate the customer ID against the live customer list (mirrors Invoices.jsx pattern)
+    const rawCustomerId = fullQuotation.customerId ?? fullQuotation.customer_id ?? null;
+    const validCustomer = rawCustomerId != null
+      ? availableCustomers.find(c => c.id === rawCustomerId)
+      : null;
+    if (rawCustomerId != null && !validCustomer) {
+      console.warn(`⚠️ DO handleDocumentSelect: Customer ID ${rawCustomerId} not found in customer list.`);
+    }
 
     const vatAmount = parseFloat(fullQuotation.vatAmount || fullQuotation.vat_amount || 0);
     const taxTreatment = vatAmount > 0 ? 'StandardRated' : 'ZeroRated';
@@ -144,7 +158,7 @@ export default function DeliveryOrders() {
 
     const doData = {
       do_number: '',
-      customer_id: fullQuotation.customerId ?? fullQuotation.customer_id,
+      customer_id: validCustomer ? rawCustomerId : null,
       order_date: new Date().toISOString().split('T')[0],
       reference: fullQuotation.reference || '',
       reference_date: fullQuotation.referenceDate ? String(fullQuotation.referenceDate).split('T')[0] : (fullQuotation.reference_date || ''),
