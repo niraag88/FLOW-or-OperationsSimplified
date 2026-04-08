@@ -215,7 +215,7 @@ export default function InvoicePrintView() {
         {invoice.remarks && (
           <div className="print-remarks-section">
             <div className="supplier-title">REMARKS</div>
-            <div style={{fontSize: '11px', color: '#333', marginTop: '5px'}}>
+            <div style={{fontSize: '11px', color: '#333', marginTop: '5px', whiteSpace: 'pre-line'}}>
               {invoice.remarks}
             </div>
           </div>

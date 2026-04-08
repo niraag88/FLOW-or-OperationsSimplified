@@ -226,7 +226,7 @@ export default function QuotationPrintView() {
         {quotation.notes && quotation.showRemarks && (
           <div className="print-remarks-section">
             <div className="supplier-title">REMARKS</div>
-            <div style={{fontSize: '11px', color: '#333', marginTop: '5px'}}>
+            <div style={{fontSize: '11px', color: '#333', marginTop: '5px', whiteSpace: 'pre-line'}}>
               {quotation.notes}
             </div>
           </div>
