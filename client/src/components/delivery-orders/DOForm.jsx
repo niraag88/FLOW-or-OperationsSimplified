@@ -62,11 +62,12 @@ export default function DOForm({ open, onClose, editingDO, currentUser, onSucces
     if (open) {
       loadData();
     }
-  }, [open]);
+  }, [open, editingDO]);
 
   const loadData = async () => {
     try {
       setLoading(true);
+      setFormData(getInitialDOFormData());
       const [customersData, productsData, brandsData] = await Promise.all([
         Customer.list().catch(() => []),
         Product.list().catch(() => []),
@@ -399,7 +400,7 @@ export default function DOForm({ open, onClose, editingDO, currentUser, onSucces
                       <div className="space-y-2">
                         <Label>Brand</Label>
                         <Select 
-                          value={item.brand_id || ''} 
+                          value={item.brand_id ? String(item.brand_id) : ''} 
                           onValueChange={(v) => updateItem(index, 'brand_id', v)} 
                           disabled={!isEditable}
                         >
@@ -417,7 +418,7 @@ export default function DOForm({ open, onClose, editingDO, currentUser, onSucces
                       <div className="space-y-2">
                         <Label>Product</Label>
                         <Select 
-                          value={item.product_id || ''} 
+                          value={item.product_id ? String(item.product_id) : ''} 
                           onValueChange={(v) => updateItem(index, 'product_id', v)} 
                           disabled={!isEditable || !item.brand_id}
                         >
@@ -438,14 +439,7 @@ export default function DOForm({ open, onClose, editingDO, currentUser, onSucces
                       </div>
 
                       <div className="space-y-2">
-                        <div className="flex items-center gap-2">
-                          <Label>Description</Label>
-                          {item.size && (
-                            <span className="text-xs text-gray-500 bg-gray-100 px-1.5 py-0.5 rounded">
-                              {item.size}
-                            </span>
-                          )}
-                        </div>
+                        <Label>Description</Label>
                         <Input 
                           value={item.description} 
                           onChange={(e) => updateItem(index, 'description', e.target.value)} 

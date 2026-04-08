@@ -147,7 +147,7 @@ export default function DeliveryOrders() {
       customer_id: fullQuotation.customerId ?? fullQuotation.customer_id,
       order_date: new Date().toISOString().split('T')[0],
       reference: fullQuotation.reference || '',
-      reference_date: fullQuotation.referenceDate || fullQuotation.reference_date || '',
+      reference_date: fullQuotation.referenceDate ? String(fullQuotation.referenceDate).split('T')[0] : (fullQuotation.reference_date || ''),
       status: 'draft',
       currency: fullQuotation.currency || 'AED',
       tax_treatment: taxTreatment,
