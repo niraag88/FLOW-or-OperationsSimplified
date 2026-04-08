@@ -460,7 +460,8 @@ export const exportDeliveryOrderToXLSX = async (deliveryOrder) => {
     exportData.push(['Reference:', deliveryOrder.reference || '', '', '', '', '', '']);
     exportData.push(['Reference Date:', fmtShort(deliveryOrder.reference_date), '', '', '', '', '']);
     exportData.push(['Currency:', deliveryOrder.currency || 'AED', '', '', '', '', '']);
-    exportData.push(['Status:', deliveryOrder.status || '', '', '', '', '', '']);
+    const doStatusLabel = deliveryOrder.status?.toLowerCase() === 'submitted' ? 'Confirmed' : deliveryOrder.status ? deliveryOrder.status.charAt(0).toUpperCase() + deliveryOrder.status.slice(1) : '';
+    exportData.push(['Status:', doStatusLabel, '', '', '', '', '']);
     
     exportData.push([]); // Empty row
     

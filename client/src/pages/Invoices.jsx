@@ -325,12 +325,16 @@ export default function Invoices() {
         setSourceQuotationId(document.id);
       }
 
-      // For delivery orders, fetch the complete data with line items (list API omits items)
+      // For delivery orders: only fetch from API if the passed document lacks items
+      // (the CreateFromExistingDialog already fetches the full DO and may have adjusted quantities)
       if (documentType === 'delivery_order') {
-        const response = await fetch(`/api/delivery-orders/${document.id}`, { credentials: 'include' });
-        if (response.ok) {
-          fullDocument = await response.json();
+        if (!document.items || document.items.length === 0) {
+          const response = await fetch(`/api/delivery-orders/${document.id}`, { credentials: 'include' });
+          if (response.ok) {
+            fullDocument = await response.json();
+          }
         }
+        // If document already has items (from partial-quantity adjustment), use it as-is
       }
       
       // Load current dropdown data for validation and mapping
