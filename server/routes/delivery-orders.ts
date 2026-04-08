@@ -123,6 +123,10 @@ export function registerDeliveryOrderRoutes(app: Express) {
         show_remarks: doRecord.showRemarks || false,
         tax_rate: taxRt,
         tax_treatment: (() => {
+          // Prefer the persisted value; fall back to derivation for older records
+          if (doRecord.taxTreatment === 'StandardRated' || doRecord.taxTreatment === 'ZeroRated') {
+            return doRecord.taxTreatment;
+          }
           if (taxAmt > 0) return 'StandardRated';
           const localTreatments = ['Local', 'standard', 'Standard', 'local'];
           return localTreatments.includes(doRecord.customerVatTreatment || '') ? 'StandardRated' : 'ZeroRated';
