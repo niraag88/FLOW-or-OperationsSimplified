@@ -8,7 +8,7 @@ import { Skeleton } from "@/components/ui/skeleton";
 import { format, isValid, parseISO } from "date-fns";
 import DOActionsDropdown from "./DOActionsDropdown";
 
-export default function DOList({ deliveryOrders, totalCount, loading, canEdit, currentUser, onEdit, onRefresh }) {
+export default function DOList({ deliveryOrders, totalCount, loading, canEdit, currentUser, onEdit, onRefresh, onQuickView }) {
   const getCustomerName = (doOrder) => {
     return doOrder.customer_name || doOrder.customerName || 'Unknown Customer';
   };
@@ -30,6 +30,12 @@ export default function DOList({ deliveryOrders, totalCount, loading, canEdit, c
       case 'delivered': return 'bg-green-100 text-green-800';
       default: return 'bg-gray-100 text-gray-800';
     }
+  };
+
+  const getStatusLabel = (status) => {
+    if (!status) return '';
+    if (status.toLowerCase() === 'submitted') return 'CONFIRMED';
+    return status.replace(/_/g, ' ').toUpperCase();
   };
 
   const formatCurrency = (amount, currency = 'AED') => {
@@ -98,7 +104,12 @@ export default function DOList({ deliveryOrders, totalCount, loading, canEdit, c
                 <TableRow key={doOrder.id} className="hover:bg-gray-50">
                   <TableCell className="font-medium">
                     <span className="flex items-center gap-1">
-                      {doOrder.do_number}
+                      <button
+                        onClick={() => onQuickView && onQuickView(doOrder.id)}
+                        className="text-blue-600 hover:text-blue-800 hover:underline font-medium text-sm text-left"
+                      >
+                        {doOrder.do_number}
+                      </button>
                       {(doOrder.scanKey || doOrder.scan_key) && (
                         <Paperclip className="w-3 h-3 text-blue-500 shrink-0" title="Attachment" />
                       )}
@@ -118,7 +129,7 @@ export default function DOList({ deliveryOrders, totalCount, loading, canEdit, c
                   </TableCell>
                   <TableCell>
                     <Badge className={`${getStatusColor(doOrder.status)} border`}>
-                      {doOrder.status?.replace(/_/g, ' ').toUpperCase()}
+                      {getStatusLabel(doOrder.status)}
                     </Badge>
                   </TableCell>
                   <TableCell>

@@ -29,7 +29,11 @@ export default function DOFilters({ selectedStatuses, setSelectedStatuses, selec
                           selectedTaxTreatments.length > 0 || dateRange !== "all";
 
   // Get unique values
-  const uniqueStatuses = ['draft', 'submitted', 'delivered'];
+  const uniqueStatuses = [
+    { value: 'draft', label: 'Draft' },
+    { value: 'submitted', label: 'Confirmed' },
+    { value: 'delivered', label: 'Delivered' },
+  ];
   const uniqueTaxTreatments = [
     { value: 'StandardRated', label: 'Standard Rated (5%)' },
     { value: 'ZeroRated', label: 'Zero Rated (0%)' },
@@ -80,25 +84,25 @@ export default function DOFilters({ selectedStatuses, setSelectedStatuses, selec
             <div className="space-y-3">
               <h4 className="font-medium leading-none">Select Status</h4>
               <div className="space-y-2 max-h-60 overflow-y-auto">
-                {uniqueStatuses.map(status => (
-                  <div key={status} className="flex items-center space-x-2">
+                {uniqueStatuses.map(({ value, label }) => (
+                  <div key={value} className="flex items-center space-x-2">
                     <Checkbox
-                      id={`do-status-${status}`}
-                      checked={selectedStatuses.includes(status)}
+                      id={`do-status-${value}`}
+                      checked={selectedStatuses.includes(value)}
                       onCheckedChange={(checked) => {
                         if (checked) {
-                          setSelectedStatuses(prev => [...prev, status]);
+                          setSelectedStatuses(prev => [...prev, value]);
                         } else {
-                          setSelectedStatuses(prev => prev.filter(s => s !== status));
+                          setSelectedStatuses(prev => prev.filter(s => s !== value));
                         }
                         resetPagination();
                       }}
                     />
                     <label
-                      htmlFor={`do-status-${status}`}
-                      className="text-sm leading-none peer-disabled:cursor-not-allowed peer-disabled:opacity-70 cursor-pointer capitalize"
+                      htmlFor={`do-status-${value}`}
+                      className="text-sm leading-none peer-disabled:cursor-not-allowed peer-disabled:opacity-70 cursor-pointer"
                     >
-                      {status}
+                      {label}
                     </label>
                   </div>
                 ))}
@@ -263,18 +267,21 @@ export default function DOFilters({ selectedStatuses, setSelectedStatuses, selec
       {/* Active filter badges */}
       {(selectedStatuses.length > 0 || selectedCustomers.length > 0 || selectedTaxTreatments.length > 0) && (
         <div className="flex flex-wrap gap-2">
-          {selectedStatuses.map(status => (
-            <Badge key={status} variant="secondary" className="gap-1">
-              Status: {status}
-              <X 
-                className="h-3 w-3 cursor-pointer" 
-                onClick={() => {
-                  setSelectedStatuses(prev => prev.filter(s => s !== status));
-                  resetPagination();
-                }}
-              />
-            </Badge>
-          ))}
+          {selectedStatuses.map(status => {
+            const statusOption = uniqueStatuses.find(s => s.value === status);
+            return (
+              <Badge key={status} variant="secondary" className="gap-1">
+                Status: {statusOption ? statusOption.label : status}
+                <X 
+                  className="h-3 w-3 cursor-pointer" 
+                  onClick={() => {
+                    setSelectedStatuses(prev => prev.filter(s => s !== status));
+                    resetPagination();
+                  }}
+                />
+              </Badge>
+            );
+          })}
           {selectedCustomers.map(customerId => {
             const customer = customers.find(c => c.id === customerId);
             return (

@@ -328,7 +328,7 @@ export default function DOForm({ open, onClose, editingDO, currentUser, onSucces
                 </SelectTrigger>
                 <SelectContent>
                   <SelectItem value="draft">Draft</SelectItem>
-                  <SelectItem value="submitted">Submitted</SelectItem>
+                  <SelectItem value="submitted">Confirmed</SelectItem>
                   <SelectItem value="delivered">Delivered</SelectItem>
                 </SelectContent>
               </Select>

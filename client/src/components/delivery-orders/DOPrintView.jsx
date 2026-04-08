@@ -100,7 +100,7 @@ export default function DOPrintView() {
               <div><span className="print-label">Customer:</span> {deliveryOrder.customer_name}</div>
               {deliveryOrder.reference && <div><span className="print-label">Reference:</span> {deliveryOrder.reference}</div>}
               {deliveryOrder.reference_date && <div><span className="print-label">Reference Date:</span> {formatDate(deliveryOrder.reference_date)}</div>}
-              <div><span className="print-label">Status:</span> {deliveryOrder.status?.replace(/_/g, ' ').toUpperCase()}</div>
+              <div><span className="print-label">Status:</span> {deliveryOrder.status?.toLowerCase() === 'submitted' ? 'CONFIRMED' : deliveryOrder.status?.replace(/_/g, ' ').toUpperCase()}</div>
             </div>
           </div>
         </div>

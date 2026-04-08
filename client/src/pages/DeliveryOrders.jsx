@@ -16,6 +16,7 @@ import { User } from "@/api/entities";
 import DOList from "../components/delivery-orders/DOList";
 import DOForm from "../components/delivery-orders/DOForm";
 import DOFilters from "../components/delivery-orders/DOFilters";
+import DOQuickViewModal from "../components/delivery-orders/DOQuickViewModal";
 import CreateFromExistingDialog from "../components/delivery-orders/CreateFromExistingDialog";
 import ExportDropdown from "../components/common/ExportDropdown";
 
@@ -37,6 +38,7 @@ export default function DeliveryOrders() {
   const [dateRange, setDateRange] = useState("all");
   const [showCreateFromExistingDialog, setShowCreateFromExistingDialog] = useState(false);
   const [financialYears, setFinancialYears] = useState([]);
+  const [quickViewDoId, setQuickViewDoId] = useState(null);
 
   // Pagination state
   const [currentPage, setCurrentPage] = useState(1);
@@ -257,7 +259,7 @@ export default function DeliveryOrders() {
               customer_name: 'Customer',
               order_date: { label: 'Order Date', transform: (date) => date ? format(new Date(date), 'dd/MM/yy') : '' },
               reference: 'Reference',
-              status: 'Status',
+              status: { label: 'Status', transform: (val) => val?.toLowerCase() === 'submitted' ? 'Confirmed' : val ? val.charAt(0).toUpperCase() + val.slice(1) : '' },
               subtotal: { label: 'Subtotal (AED)', transform: (val) => `${val || 0}` },
               tax_amount: { label: 'VAT (AED)', transform: (val) => `${val || 0}` },
               total_amount: { label: 'Total (AED)', transform: (val) => `${val || 0}` }
@@ -321,6 +323,7 @@ export default function DeliveryOrders() {
         currentUser={currentUser}
         onEdit={handleEditDO}
         onRefresh={handleRefresh}
+        onQuickView={(id) => setQuickViewDoId(id)}
       />
 
       {/* Pagination Controls */}
@@ -404,6 +407,18 @@ export default function DeliveryOrders() {
           </div>
         </div>
       )}
+
+      {/* DO Quick View Modal */}
+      <DOQuickViewModal
+        doId={quickViewDoId}
+        open={!!quickViewDoId}
+        onClose={() => setQuickViewDoId(null)}
+        canEdit={canEdit}
+        onEdit={(doData) => {
+          setQuickViewDoId(null);
+          handleEditDO(doData);
+        }}
+      />
 
       {/* DO Form Modal */}
       <DOForm
