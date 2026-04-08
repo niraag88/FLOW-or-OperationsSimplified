@@ -20,6 +20,16 @@ import { Customer } from "@/api/entities";
 import { Brand } from "@/api/entities";
 import { Card } from "@/components/ui/card";
 
+const toNum = (v) => parseFloat(v) || 0;
+
+const normalizeDoData = (data) => ({
+  ...data,
+  subtotal: toNum(data.subtotal),
+  tax_amount: toNum(data.tax_amount),
+  total_amount: toNum(data.total_amount),
+  tax_rate: toNum(data.tax_rate) || 0.05,
+});
+
 const getInitialDOFormData = () => ({
   do_number: "",
   customer_id: "",
@@ -76,28 +86,28 @@ export default function DOForm({ open, onClose, editingDO, currentUser, onSucces
               const fullDO = await response.json();
               const customer = customersData.find(c => c.id === fullDO.customer_id);
               setSelectedCustomer(customer);
-              setFormData({
+              setFormData(normalizeDoData({
                 ...getInitialDOFormData(),
                 ...fullDO,
                 items: fullDO.items || []
-              });
+              }));
             } else {
               // Fallback to passed data
               const customer = customersData.find(c => c.id === editingDO.customer_id);
               setSelectedCustomer(customer);
-              setFormData({ ...editingDO, items: editingDO.items || [] });
+              setFormData(normalizeDoData({ ...editingDO, items: editingDO.items || [] }));
             }
           } catch (err) {
             console.error('Error fetching DO:', err);
             const customer = customersData.find(c => c.id === editingDO.customer_id);
             setSelectedCustomer(customer);
-            setFormData({ ...editingDO, items: editingDO.items || [] });
+            setFormData(normalizeDoData({ ...editingDO, items: editingDO.items || [] }));
           }
         } else {
           // New DO created from existing document — fetch real next DO number
           const customer = customersData.find(c => c.id === editingDO.customer_id);
           setSelectedCustomer(customer);
-          setFormData({ ...editingDO, items: editingDO.items || [] });
+          setFormData(normalizeDoData({ ...editingDO, items: editingDO.items || [] }));
           // Overwrite the client-generated placeholder number with the real server sequence
           fetch('/api/delivery-orders/next-number', { credentials: 'include' })
             .then(r => r.json())
