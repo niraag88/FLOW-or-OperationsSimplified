@@ -67,9 +67,16 @@ export function registerDeliveryOrderRoutes(app: Express) {
         currency: deliveryOrders.currency,
         notes: deliveryOrders.notes,
         taxRate: deliveryOrders.taxRate,
+        taxTreatment: deliveryOrders.taxTreatment,
         status: deliveryOrders.status,
         companySnapshot: deliveryOrders.companySnapshot,
+        scanKey: deliveryOrders.scanKey,
         customerVatTreatment: customers.vatTreatment,
+        customerEmail: customers.email,
+        customerPhone: customers.phone,
+        customerBillingAddress: customers.billingAddress,
+        customerContactPerson: customers.contactPerson,
+        customerVatNumber: customers.vatNumber,
       }).from(deliveryOrders)
         .leftJoin(customers, eq(customers.id, deliveryOrders.customerId))
         .where(eq(deliveryOrders.id, id));
@@ -122,7 +129,15 @@ export function registerDeliveryOrderRoutes(app: Express) {
         })(),
         status: doRecord.status,
         company_snapshot: doRecord.companySnapshot || null,
-        attachments: [],
+        scan_key: doRecord.scanKey || null,
+        customer: {
+          name: doRecord.customerName,
+          email: doRecord.customerEmail || null,
+          phone: doRecord.customerPhone || null,
+          address: doRecord.customerBillingAddress || null,
+          contact_name: doRecord.customerContactPerson || null,
+          trn_number: doRecord.customerVatNumber || null,
+        },
         items: lineItems.map(item => ({
           id: item.id,
           product_id: item.productId,
