@@ -8,7 +8,7 @@ import { Skeleton } from "@/components/ui/skeleton";
 import { format, isValid, parseISO } from "date-fns";
 import QuotationActionsDropdown from "./QuotationActionsDropdown";
 
-export default function QuotationList({ quotations, totalCount, loading, canEdit, canCreate, canOverride, currentUser, onEdit, onRefresh }) {
+export default function QuotationList({ quotations, totalCount, loading, canEdit, canCreate, canOverride, currentUser, onEdit, onRefresh, onQuickView }) {
   const getCustomerName = (quotation) => {
     return quotation.customerName || quotation.customer_name || 'Unknown Customer';
   };
@@ -112,7 +112,14 @@ export default function QuotationList({ quotations, totalCount, loading, canEdit
               <TableBody>
                 {quotations.map((quotation) => (
                   <TableRow key={quotation.id} className="hover:bg-gray-50">
-                    <TableCell className="font-medium">{quotation.quoteNumber}</TableCell>
+                    <TableCell className="font-medium">
+                      <button
+                        onClick={() => onQuickView && onQuickView(quotation.id)}
+                        className="text-blue-600 hover:text-blue-800 hover:underline font-medium text-left transition-colors"
+                      >
+                        {quotation.quoteNumber}
+                      </button>
+                    </TableCell>
                     <TableCell>{getCustomerName(quotation)}</TableCell>
                     <TableCell>{formatDate(quotation.quoteDate)}</TableCell>
                     <TableCell>{quotation.reference || '-'}</TableCell>

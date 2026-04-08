@@ -16,6 +16,7 @@ import QuotationList from "../components/quotations/QuotationList";
 import QuotationForm from "../components/quotations/QuotationForm";
 import QuotationFilters from "../components/quotations/QuotationFilters";
 import ExportDropdown from "../components/common/ExportDropdown";
+import QuotationQuickViewModal from "../components/quotations/QuotationQuickViewModal";
 
 
 const STALE_3MIN = 3 * 60 * 1000;
@@ -31,6 +32,7 @@ export default function Quotations() {
   const [selectedCustomers, setSelectedCustomers] = useState([]);
   const [dateRange, setDateRange] = useState("all");
   const [financialYears, setFinancialYears] = useState([]);
+  const [quickViewQuotationId, setQuickViewQuotationId] = useState(null);
 
   // Pagination state
   const [currentPage, setCurrentPage] = useState(1);
@@ -251,6 +253,7 @@ export default function Quotations() {
         currentUser={currentUser}
         onEdit={handleEditQuotation}
         onRefresh={handleRefresh}
+        onQuickView={(id) => setQuickViewQuotationId(id)}
       />
 
       {/* Pagination Controls */}
@@ -345,6 +348,19 @@ export default function Quotations() {
         preloadedCustomers={customers}
         preloadedProducts={products}
         preloadedBrands={brands}
+      />
+
+      {/* Quotation Quick View Modal */}
+      <QuotationQuickViewModal
+        quotationId={quickViewQuotationId}
+        open={!!quickViewQuotationId}
+        onClose={() => setQuickViewQuotationId(null)}
+        canEdit={canEdit}
+        canOverride={canOverride}
+        onEdit={(quotation) => {
+          setQuickViewQuotationId(null);
+          handleEditQuotation(quotation);
+        }}
       />
     </div>
   );
