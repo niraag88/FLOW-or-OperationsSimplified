@@ -320,6 +320,13 @@ export function registerInvoiceRoutes(app: Express) {
         invoiceNumber: invoices.invoiceNumber,
       }).from(invoices).where(eq(invoices.id, id));
 
+      if (!existingInvoice) {
+        return res.status(404).json({ error: 'Invoice not found' });
+      }
+      if (existingInvoice.status === 'cancelled') {
+        return res.status(409).json({ error: 'Cannot edit a cancelled invoice' });
+      }
+
       const newStatus = body.status || 'draft';
       const becomingDelivered = newStatus === 'delivered' && existingInvoice?.status !== 'delivered';
       const needsStockDeduction = becomingDelivered && !existingInvoice?.stockDeducted;
@@ -440,6 +447,13 @@ export function registerInvoiceRoutes(app: Express) {
       const { paymentStatus, paymentReceivedDate, paymentRemarks } = req.body;
       if (!paymentStatus || !['outstanding', 'paid'].includes(paymentStatus)) {
         return res.status(400).json({ error: 'paymentStatus must be "outstanding" or "paid"' });
+      }
+      const [existingForPayment] = await db.select({ status: invoices.status }).from(invoices).where(eq(invoices.id, id));
+      if (!existingForPayment) {
+        return res.status(404).json({ error: 'Invoice not found' });
+      }
+      if (existingForPayment.status === 'cancelled') {
+        return res.status(409).json({ error: 'Cannot update payment on a cancelled invoice' });
       }
       if (paymentStatus === 'paid' && !paymentReceivedDate) {
         return res.status(400).json({ error: 'paymentReceivedDate is required when marking as paid' });
