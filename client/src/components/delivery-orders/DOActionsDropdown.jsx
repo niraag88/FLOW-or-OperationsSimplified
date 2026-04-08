@@ -130,6 +130,7 @@ export default function DOActionsDropdown({ doOrder, canEdit, onEdit, onRefresh,
 
   const hasScanKey = !!(doOrder.scanKey || doOrder.scan_key);
   const doNumber = doOrder.do_number || doOrder.orderNumber || `do-${doOrder.id}`;
+  const canDelete = ['Admin', 'Manager'].includes(currentUser?.role);
 
   return (
     <>
@@ -174,14 +175,18 @@ export default function DOActionsDropdown({ doOrder, canEdit, onEdit, onRefresh,
               </DropdownMenuItem>
             </>
           )}
-          <DropdownMenuSeparator />
-          <DropdownMenuItem 
-            onClick={() => setShowDeleteDialog(true)}
-            className="text-red-600 focus:text-red-600"
-          >
-            <Trash2 className="w-4 h-4 mr-2" />
-            Delete
-          </DropdownMenuItem>
+          {canDelete && (
+            <>
+              <DropdownMenuSeparator />
+              <DropdownMenuItem 
+                onClick={() => setShowDeleteDialog(true)}
+                className="text-red-600 focus:text-red-600"
+              >
+                <Trash2 className="w-4 h-4 mr-2" />
+                Delete
+              </DropdownMenuItem>
+            </>
+          )}
         </DropdownMenuContent>
       </DropdownMenu>
 

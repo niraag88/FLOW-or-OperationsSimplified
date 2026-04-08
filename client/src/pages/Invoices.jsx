@@ -301,6 +301,7 @@ export default function Invoices() {
         brand_name: item.brandName || item.brand_name || '',
         product_code: item.productCode || item.product_code || '',
         description: item.description || '',
+        size: item.size || item.productSize || '',
         quantity: parseInt(item.quantity) || 0,
         unit_price: parseFloat(item.unitPrice || item.unit_price) || 0,
         line_total: parseFloat(item.lineTotal || item.line_total) || 0
@@ -316,12 +317,20 @@ export default function Invoices() {
       
       // For quotations, fetch the complete data with line items
       if (documentType === 'quotation') {
-        const response = await fetch(`/api/quotations/${document.id}`);
+        const response = await fetch(`/api/quotations/${document.id}`, { credentials: 'include' });
         if (response.ok) {
           fullDocument = await response.json();
         }
         // Track source quotation so we can mark it 'converted' after save
         setSourceQuotationId(document.id);
+      }
+
+      // For delivery orders, fetch the complete data with line items (list API omits items)
+      if (documentType === 'delivery_order') {
+        const response = await fetch(`/api/delivery-orders/${document.id}`, { credentials: 'include' });
+        if (response.ok) {
+          fullDocument = await response.json();
+        }
       }
       
       // Load current dropdown data for validation and mapping

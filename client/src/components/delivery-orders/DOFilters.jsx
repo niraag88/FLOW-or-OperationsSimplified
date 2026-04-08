@@ -29,8 +29,11 @@ export default function DOFilters({ selectedStatuses, setSelectedStatuses, selec
                           selectedTaxTreatments.length > 0 || dateRange !== "all";
 
   // Get unique values
-  const uniqueStatuses = ['draft', 'confirmed', 'shipped', 'delivered'];
-  const uniqueTaxTreatments = ['standard', 'exempt', 'reverse_charge'];
+  const uniqueStatuses = ['draft', 'submitted', 'delivered'];
+  const uniqueTaxTreatments = [
+    { value: 'StandardRated', label: 'Standard Rated (5%)' },
+    { value: 'ZeroRated', label: 'Zero Rated (0%)' },
+  ];
 
   const handleDateRangeChange = (value) => {
     if (value !== 'custom') {
@@ -155,25 +158,25 @@ export default function DOFilters({ selectedStatuses, setSelectedStatuses, selec
             <div className="space-y-3">
               <h4 className="font-medium leading-none">Select Tax Treatment</h4>
               <div className="space-y-2 max-h-60 overflow-y-auto">
-                {uniqueTaxTreatments.map(treatment => (
-                  <div key={treatment} className="flex items-center space-x-2">
+                {uniqueTaxTreatments.map(({ value, label }) => (
+                  <div key={value} className="flex items-center space-x-2">
                     <Checkbox
-                      id={`do-tax-${treatment}`}
-                      checked={selectedTaxTreatments.includes(treatment)}
+                      id={`do-tax-${value}`}
+                      checked={selectedTaxTreatments.includes(value)}
                       onCheckedChange={(checked) => {
                         if (checked) {
-                          setSelectedTaxTreatments(prev => [...prev, treatment]);
+                          setSelectedTaxTreatments(prev => [...prev, value]);
                         } else {
-                          setSelectedTaxTreatments(prev => prev.filter(t => t !== treatment));
+                          setSelectedTaxTreatments(prev => prev.filter(t => t !== value));
                         }
                         resetPagination();
                       }}
                     />
                     <label
-                      htmlFor={`do-tax-${treatment}`}
-                      className="text-sm leading-none peer-disabled:cursor-not-allowed peer-disabled:opacity-70 cursor-pointer capitalize"
+                      htmlFor={`do-tax-${value}`}
+                      className="text-sm leading-none peer-disabled:cursor-not-allowed peer-disabled:opacity-70 cursor-pointer"
                     >
-                      {treatment.replace('_', ' ')}
+                      {label}
                     </label>
                   </div>
                 ))}
@@ -287,18 +290,21 @@ export default function DOFilters({ selectedStatuses, setSelectedStatuses, selec
               </Badge>
             );
           })}
-          {selectedTaxTreatments.map(treatment => (
-            <Badge key={treatment} variant="secondary" className="gap-1">
-              Tax: {treatment.replace('_', ' ')}
-              <X 
-                className="h-3 w-3 cursor-pointer" 
-                onClick={() => {
-                  setSelectedTaxTreatments(prev => prev.filter(t => t !== treatment));
-                  resetPagination();
-                }}
-              />
-            </Badge>
-          ))}
+          {selectedTaxTreatments.map(treatment => {
+            const taxOption = uniqueTaxTreatments.find(t => t.value === treatment);
+            return (
+              <Badge key={treatment} variant="secondary" className="gap-1">
+                Tax: {taxOption ? taxOption.label : treatment}
+                <X 
+                  className="h-3 w-3 cursor-pointer" 
+                  onClick={() => {
+                    setSelectedTaxTreatments(prev => prev.filter(t => t !== treatment));
+                    resetPagination();
+                  }}
+                />
+              </Badge>
+            );
+          })}
         </div>
       )}
     </>
