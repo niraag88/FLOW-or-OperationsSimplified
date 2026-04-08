@@ -51,108 +51,100 @@ export default function InvoiceForm({ open, onClose, editingInvoice, currentUser
   const [formData, setFormData] = useState(getInitialFormData());
 
   useEffect(() => {
-    // Effect to load dropdown data (customers, etc.) when the dialog opens
-    const loadDropdownData = async () => {
+    if (!open) return;
+
+    const loadFormData = async () => {
       try {
         setLoading(true);
-        const [customersData, productsData, brandsData] = await Promise.all([
-          Customer.list().catch(() => []),
-          Product.list().catch(() => []),
-          Brand.list().catch(() => [])
+
+        const isEditing = !!(editingInvoice && editingInvoice.id);
+        const isNewFromDocument = !!(editingInvoice && !editingInvoice.id);
+        const isNew = !editingInvoice;
+        const needsNextNumber = isNew || isNewFromDocument;
+
+        const settled = await Promise.allSettled([
+          Customer.list(),
+          Product.list(),
+          Brand.list(),
+          needsNextNumber
+            ? fetch('/api/invoices/next-number', { credentials: 'include' })
+            : Promise.resolve(null),
+          isEditing
+            ? fetch(`/api/invoices/${editingInvoice.id}`, { credentials: 'include' })
+            : Promise.resolve(null),
         ]);
-        setCustomers(customersData.filter(c => c.isActive !== false));
+
+        const customersData = settled[0].status === 'fulfilled' ? (settled[0].value || []) : [];
+        const productsData  = settled[1].status === 'fulfilled' ? (settled[1].value || []) : [];
+        const brandsData    = settled[2].status === 'fulfilled' ? (settled[2].value || []) : [];
+        const nextNumResp   = settled[3].status === 'fulfilled' ? settled[3].value : null;
+        const fullInvResp   = settled[4].status === 'fulfilled' ? settled[4].value : null;
+
+        const filteredCustomers = customersData.filter(c => c.isActive !== false);
+        const filteredBrands    = brandsData.filter(b => b.isActive !== false);
+
+        setCustomers(filteredCustomers);
         setProducts(productsData);
-        setBrands(brandsData.filter(b => b.isActive !== false));
+        setBrands(filteredBrands);
+
+        let nextNumber = '';
+        if (needsNextNumber && nextNumResp && nextNumResp.ok) {
+          try {
+            const data = await nextNumResp.json();
+            nextNumber = data.nextNumber || '';
+          } catch {}
+        }
+
+        if (isNew) {
+          setFormData(getInitialFormData(nextNumber));
+        } else if (isNewFromDocument) {
+          setFormData({
+            ...getInitialFormData(),
+            ...editingInvoice,
+            invoice_number: nextNumber,
+            status: 'draft',
+            invoice_date: new Date().toISOString().split('T')[0],
+            items: editingInvoice.items || [],
+            attachments: editingInvoice.attachments || [],
+          });
+        } else {
+          let full = null;
+          if (fullInvResp && fullInvResp.ok) {
+            try { full = await fullInvResp.json(); } catch {}
+          }
+          if (full) {
+            let resolvedCustomerId = full.customer_id;
+            if (!resolvedCustomerId && full.customer_name && filteredCustomers.length > 0) {
+              const matched = filteredCustomers.find(c =>
+                c.name?.trim().toLowerCase() === full.customer_name?.trim().toLowerCase()
+              );
+              if (matched) resolvedCustomerId = matched.id;
+            }
+            setFormData({
+              ...getInitialFormData(),
+              ...full,
+              customer_id: resolvedCustomerId || full.customer_id || null,
+              status: (full.status && full.status !== 'draft') ? 'submitted' : (full.status || 'draft'),
+            });
+          } else {
+            setFormData({
+              ...getInitialFormData(),
+              ...editingInvoice,
+              items: editingInvoice.items || [],
+              attachments: editingInvoice.attachments || [],
+            });
+          }
+        }
       } catch (error) {
-        console.error("Error loading form data:", error);
-        toast({ title: "Error", description: "Failed to load required data.", variant: "destructive" });
+        console.error('Error loading invoice form data:', error);
+        toast({ title: 'Error', description: 'Failed to load required data.', variant: 'destructive' });
       } finally {
         setLoading(false);
       }
     };
-    if (open) {
-      loadDropdownData();
-    }
-  }, [open, toast]);
 
-  useEffect(() => {
-    // Effect to populate form data based on whether we are editing, creating new, or creating from existing
-    if (open) {
-      if (editingInvoice) {
-        // Covers both editing an existing invoice and creating one from a quotation/DO
-        let dataToSet = {
-          ...getInitialFormData(),
-          ...editingInvoice,
-          items: editingInvoice.items || [],
-          attachments: editingInvoice.attachments || [],
-        };
-        
-        // If it's a new invoice from a document, it won't have an ID. Set defaults.
-        if (!editingInvoice.id) {
-          // Set default values first
-          dataToSet.status = 'draft';
-          dataToSet.invoice_date = new Date().toISOString().split('T')[0];
-          
-          // Use timestamp as fallback, we'll fetch proper number asynchronously
-          const timestamp = Date.now().toString().slice(-6);
-          dataToSet.invoice_number = `INV-${timestamp}`;
-          
-          // Fetch next invoice number from backend and update
-          fetch('/api/invoices/next-number')
-            .then(response => response.json())
-            .then(({ nextNumber }) => {
-              setFormData(prev => ({ ...prev, invoice_number: nextNumber }));
-            })
-            .catch(error => {
-              console.error('Error fetching next invoice number:', error);
-            });
-          setFormData(dataToSet);
-        } else {
-          // Fetch full invoice with items from API
-          fetch(`/api/invoices/${editingInvoice.id}`, { credentials: 'include' })
-            .then(r => r.json())
-            .then(full => {
-              // If customer_id is missing but customer_name is set, resolve it by name
-              let resolvedCustomerId = full.customer_id;
-              if (!resolvedCustomerId && full.customer_name && customers.length > 0) {
-                const matched = customers.find(c =>
-                  c.name?.trim().toLowerCase() === full.customer_name?.trim().toLowerCase()
-                );
-                if (matched) resolvedCustomerId = matched.id;
-              }
-              const merged = {
-                ...getInitialFormData(),
-                ...full,
-                customer_id: resolvedCustomerId || full.customer_id || null,
-                status: (full.status && full.status !== 'draft') ? 'submitted' : (full.status || 'draft'),
-              };
-              setFormData(merged);
-            })
-            .catch(err => {
-              console.error('Error fetching invoice:', err);
-              setFormData(dataToSet);
-            });
-          return; // wait for async fetch
-        }
-      } else {
-        // Creating a completely new blank invoice
-        // Set initial form data with timestamp fallback
-        const timestamp = Date.now().toString().slice(-6);
-        setFormData(getInitialFormData(`INV-${timestamp}`));
-        
-        // Fetch next invoice number from backend and update
-        fetch('/api/invoices/next-number')
-          .then(response => response.json())
-          .then(({ nextNumber }) => {
-            setFormData(prev => ({ ...prev, invoice_number: nextNumber }));
-          })
-          .catch(error => {
-            console.error('Error fetching next invoice number:', error);
-            // Keep the timestamp fallback
-          });
-      }
-    }
-  }, [open, editingInvoice, customers, brands, products]);
+    loadFormData();
+  }, [open, editingInvoice]);
 
   useEffect(() => {
     // Effect to update the selected customer object whenever the customer_id in formData changes
