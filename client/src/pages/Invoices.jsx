@@ -603,6 +603,7 @@ export default function Invoices() {
         open={!!quickViewInvoiceId}
         onClose={() => setQuickViewInvoiceId(null)}
         canEdit={canEdit}
+        canOverride={canOverride}
         onEdit={(invoice) => {
           setQuickViewInvoiceId(null);
           handleEditInvoice(invoice);

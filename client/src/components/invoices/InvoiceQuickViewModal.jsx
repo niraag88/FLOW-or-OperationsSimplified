@@ -46,7 +46,7 @@ function DocLink({ label, scanKey, onView }) {
   );
 }
 
-export default function InvoiceQuickViewModal({ invoiceId, open, onClose, canEdit, onEdit }) {
+export default function InvoiceQuickViewModal({ invoiceId, open, onClose, canEdit, canOverride, onEdit }) {
   const [detail, setDetail] = useState(null);
   const [loading, setLoading] = useState(false);
   const { toast } = useToast();
@@ -101,7 +101,8 @@ export default function InvoiceQuickViewModal({ invoiceId, open, onClose, canEdi
   };
 
   const isCancelled = detail?.status === 'cancelled';
-  const ps = detail?.paymentStatus || detail?.payment_status || 'outstanding';
+  const ps = detail?.payment_status || 'outstanding';
+  const canActOnInvoice = canEdit && !isCancelled && (canOverride || ['draft', 'submitted'].includes(detail?.status || ''));
   const subtotal = detail?.subtotal ?? 0;
   const vatAmount = detail?.tax_amount ?? 0;
   const totalAmount = detail?.total_amount ?? 0;
@@ -229,7 +230,7 @@ export default function InvoiceQuickViewModal({ invoiceId, open, onClose, canEdi
                       <span className="w-28 text-right">{formatCurrency(subtotal, 'AED')}</span>
                     </div>
                     <div className="flex justify-end gap-6 text-sm text-gray-600">
-                      <span>VAT ({vatAmount > 0 && subtotal > 0 ? `${(vatAmount / subtotal * 100).toFixed(0)}%` : '5%'})</span>
+                      <span>VAT ({detail.tax_rate != null ? `${(detail.tax_rate * 100).toFixed(0)}%` : vatAmount > 0 && subtotal > 0 ? `${(vatAmount / subtotal * 100).toFixed(0)}%` : '0%'})</span>
                       <span className="w-28 text-right">{formatCurrency(vatAmount, 'AED')}</span>
                     </div>
                     <div className="flex justify-end gap-6 text-sm font-bold border-t border-gray-200 pt-1.5 mt-1">
@@ -301,7 +302,7 @@ export default function InvoiceQuickViewModal({ invoiceId, open, onClose, canEdi
         {/* ── Footer Actions ── */}
         {!loading && detail && (
           <div className="flex items-center justify-end gap-2 pt-4 border-t mt-2">
-            {canEdit && !isCancelled && (
+            {canActOnInvoice && (
               <Button variant="outline" size="sm" onClick={handleEdit}>
                 <Edit2 className="w-3.5 h-3.5 mr-1.5" />
                 Edit
