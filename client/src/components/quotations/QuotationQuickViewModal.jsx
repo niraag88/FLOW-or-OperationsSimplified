@@ -84,7 +84,7 @@ export default function QuotationQuickViewModal({ quotationId, open, onClose, ca
     ? `${(vatAmount / subtotal * 100).toFixed(0)}%`
     : detail?.items?.[0]?.vatRate != null
       ? `${(parseFloat(detail.items[0].vatRate) * 100).toFixed(0)}%`
-      : '5%';
+      : '0%';
 
   return (
     <Dialog open={open} onOpenChange={(v) => !v && onClose()}>
