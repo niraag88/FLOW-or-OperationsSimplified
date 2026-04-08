@@ -45,7 +45,6 @@ const getInitialDOFormData = () => ({
   total_amount: 0,
   remarks: "",
   show_remarks: false,
-  attachments: [],
   items: []
 });
 
@@ -476,7 +475,7 @@ export default function DOForm({ open, onClose, editingDO, currentUser, onSucces
                       <div className="space-y-2">
                         <Label>Total</Label>
                         <div className="flex items-center gap-2">
-                          <span className="font-medium">{(item.line_total || 0).toFixed(2)} AED</span>
+                          <span className="font-medium">AED {(item.line_total || 0).toFixed(2)}</span>
                           {isEditable && (
                             <Button 
                               type="button" 
@@ -501,17 +500,17 @@ export default function DOForm({ open, onClose, editingDO, currentUser, onSucces
             <div className="space-y-2 max-w-sm ml-auto">
               <div className="flex justify-between">
                 <span className="text-gray-600">Subtotal:</span>
-                <span className="font-semibold">{formData.subtotal.toFixed(2)} AED</span>
+                <span className="font-semibold">AED {formData.subtotal.toFixed(2)}</span>
               </div>
               {formData.tax_amount > 0 && (
                 <div className="flex justify-between">
                   <span className="text-gray-600">VAT ({(formData.tax_rate * 100).toFixed(1)}%):</span>
-                  <span className="font-semibold">{formData.tax_amount.toFixed(2)} AED</span>
+                  <span className="font-semibold">AED {formData.tax_amount.toFixed(2)}</span>
                 </div>
               )}
               <div className="flex justify-between border-t pt-2">
                 <span className="font-bold">Total:</span>
-                <span className="font-bold text-amber-600">{formData.total_amount.toFixed(2)} AED</span>
+                <span className="font-bold text-amber-600">AED {formData.total_amount.toFixed(2)}</span>
               </div>
             </div>
           </div>

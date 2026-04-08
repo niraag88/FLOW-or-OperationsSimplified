@@ -141,7 +141,7 @@ export default function DOFilters({ selectedStatuses, setSelectedStatuses, selec
                       htmlFor={`do-customer-${customer.id}`}
                       className="text-sm leading-none peer-disabled:cursor-not-allowed peer-disabled:opacity-70 cursor-pointer"
                     >
-                      {customer.customer_name}
+                      {customer.name}
                     </label>
                   </div>
                 ))}
@@ -286,7 +286,7 @@ export default function DOFilters({ selectedStatuses, setSelectedStatuses, selec
             const customer = customers.find(c => c.id === customerId);
             return (
               <Badge key={customerId} variant="secondary" className="gap-1">
-                Customer: {customer?.customer_name}
+                Customer: {customer?.name}
                 <X 
                   className="h-3 w-3 cursor-pointer" 
                   onClick={() => {

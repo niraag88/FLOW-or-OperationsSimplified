@@ -182,7 +182,6 @@ export default function DeliveryOrders() {
         unit_price: parseFloat(item.unitPrice ?? item.unit_price ?? 0),
         line_total: parseFloat(item.lineTotal ?? item.line_total ?? 0),
       })),
-      attachments: []
     };
 
     setEditingDO(doData);
