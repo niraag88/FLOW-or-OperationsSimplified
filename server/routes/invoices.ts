@@ -132,6 +132,9 @@ export function registerInvoiceRoutes(app: Express) {
         object_key: invoice.objectKey || null,
         scan_key: invoice.scanKey || null,
         payment_method: invoice.paymentMethod || null,
+        payment_status: invoice.paymentStatus || 'outstanding',
+        payment_received_date: invoice.paymentReceivedDate ? String(invoice.paymentReceivedDate).split('T')[0] : null,
+        payment_remarks: invoice.paymentRemarks || null,
         attachments: [],
         customer: invoice.customerId ? {
           contact_name: invoice.customerContactPerson || '',
