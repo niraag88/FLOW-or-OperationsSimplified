@@ -242,7 +242,7 @@ export default function DeliveryOrders() {
               customer_name: 'Customer',
               order_date: { label: 'Order Date', transform: (date) => date ? format(new Date(date), 'dd/MM/yy') : '' },
               reference: 'Reference',
-              status: { label: 'Status', transform: (val) => val?.toLowerCase() === 'submitted' ? 'Confirmed' : val ? val.charAt(0).toUpperCase() + val.slice(1) : '' },
+              status: { label: 'Status', transform: (val) => val?.toLowerCase() === 'submitted' ? 'Submitted' : val ? val.charAt(0).toUpperCase() + val.slice(1) : '' },
               subtotal: { label: 'Subtotal (AED)', transform: (val) => `${val || 0}` },
               tax_amount: { label: 'VAT (AED)', transform: (val) => `${val || 0}` },
               total_amount: { label: 'Total (AED)', transform: (val) => `${val || 0}` }

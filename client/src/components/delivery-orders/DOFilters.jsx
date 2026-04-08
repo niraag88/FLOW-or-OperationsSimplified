@@ -31,7 +31,7 @@ export default function DOFilters({ selectedStatuses, setSelectedStatuses, selec
   // Get unique values
   const uniqueStatuses = [
     { value: 'draft', label: 'Draft' },
-    { value: 'submitted', label: 'Confirmed' },
+    { value: 'submitted', label: 'Submitted' },
     { value: 'delivered', label: 'Delivered' },
   ];
   const uniqueTaxTreatments = [

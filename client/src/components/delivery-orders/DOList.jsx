@@ -34,7 +34,7 @@ export default function DOList({ deliveryOrders, totalCount, loading, canEdit, c
 
   const getStatusLabel = (status) => {
     if (!status) return '';
-    if (status.toLowerCase() === 'submitted') return 'CONFIRMED';
+    if (status.toLowerCase() === 'submitted') return 'SUBMITTED';
     return status.replace(/_/g, ' ').toUpperCase();
   };
 

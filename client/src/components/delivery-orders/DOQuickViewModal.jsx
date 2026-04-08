@@ -20,7 +20,7 @@ const STATUS_COLORS = {
 
 const STATUS_LABELS = {
   draft: "DRAFT",
-  submitted: "CONFIRMED",
+  submitted: "SUBMITTED",
   delivered: "DELIVERED",
   cancelled: "CANCELLED",
 };
