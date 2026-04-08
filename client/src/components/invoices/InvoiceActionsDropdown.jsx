@@ -8,7 +8,7 @@ import {
   DropdownMenuSeparator,
 } from "@/components/ui/dropdown-menu";
 import { Button } from "@/components/ui/button";
-import { MoreHorizontal, Edit2, Download, Trash2, Eye, Upload, Paperclip, X, CheckCircle, RotateCcw } from "lucide-react";
+import { MoreHorizontal, Edit2, Download, Trash2, Eye, Upload, Paperclip, X, CheckCircle, RotateCcw, Ban } from "lucide-react";
 import { useToast } from "@/components/ui/use-toast";
 import { exportInvoiceToXLSX } from "../utils/export";
 import { format } from 'date-fns';
@@ -23,6 +23,9 @@ export default function InvoiceActionsDropdown({ invoice, canEdit, onEdit, onRef
   const [showMarkPaidDialog, setShowMarkPaidDialog] = useState(false);
   const [showUploadDialog, setShowUploadDialog] = useState(false);
   const [showRemoveFileDialog, setShowRemoveFileDialog] = useState(false);
+  const [showCancelDialog, setShowCancelDialog] = useState(false);
+
+  const isCancelled = invoice.status === 'cancelled';
 
   const handleExportXLSX = async () => {
     try {
@@ -66,6 +69,32 @@ export default function InvoiceActionsDropdown({ invoice, canEdit, onEdit, onRef
         title: 'Delete Failed',
         description: 'Failed to delete the invoice. Please try again.',
         variant: 'destructive'
+      });
+    }
+  };
+
+  const handleCancelInvoice = async () => {
+    try {
+      const res = await fetch(`/api/invoices/${invoice.id}/cancel`, {
+        method: 'PATCH',
+        credentials: 'include',
+      });
+      if (!res.ok) {
+        const data = await res.json().catch(() => ({}));
+        throw new Error(data.error || 'Failed to cancel invoice');
+      }
+      toast({
+        title: 'Invoice Cancelled',
+        description: `Invoice ${invoiceNumber} has been cancelled.`,
+      });
+      setShowCancelDialog(false);
+      onRefresh();
+    } catch (error) {
+      console.error('Error cancelling invoice:', error);
+      toast({
+        title: 'Cancellation Failed',
+        description: error.message || 'Failed to cancel the invoice. Please try again.',
+        variant: 'destructive',
       });
     }
   };
@@ -159,7 +188,7 @@ export default function InvoiceActionsDropdown({ invoice, canEdit, onEdit, onRef
           </Button>
         </DropdownMenuTrigger>
         <DropdownMenuContent align="end">
-          {canEdit && (
+          {canEdit && !isCancelled && (
             <DropdownMenuItem onClick={() => onEdit(invoice)}>
               <Edit2 className="w-4 h-4 mr-2" />
               Edit
@@ -173,18 +202,24 @@ export default function InvoiceActionsDropdown({ invoice, canEdit, onEdit, onRef
             <Download className="w-4 h-4 mr-2" />
             Export to XLSX
           </DropdownMenuItem>
-          <DropdownMenuSeparator />
-          {invoice.paymentStatus !== 'paid' && invoice.payment_status !== 'paid' ? (
-            <DropdownMenuItem onClick={() => setShowMarkPaidDialog(true)} className="text-green-700 focus:text-green-700">
-              <CheckCircle className="w-4 h-4 mr-2" />
-              Mark as Paid
-            </DropdownMenuItem>
-          ) : (
-            <DropdownMenuItem onClick={handleMarkOutstanding} className="text-amber-700 focus:text-amber-700">
-              <RotateCcw className="w-4 h-4 mr-2" />
-              Mark as Outstanding
-            </DropdownMenuItem>
+
+          {!isCancelled && (
+            <>
+              <DropdownMenuSeparator />
+              {invoice.paymentStatus !== 'paid' && invoice.payment_status !== 'paid' ? (
+                <DropdownMenuItem onClick={() => setShowMarkPaidDialog(true)} className="text-green-700 focus:text-green-700">
+                  <CheckCircle className="w-4 h-4 mr-2" />
+                  Mark as Paid
+                </DropdownMenuItem>
+              ) : (
+                <DropdownMenuItem onClick={handleMarkOutstanding} className="text-amber-700 focus:text-amber-700">
+                  <RotateCcw className="w-4 h-4 mr-2" />
+                  Mark as Outstanding
+                </DropdownMenuItem>
+              )}
+            </>
           )}
+
           <DropdownMenuSeparator />
           <DropdownMenuItem onClick={() => setShowUploadDialog(true)}>
             <Upload className="w-4 h-4 mr-2" />
@@ -205,7 +240,17 @@ export default function InvoiceActionsDropdown({ invoice, canEdit, onEdit, onRef
               </DropdownMenuItem>
             </>
           )}
+
           <DropdownMenuSeparator />
+          {canEdit && !isCancelled && (
+            <DropdownMenuItem
+              onClick={() => setShowCancelDialog(true)}
+              className="text-orange-700 focus:text-orange-700"
+            >
+              <Ban className="w-4 h-4 mr-2" />
+              Cancel Invoice
+            </DropdownMenuItem>
+          )}
           <DropdownMenuItem 
             onClick={() => setShowDeleteDialog(true)}
             className="text-red-600 focus:text-red-600"
@@ -238,6 +283,15 @@ export default function InvoiceActionsDropdown({ invoice, canEdit, onEdit, onRef
         title="Remove Attachment"
         description={`Remove the uploaded file from Invoice "${invoiceNumber}"? The file will be permanently deleted.`}
         confirmText="Yes, Remove"
+        confirmVariant="destructive"
+      />
+      <SimpleConfirmDialog
+        open={showCancelDialog}
+        onClose={() => setShowCancelDialog(false)}
+        onConfirm={handleCancelInvoice}
+        title="Cancel Invoice"
+        description={`Are you sure you want to cancel Invoice "${invoiceNumber}"? This cannot be undone. The invoice will remain on record but will be marked as cancelled.`}
+        confirmText="Yes, Cancel Invoice"
         confirmVariant="destructive"
       />
       <UploadFileDialog

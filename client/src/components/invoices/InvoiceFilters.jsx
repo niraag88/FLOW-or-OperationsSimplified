@@ -28,7 +28,7 @@ export default function InvoiceFilters({ selectedStatuses, setSelectedStatuses, 
                           dateRange !== "all" ||
                           (paymentStatusFilter && paymentStatusFilter !== 'all');
 
-  const uniqueStatuses = ['draft', 'submitted', 'delivered'];
+  const uniqueStatuses = ['draft', 'submitted', 'delivered', 'cancelled'];
 
   const handleDateRangeChange = (value) => {
     if (value !== 'custom') {

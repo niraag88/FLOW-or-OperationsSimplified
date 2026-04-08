@@ -508,6 +508,64 @@ export function registerInvoiceRoutes(app: Express) {
     }
   });
 
+  app.patch('/api/invoices/:id/cancel', requireAuth(['Admin', 'Manager', 'Staff']), async (req: AuthenticatedRequest, res) => {
+    try {
+      const id = parseInt(req.params.id);
+
+      const [invoice] = await db.select({
+        id: invoices.id,
+        invoiceNumber: invoices.invoiceNumber,
+        status: invoices.status,
+        stockDeducted: invoices.stockDeducted,
+      }).from(invoices).where(eq(invoices.id, id));
+
+      if (!invoice) {
+        return res.status(404).json({ error: 'Invoice not found' });
+      }
+      if (invoice.status === 'cancelled') {
+        return res.status(409).json({ error: 'Invoice is already cancelled' });
+      }
+
+      await db.transaction(async (tx) => {
+        await tx.update(invoices).set({ status: 'cancelled' }).where(eq(invoices.id, id));
+
+        if (invoice.stockDeducted) {
+          const items = await tx.select().from(invoiceLineItems).where(eq(invoiceLineItems.invoiceId, id));
+          for (const item of items) {
+            if (!item.productId) continue;
+            await updateProductStock(
+              item.productId,
+              item.quantity,
+              'cancellation',
+              id,
+              'invoice',
+              parseFloat(item.unitPrice.toString()),
+              `Stock reversed — Invoice #${invoice.invoiceNumber} cancelled`,
+              req.user!.id,
+              tx
+            );
+          }
+          await tx.update(invoices).set({ stockDeducted: false }).where(eq(invoices.id, id));
+        }
+      });
+
+      writeAuditLog({
+        actor: req.user!.id,
+        actorName: req.user?.username || String(req.user!.id),
+        targetId: String(id),
+        targetType: 'invoice',
+        action: 'UPDATE',
+        details: `Invoice #${invoice.invoiceNumber} cancelled${invoice.stockDeducted ? ' — stock reversed' : ''}`,
+      });
+
+      const [updated] = await db.select().from(invoices).where(eq(invoices.id, id));
+      res.json(updated);
+    } catch (error) {
+      console.error('Error cancelling invoice:', error);
+      res.status(500).json({ error: 'Failed to cancel invoice' });
+    }
+  });
+
   app.delete('/api/invoices/:id', requireAuth(['Admin', 'Manager']), async (req: AuthenticatedRequest, res) => {
     try {
       const id = parseInt(req.params.id);

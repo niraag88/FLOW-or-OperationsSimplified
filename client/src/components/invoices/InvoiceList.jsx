@@ -45,6 +45,7 @@ export default function InvoiceList({ invoices, totalCount, loading, canEdit, ca
       case 'submitted':
       case 'sent': return 'bg-blue-100 text-blue-800';
       case 'delivered': return 'bg-green-100 text-green-800';
+      case 'cancelled': return 'bg-red-100 text-red-800';
       default: return 'bg-gray-100 text-gray-800';
     }
   };
@@ -125,6 +126,7 @@ export default function InvoiceList({ invoices, totalCount, loading, canEdit, ca
               </TableHeader>
               <TableBody>
                 {invoices.map((invoice) => {
+                  const isCancelled = invoice.status === 'cancelled';
                   const ps = invoice.paymentStatus || invoice.payment_status || 'outstanding';
                   const paidDate = invoice.paymentReceivedDate || invoice.payment_received_date;
                   const remarks = invoice.paymentRemarks || invoice.payment_remarks;
@@ -166,7 +168,9 @@ export default function InvoiceList({ invoices, totalCount, loading, canEdit, ca
                         </Badge>
                       </TableCell>
                       <TableCell>
-                        {ps === 'paid' ? (
+                        {isCancelled ? (
+                          <span className="text-gray-400">—</span>
+                        ) : ps === 'paid' ? (
                           <div className="flex items-center gap-1.5">
                             <Popover>
                               <PopoverTrigger asChild>
