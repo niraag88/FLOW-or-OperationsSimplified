@@ -56,7 +56,10 @@ export default function InvoiceQuickViewModal({ invoiceId, open, onClose, canEdi
     setDetail(null);
     setLoading(true);
     fetch(`/api/invoices/${invoiceId}`, { credentials: "include" })
-      .then((r) => r.json())
+      .then((r) => {
+        if (!r.ok) throw new Error(`HTTP ${r.status}`);
+        return r.json();
+      })
       .then((data) => setDetail(data))
       .catch(() => toast({ title: "Error", description: "Could not load invoice details.", variant: "destructive" }))
       .finally(() => setLoading(false));
@@ -191,23 +194,22 @@ export default function InvoiceQuickViewModal({ invoiceId, open, onClose, canEdi
                   <Table>
                     <TableHeader>
                       <TableRow className="bg-gray-50">
-                        <TableHead>Product</TableHead>
-                        <TableHead className="w-20 text-right">Qty</TableHead>
-                        <TableHead className="w-32 text-right">Unit Price (AED)</TableHead>
-                        <TableHead className="w-32 text-right">Line Total (AED)</TableHead>
+                        <TableHead className="w-28">Brand</TableHead>
+                        <TableHead className="w-24">Code</TableHead>
+                        <TableHead>Description</TableHead>
+                        <TableHead className="w-20">Size</TableHead>
+                        <TableHead className="w-14 text-right">Qty</TableHead>
+                        <TableHead className="w-28 text-right">Unit Price (AED)</TableHead>
+                        <TableHead className="w-28 text-right">Line Total (AED)</TableHead>
                       </TableRow>
                     </TableHeader>
                     <TableBody>
                       {detail.items.map((item, idx) => (
                         <TableRow key={item.id || idx}>
-                          <TableCell>
-                            <div className="font-medium text-sm">{item.product_name || item.description || '—'}</div>
-                            {item.brand_name && <div className="text-xs text-gray-500">{item.brand_name}</div>}
-                            {item.size && <div className="text-xs text-gray-400">{item.size}</div>}
-                            {item.product_code && (
-                              <div className="text-xs text-gray-400 font-mono">{item.product_code}</div>
-                            )}
-                          </TableCell>
+                          <TableCell className="text-sm text-gray-600">{item.brand_name || '—'}</TableCell>
+                          <TableCell className="text-sm font-mono text-gray-600">{item.product_code || '—'}</TableCell>
+                          <TableCell className="text-sm font-medium">{item.product_name || item.description || '—'}</TableCell>
+                          <TableCell className="text-sm text-gray-600">{item.size || '—'}</TableCell>
                           <TableCell className="text-right text-sm">{item.quantity}</TableCell>
                           <TableCell className="text-right text-sm">
                             {parseFloat(item.unit_price || 0).toFixed(2)}
