@@ -585,6 +585,7 @@ export function registerSystemRoutes(app: Express) {
       const success = !!(dbResult?.success && manifestResult?.success);
       try {
         await db.insert(backupRuns).values({
+          ranAt: startedAt,
           finishedAt: new Date(),
           triggeredBy: req.user!.id,
           success,

@@ -83,9 +83,9 @@ export function registerSettingsRoutes(app: Express) {
 
       let storageFilesDeleted = 0;
       for (const obj of oldExports) {
-        // Only purge export-type files (xlsx, csv, pdf) — not permanent business documents (scans, logos)
+        // Only purge files under the exports/ prefix to avoid deleting permanent business documents
         const key = obj.key.toLowerCase();
-        if (key.endsWith('.xlsx') || key.endsWith('.csv') || (key.endsWith('.pdf') && key.startsWith('exports/'))) {
+        if (key.startsWith('exports/') && (key.endsWith('.xlsx') || key.endsWith('.csv') || key.endsWith('.pdf'))) {
           try {
             await objectStorageClient.delete(obj.key);
           } catch {
