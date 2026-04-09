@@ -1,5 +1,5 @@
 import React, { useState, useMemo, useCallback } from "react";
-import { createPortal } from "react-dom";
+import { useQuery } from "@tanstack/react-query";
 import { format } from "date-fns";
 import { Card, CardContent } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
@@ -141,166 +141,296 @@ function EntityCombobox({ items, value, onValueChange, placeholder = "Select…"
   );
 }
 
-/* ── print portal CSS ───────────────────────────────────────────────────── */
+/* ── HTML escape helper for print window ────────────────────────────────── */
 
-const PORTAL_PRINT_CSS = `
-  @media print {
-    body > *:not(#__stmt_print_portal) { display: none !important; }
-    body > #__stmt_print_portal {
-      display: block !important;
-      position: fixed;
-      top: 0; left: 0;
-      width: 100%;
-      z-index: 99999;
-      background: white;
-      padding: 30px;
-      box-sizing: border-box;
-      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
-      font-size: 11px;
-      color: #000;
-    }
-  }
-`;
+function esc(s) {
+  return String(s == null ? "" : s)
+    .replace(/&/g, "&amp;")
+    .replace(/</g, "&lt;")
+    .replace(/>/g, "&gt;")
+    .replace(/"/g, "&quot;");
+}
+
+/* ── buildStatementHtml — plain HTML string for window.open print ────────── */
+
+function buildStatementHtml({ type, entity, companySettings, records, dateFrom, dateTo, statusFilter }) {
+  const totalAed = records.reduce((s, r) => s + (r._aed || 0), 0);
+  const paidAed  = records.filter((r) => r._paymentStatus === "paid").reduce((s, r) => s + (r._aed || 0), 0);
+  const outAed   = records.filter((r) => r._paymentStatus !== "paid").reduce((s, r) => s + (r._aed || 0), 0);
+
+  const entityName    = entity?.name || "—";
+  const entityAddress = type === "invoices" ? (entity?.billingAddress || entity?.address || "") : "";
+  const entityTrn     = type === "invoices" ? (entity?.vatNumber || "") : "";
+  const entityPhone   = type === "invoices" ? (entity?.phone || "") : (entity?.contactPhone || "");
+  const entityEmail   = type === "invoices" ? (entity?.email || "") : (entity?.contactEmail || "");
+  const entityContact = entity?.contactPerson || "";
+  const entityWebsite = type === "pos" ? (entity?.website || "") : "";
+
+  const periodFrom  = dateFrom ? fmtDate(dateFrom, true) : null;
+  const periodTo    = dateTo   ? fmtDate(dateTo, true)   : null;
+  const period      = periodFrom || periodTo ? `${periodFrom || "start"} – ${periodTo || "present"}` : "All time";
+  const statusLabel = statusFilter === "all" ? "All" : statusFilter === "paid" ? "Paid" : "Outstanding";
+  const today       = format(new Date(), "dd/MM/yyyy");
+
+  const logoHtml = companySettings?.logo
+    ? `<img src="${esc(companySettings.logo)}" style="max-height:56px;max-width:150px;object-fit:contain" alt="Logo">`
+    : "<div></div>";
+
+  const thStyle  = "padding:6px 8px;font-weight:bold;color:#064e3b;text-align:left;";
+  const thR      = "padding:6px 8px;font-weight:bold;color:#064e3b;text-align:right;";
+  const thC      = "padding:6px 8px;font-weight:bold;color:#064e3b;text-align:center;";
+  const tdStyle  = "padding:5px 8px;border-bottom:1px solid #f3f4f6;";
+  const tdR      = "padding:5px 8px;border-bottom:1px solid #f3f4f6;text-align:right;";
+  const tdC      = "padding:5px 8px;border-bottom:1px solid #f3f4f6;text-align:center;";
+
+  const headerRow = type === "invoices"
+    ? `<th style="${thStyle}">Invoice #</th><th style="${thC}">Date</th><th style="${thR}">Subtotal</th><th style="${thR}">VAT</th><th style="${thR}">Total (AED)</th><th style="${thC}">Status</th><th style="${thC}">Received</th>`
+    : `<th style="${thStyle}">PO #</th><th style="${thC}">Date</th><th style="${thR}">Amount (Orig)</th><th style="${thR}">Amount (AED)</th><th style="${thC}">Status</th><th style="${thC}">Payment Date</th>`;
+
+  const dataRows = records.length === 0
+    ? `<tr><td colspan="8" style="text-align:center;padding:16px;color:#9ca3af">No records</td></tr>`
+    : records.map((r, i) => {
+        const statusBg    = r._paymentStatus === "paid" ? "#dcfce7" : "#fef3c7";
+        const statusColor = r._paymentStatus === "paid" ? "#166534" : "#92400e";
+        const statusText  = r._paymentStatus === "paid" ? "Paid" : "Outstanding";
+        const badge       = `<span style="background:${statusBg};color:${statusColor};padding:2px 7px;border-radius:4px;font-size:9px;font-weight:600">${statusText}</span>`;
+        if (type === "invoices") {
+          return `<tr>
+            <td style="${tdC}">${i + 1}</td>
+            <td style="${tdStyle}color:#1d4ed8;font-weight:500">${esc(r._ref)}</td>
+            <td style="${tdC}">${esc(fmtDate(r._date))}</td>
+            <td style="${tdR}">AED ${esc(fmt(r._subtotal))}</td>
+            <td style="${tdR}">AED ${esc(fmt(r._vat))}</td>
+            <td style="${tdR}font-weight:600">AED ${esc(fmt(r._aed))}</td>
+            <td style="${tdC}">${badge}</td>
+            <td style="${tdC}">${esc(fmtDate(r._paymentDate))}</td>
+          </tr>`;
+        }
+        return `<tr>
+          <td style="${tdC}">${i + 1}</td>
+          <td style="${tdStyle}color:#7e22ce;font-weight:500">${esc(r._ref)}</td>
+          <td style="${tdC}">${esc(fmtDate(r._date))}</td>
+          <td style="${tdR}">${esc(r._currency)} ${esc(fmt(r._origAmount))}</td>
+          <td style="${tdR}font-weight:600">AED ${esc(fmt(r._aed))}</td>
+          <td style="${tdC}">${badge}</td>
+          <td style="${tdC}">${esc(fmtDate(r._paymentDate))}</td>
+        </tr>`;
+      }).join("");
+
+  return `<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>Statement of Account</title>
+<style>
+  @page { size: A4 portrait; margin: 15mm 15mm 20mm 15mm; }
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  body { font-family: Arial, Helvetica, sans-serif; font-size: 11px; color: #000; background: #fff; }
+  .header { display:flex; justify-content:space-between; align-items:flex-start; border-bottom:3px solid #064e3b; padding-bottom:12px; margin-bottom:16px; }
+  .header h1 { font-size:20px; font-weight:bold; color:#064e3b; letter-spacing:1px; }
+  .parties { display:flex; justify-content:space-between; gap:32px; border-bottom:1px solid #e5e7eb; padding-bottom:12px; margin-bottom:12px; }
+  .party-right { text-align:right; }
+  .lbl { font-size:8px; text-transform:uppercase; letter-spacing:2px; color:#9ca3af; margin-bottom:4px; }
+  .cname { font-weight:bold; font-size:12px; }
+  .det { font-size:10px; color:#4b5563; margin-top:2px; }
+  .meta { display:flex; justify-content:space-between; background:#f9fafb; padding:6px 10px; border-radius:4px; font-size:10px; color:#6b7280; margin-bottom:14px; }
+  .meta-lbl { font-weight:600; color:#065f46; }
+  table { width:100%; border-collapse:collapse; font-size:10px; }
+  thead tr { background:#f9fafb; border-top:2px solid #064e3b; border-bottom:2px solid #064e3b; }
+  .totals { margin-top:14px; border-top:2px solid #064e3b; padding-top:8px; display:flex; flex-direction:column; align-items:flex-end; gap:4px; }
+  .tr { display:flex; gap:40px; font-size:10px; }
+  .tr.grand { font-size:12px; font-weight:bold; border-top:1px solid #e5e7eb; padding-top:5px; margin-top:2px; }
+  .tl { width:110px; text-align:right; color:#6b7280; }
+  .tl.grand { color:#000; }
+  .tv { width:110px; text-align:right; }
+  .footer { position:fixed; bottom:0; left:0; right:0; border-top:1px solid #e5e7eb; padding:4px 15mm; text-align:center; font-size:9px; color:#9ca3af; background:#fff; }
+</style>
+</head>
+<body>
+<div class="footer">Generated on ${esc(today)}</div>
+<div class="header">
+  ${logoHtml}
+  <h1>STATEMENT OF ACCOUNT</h1>
+</div>
+<div class="parties">
+  <div>
+    <div class="lbl">From</div>
+    <div class="cname">${esc(companySettings?.companyName || "")}</div>
+    ${companySettings?.address ? `<div class="det">${esc(companySettings.address).replace(/\n/g, "<br>")}</div>` : ""}
+    ${companySettings?.phone    ? `<div class="det">Tel: ${esc(companySettings.phone)}</div>` : ""}
+    ${companySettings?.email    ? `<div class="det">Email: ${esc(companySettings.email)}</div>` : ""}
+    ${companySettings?.taxNumber ? `<div class="det">TRN: ${esc(companySettings.taxNumber)}</div>` : ""}
+  </div>
+  <div class="party-right">
+    <div class="lbl">${type === "invoices" ? "Bill To" : "Brand"}</div>
+    <div class="cname">${esc(entityName)}</div>
+    ${entityAddress ? `<div class="det">${esc(entityAddress).replace(/\n/g, "<br>")}</div>` : ""}
+    ${entityContact ? `<div class="det">Attn: ${esc(entityContact)}</div>` : ""}
+    ${entityPhone   ? `<div class="det">Tel: ${esc(entityPhone)}</div>` : ""}
+    ${entityEmail   ? `<div class="det">Email: ${esc(entityEmail)}</div>` : ""}
+    ${entityTrn     ? `<div class="det">TRN: ${esc(entityTrn)}</div>` : ""}
+    ${entityWebsite ? `<div class="det">Web: ${esc(entityWebsite)}</div>` : ""}
+  </div>
+</div>
+<div class="meta">
+  <span><span class="meta-lbl">Period:</span> ${esc(period)}</span>
+  <span><span class="meta-lbl">Status:</span> ${esc(statusLabel)}</span>
+  <span><span class="meta-lbl">Records:</span> ${records.length}</span>
+</div>
+<table>
+  <thead><tr><th style="${thC}">#</th>${headerRow}</tr></thead>
+  <tbody>${dataRows}</tbody>
+</table>
+<div class="totals">
+  <div class="tr"><span class="tl">Outstanding</span><span class="tv">AED ${esc(fmt(outAed))}</span></div>
+  <div class="tr"><span class="tl">Paid</span><span class="tv">AED ${esc(fmt(paidAed))}</span></div>
+  <div class="tr grand"><span class="tl grand">Grand Total</span><span class="tv">AED ${esc(fmt(totalAed))}</span></div>
+</div>
+</body>
+</html>`;
+}
 
 /* ── statement layout (shared between modal preview and print portal) ───── */
 
 function StatementLayout({ type, entity, companySettings, records, dateFrom, dateTo, statusFilter }) {
-  const totalAed = records.reduce((s, r) => s + r._aed, 0);
-  const paidAed = records.filter((r) => r._paymentStatus === "paid").reduce((s, r) => s + r._aed, 0);
-  const outAed = records.filter((r) => r._paymentStatus !== "paid").reduce((s, r) => s + r._aed, 0);
+  const totalAed = records.reduce((s, r) => s + (r._aed || 0), 0);
+  const paidAed  = records.filter((r) => r._paymentStatus === "paid").reduce((s, r) => s + (r._aed || 0), 0);
+  const outAed   = records.filter((r) => r._paymentStatus !== "paid").reduce((s, r) => s + (r._aed || 0), 0);
 
-  const entityName = entity?.name || "—";
-  const entityAddress = type === "invoices" ? (entity?.billingAddress || entity?.address || "") : (entity?.address || "");
-  const entityTrn = entity?.vatNumber || "";
-  const entityPhone = entity?.phone || "";
-  const entityEmail = entity?.email || "";
-  const entityContact = type === "invoices" ? (entity?.contactPerson || "") : "";
+  const entityName    = entity?.name || "—";
+  const entityAddress = type === "invoices" ? (entity?.billingAddress || entity?.address || "") : "";
+  const entityTrn     = type === "invoices" ? (entity?.vatNumber || "") : "";
+  const entityPhone   = type === "invoices" ? (entity?.phone || "") : (entity?.contactPhone || "");
+  const entityEmail   = type === "invoices" ? (entity?.email || "") : (entity?.contactEmail || "");
+  const entityContact = entity?.contactPerson || "";
+  const entityWebsite = type === "pos" ? (entity?.website || "") : "";
 
-  const periodFrom = dateFrom ? fmtDate(dateFrom, true) : null;
-  const periodTo = dateTo ? fmtDate(dateTo, true) : null;
-  const period = periodFrom || periodTo ? `${periodFrom || "start"} – ${periodTo || "present"}` : "All time";
+  const periodFrom  = dateFrom ? fmtDate(dateFrom, true) : null;
+  const periodTo    = dateTo   ? fmtDate(dateTo, true)   : null;
+  const period      = periodFrom || periodTo ? `${periodFrom || "start"} – ${periodTo || "present"}` : "All time";
   const statusLabel = statusFilter === "all" ? "All" : statusFilter === "paid" ? "Paid" : "Outstanding";
 
   return (
-    <div className="text-sm font-[system-ui]">
-      {/* Header */}
-      <div className="flex justify-between items-start border-b-4 border-emerald-900 pb-4 mb-5">
-        {companySettings?.logo ? (
-          <img src={companySettings.logo} alt="Company Logo" className="max-h-16 max-w-44 object-contain" />
-        ) : <div />}
-        <h2 className="text-2xl font-bold text-emerald-900 tracking-wide">STATEMENT OF ACCOUNT</h2>
-      </div>
-
-      {/* Parties */}
-      <div className="flex justify-between gap-8 border-b border-gray-200 pb-4 mb-4">
-        <div className="flex-1">
-          <p className="text-[10px] uppercase tracking-widest text-gray-400 mb-1">From</p>
-          <p className="font-bold text-sm text-gray-900">{companySettings?.companyName || ""}</p>
-          {companySettings?.address && <p className="text-xs text-gray-600 mt-0.5 whitespace-pre-line">{companySettings.address}</p>}
-          {companySettings?.phone && <p className="text-xs text-gray-600">Tel: {companySettings.phone}</p>}
-          {companySettings?.email && <p className="text-xs text-gray-600">Email: {companySettings.email}</p>}
-          {companySettings?.taxNumber && <p className="text-xs text-gray-600">TRN: {companySettings.taxNumber}</p>}
+    <div className="text-sm font-[system-ui] flex flex-col" style={{ minHeight: "260mm" }}>
+      <div className="flex-1">
+        {/* Header */}
+        <div className="flex justify-between items-start border-b-4 border-emerald-900 pb-4 mb-5">
+          {companySettings?.logo ? (
+            <img src={companySettings.logo} alt="Company Logo" className="max-h-16 max-w-44 object-contain" />
+          ) : <div />}
+          <h2 className="text-2xl font-bold text-emerald-900 tracking-wide">STATEMENT OF ACCOUNT</h2>
         </div>
-        <div className="flex-1 text-right">
-          <p className="text-[10px] uppercase tracking-widest text-gray-400 mb-1">
-            {type === "invoices" ? "Bill To" : "Brand"}
-          </p>
-          <p className="font-bold text-sm text-gray-900">{entityName}</p>
-          {entityAddress && <p className="text-xs text-gray-600 mt-0.5 whitespace-pre-line">{entityAddress}</p>}
-          {entityContact && <p className="text-xs text-gray-600">Attn: {entityContact}</p>}
-          {entityPhone && <p className="text-xs text-gray-600">Tel: {entityPhone}</p>}
-          {entityEmail && <p className="text-xs text-gray-600">Email: {entityEmail}</p>}
-          {entityTrn && <p className="text-xs text-gray-600">TRN: {entityTrn}</p>}
+
+        {/* Parties */}
+        <div className="flex justify-between gap-8 border-b border-gray-200 pb-4 mb-4">
+          <div className="flex-1">
+            <p className="text-[10px] uppercase tracking-widest text-gray-400 mb-1">From</p>
+            <p className="font-bold text-sm text-gray-900">{companySettings?.companyName || ""}</p>
+            {companySettings?.address && <p className="text-xs text-gray-600 mt-0.5 whitespace-pre-line">{companySettings.address}</p>}
+            {companySettings?.phone && <p className="text-xs text-gray-600">Tel: {companySettings.phone}</p>}
+            {companySettings?.email && <p className="text-xs text-gray-600">Email: {companySettings.email}</p>}
+            {companySettings?.taxNumber && <p className="text-xs text-gray-600">TRN: {companySettings.taxNumber}</p>}
+          </div>
+          <div className="flex-1 text-right">
+            <p className="text-[10px] uppercase tracking-widest text-gray-400 mb-1">
+              {type === "invoices" ? "Bill To" : "Brand"}
+            </p>
+            <p className="font-bold text-sm text-gray-900">{entityName}</p>
+            {entityAddress && <p className="text-xs text-gray-600 mt-0.5 whitespace-pre-line">{entityAddress}</p>}
+            {entityContact && <p className="text-xs text-gray-600">Attn: {entityContact}</p>}
+            {entityPhone && <p className="text-xs text-gray-600">Tel: {entityPhone}</p>}
+            {entityEmail && <p className="text-xs text-gray-600">Email: {entityEmail}</p>}
+            {entityTrn && <p className="text-xs text-gray-600">TRN: {entityTrn}</p>}
+            {entityWebsite && <p className="text-xs text-gray-600">Web: {entityWebsite}</p>}
+          </div>
         </div>
-      </div>
 
-      {/* Meta row */}
-      <div className="flex justify-between text-xs text-gray-500 bg-gray-50 rounded px-3 py-2 mb-4">
-        <span><span className="font-semibold text-emerald-800">Period:</span> {period}</span>
-        <span><span className="font-semibold text-emerald-800">Status:</span> {statusLabel}</span>
-        <span><span className="font-semibold text-emerald-800">Records:</span> {records.length}</span>
-      </div>
+        {/* Meta row */}
+        <div className="flex justify-between text-xs text-gray-500 bg-gray-50 rounded px-3 py-2 mb-4">
+          <span><span className="font-semibold text-emerald-800">Period:</span> {period}</span>
+          <span><span className="font-semibold text-emerald-800">Status:</span> {statusLabel}</span>
+          <span><span className="font-semibold text-emerald-800">Records:</span> {records.length}</span>
+        </div>
 
-      {/* Table */}
-      <div className="overflow-x-auto rounded border">
-        <table className="w-full text-xs border-collapse">
-          <thead>
-            <tr className="bg-gray-50 border-t-2 border-b-2 border-emerald-900">
-              <th className="text-center p-2 font-bold text-emerald-900">#</th>
-              {type === "invoices" ? (
-                <>
-                  <th className="p-2 font-bold text-emerald-900 text-left">Invoice #</th>
-                  <th className="text-center p-2 font-bold text-emerald-900">Date</th>
-                  <th className="text-right p-2 font-bold text-emerald-900">Subtotal</th>
-                  <th className="text-right p-2 font-bold text-emerald-900">VAT</th>
-                  <th className="text-right p-2 font-bold text-emerald-900">Total (AED)</th>
-                  <th className="text-center p-2 font-bold text-emerald-900">Status</th>
-                  <th className="text-center p-2 font-bold text-emerald-900">Received</th>
-                </>
-              ) : (
-                <>
-                  <th className="p-2 font-bold text-emerald-900 text-left">PO #</th>
-                  <th className="text-center p-2 font-bold text-emerald-900">Date</th>
-                  <th className="text-center p-2 font-bold text-emerald-900">Curr.</th>
-                  <th className="text-right p-2 font-bold text-emerald-900">Amt (Orig)</th>
-                  <th className="text-right p-2 font-bold text-emerald-900">Amt (AED)</th>
-                  <th className="text-center p-2 font-bold text-emerald-900">Status</th>
-                  <th className="text-center p-2 font-bold text-emerald-900">Paid Date</th>
-                </>
-              )}
-            </tr>
-          </thead>
-          <tbody>
-            {records.length === 0 ? (
-              <tr><td colSpan={8} className="text-center py-6 text-gray-400">No records</td></tr>
-            ) : records.map((r, i) => (
-              <tr key={r.id || i} className="border-b border-gray-100">
-                <td className="text-center p-2 text-gray-500">{i + 1}</td>
+        {/* Table */}
+        <div className="overflow-x-auto rounded border">
+          <table className="w-full text-xs border-collapse">
+            <thead>
+              <tr className="bg-gray-50 border-t-2 border-b-2 border-emerald-900">
+                <th className="text-center p-2 font-bold text-emerald-900">#</th>
                 {type === "invoices" ? (
                   <>
-                    <td className="p-2 font-medium text-blue-700">{r._ref}</td>
-                    <td className="text-center p-2 text-gray-600">{fmtDate(r._date)}</td>
-                    <td className="text-right p-2">AED {fmt(r._subtotal)}</td>
-                    <td className="text-right p-2">AED {fmt(r._vat)}</td>
-                    <td className="text-right p-2 font-semibold">AED {fmt(r._aed)}</td>
-                    <td className="text-center p-2"><StatusBadge status={r._paymentStatus} /></td>
-                    <td className="text-center p-2 text-gray-600">{fmtDate(r._paymentDate)}</td>
+                    <th className="p-2 font-bold text-emerald-900 text-left">Invoice #</th>
+                    <th className="text-center p-2 font-bold text-emerald-900">Date</th>
+                    <th className="text-right p-2 font-bold text-emerald-900">Subtotal</th>
+                    <th className="text-right p-2 font-bold text-emerald-900">VAT</th>
+                    <th className="text-right p-2 font-bold text-emerald-900">Total (AED)</th>
+                    <th className="text-center p-2 font-bold text-emerald-900">Status</th>
+                    <th className="text-center p-2 font-bold text-emerald-900">Received</th>
                   </>
                 ) : (
                   <>
-                    <td className="p-2 font-medium text-purple-700">{r._ref}</td>
-                    <td className="text-center p-2 text-gray-600">{fmtDate(r._date)}</td>
-                    <td className="text-center p-2">{r._currency}</td>
-                    <td className="text-right p-2">{r._currency} {fmt(r._origAmount)}</td>
-                    <td className="text-right p-2 font-semibold">AED {fmt(r._aed)}</td>
-                    <td className="text-center p-2"><StatusBadge status={r._paymentStatus} /></td>
-                    <td className="text-center p-2 text-gray-600">{fmtDate(r._paymentDate)}</td>
+                    <th className="p-2 font-bold text-emerald-900 text-left">PO #</th>
+                    <th className="text-center p-2 font-bold text-emerald-900">Date</th>
+                    <th className="text-right p-2 font-bold text-emerald-900">Amount (Orig)</th>
+                    <th className="text-right p-2 font-bold text-emerald-900">Amount (AED)</th>
+                    <th className="text-center p-2 font-bold text-emerald-900">Status</th>
+                    <th className="text-center p-2 font-bold text-emerald-900">Payment Date</th>
                   </>
                 )}
               </tr>
-            ))}
-          </tbody>
-        </table>
+            </thead>
+            <tbody>
+              {records.length === 0 ? (
+                <tr><td colSpan={7} className="text-center py-6 text-gray-400">No records</td></tr>
+              ) : records.map((r, i) => (
+                <tr key={r.id || i} className="border-b border-gray-100">
+                  <td className="text-center p-2 text-gray-500">{i + 1}</td>
+                  {type === "invoices" ? (
+                    <>
+                      <td className="p-2 font-medium text-blue-700">{r._ref}</td>
+                      <td className="text-center p-2 text-gray-600">{fmtDate(r._date)}</td>
+                      <td className="text-right p-2">AED {fmt(r._subtotal)}</td>
+                      <td className="text-right p-2">AED {fmt(r._vat)}</td>
+                      <td className="text-right p-2 font-semibold">AED {fmt(r._aed)}</td>
+                      <td className="text-center p-2"><StatusBadge status={r._paymentStatus} /></td>
+                      <td className="text-center p-2 text-gray-600">{fmtDate(r._paymentDate)}</td>
+                    </>
+                  ) : (
+                    <>
+                      <td className="p-2 font-medium text-purple-700">{r._ref}</td>
+                      <td className="text-center p-2 text-gray-600">{fmtDate(r._date)}</td>
+                      <td className="text-right p-2">{r._currency} {fmt(r._origAmount)}</td>
+                      <td className="text-right p-2 font-semibold">AED {fmt(r._aed)}</td>
+                      <td className="text-center p-2"><StatusBadge status={r._paymentStatus} /></td>
+                      <td className="text-center p-2 text-gray-600">{fmtDate(r._paymentDate)}</td>
+                    </>
+                  )}
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+
+        {/* Totals */}
+        <div className="mt-4 border-t-2 border-emerald-900 pt-3 flex flex-col items-end gap-1.5">
+          <div className="flex gap-10 text-xs">
+            <span className="text-gray-500 w-28 text-right">Outstanding</span>
+            <span className="font-medium w-28 text-right">AED {fmt(outAed)}</span>
+          </div>
+          <div className="flex gap-10 text-xs">
+            <span className="text-gray-500 w-28 text-right">Paid</span>
+            <span className="font-medium w-28 text-right">AED {fmt(paidAed)}</span>
+          </div>
+          <div className="flex gap-10 text-sm font-bold border-t border-gray-200 pt-1.5 mt-1">
+            <span className="w-28 text-right">Grand Total</span>
+            <span className="w-28 text-right">AED {fmt(totalAed)}</span>
+          </div>
+        </div>
       </div>
 
-      {/* Totals */}
-      <div className="mt-4 border-t-2 border-emerald-900 pt-3 flex flex-col items-end gap-1.5">
-        <div className="flex gap-10 text-xs">
-          <span className="text-gray-500 w-28 text-right">Outstanding</span>
-          <span className="font-medium w-28 text-right">AED {fmt(outAed)}</span>
-        </div>
-        <div className="flex gap-10 text-xs">
-          <span className="text-gray-500 w-28 text-right">Paid</span>
-          <span className="font-medium w-28 text-right">AED {fmt(paidAed)}</span>
-        </div>
-        <div className="flex gap-10 text-sm font-bold border-t border-gray-200 pt-1.5 mt-1">
-          <span className="w-28 text-right">Grand Total</span>
-          <span className="w-28 text-right">AED {fmt(totalAed)}</span>
-        </div>
-      </div>
-
-      {/* Footer */}
-      <div className="mt-6 border-t border-gray-200 pt-3 text-center text-[10px] text-gray-400">
+      {/* Footer — pushed to bottom via flex */}
+      <div className="mt-auto pt-6 border-t border-gray-200 text-center text-[10px] text-gray-400">
         Generated on {format(new Date(), "dd/MM/yy")}
       </div>
     </div>
@@ -311,81 +441,68 @@ function StatementLayout({ type, entity, companySettings, records, dateFrom, dat
 
 function StatementPreviewModal({ open, onClose, type, entity, companySettings, records, dateFrom, dateTo, statusFilter, exportData, exportFilename }) {
   const handlePrint = useCallback(() => {
-    let styleEl = document.getElementById("__stmt_print_css");
-    if (!styleEl) {
-      styleEl = document.createElement("style");
-      styleEl.id = "__stmt_print_css";
-      styleEl.textContent = PORTAL_PRINT_CSS;
-      document.head.appendChild(styleEl);
+    const pw = window.open("", "_blank");
+    if (!pw) {
+      alert("Please allow popups in your browser to use Print / Save PDF.");
+      return;
     }
-    window.print();
-    window.addEventListener("afterprint", () => {
-      document.getElementById("__stmt_print_css")?.remove();
-    }, { once: true });
-  }, []);
+    pw.document.open();
+    pw.document.write(buildStatementHtml({ type, entity, companySettings, records, dateFrom, dateTo, statusFilter }));
+    pw.document.close();
+    pw.focus();
+  }, [type, entity, companySettings, records, dateFrom, dateTo, statusFilter]);
 
   const statementProps = { type, entity, companySettings, records, dateFrom, dateTo, statusFilter };
 
   return (
-    <>
-      {/* Print portal — direct body child, hidden normally, shown by @media print CSS */}
-      {open && createPortal(
-        <div id="__stmt_print_portal" style={{ display: "none" }}>
+    <Dialog open={open} onOpenChange={(v) => !v && onClose()}>
+      <DialogContent className="max-w-4xl max-h-[90vh] overflow-y-auto">
+        <DialogHeader>
+          <DialogTitle className="flex items-center justify-between pr-2">
+            <span>Statement of Account Preview</span>
+            <div className="flex gap-2">
+              <Button size="sm" onClick={handlePrint} className="bg-emerald-700 hover:bg-emerald-800 text-white">
+                <Printer className="w-4 h-4 mr-1.5" />
+                Print / Save PDF
+              </Button>
+              <ExportDropdown
+                data={exportData || []}
+                type="Statement"
+                filename={exportFilename || "statement"}
+                columns={type === "invoices" ? {
+                  invoice_number: "Invoice #",
+                  customer: "Customer",
+                  invoice_date: "Invoice Date",
+                  subtotal_aed: "Subtotal (AED)",
+                  vat_aed: "VAT (AED)",
+                  total_aed: "Total (AED)",
+                  payment_status: "Payment Status",
+                  received_date: "Received Date",
+                  remarks: "Remarks",
+                } : {
+                  po_number: "PO #",
+                  brand: "Brand",
+                  order_date: "Order Date",
+                  amount_orig: "Amount (Original)",
+                  amount_aed: "Amount (AED)",
+                  payment_status: "Payment Status",
+                  payment_date: "Payment Date",
+                  remarks: "Remarks",
+                }}
+              />
+              <Button size="sm" variant="outline" onClick={onClose}>
+                <X className="w-4 h-4 mr-1.5" />
+                Close
+              </Button>
+            </div>
+          </DialogTitle>
+        </DialogHeader>
+
+        <div className="border rounded-lg p-6 bg-white">
           <StatementLayout {...statementProps} />
-        </div>,
-        document.body
-      )}
-
-      <Dialog open={open} onOpenChange={(v) => !v && onClose()}>
-        <DialogContent className="max-w-4xl max-h-[90vh] overflow-y-auto">
-          <DialogHeader>
-            <DialogTitle className="flex items-center justify-between pr-2">
-              <span>Statement of Account Preview</span>
-              <div className="flex gap-2">
-                <Button size="sm" onClick={handlePrint} className="bg-emerald-700 hover:bg-emerald-800 text-white">
-                  <Printer className="w-4 h-4 mr-1.5" />
-                  Print / Save PDF
-                </Button>
-                <ExportDropdown
-                  data={exportData || []}
-                  type="Statement"
-                  filename={exportFilename || "statement"}
-                  columns={type === "invoices" ? {
-                    invoice_number: "Invoice #",
-                    customer: "Customer",
-                    invoice_date: "Invoice Date",
-                    subtotal_aed: "Subtotal (AED)",
-                    vat_aed: "VAT (AED)",
-                    total_aed: "Total (AED)",
-                    payment_status: "Payment Status",
-                    received_date: "Received Date",
-                    remarks: "Remarks",
-                  } : {
-                    po_number: "PO #",
-                    brand: "Brand",
-                    order_date: "Order Date",
-                    currency: "Currency",
-                    amount_orig: "Amount (Original)",
-                    amount_aed: "Amount (AED)",
-                    payment_status: "Payment Status",
-                    payment_date: "Payment Date",
-                    remarks: "Remarks",
-                  }}
-                />
-                <Button size="sm" variant="outline" onClick={onClose}>
-                  <X className="w-4 h-4 mr-1.5" />
-                  Close
-                </Button>
-              </div>
-            </DialogTitle>
-          </DialogHeader>
-
-          <div className="border rounded-lg p-6 bg-white">
-            <StatementLayout {...statementProps} />
-          </div>
-        </DialogContent>
-      </Dialog>
-    </>
+        </div>
+      </DialogContent>
+    </Dialog>
   );
 }
 
@@ -622,6 +739,11 @@ function PurchaseOrdersSection({ purchaseOrders, companySettings }) {
   const [dateTo, setDateTo] = useState("");
   const [showStatement, setShowStatement] = useState(false);
 
+  const { data: allBrands = [] } = useQuery({
+    queryKey: ["/api/brands"],
+    staleTime: 5 * 60 * 1000,
+  });
+
   const eligibleBrands = useMemo(() => {
     const brandMap = new Map();
     purchaseOrders.forEach((po) => {
@@ -632,10 +754,12 @@ function PurchaseOrdersSection({ purchaseOrders, companySettings }) {
     return Array.from(brandMap.values()).sort((a, b) => a.name.localeCompare(b.name));
   }, [purchaseOrders]);
 
-  const selectedBrand = useMemo(
-    () => eligibleBrands.find((b) => b.id === selectedBrandId) || null,
-    [eligibleBrands, selectedBrandId]
-  );
+  const selectedBrand = useMemo(() => {
+    const base = eligibleBrands.find((b) => b.id === selectedBrandId) || null;
+    if (!base) return null;
+    const full = allBrands.find((b) => String(b.id) === base.id);
+    return full ? { ...base, ...full } : base;
+  }, [eligibleBrands, selectedBrandId, allBrands]);
 
   const enriched = useMemo(() => {
     return purchaseOrders.map((po) => {
@@ -690,7 +814,6 @@ function PurchaseOrdersSection({ purchaseOrders, companySettings }) {
     po_number: r._ref,
     brand: r._brand,
     order_date: fmtDate(r._date),
-    currency: r._currency,
     amount_orig: `${r._currency} ${fmt(r._origAmount)}`,
     amount_aed: `AED ${fmt(r._aed)}`,
     payment_status: r._paymentStatus === "paid" ? "Paid" : "Outstanding",
