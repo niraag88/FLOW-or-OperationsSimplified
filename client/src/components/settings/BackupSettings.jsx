@@ -1,9 +1,8 @@
-import { useState } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
-import { Database, FileJson, Play, CheckCircle, XCircle, Loader2, Clock } from "lucide-react";
+import { Database, Play, CheckCircle, XCircle, Loader2, Clock } from "lucide-react";
 import { useToast } from "@/components/ui/use-toast";
 import { apiRequest } from "@/lib/queryClient";
 import { format } from "date-fns";
@@ -37,7 +36,10 @@ export default function BackupSettings() {
   });
 
   const runBackup = useMutation({
-    mutationFn: () => apiRequest("POST", "/api/ops/run-backups"),
+    mutationFn: async () => {
+      const res = await apiRequest("POST", "/api/ops/run-backups");
+      return res.json();
+    },
     onSuccess: (data) => {
       queryClient.invalidateQueries({ queryKey: ["/api/ops/backup-runs"] });
       if (data.success) {
@@ -63,7 +65,7 @@ export default function BackupSettings() {
           Backup & Recovery
         </CardTitle>
         <CardDescription>
-          Manual database and object storage backups. Run a backup now or review the last 20 run records.
+          Manual database and object storage backups. Run a backup now or review the last 10 run records.
         </CardDescription>
       </CardHeader>
       <CardContent className="space-y-6">
@@ -138,10 +140,10 @@ export default function BackupSettings() {
               <table className="w-full text-sm">
                 <thead className="bg-gray-50 border-b">
                   <tr>
-                    <th className="text-left px-3 py-2 text-xs font-medium text-gray-500">Ran At</th>
-                    <th className="text-left px-3 py-2 text-xs font-medium text-gray-500">DB</th>
-                    <th className="text-left px-3 py-2 text-xs font-medium text-gray-500">Manifest</th>
+                    <th className="text-left px-3 py-2 text-xs font-medium text-gray-500">Started</th>
+                    <th className="text-left px-3 py-2 text-xs font-medium text-gray-500">Status</th>
                     <th className="text-left px-3 py-2 text-xs font-medium text-gray-500 hidden sm:table-cell">DB File</th>
+                    <th className="text-left px-3 py-2 text-xs font-medium text-gray-500 hidden sm:table-cell">DB Size</th>
                     <th className="text-left px-3 py-2 text-xs font-medium text-gray-500 hidden sm:table-cell">Objects</th>
                   </tr>
                 </thead>
@@ -149,10 +151,12 @@ export default function BackupSettings() {
                   {runs.map((run) => (
                     <tr key={run.id} className="hover:bg-gray-50">
                       <td className="px-3 py-2 whitespace-nowrap text-gray-700">{formatDate(run.ranAt)}</td>
-                      <td className="px-3 py-2"><StatusBadge success={run.dbSuccess} /></td>
-                      <td className="px-3 py-2"><StatusBadge success={run.manifestSuccess} /></td>
-                      <td className="px-3 py-2 font-mono text-xs text-gray-500 hidden sm:table-cell truncate max-w-[200px]">
+                      <td className="px-3 py-2"><StatusBadge success={run.success} /></td>
+                      <td className="px-3 py-2 font-mono text-xs text-gray-500 hidden sm:table-cell truncate max-w-[180px]">
                         {run.dbFilename?.split('/').pop() || "—"}
+                      </td>
+                      <td className="px-3 py-2 text-gray-500 hidden sm:table-cell">
+                        {formatBytes(run.dbFileSize)}
                       </td>
                       <td className="px-3 py-2 text-gray-500 hidden sm:table-cell">
                         {run.manifestTotalObjects != null ? run.manifestTotalObjects.toLocaleString() : "—"}

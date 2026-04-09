@@ -577,6 +577,33 @@ export function registerSystemRoutes(app: Express) {
   });
 
   app.post('/api/ops/run-backups', requireAuth(['Admin']), async (req: AuthenticatedRequest, res) => {
+    const startedAt = new Date();
+    let dbResult: any = null;
+    let manifestResult: any = null;
+
+    const recordRun = async (overrideError?: string) => {
+      const success = !!(dbResult?.success && manifestResult?.success);
+      try {
+        await db.insert(backupRuns).values({
+          finishedAt: new Date(),
+          triggeredBy: req.user!.id,
+          success,
+          dbSuccess: dbResult?.success ?? false,
+          dbFilename: dbResult?.filename || null,
+          dbStorageKey: dbResult?.storageKey || null,
+          dbFileSize: dbResult?.fileSize || null,
+          manifestSuccess: manifestResult?.success ?? false,
+          manifestFilename: manifestResult?.filename || null,
+          manifestStorageKey: manifestResult?.storageKey || null,
+          manifestTotalObjects: manifestResult?.totalObjects || null,
+          manifestTotalSizeBytes: manifestResult?.totalSize || null,
+          errorMessage: overrideError || (!success ? [dbResult?.error, manifestResult?.error].filter(Boolean).join('; ') : null),
+        });
+      } catch (dbErr) {
+        console.error('Failed to record backup run:', dbErr);
+      }
+    };
+
     try {
       console.log('Starting backup process...');
       // @ts-ignore
@@ -584,43 +611,17 @@ export function registerSystemRoutes(app: Express) {
       // @ts-ignore
       const { writeManifest } = await import('../../scripts/writeManifest.js');
 
-      const [dbResult, manifestResult] = await Promise.all([uploadBackup(), writeManifest()]);
+      [dbResult, manifestResult] = await Promise.all([uploadBackup(), writeManifest()]);
       const success = dbResult.success && manifestResult.success;
 
-      // Record this run in the database
-      await db.insert(backupRuns).values({
-        triggeredBy: req.user!.id,
-        dbSuccess: dbResult.success,
-        dbFilename: dbResult.filename || null,
-        dbStorageKey: dbResult.storageKey || null,
-        manifestSuccess: manifestResult.success,
-        manifestFilename: manifestResult.filename || null,
-        manifestStorageKey: manifestResult.storageKey || null,
-        manifestTotalObjects: manifestResult.totalObjects || null,
-        manifestTotalSizeBytes: manifestResult.totalSize || null,
-        errorMessage: !success ? [dbResult.error, manifestResult.error].filter(Boolean).join('; ') : null,
-      });
-
+      await recordRun();
       writeAuditLog({ actor: req.user!.id, actorName: req.user?.username || String(req.user!.id), targetId: 'backup', targetType: 'backup_run', action: 'CREATE', details: `Manual backup ${success ? 'succeeded' : 'failed'}` });
 
       const response = {
         success,
         timestamp: new Date().toISOString(),
-        dbBackup: {
-          success: dbResult.success,
-          filename: dbResult.filename,
-          storageKey: dbResult.storageKey,
-          error: dbResult.error
-        },
-        manifestBackup: {
-          success: manifestResult.success,
-          filename: manifestResult.filename,
-          storageKey: manifestResult.storageKey,
-          totalObjects: manifestResult.totalObjects,
-          totalSize: manifestResult.totalSize,
-          totals: manifestResult.totals,
-          error: manifestResult.error
-        }
+        dbBackup: { success: dbResult.success, filename: dbResult.filename, storageKey: dbResult.storageKey, fileSize: dbResult.fileSize, error: dbResult.error },
+        manifestBackup: { success: manifestResult.success, filename: manifestResult.filename, storageKey: manifestResult.storageKey, totalObjects: manifestResult.totalObjects, totalSize: manifestResult.totalSize, error: manifestResult.error }
       };
 
       if (success) {
@@ -632,11 +633,9 @@ export function registerSystemRoutes(app: Express) {
       }
     } catch (error) {
       console.error('Error running backups:', error);
-      res.status(500).json({
-        success: false,
-        error: error instanceof Error ? error.message : 'Unknown error',
-        timestamp: new Date().toISOString()
-      });
+      const errMsg = error instanceof Error ? error.message : 'Unknown error';
+      await recordRun(errMsg);
+      res.status(500).json({ success: false, error: errMsg, timestamp: new Date().toISOString() });
     }
   });
 

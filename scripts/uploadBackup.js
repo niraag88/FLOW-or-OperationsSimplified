@@ -38,6 +38,10 @@ async function uploadBackup() {
 
     console.log(`Database dump created: ${tempPath}`);
 
+    // Get file size before upload
+    const stat = await fs.promises.stat(tempPath);
+    const fileSize = stat.size;
+
     // Upload to object storage
     const uploadResult = await objectStorageClient.uploadFromFilename(storageKey, tempPath);
     
@@ -45,7 +49,7 @@ async function uploadBackup() {
       throw new Error(`Failed to upload backup: ${uploadResult.error}`);
     }
 
-    console.log(`Backup uploaded to: ${storageKey}`);
+    console.log(`Backup uploaded to: ${storageKey} (${fileSize} bytes)`);
 
     // Clean up temp file
     await fs.promises.unlink(tempPath);
@@ -55,6 +59,7 @@ async function uploadBackup() {
       success: true,
       filename,
       storageKey,
+      fileSize,
       timestamp: new Date().toISOString()
     };
 

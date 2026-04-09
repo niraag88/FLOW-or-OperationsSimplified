@@ -777,11 +777,14 @@ export type StorageMonitoring = typeof storageMonitoring.$inferSelect;
 // Backup Runs table — records every manual/automated backup attempt
 export const backupRuns = pgTable("backup_runs", {
   id: serial("id").primaryKey(),
-  ranAt: timestamp("ran_at").defaultNow().notNull(),
+  ranAt: timestamp("ran_at").defaultNow().notNull(), // startedAt
+  finishedAt: timestamp("finished_at"),              // null if still running / crashed
   triggeredBy: varchar("triggered_by").references(() => users.id),
+  success: boolean("success").notNull().default(false), // true only when BOTH db + manifest succeeded
   dbSuccess: boolean("db_success").notNull(),
   dbFilename: text("db_filename"),
   dbStorageKey: text("db_storage_key"),
+  dbFileSize: bigint("db_file_size", { mode: "number" }), // compressed file size in bytes
   manifestSuccess: boolean("manifest_success").notNull(),
   manifestFilename: text("manifest_filename"),
   manifestStorageKey: text("manifest_storage_key"),
