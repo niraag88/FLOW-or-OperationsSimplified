@@ -10,9 +10,10 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Command, CommandEmpty, CommandGroup, CommandInput, CommandItem, CommandList } from "@/components/ui/command";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
-import { ChevronDown, ChevronRight, FileText, TrendingUp, TrendingDown, Printer, Check, ChevronsUpDown, X } from "lucide-react";
+import { ChevronDown, ChevronRight, FileText, TrendingUp, TrendingDown, Printer, Check, ChevronsUpDown, X, Download } from "lucide-react";
 import ExportDropdown from "../common/ExportDropdown";
 import { getRateToAed } from "@/utils/currency";
+import { exportStatementToXLSX } from "../utils/export";
 
 /* ── formatting helpers ─────────────────────────────────────────────────── */
 
@@ -497,7 +498,7 @@ function StatementLayout({ type, entity, companySettings, records, dateFrom, dat
 
 /* ── statement preview modal ────────────────────────────────────────────── */
 
-function StatementPreviewModal({ open, onClose, type, entity, companySettings, records, dateFrom, dateTo, statusFilter, exportData, exportFilename }) {
+function StatementPreviewModal({ open, onClose, type, entity, companySettings, records, dateFrom, dateTo, statusFilter }) {
   const handlePrint = useCallback(() => {
     const html = buildStatementHtml({ type, entity, companySettings, records, dateFrom, dateTo, statusFilter });
     const blob = new Blob([html], { type: "text/html" });
@@ -507,6 +508,10 @@ function StatementPreviewModal({ open, onClose, type, entity, companySettings, r
       alert("Please allow popups in your browser to use Print / Save PDF.");
     }
     setTimeout(() => URL.revokeObjectURL(url), 60000);
+  }, [type, entity, companySettings, records, dateFrom, dateTo, statusFilter]);
+
+  const handleExportXlsx = useCallback(() => {
+    exportStatementToXLSX({ type, entity, companySettings, records, dateFrom, dateTo, statusFilter });
   }, [type, entity, companySettings, records, dateFrom, dateTo, statusFilter]);
 
   const statementProps = { type, entity, companySettings, records, dateFrom, dateTo, statusFilter };
@@ -522,31 +527,10 @@ function StatementPreviewModal({ open, onClose, type, entity, companySettings, r
                 <Printer className="w-4 h-4 mr-1.5" />
                 Print / Save PDF
               </Button>
-              <ExportDropdown
-                data={exportData || []}
-                type="Statement"
-                filename={exportFilename || "statement"}
-                columns={type === "invoices" ? {
-                  invoice_number: "Invoice #",
-                  customer: "Customer",
-                  invoice_date: "Invoice Date",
-                  subtotal_aed: "Subtotal (AED)",
-                  vat_aed: "VAT (AED)",
-                  total_aed: "Total (AED)",
-                  payment_status: "Payment Status",
-                  received_date: "Received Date",
-                  remarks: "Remarks",
-                } : {
-                  po_number: "PO #",
-                  brand: "Brand",
-                  order_date: "Order Date",
-                  amount_orig: "Amount",
-                  amount_aed: "Amount (AED)",
-                  payment_status: "Payment Status",
-                  payment_date: "Payment Date",
-                  remarks: "Remarks",
-                }}
-              />
+              <Button size="sm" variant="outline" onClick={handleExportXlsx}>
+                <Download className="w-4 h-4 mr-1.5" />
+                Export to XLSX
+              </Button>
               <Button size="sm" variant="outline" onClick={onClose}>
                 <X className="w-4 h-4 mr-1.5" />
                 Close
@@ -646,8 +630,8 @@ function InvoicesSection({ invoices, customers, companySettings }) {
   }));
 
   const exportFilename = selectedCustomer
-    ? `statement_invoices_${(selectedCustomer.name || "customer").replace(/\s+/g, "_")}_${format(new Date(), "yyyyMMdd")}`
-    : "statement_invoices";
+    ? `SOA_${(selectedCustomer.name || "customer").replace(/\s+/g, "_")}`
+    : "SOA";
 
   const hasActiveFilters = selectedCustomerId || statusFilter !== "all" || dateFrom || dateTo;
 
@@ -780,8 +764,6 @@ function InvoicesSection({ invoices, customers, companySettings }) {
         dateFrom={dateFrom}
         dateTo={dateTo}
         statusFilter={statusFilter}
-        exportData={exportData}
-        exportFilename={exportFilename}
       />
     </>
   );
@@ -879,8 +861,8 @@ function PurchaseOrdersSection({ purchaseOrders, companySettings }) {
   }));
 
   const exportFilename = selectedBrand
-    ? `statement_pos_${(selectedBrand.name || "brand").replace(/\s+/g, "_")}_${format(new Date(), "yyyyMMdd")}`
-    : "statement_pos";
+    ? `SOA_${(selectedBrand.name || "brand").replace(/\s+/g, "_")}`
+    : "SOA";
 
   const hasActiveFilters = selectedBrandId || statusFilter !== "all" || dateFrom || dateTo;
 
@@ -1016,8 +998,6 @@ function PurchaseOrdersSection({ purchaseOrders, companySettings }) {
         dateFrom={dateFrom}
         dateTo={dateTo}
         statusFilter={statusFilter}
-        exportData={exportData}
-        exportFilename={exportFilename}
       />
     </>
   );

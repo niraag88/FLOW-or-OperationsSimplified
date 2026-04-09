@@ -1041,3 +1041,143 @@ export const exportPODetailToXLSX = async (poId, poNumber) => {
   XLSX.utils.book_append_sheet(workbook, worksheet, 'Purchase Order');
   XLSX.writeFile(workbook, `PO_${d.poNumber}_${new Date().toISOString().split('T')[0]}.xlsx`);
 };
+
+/* ── Statement of Account XLSX export ──────────────────────────────────── */
+
+export const exportStatementToXLSX = ({ type, entity, companySettings, records, dateFrom, dateTo, statusFilter }) => {
+  const fmtAmt = (v) => new Intl.NumberFormat("en-US", { minimumFractionDigits: 2, maximumFractionDigits: 2 }).format(v || 0);
+  const fmtD   = (val) => {
+    if (!val) return "—";
+    try {
+      const d = new Date(val);
+      if (isNaN(d.getTime())) return "—";
+      return format(d, "dd/MM/yy");
+    } catch { return "—"; }
+  };
+
+  const entityName    = entity?.name || "—";
+  const entityAddress = type === "invoices" ? (entity?.billingAddress || entity?.address || "") : (entity?.description || "");
+  const entityTrn     = type === "invoices" ? (entity?.vatNumber || "") : "";
+  const entityPhone   = type === "invoices" ? (entity?.phone || "") : (entity?.contactPhone || "");
+  const entityEmail   = type === "invoices" ? (entity?.email || "") : (entity?.contactEmail || "");
+  const entityContact = entity?.contactPerson || "";
+  const entityWebsite = type === "pos" ? (entity?.website || "") : "";
+
+  const dateFromFmt = dateFrom ? fmtD(dateFrom) : null;
+  const dateToFmt   = dateTo   ? fmtD(dateTo)   : null;
+  const period      = dateFromFmt || dateToFmt ? `${dateFromFmt || "start"} – ${dateToFmt || "present"}` : "All time";
+  const statusLabel = statusFilter === "all" ? "All" : statusFilter === "paid" ? "Paid" : "Outstanding";
+  const today       = format(new Date(), "dd/MM/yy");
+
+  const totalAed = records.reduce((s, r) => s + (r._aed || 0), 0);
+  const paidAed  = records.filter((r) => r._paymentStatus === "paid").reduce((s, r) => s + (r._aed || 0), 0);
+  const outAed   = records.filter((r) => r._paymentStatus !== "paid").reduce((s, r) => s + (r._aed || 0), 0);
+  const origCurrency = records.find((r) => r._currency && r._currency !== "AED")?._currency || null;
+  const showDual = Boolean(origCurrency);
+  const totalOrig = showDual ? records.reduce((s, r) => s + (r._origAmount || r._aed || 0), 0) : 0;
+  const paidOrig  = showDual ? records.filter((r) => r._paymentStatus === "paid").reduce((s, r) => s + (r._origAmount || r._aed || 0), 0) : 0;
+  const outOrig   = showDual ? records.filter((r) => r._paymentStatus !== "paid").reduce((s, r) => s + (r._origAmount || r._aed || 0), 0) : 0;
+
+  const rows = [];
+
+  rows.push(["STATEMENT OF ACCOUNT"]);
+  rows.push([]);
+
+  const fromLabel = "FROM";
+  const toLabel   = type === "invoices" ? "BILL TO" : "BRAND";
+  rows.push([fromLabel, "", "", "", "", toLabel]);
+  rows.push([companySettings?.companyName || "", "", "", "", "", entityName]);
+
+  const companyAddressLines = (companySettings?.address || "").split("\n").map((l) => l.trim()).filter(Boolean);
+  const entityAddressLines  = entityAddress.split("\n").map((l) => l.trim()).filter(Boolean);
+
+  const maxLines = Math.max(companyAddressLines.length, entityAddressLines.length);
+  for (let i = 0; i < maxLines; i++) {
+    rows.push([companyAddressLines[i] || "", "", "", "", "", entityAddressLines[i] || ""]);
+  }
+
+  if (entityContact) {
+    rows.push(["", "", "", "", "", `Attn: ${entityContact}`]);
+  }
+
+  const phoneRow = [];
+  phoneRow.push(companySettings?.phone ? `Tel: ${companySettings.phone}` : "");
+  phoneRow.push(""); phoneRow.push(""); phoneRow.push(""); phoneRow.push("");
+  phoneRow.push(entityPhone ? `Tel: ${entityPhone}` : "");
+  if (phoneRow[0] || phoneRow[5]) rows.push(phoneRow);
+
+  const emailRow = [];
+  emailRow.push(companySettings?.email ? `Email: ${companySettings.email}` : "");
+  emailRow.push(""); emailRow.push(""); emailRow.push(""); emailRow.push("");
+  emailRow.push(entityEmail ? `Email: ${entityEmail}` : "");
+  if (emailRow[0] || emailRow[5]) rows.push(emailRow);
+
+  const trnRow = [];
+  trnRow.push(companySettings?.taxNumber ? `TRN: ${companySettings.taxNumber}` : "");
+  trnRow.push(""); trnRow.push(""); trnRow.push(""); trnRow.push("");
+  trnRow.push(entityTrn ? `TRN: ${entityTrn}` : (entityWebsite ? `Web: ${entityWebsite}` : ""));
+  if (trnRow[0] || trnRow[5]) rows.push(trnRow);
+
+  rows.push([]);
+  rows.push(["Period:", period, "", "Status:", statusLabel, "", "Records:", records.length]);
+  rows.push([]);
+
+  if (type === "invoices") {
+    rows.push(["#", "Invoice #", "Date", "Subtotal (AED)", "VAT (AED)", "Total (AED)", "Status", "Received"]);
+    records.forEach((r, i) => {
+      rows.push([
+        i + 1,
+        r._ref,
+        fmtD(r._date),
+        `AED ${fmtAmt(r._subtotal)}`,
+        `AED ${fmtAmt(r._vat)}`,
+        `AED ${fmtAmt(r._aed)}`,
+        r._paymentStatus === "paid" ? "Paid" : "Outstanding",
+        fmtD(r._paymentDate),
+      ]);
+    });
+  } else {
+    rows.push(["#", "PO #", "Date", "Amount", "Amount (AED)", "Status", "Payment Date"]);
+    records.forEach((r, i) => {
+      rows.push([
+        i + 1,
+        r._ref,
+        fmtD(r._date),
+        `${r._currency} ${fmtAmt(r._origAmount)}`,
+        `AED ${fmtAmt(r._aed)}`,
+        r._paymentStatus === "paid" ? "Paid" : "Outstanding",
+        fmtD(r._paymentDate),
+      ]);
+    });
+  }
+
+  rows.push([]);
+
+  const colCount = type === "invoices" ? 8 : 7;
+  const pad = (n) => Array(n).fill("");
+
+  if (showDual) {
+    rows.push([...pad(colCount - 3), "Outstanding:", `${origCurrency} ${fmtAmt(outOrig)}`, `AED ${fmtAmt(outAed)}`]);
+    rows.push([...pad(colCount - 3), "Paid:",        `${origCurrency} ${fmtAmt(paidOrig)}`,`AED ${fmtAmt(paidAed)}`]);
+    rows.push([...pad(colCount - 3), "Grand Total:", `${origCurrency} ${fmtAmt(totalOrig)}`,`AED ${fmtAmt(totalAed)}`]);
+  } else {
+    rows.push([...pad(colCount - 2), "Outstanding:", `AED ${fmtAmt(outAed)}`]);
+    rows.push([...pad(colCount - 2), "Paid:",        `AED ${fmtAmt(paidAed)}`]);
+    rows.push([...pad(colCount - 2), "Grand Total:", `AED ${fmtAmt(totalAed)}`]);
+  }
+
+  rows.push([]);
+  rows.push(["Generated on:", today]);
+
+  const workbook  = XLSX.utils.book_new();
+  const worksheet = XLSX.utils.aoa_to_sheet(rows);
+
+  worksheet["!cols"] = type === "invoices"
+    ? [{ width: 5 }, { width: 14 }, { width: 12 }, { width: 16 }, { width: 14 }, { width: 16 }, { width: 14 }, { width: 14 }]
+    : [{ width: 5 }, { width: 14 }, { width: 12 }, { width: 18 }, { width: 16 }, { width: 14 }, { width: 14 }];
+
+  XLSX.utils.book_append_sheet(workbook, worksheet, "Statement");
+
+  const safeName = (entity?.name || "statement").replace(/[/\\?*:|"<>]/g, "").replace(/\s+/g, "_");
+  XLSX.writeFile(workbook, `SOA_${safeName}_${format(new Date(), "dd-MM-yy")}.xlsx`);
+};
