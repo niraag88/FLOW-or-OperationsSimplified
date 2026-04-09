@@ -289,13 +289,13 @@ export default function VATReportTab({ invoices, customers, books, companySettin
                 </Button>
               </DropdownMenuTrigger>
               <DropdownMenuContent align="end">
-                <DropdownMenuItem onClick={handleExportXLSX}>
-                  <Download className="w-4 h-4 mr-2" />
-                  Export to XLSX
-                </DropdownMenuItem>
                 <DropdownMenuItem onClick={handleViewAndPrint}>
                   <Eye className="w-4 h-4 mr-2" />
                   View &amp; Print
+                </DropdownMenuItem>
+                <DropdownMenuItem onClick={handleExportXLSX}>
+                  <Download className="w-4 h-4 mr-2" />
+                  Export to XLSX
                 </DropdownMenuItem>
               </DropdownMenuContent>
             </DropdownMenu>
