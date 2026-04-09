@@ -465,7 +465,7 @@ export default function BackupSettings() {
                         <td className="px-3 py-2 font-mono text-xs text-gray-500 hidden sm:table-cell truncate max-w-[200px]">
                           {r.sourceFilename || r.backupDbFilename?.split('/').pop() || (r.sourceBackupRunId ? `Backup run #${r.sourceBackupRunId}` : "—")}
                         </td>
-                        <td className="px-3 py-2 text-gray-500 hidden sm:table-cell">{r.username || "—"}</td>
+                        <td className="px-3 py-2 text-gray-500 hidden sm:table-cell">{r.triggeredByName || "—"}</td>
                         <td className="px-3 py-2 text-gray-500 hidden sm:table-cell">{formatDuration(r.durationMs)}</td>
                       </tr>
                     ))}

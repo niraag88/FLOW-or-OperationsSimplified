@@ -687,7 +687,19 @@ export function registerSystemRoutes(app: Express) {
 
   // ─── Restore Endpoints ────────────────────────────────────────────────────
 
-  /** Shared helper: run the restore and record the outcome in restore_runs */
+  /**
+   * Shared restore helper.
+   *
+   * Audit persistence strategy:
+   *   1. BEFORE the restore, insert a "pending" row into ops.restore_runs.
+   *      The ops schema is NOT dropped by the restore (only public is), so
+   *      this record is guaranteed to survive regardless of outcome.
+   *   2. RUN the restore (drops + recreates public schema).
+   *   3. AFTER the restore, update the pre-created row with the final result.
+   *      Also best-effort write to public.audit_log (which is recreated from
+   *      the backup; if the backup is very old and lacks audit_log, this fails
+   *      silently — the ops record is already the definitive audit trail).
+   */
   async function runRestore(opts: {
     sqlGzStream: import('stream').Readable;
     triggeredBy: string;
@@ -697,7 +709,26 @@ export function registerSystemRoutes(app: Express) {
     actorName: string;
   }) {
     const { sqlGzStream, triggeredBy, sourceBackupRunId, sourceFilename, res, actorName } = opts;
-    let result: { success: boolean; error?: string; durationMs: number } | null = null;
+    const label = sourceFilename || (sourceBackupRunId ? `backup run #${sourceBackupRunId}` : 'unknown');
+
+    // Step 1: Pre-create a pending record in ops.restore_runs BEFORE the restore.
+    // ops schema is not touched by DROP SCHEMA public CASCADE, so this always persists.
+    let preCreatedId: number | null = null;
+    try {
+      const [inserted] = await db.insert(restoreRuns).values({
+        triggeredBy,
+        triggeredByName: actorName,
+        sourceBackupRunId: sourceBackupRunId ?? null,
+        sourceFilename: sourceFilename ?? null,
+        success: null,  // pending — will be updated after restore
+      }).returning({ id: restoreRuns.id });
+      preCreatedId = inserted?.id ?? null;
+    } catch (preErr) {
+      console.warn('Could not pre-create ops.restore_runs record:', preErr);
+    }
+
+    // Step 2: Run the restore.
+    let result: { success: boolean; error?: string; durationMs: number };
     try {
       // @ts-ignore
       const { restoreBackup } = await import('../../scripts/restoreBackup.js');
@@ -707,43 +738,50 @@ export function registerSystemRoutes(app: Express) {
       result = { success: false, error: importOrRunError.message || 'Restore failed unexpectedly', durationMs: 0 };
     }
 
-    // Best-effort: record the outcome in restore_runs.
-    // source_backup_run_id has no FK so the insert won't fail due to missing backup_runs row.
-    // The table itself may be absent if restoring a very old backup — fall back to audit_log.
-    try {
-      await db.insert(restoreRuns).values({
-        triggeredBy,
-        sourceBackupRunId: sourceBackupRunId ?? null,
-        sourceFilename: sourceFilename ?? null,
-        success: result.success,
-        errorMessage: result.error ?? null,
-        durationMs: result.durationMs ?? null,
-      });
-    } catch (auditErr) {
-      console.warn('Could not persist restore_runs record — falling back to audit_log:', auditErr);
+    const finishedAt = new Date();
+
+    // Step 3: Update the pre-created ops record with the final outcome.
+    // The ops schema was untouched by the restore, so this always works.
+    if (preCreatedId !== null) {
       try {
-        const label = sourceFilename || (sourceBackupRunId ? `backup run #${sourceBackupRunId}` : 'unknown');
-        writeAuditLog({
-          actor: triggeredBy,
-          actorName,
-          targetId: 'restore',
-          targetType: 'restore_run',
-          action: 'CREATE',
-          details: `[restore_runs fallback] Restore from ${label} ${result.success ? 'succeeded' : `failed: ${result.error}`} (durationMs: ${result.durationMs})`,
+        await db.update(restoreRuns)
+          .set({
+            finishedAt,
+            success: result.success,
+            errorMessage: result.error ?? null,
+            durationMs: result.durationMs ?? null,
+          })
+          .where(eq(restoreRuns.id, preCreatedId));
+      } catch (updateErr) {
+        console.warn('Could not update ops.restore_runs record after restore:', updateErr);
+      }
+    } else {
+      // Pre-create failed — insert a new complete record now.
+      try {
+        await db.insert(restoreRuns).values({
+          triggeredBy,
+          triggeredByName: actorName,
+          sourceBackupRunId: sourceBackupRunId ?? null,
+          sourceFilename: sourceFilename ?? null,
+          finishedAt,
+          success: result.success,
+          errorMessage: result.error ?? null,
+          durationMs: result.durationMs ?? null,
         });
-      } catch (_) {}
+      } catch (retryErr) {
+        console.warn('Could not insert ops.restore_runs record after restore:', retryErr);
+      }
     }
 
-    // Best-effort: write audit log
+    // Step 4 (best-effort): Write to public.audit_log in the now-restored DB.
     try {
-      const label = sourceFilename || (sourceBackupRunId ? `backup run #${sourceBackupRunId}` : 'unknown');
       writeAuditLog({
         actor: triggeredBy,
         actorName,
         targetId: 'restore',
         targetType: 'restore_run',
         action: 'CREATE',
-        details: `Database restore from ${label} ${result.success ? 'succeeded' : 'failed'}`,
+        details: `Database restore from ${label} ${result.success ? 'succeeded' : `failed: ${result.error}`} (durationMs: ${result.durationMs})`,
       });
     } catch (_) {}
 
@@ -797,24 +835,32 @@ export function registerSystemRoutes(app: Express) {
     });
   });
 
-  /** GET /api/ops/restore-runs — last 10 restore run records with username and source backup filename */
+  /**
+   * GET /api/ops/restore-runs — last 10 restore run records.
+   *
+   * Reads from ops.restore_runs which is NOT in the public schema
+   * and is therefore unaffected by database restores.
+   * Uses triggeredByName (denormalized) since users table is in public
+   * and may reflect a different state after restore.
+   * LEFT JOIN on backup_runs (public) for the backup filename — best-effort.
+   */
   app.get('/api/ops/restore-runs', requireAuth(['Admin']), async (req, res) => {
     try {
       const rows = await db
         .select({
           id: restoreRuns.id,
           restoredAt: restoreRuns.restoredAt,
+          finishedAt: restoreRuns.finishedAt,
           triggeredBy: restoreRuns.triggeredBy,
+          triggeredByName: restoreRuns.triggeredByName,
           sourceBackupRunId: restoreRuns.sourceBackupRunId,
           sourceFilename: restoreRuns.sourceFilename,
           success: restoreRuns.success,
           errorMessage: restoreRuns.errorMessage,
           durationMs: restoreRuns.durationMs,
-          username: users.username,
           backupDbFilename: backupRuns.dbFilename,
         })
         .from(restoreRuns)
-        .leftJoin(users, eq(restoreRuns.triggeredBy, users.id))
         .leftJoin(backupRuns, eq(restoreRuns.sourceBackupRunId, backupRuns.id))
         .orderBy(desc(restoreRuns.restoredAt))
         .limit(10);

@@ -99,6 +99,13 @@
       "when": 1775770922369,
       "tag": "0013_cuddly_scarlet_witch",
       "breakpoints": true
+    },
+    {
+      "idx": 14,
+      "version": "7",
+      "when": 1775771280990,
+      "tag": "0014_jazzy_puff_adder",
+      "breakpoints": true
     }
   ]
 }

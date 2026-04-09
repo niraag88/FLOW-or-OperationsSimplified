@@ -1,7 +1,11 @@
 import { sql } from "drizzle-orm";
-import { pgTable, text, varchar, timestamp, boolean, serial, decimal, integer, bigint, date, index, jsonb } from "drizzle-orm/pg-core";
+import { pgTable, pgSchema, text, varchar, timestamp, boolean, serial, decimal, integer, bigint, date, index, jsonb } from "drizzle-orm/pg-core";
 import { createInsertSchema } from "drizzle-zod";
 import { z } from "zod";
+
+// Separate schema for operational audit tables that must survive database restores.
+// DROP SCHEMA public CASCADE (used during restore) does NOT affect this schema.
+export const opsSchema = pgSchema("ops");
 
 export const users = pgTable("users", {
   id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
@@ -798,17 +802,26 @@ export type InsertBackupRun = z.infer<typeof insertBackupRunSchema>;
 export type BackupRun = typeof backupRuns.$inferSelect;
 
 // Restore Runs table — records every database restore attempt.
-// Note: source_backup_run_id is intentionally NOT a FK to backup_runs.
-// After a restore the restored database may not contain the referenced
-// backup_runs row (if it was created after the backup was taken), so a
-// FK would cause the insert to fail and lose the audit record.
-export const restoreRuns = pgTable("restore_runs", {
+//
+// IMPORTANT: This table lives in the "ops" schema, NOT "public".
+// The restore process runs `DROP SCHEMA public CASCADE` which would wipe
+// any table in the public schema. Placing restore_runs in the ops schema
+// guarantees that pre-created restore records and historical data survive
+// the restore operation.
+//
+// source_backup_run_id has NO FK to backup_runs because:
+//   pg_dump captures the DB state before the backup_runs row for that run
+//   is inserted, so the referenced row is absent in the restored snapshot.
+//   Using a plain integer avoids FK violations while keeping the reference.
+export const restoreRuns = opsSchema.table("restore_runs", {
   id: serial("id").primaryKey(),
   restoredAt: timestamp("restored_at").defaultNow().notNull(),
-  triggeredBy: varchar("triggered_by").references(() => users.id),
-  sourceBackupRunId: integer("source_backup_run_id"), // no FK — see note above
-  sourceFilename: text("source_filename"), // for file-upload restores (also used as denormalized label for cloud restores)
-  success: boolean("success").notNull().default(false),
+  finishedAt: timestamp("finished_at"),                        // set after restore completes
+  triggeredBy: varchar("triggered_by"),                        // user id (no FK — users table is in public)
+  triggeredByName: text("triggered_by_name"),                  // denormalized username for post-restore reads
+  sourceBackupRunId: integer("source_backup_run_id"),          // no FK — see note above
+  sourceFilename: text("source_filename"),                      // denormalized filename label (cloud or upload)
+  success: boolean("success"),                                  // null = pending / in-progress
   errorMessage: text("error_message"),
   durationMs: integer("duration_ms"),
 });
