@@ -146,12 +146,12 @@ export const exportQuotationToXLSX = async (quotation) => {
     
     // Get company info — use snapshot captured at creation time; fall back to live settings for older quotations
     let companyInfo = {
-      companyName: 'SUPERNATURE LLC',
-      address: 'Al Rukhaimi Building\nSheikh Zayed Road\nDubai\nU.A.E.',
-      phone: '+971 4 4582211',
-      email: 'info@supernaturellc.com',
+      companyName: '',
+      address: '',
+      phone: '',
+      email: '',
       website: '',
-      taxNumber: '100042339000003',
+      taxNumber: '',
       currency: 'AED'
     };
 
@@ -538,13 +538,13 @@ export const exportPurchaseOrderToPDF = async (purchaseOrder) => {
   try {
     // Get company settings dynamically
     let companyInfo = {
-      companyName: 'SUPERNATURE LLC',
-      address: 'Al Rukhaimi Building\nSheikh Zayed Road\nDubai\nU.A.E.',
-      phone: '+971 4 4582211',
-      email: 'info@supernaturellc.com',
+      companyName: '',
+      address: '',
+      phone: '',
+      email: '',
       website: '',
-      vatNumber: '100042339000003',
-      currency: 'GBP',
+      vatNumber: '',
+      currency: 'AED',
       logo: null
     };
     
