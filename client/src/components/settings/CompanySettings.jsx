@@ -9,7 +9,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Upload, Building, Save, PoundSterling, DollarSign, Edit2, X } from "lucide-react";
 import { CompanySettings } from "@/api/entities";
 import { UploadFile } from "@/api/integrations";
-import { useToast } from "@/components/ui/use-toast";
+import { useToast } from "@/hooks/use-toast";
 import { useAuth } from "@/hooks/useAuth";
 
 export default function CompanySettingsComponent() {

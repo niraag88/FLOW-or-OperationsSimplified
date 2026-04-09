@@ -18,7 +18,7 @@ import { ArrowLeft, Loader2 } from 'lucide-react';
 import { Customer } from '@/api/entities';
 import { Quotation } from '@/api/entities';
 import { DeliveryOrder } from '@/api/entities';
-import { useToast } from '@/components/ui/use-toast';
+import { useToast } from '@/hooks/use-toast';
 
 export default function CreateFromExistingDialog({ open, onClose, onDocumentSelected }) {
   const [loading, setLoading] = useState(false);

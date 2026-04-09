@@ -19,7 +19,7 @@ import {
 } from "@/components/ui/alert-dialog";
 import { Lock, Unlock, AlertTriangle, PlusCircle, Download } from 'lucide-react';
 import { format, getYear, isValid, parseISO } from 'date-fns';
-import { useToast } from "@/components/ui/use-toast";
+import { useToast } from "@/hooks/use-toast";
 
 export default function BookClosingManager({ currentUser }) {
   const [books, setBooks] = useState([]);

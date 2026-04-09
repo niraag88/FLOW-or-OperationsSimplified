@@ -18,7 +18,7 @@ import { Plus, Edit2, Trash2, Building2, ExternalLink } from "lucide-react";
 import { Brand } from "@/api/entities";
 import { useAuth } from "@/hooks/useAuth";
 import { logAuditAction } from "../utils/auditLogger";
-import { useToast } from "@/components/ui/use-toast";
+import { useToast } from "@/hooks/use-toast";
 import SimpleConfirmDialog from "../common/SimpleConfirmDialog";
 
 const initialFormData = {

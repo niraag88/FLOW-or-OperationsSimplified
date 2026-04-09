@@ -14,7 +14,7 @@ import {
   CheckCircle,
   Settings as SettingsIcon,
 } from 'lucide-react';
-import { useToast } from '@/components/ui/use-toast';
+import { useToast } from '@/hooks/use-toast';
 
 const QUOTA_BYTES = 10 * 1024 * 1024 * 1024; // 10 GiB
 

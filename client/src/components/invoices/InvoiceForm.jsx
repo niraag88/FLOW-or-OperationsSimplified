@@ -19,7 +19,7 @@ import { Product } from "@/api/entities";
 import { Customer } from "@/api/entities";
 import { Brand } from "@/api/entities";
 import { Card } from "@/components/ui/card";
-import { useToast } from "@/components/ui/use-toast";
+import { useToast } from "@/hooks/use-toast";
 
 const getInitialFormData = (invoiceNumber) => ({
   invoice_number: invoiceNumber || "",

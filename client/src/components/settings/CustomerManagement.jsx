@@ -18,7 +18,7 @@ import {
 } from "@/components/ui/dialog";
 import { Plus, Edit2, Trash2, Save, X, Users, Download } from "lucide-react";
 import { Customer } from "@/api/entities";
-import { useToast } from "@/components/ui/use-toast";
+import { useToast } from "@/hooks/use-toast";
 import { logAuditAction } from "../utils/auditLogger";
 import { exportToCsv } from "../utils/export";
 import CustomerActionsDropdown from "./CustomerActionsDropdown";

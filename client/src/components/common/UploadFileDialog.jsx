@@ -8,7 +8,7 @@ import {
 } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
 import { Upload, Paperclip, X, FileText, Image } from "lucide-react";
-import { useToast } from "@/components/ui/use-toast";
+import { useToast } from "@/hooks/use-toast";
 
 const ALLOWED_TYPES = {
   'application/pdf': { ext: 'pdf', label: 'PDF' },
