@@ -78,17 +78,15 @@ export default function StockOnHandReport({ products }) {
   const resetPage = () => setCurrentPage(1);
 
   const handleViewAndPrint = () => {
-    const now = format(new Date(), 'dd/MM/yy HH:mm');
-    const reportDate = format(new Date(), 'dd/MM/yy');
-    const headerCells = `<th>Date</th><th>Brand</th><th>Product</th><th>SKU</th><th>Size</th><th style="text-align:right">Qty</th><th>Status</th>`;
+    const now = format(new Date(), 'dd/MM/yy');
+    const headerCells = `<th>SKU</th><th>Brand</th><th>Product</th><th>Size</th><th style="text-align:right">Qty</th><th>Status</th>`;
     const bodyRows = filtered.map(p => {
       const qty = p.stockQuantity || 0;
       const status = getStatus(qty);
       return `<tr>
-        <td>${escapeHtml(reportDate)}</td>
+        <td>${escapeHtml(p.sku)}</td>
         <td>${escapeHtml(p.brandName)}</td>
         <td>${escapeHtml(p.name)}</td>
-        <td>${escapeHtml(p.sku)}</td>
         <td>${escapeHtml(p.size)}</td>
         <td style="text-align:right">${qty}</td>
         <td>${escapeHtml(status)}</td>
@@ -137,14 +135,14 @@ export default function StockOnHandReport({ products }) {
 
   const handleExportXLSX = () => {
     const rows = filtered.map(p => ({
+      'SKU': p.sku || '-',
       'Brand': p.brandName || '-',
       'Product': p.name || '-',
-      'SKU': p.sku || '-',
       'Size': p.size || '-',
       'Qty': p.stockQuantity || 0,
       'Status': getStatus(p.stockQuantity || 0),
     }));
-    exportToXLSX(rows, `Stock_Report_${format(new Date(), 'dd-MM-yy')}`, 'Stock Report');
+    exportToXLSX(rows, `Stock_Report_${format(new Date(), 'ddMMyy')}`, 'Stock Report');
   };
 
   return (
