@@ -797,13 +797,17 @@ export const insertBackupRunSchema = createInsertSchema(backupRuns).omit({ id: t
 export type InsertBackupRun = z.infer<typeof insertBackupRunSchema>;
 export type BackupRun = typeof backupRuns.$inferSelect;
 
-// Restore Runs table — records every database restore attempt
+// Restore Runs table — records every database restore attempt.
+// Note: source_backup_run_id is intentionally NOT a FK to backup_runs.
+// After a restore the restored database may not contain the referenced
+// backup_runs row (if it was created after the backup was taken), so a
+// FK would cause the insert to fail and lose the audit record.
 export const restoreRuns = pgTable("restore_runs", {
   id: serial("id").primaryKey(),
   restoredAt: timestamp("restored_at").defaultNow().notNull(),
   triggeredBy: varchar("triggered_by").references(() => users.id),
-  sourceBackupRunId: integer("source_backup_run_id").references(() => backupRuns.id),
-  sourceFilename: text("source_filename"), // for file-upload restores
+  sourceBackupRunId: integer("source_backup_run_id"), // no FK — see note above
+  sourceFilename: text("source_filename"), // for file-upload restores (also used as denormalized label for cloud restores)
   success: boolean("success").notNull().default(false),
   errorMessage: text("error_message"),
   durationMs: integer("duration_ms"),

@@ -708,7 +708,8 @@ export function registerSystemRoutes(app: Express) {
     }
 
     // Best-effort: record the outcome in restore_runs.
-    // After a restore the table may be absent (old backup) — that must NOT override the actual result.
+    // source_backup_run_id has no FK so the insert won't fail due to missing backup_runs row.
+    // The table itself may be absent if restoring a very old backup — fall back to audit_log.
     try {
       await db.insert(restoreRuns).values({
         triggeredBy,
@@ -719,7 +720,18 @@ export function registerSystemRoutes(app: Express) {
         durationMs: result.durationMs ?? null,
       });
     } catch (auditErr) {
-      console.warn('Could not persist restore_runs record (table may be absent in restored backup):', auditErr);
+      console.warn('Could not persist restore_runs record — falling back to audit_log:', auditErr);
+      try {
+        const label = sourceFilename || (sourceBackupRunId ? `backup run #${sourceBackupRunId}` : 'unknown');
+        writeAuditLog({
+          actor: triggeredBy,
+          actorName,
+          targetId: 'restore',
+          targetType: 'restore_run',
+          action: 'CREATE',
+          details: `[restore_runs fallback] Restore from ${label} ${result.success ? 'succeeded' : `failed: ${result.error}`} (durationMs: ${result.durationMs})`,
+        });
+      } catch (_) {}
     }
 
     // Best-effort: write audit log
