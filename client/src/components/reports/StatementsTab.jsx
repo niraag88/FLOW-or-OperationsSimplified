@@ -46,12 +46,12 @@ function SummaryTiles({ records }) {
     let origCurrency = null;
     records.forEach((r) => {
       totalAed  += r._aed || 0;
-      totalOrig += r._origAmount || 0;
+      totalOrig += r._origAmount || r._aed || 0;
       if (!origCurrency && r._currency && r._currency !== "AED") origCurrency = r._currency;
       if (r._paymentStatus === "paid") {
-        paidCount++; paidAed += r._aed || 0; paidOrig += r._origAmount || 0;
+        paidCount++; paidAed += r._aed || 0; paidOrig += r._origAmount || r._aed || 0;
       } else {
-        outCount++; outAed += r._aed || 0; outOrig += r._origAmount || 0;
+        outCount++; outAed += r._aed || 0; outOrig += r._origAmount || r._aed || 0;
       }
     });
     const showOrig = Boolean(origCurrency);
@@ -171,9 +171,9 @@ function buildStatementHtml({ type, entity, companySettings, records, dateFrom, 
 
   const origCurrency = records.find((r) => r._currency && r._currency !== "AED")?._currency || null;
   const showDual = Boolean(origCurrency);
-  const totalOrig = showDual ? records.reduce((s, r) => s + (r._origAmount || 0), 0) : 0;
-  const paidOrig  = showDual ? records.filter((r) => r._paymentStatus === "paid").reduce((s, r) => s + (r._origAmount || 0), 0) : 0;
-  const outOrig   = showDual ? records.filter((r) => r._paymentStatus !== "paid").reduce((s, r) => s + (r._origAmount || 0), 0) : 0;
+  const totalOrig = showDual ? records.reduce((s, r) => s + (r._origAmount || r._aed || 0), 0) : 0;
+  const paidOrig  = showDual ? records.filter((r) => r._paymentStatus === "paid").reduce((s, r) => s + (r._origAmount || r._aed || 0), 0) : 0;
+  const outOrig   = showDual ? records.filter((r) => r._paymentStatus !== "paid").reduce((s, r) => s + (r._origAmount || r._aed || 0), 0) : 0;
 
   const entityName    = entity?.name || "—";
   const entityAddress = type === "invoices" ? (entity?.billingAddress || entity?.address || "") : (entity?.description || "");
@@ -317,7 +317,7 @@ function buildStatementHtml({ type, entity, companySettings, records, dateFrom, 
     <span class="tl grand">Grand Total</span>
     <span class="tv">
       ${showDual ? `<div>${esc(origCurrency)} ${esc(fmt(totalOrig))}</div>` : ""}
-      <div style="${showDual ? "color:#6b7280;font-weight:normal" : ""}">AED ${esc(fmt(totalAed))}</div>
+      <div style="${showDual ? "color:#6b7280;font-size:9px;font-weight:normal" : ""}">AED ${esc(fmt(totalAed))}</div>
     </span>
   </div>
 </div>
@@ -334,9 +334,9 @@ function StatementLayout({ type, entity, companySettings, records, dateFrom, dat
 
   const origCurrency = records.find((r) => r._currency && r._currency !== "AED")?._currency || null;
   const showDual = Boolean(origCurrency);
-  const totalOrig = showDual ? records.reduce((s, r) => s + (r._origAmount || 0), 0) : 0;
-  const paidOrig  = showDual ? records.filter((r) => r._paymentStatus === "paid").reduce((s, r) => s + (r._origAmount || 0), 0) : 0;
-  const outOrig   = showDual ? records.filter((r) => r._paymentStatus !== "paid").reduce((s, r) => s + (r._origAmount || 0), 0) : 0;
+  const totalOrig = showDual ? records.reduce((s, r) => s + (r._origAmount || r._aed || 0), 0) : 0;
+  const paidOrig  = showDual ? records.filter((r) => r._paymentStatus === "paid").reduce((s, r) => s + (r._origAmount || r._aed || 0), 0) : 0;
+  const outOrig   = showDual ? records.filter((r) => r._paymentStatus !== "paid").reduce((s, r) => s + (r._origAmount || r._aed || 0), 0) : 0;
 
   const entityName    = entity?.name || "—";
   const entityAddress = type === "invoices" ? (entity?.billingAddress || entity?.address || "") : (entity?.description || "");
@@ -473,7 +473,7 @@ function StatementLayout({ type, entity, companySettings, records, dateFrom, dat
             <span className="w-28 text-right">Grand Total</span>
             <span className="w-36 text-right">
               {showDual && <p>{origCurrency} {fmt(totalOrig)}</p>}
-              <p className={showDual ? "text-gray-400 font-normal" : ""}>AED {fmt(totalAed)}</p>
+              <p className={showDual ? "text-gray-500 text-xs font-normal" : ""}>AED {fmt(totalAed)}</p>
             </span>
           </div>
         </div>
