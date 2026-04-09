@@ -196,11 +196,11 @@ export default function VATReportTab({ invoices, customers, books, companySettin
         'Date': formatDate(invoice.invoice_date || invoice.invoiceDate),
         'Invoice #': invoice.invoice_number || invoice.invoiceNumber || '',
         'Customer': getCustomerName(custId),
+        'Status': invoice.status || '',
         'VAT Treatment': vatLabel(t),
         'Amount (ex-VAT)': `AED ${fmt(invoice.subtotal || 0)}`,
         'VAT Amount': `AED ${fmt(invoice.tax_amount || 0)}`,
         'Total (incl VAT)': `AED ${fmt(invoice.total_amount || invoice.amount || 0)}`,
-        'Status': invoice.status || '',
       };
     });
     exportToXLSX(exportData, `VAT_Report_${format(new Date(), 'dd-MM-yy')}`, 'VAT Report');
@@ -208,7 +208,7 @@ export default function VATReportTab({ invoices, customers, books, companySettin
 
   const handleViewAndPrint = () => {
     const now = format(new Date(), 'dd/MM/yy HH:mm');
-    const headerCells = `<th>Date</th><th>Invoice #</th><th>Customer</th><th>VAT Treatment</th><th style="text-align:right">Amount (ex-VAT)</th><th style="text-align:right">VAT Amount</th><th style="text-align:right">Total (incl VAT)</th>`;
+    const headerCells = `<th>Date</th><th>Invoice #</th><th>Customer</th><th>Status</th><th>VAT Treatment</th><th style="text-align:right">Amount (ex-VAT)</th><th style="text-align:right">VAT Amount</th><th style="text-align:right">Total (incl VAT)</th>`;
     const bodyRows = filteredInvoices.map(inv => {
       const custId = inv.customer_id ?? inv.customerId;
       const t = inv.tax_treatment || inv.taxTreatment || 'StandardRated';
@@ -216,6 +216,7 @@ export default function VATReportTab({ invoices, customers, books, companySettin
         <td>${formatDate(inv.invoice_date || inv.invoiceDate)}</td>
         <td>${inv.invoice_number || inv.invoiceNumber || ''}</td>
         <td>${getCustomerName(custId)}</td>
+        <td>${inv.status ? inv.status.charAt(0).toUpperCase() + inv.status.slice(1) : ''}</td>
         <td>${vatLabel(t)}</td>
         <td style="text-align:right">AED ${fmt(inv.subtotal || 0)}</td>
         <td style="text-align:right">AED ${fmt(inv.tax_amount || 0)}</td>
@@ -421,6 +422,7 @@ export default function VATReportTab({ invoices, customers, books, companySettin
                   <TableHead>Date</TableHead>
                   <TableHead>Invoice #</TableHead>
                   <TableHead>Customer</TableHead>
+                  <TableHead>Status</TableHead>
                   <TableHead>VAT Treatment</TableHead>
                   <TableHead className="text-right">Amount (ex-VAT)</TableHead>
                   <TableHead className="text-right">VAT Amount</TableHead>
@@ -431,7 +433,7 @@ export default function VATReportTab({ invoices, customers, books, companySettin
               <TableBody>
                 {paginatedInvoices.length === 0 ? (
                   <TableRow>
-                    <TableCell colSpan={8} className="text-center py-12 text-gray-500">
+                    <TableCell colSpan={9} className="text-center py-12 text-gray-500">
                       No invoices found for the selected filters
                     </TableCell>
                   </TableRow>
@@ -452,6 +454,17 @@ export default function VATReportTab({ invoices, customers, books, companySettin
                       </TableCell>
                       <TableCell className="font-medium">{invNum}</TableCell>
                       <TableCell>{getCustomerName(custId)}</TableCell>
+                      <TableCell>
+                        {(() => {
+                          const s = invoice.status || '';
+                          if (s === 'cancelled') return <Badge className="bg-red-100 text-red-800 border border-red-300 text-xs">Cancelled</Badge>;
+                          if (s === 'paid')      return <Badge className="bg-purple-100 text-purple-800 border border-purple-300 text-xs">Paid</Badge>;
+                          if (s === 'delivered') return <Badge className="bg-green-100 text-green-800 border border-green-300 text-xs">Delivered</Badge>;
+                          if (s === 'submitted') return <Badge className="bg-blue-100 text-blue-800 border border-blue-300 text-xs">Submitted</Badge>;
+                          if (s === 'draft')     return <Badge className="bg-gray-100 text-gray-600 border border-gray-300 text-xs">Draft</Badge>;
+                          return <Badge variant="outline" className="text-xs capitalize">{s}</Badge>;
+                        })()}
+                      </TableCell>
                       <TableCell>
                         {t === 'StandardRated' && <Badge className="bg-green-100 text-green-800 border border-green-300 text-xs">Standard Rated</Badge>}
                         {t === 'ZeroRated'    && <Badge className="bg-blue-100 text-blue-800 border border-blue-300 text-xs">Zero Rated</Badge>}
