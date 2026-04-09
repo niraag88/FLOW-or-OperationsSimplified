@@ -54,8 +54,8 @@ export default function ProductsPrintView({ products, onClose }) {
                 <td>{product.sku}</td>
                 <td>{product.name}</td>
                 <td>{product.size || '-'}</td>
-                <td>GBP {parseFloat(product.costPrice || 0).toFixed(2)}</td>
-                <td>GBP {parseFloat(product.unitPrice || 0).toFixed(2)}</td>
+                <td>{product.costPriceCurrency || 'AED'} {parseFloat(product.costPrice || 0).toFixed(2)}</td>
+                <td>AED {parseFloat(product.unitPrice || 0).toFixed(2)}</td>
                 <td>{product.stockQuantity || 0}</td>
                 <td>{product.isActive ? 'Active' : 'Inactive'}</td>
               </tr>

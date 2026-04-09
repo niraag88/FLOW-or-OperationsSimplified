@@ -124,8 +124,6 @@ export const exportQuotationToXLSX = async (quotation) => {
     return;
   }
 
-  console.log('Starting XLSX export for quotation:', quotation);
-  
   try {
     // Get quotation number with fallback
     const quotationNumber = quotation.quotation_number || quotation.quoteNumber || 'UNKNOWN';
@@ -136,7 +134,6 @@ export const exportQuotationToXLSX = async (quotation) => {
       const response = await fetch(`/api/quotations/${quotation.id}`, { credentials: 'include' });
       if (response.ok) {
         fullQuotation = await response.json();
-        console.log('Fetched complete quotation with items:', fullQuotation);
       } else {
         console.warn('Could not fetch complete quotation, using base quotation data');
       }
@@ -188,8 +185,6 @@ export const exportQuotationToXLSX = async (quotation) => {
       }
     }
 
-    console.log('Creating XLSX workbook...');
-    
     // Use array of arrays approach to avoid column headers (A, B, C, etc.)
     const exportData = [];
     
@@ -312,8 +307,6 @@ export const exportQuotationToXLSX = async (quotation) => {
     const total = parseFloat(fullQuotation.grandTotal || fullQuotation.total || fullQuotation.totalAmount || (subtotal + vatAmount) || 0);
     exportData.push(['', '', '', '', '', 'TOTAL:', `AED ${total.toFixed(2)}`]);
     
-    console.log('Export data prepared:', exportData);
-    
     // Create workbook and worksheet using array of arrays (no column headers)
     const workbook = XLSX.utils.book_new();
     const worksheet = XLSX.utils.aoa_to_sheet(exportData);
@@ -335,12 +328,8 @@ export const exportQuotationToXLSX = async (quotation) => {
     // Generate filename with timestamp
     const timestampedFilename = `Quotation_${fullQuotation.quoteNumber || quotationNumber || 'Unknown'}_${new Date().toISOString().split('T')[0]}.xlsx`;
     
-    console.log('Saving file as:', timestampedFilename);
-    
     // Write and download the file
     XLSX.writeFile(workbook, timestampedFilename);
-    
-    console.log('XLSX export completed successfully');
     
   } catch (error) {
     console.error("Quotation XLSX export error:", error);
@@ -533,8 +522,6 @@ export const exportDeliveryOrderToXLSX = async (deliveryOrder) => {
 };
 
 export const exportPurchaseOrderToPDF = async (purchaseOrder) => {
-  console.log('Purchase Order data:', purchaseOrder);
-  
   try {
     // Get company settings dynamically
     let companyInfo = {

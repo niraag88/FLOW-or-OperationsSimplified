@@ -42,6 +42,7 @@ export function registerInvoiceRoutes(app: Express) {
   app.get('/api/invoices/:id', requireAuth(), async (req: AuthenticatedRequest, res) => {
     try {
       const id = parseInt(req.params.id);
+      if (isNaN(id)) return res.status(400).json({ error: 'Invalid ID' });
 
       const [invoice] = await db.select({
         id: invoices.id,
@@ -305,6 +306,7 @@ export function registerInvoiceRoutes(app: Express) {
   app.put('/api/invoices/:id', requireAuth(), async (req: AuthenticatedRequest, res) => {
     try {
       const id = parseInt(req.params.id);
+      if (isNaN(id)) return res.status(400).json({ error: 'Invalid ID' });
       const body = req.body;
 
       let customerName = body.customer_name || 'Unknown Customer';
@@ -405,6 +407,7 @@ export function registerInvoiceRoutes(app: Express) {
   app.patch('/api/invoices/:id/scan-key', requireAuth(['Admin', 'Manager', 'Staff']), async (req: AuthenticatedRequest, res) => {
     try {
       const id = parseInt(req.params.id);
+      if (isNaN(id)) return res.status(400).json({ error: 'Invalid ID' });
       const { scanKey } = req.body;
       if (!scanKey || typeof scanKey !== 'string') {
         return res.status(400).json({ error: 'scanKey is required' });
@@ -422,6 +425,7 @@ export function registerInvoiceRoutes(app: Express) {
   app.delete('/api/invoices/:id/scan-key', requireAuth(['Admin', 'Manager', 'Staff']), async (req: AuthenticatedRequest, res) => {
     try {
       const id = parseInt(req.params.id);
+      if (isNaN(id)) return res.status(400).json({ error: 'Invalid ID' });
       const [invoice] = await db.select().from(invoices).where(eq(invoices.id, id));
       if (!invoice) {
         return res.status(404).json({ error: 'Invoice not found' });
@@ -447,6 +451,7 @@ export function registerInvoiceRoutes(app: Express) {
   app.patch('/api/invoices/:id/payment', requireAuth(['Admin', 'Manager', 'Staff']), async (req: AuthenticatedRequest, res) => {
     try {
       const id = parseInt(req.params.id);
+      if (isNaN(id)) return res.status(400).json({ error: 'Invalid ID' });
       const { paymentStatus, paymentReceivedDate, paymentRemarks } = req.body;
       if (!paymentStatus || !['outstanding', 'paid'].includes(paymentStatus)) {
         return res.status(400).json({ error: 'paymentStatus must be "outstanding" or "paid"' });
@@ -482,6 +487,7 @@ export function registerInvoiceRoutes(app: Express) {
   app.post('/api/invoices/:id/process-sale', requireAuth(), async (req: AuthenticatedRequest, res) => {
     try {
       const invoiceId = parseInt(req.params.id);
+      if (isNaN(invoiceId)) return res.status(400).json({ error: 'Invalid ID' });
 
       const [invoice] = await db.select({ stockDeducted: invoices.stockDeducted, invoiceNumber: invoices.invoiceNumber }).from(invoices).where(eq(invoices.id, invoiceId));
       if (!invoice) {
@@ -528,6 +534,7 @@ export function registerInvoiceRoutes(app: Express) {
   app.patch('/api/invoices/:id/cancel', requireAuth(['Admin', 'Manager', 'Staff']), async (req: AuthenticatedRequest, res) => {
     try {
       const id = parseInt(req.params.id);
+      if (isNaN(id)) return res.status(400).json({ error: 'Invalid ID' });
 
       const [invoice] = await db.select({
         id: invoices.id,
@@ -586,6 +593,7 @@ export function registerInvoiceRoutes(app: Express) {
   app.delete('/api/invoices/:id', requireAuth(['Admin', 'Manager']), async (req: AuthenticatedRequest, res) => {
     try {
       const id = parseInt(req.params.id);
+      if (isNaN(id)) return res.status(400).json({ error: 'Invalid ID' });
       const userEmail = req.user?.email || req.user?.username || 'unknown';
 
       const [invoiceHeader] = await db.select().from(invoices).where(eq(invoices.id, id));

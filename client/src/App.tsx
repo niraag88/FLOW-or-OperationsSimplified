@@ -23,7 +23,6 @@ const EditProduct = lazy(() => import("@/pages/EditProduct.jsx"));
 const StockCountNew = lazy(() => import("@/pages/StockCountNew.jsx"));
 const GoodsReceipts = lazy(() => import("@/pages/GoodsReceipts.jsx"));
 const Customers = lazy(() => import("@/pages/Customers.jsx"));
-const BackupDrill = lazy(() => import("@/pages/BackupDrill.jsx"));
 const Print = lazy(() => import("@/pages/Print.jsx"));
 const Quotations = lazy(() => import("@/pages/Quotations.jsx"));
 const UserManagement = lazy(() => import("@/pages/UserManagement"));
@@ -33,7 +32,6 @@ const QuotationsListPrintView = lazy(() => import("@/components/quotations/Quota
 const InvoicePrintView = lazy(() => import("@/components/invoices/InvoicePrintView.jsx"));
 const InvoicesListPrintView = lazy(() => import("@/components/invoices/InvoicesListPrintView.jsx"));
 const DOPrintView = lazy(() => import("@/components/delivery-orders/DOPrintView.jsx"));
-const PrintSandboxPage = lazy(() => import("@/pages/PrintSandboxPage.jsx"));
 
 const PageSpinner = () => (
   <div className="min-h-screen flex items-center justify-center">
@@ -144,11 +142,6 @@ function PagesContent() {
             <Layout currentPageName="Customers"><Customers /></Layout>
           </ProtectedRoute>
         } />
-        <Route path="/BackupDrill" element={
-          <ProtectedRoute requiredRoles={['Admin']}>
-            <Layout currentPageName="Backup Drill"><BackupDrill /></Layout>
-          </ProtectedRoute>
-        } />
         <Route path="/Print" element={
           <ProtectedRoute>
             <Print />
@@ -192,11 +185,6 @@ function PagesContent() {
         <Route path="/delivery-orders/:id/print" element={
           <ProtectedRoute>
             <DOPrintView />
-          </ProtectedRoute>
-        } />
-        <Route path="/dev/print-sandbox" element={
-          <ProtectedRoute>
-            <PrintSandboxPage />
           </ProtectedRoute>
         } />
       </Routes>

@@ -27,6 +27,7 @@ export function registerGoodsReceiptRoutes(app: Express) {
   app.get('/api/stock-counts/:id', requireAuth(), async (req: AuthenticatedRequest, res) => {
     try {
       const stockCountId = parseInt(req.params.id);
+      if (isNaN(stockCountId)) return res.status(400).json({ error: 'Invalid ID' });
 
       const [stockCount] = await db.select().from(stockCounts).where(eq(stockCounts.id, stockCountId));
       if (!stockCount) {
@@ -135,6 +136,7 @@ export function registerGoodsReceiptRoutes(app: Express) {
   app.delete('/api/stock-counts/:id', requireAuth(), async (req: AuthenticatedRequest, res) => {
     try {
       const stockCountId = parseInt(req.params.id);
+      if (isNaN(stockCountId)) return res.status(400).json({ error: 'Invalid ID' });
 
       await db.delete(stockCountItems).where(eq(stockCountItems.stockCountId, stockCountId));
       await db.delete(stockCounts).where(eq(stockCounts.id, stockCountId));
@@ -209,6 +211,7 @@ export function registerGoodsReceiptRoutes(app: Express) {
   app.patch('/api/goods-receipts/:id/scan-key', requireAuth(['Admin', 'Manager', 'Staff']), async (req: AuthenticatedRequest, res) => {
     try {
       const id = parseInt(req.params.id);
+      if (isNaN(id)) return res.status(400).json({ error: 'Invalid ID' });
       const { scanKey, slot } = req.body;
       if (!scanKey || typeof scanKey !== 'string') {
         return res.status(400).json({ error: 'scanKey is required' });
@@ -234,6 +237,7 @@ export function registerGoodsReceiptRoutes(app: Express) {
   app.delete('/api/goods-receipts/:id/scan-key/:slot', requireAuth(['Admin', 'Manager', 'Staff']), async (req: AuthenticatedRequest, res) => {
     try {
       const id = parseInt(req.params.id);
+      if (isNaN(id)) return res.status(400).json({ error: 'Invalid ID' });
       const slotNum = parseInt(req.params.slot);
       if (![1, 2, 3].includes(slotNum)) {
         return res.status(400).json({ error: 'slot must be 1, 2, or 3' });
@@ -265,6 +269,7 @@ export function registerGoodsReceiptRoutes(app: Express) {
   app.delete('/api/goods-receipts/:id', requireAuth(['Admin', 'Manager']), async (req: AuthenticatedRequest, res) => {
     try {
       const grnId = parseInt(req.params.id);
+      if (isNaN(grnId)) return res.status(400).json({ error: 'Invalid ID' });
       const [grn] = await db.select().from(goodsReceipts).where(eq(goodsReceipts.id, grnId));
       if (!grn) return res.status(404).json({ error: 'Goods receipt not found' });
 

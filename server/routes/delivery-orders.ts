@@ -52,6 +52,7 @@ export function registerDeliveryOrderRoutes(app: Express) {
   app.get('/api/delivery-orders/:id', requireAuth(), async (req: AuthenticatedRequest, res) => {
     try {
       const id = parseInt(req.params.id);
+      if (isNaN(id)) return res.status(400).json({ error: 'Invalid ID' });
       const [doRecord] = await db.select({
         id: deliveryOrders.id,
         orderNumber: deliveryOrders.orderNumber,
@@ -237,6 +238,7 @@ export function registerDeliveryOrderRoutes(app: Express) {
   app.put('/api/delivery-orders/:id', requireAuth(), async (req: AuthenticatedRequest, res) => {
     try {
       const id = parseInt(req.params.id);
+      if (isNaN(id)) return res.status(400).json({ error: 'Invalid ID' });
       const body = req.body;
 
       let customerName = body.customer_name || 'Unknown Customer';
@@ -299,6 +301,7 @@ export function registerDeliveryOrderRoutes(app: Express) {
   app.patch('/api/delivery-orders/:id/scan-key', requireAuth(['Admin', 'Manager', 'Staff']), async (req: AuthenticatedRequest, res) => {
     try {
       const id = parseInt(req.params.id);
+      if (isNaN(id)) return res.status(400).json({ error: 'Invalid ID' });
       const { scanKey } = req.body;
       if (!scanKey || typeof scanKey !== 'string') {
         return res.status(400).json({ error: 'scanKey is required' });
@@ -316,6 +319,7 @@ export function registerDeliveryOrderRoutes(app: Express) {
   app.delete('/api/delivery-orders/:id/scan-key', requireAuth(['Admin', 'Manager', 'Staff']), async (req: AuthenticatedRequest, res) => {
     try {
       const id = parseInt(req.params.id);
+      if (isNaN(id)) return res.status(400).json({ error: 'Invalid ID' });
       const [doRecord] = await db.select().from(deliveryOrders).where(eq(deliveryOrders.id, id));
       if (!doRecord) {
         return res.status(404).json({ error: 'Delivery order not found' });
@@ -341,6 +345,7 @@ export function registerDeliveryOrderRoutes(app: Express) {
   app.delete('/api/delivery-orders/:id', requireAuth(['Admin', 'Manager']), async (req: AuthenticatedRequest, res) => {
     try {
       const id = parseInt(req.params.id);
+      if (isNaN(id)) return res.status(400).json({ error: 'Invalid ID' });
       const userEmail = req.user?.email || req.user?.username || 'unknown';
 
       const [doHeader] = await db.select().from(deliveryOrders).where(eq(deliveryOrders.id, id));
