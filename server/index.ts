@@ -3,7 +3,6 @@ import helmet from "helmet";
 import { registerRoutes } from "./routes";
 import { initializeAdminUser } from "./adminInit";
 import { setupVite, serveStatic, log } from "./vite";
-import { pool } from "./db";
 
 const app = express();
 app.use(helmet({
@@ -27,49 +26,6 @@ app.use((req, res, next) => {
 });
 
 (async () => {
-  // Run idempotent startup migrations
-  try {
-    await pool.query(`
-      CREATE TABLE IF NOT EXISTS storage_objects (
-        key TEXT PRIMARY KEY,
-        size_bytes BIGINT NOT NULL DEFAULT 0,
-        uploaded_at TIMESTAMP NOT NULL DEFAULT NOW()
-      )
-    `);
-    // Upgrade existing INTEGER column to BIGINT if needed
-    await pool.query(`
-      DO $$ BEGIN
-        IF EXISTS (
-          SELECT 1 FROM information_schema.columns
-          WHERE table_name = 'storage_objects'
-            AND column_name = 'size_bytes'
-            AND data_type = 'integer'
-        ) THEN
-          ALTER TABLE storage_objects ALTER COLUMN size_bytes TYPE BIGINT;
-        END IF;
-      END $$
-    `);
-  } catch (err) {
-    console.error('Startup migration failed (storage_objects):', err);
-  }
-
-  // Create signed_tokens table if it doesn't exist (persists tokens across restarts)
-  try {
-    await pool.query(`
-      CREATE TABLE IF NOT EXISTS signed_tokens (
-        token TEXT PRIMARY KEY,
-        key TEXT NOT NULL,
-        expires BIGINT NOT NULL,
-        type TEXT NOT NULL,
-        content_type TEXT,
-        file_size INTEGER,
-        checksum TEXT
-      )
-    `);
-  } catch (err) {
-    console.error('Startup migration failed (signed_tokens):', err);
-  }
-
   // Initialize admin user if needed
   await initializeAdminUser();
   
