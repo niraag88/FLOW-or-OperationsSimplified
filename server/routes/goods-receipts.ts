@@ -239,7 +239,7 @@ export function registerGoodsReceiptRoutes(app: Express) {
       const id = parseInt(req.params.id);
       if (isNaN(id)) return res.status(400).json({ error: 'Invalid ID' });
       const slotNum = parseInt(req.params.slot);
-      if (![1, 2, 3].includes(slotNum)) {
+      if (isNaN(slotNum) || ![1, 2, 3].includes(slotNum)) {
         return res.status(400).json({ error: 'slot must be 1, 2, or 3' });
       }
       const colName = `scanKey${slotNum}` as 'scanKey1' | 'scanKey2' | 'scanKey3';
