@@ -382,7 +382,7 @@ function StatementLayout({ type, entity, companySettings, records, dateFrom, dat
             </thead>
             <tbody>
               {records.length === 0 ? (
-                <tr><td colSpan={7} className="text-center py-6 text-gray-400">No records</td></tr>
+                <tr><td colSpan={type === "invoices" ? 8 : 7} className="text-center py-6 text-gray-400">No records</td></tr>
               ) : records.map((r, i) => (
                 <tr key={r.id || i} className="border-b border-gray-100">
                   <td className="text-center p-2 text-gray-500">{i + 1}</td>
@@ -437,7 +437,7 @@ function StatementLayout({ type, entity, companySettings, records, dateFrom, dat
   );
 }
 
-/* ── statement modal with print portal ─────────────────────────────────── */
+/* ── statement preview modal ────────────────────────────────────────────── */
 
 function StatementPreviewModal({ open, onClose, type, entity, companySettings, records, dateFrom, dateTo, statusFilter, exportData, exportFilename }) {
   const handlePrint = useCallback(() => {
@@ -889,7 +889,6 @@ function PurchaseOrdersSection({ purchaseOrders, companySettings }) {
               po_number: "PO #",
               brand: "Brand",
               order_date: "Order Date",
-              currency: "Currency",
               amount_orig: "Amount (Original)",
               amount_aed: "Amount (AED)",
               payment_status: "Payment Status",
