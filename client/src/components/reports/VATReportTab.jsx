@@ -50,7 +50,7 @@ export default function VATReportTab({ invoices, customers, books, companySettin
 
   const [searchDebounced, setSearchDebounced] = useState("");
   const [searchTerm, setSearchTerm] = useState("");
-  const [selectedCustomerId, setSelectedCustomerId] = useState("");
+  const [selectedCustomerId, setSelectedCustomerId] = useState("all");
   const { toast } = useToast();
 
   const [filters, setFilters] = useState(() => {
@@ -123,7 +123,7 @@ export default function VATReportTab({ invoices, customers, books, companySettin
 
     if (!filters.statuses.includes(invoice.status)) return false;
 
-    if (selectedCustomerId) {
+    if (selectedCustomerId && selectedCustomerId !== 'all') {
       const custId = String(invoice.customer_id ?? invoice.customerId ?? '');
       if (custId !== selectedCustomerId) return false;
     }
@@ -340,7 +340,7 @@ export default function VATReportTab({ invoices, customers, books, companySettin
               <Select value={selectedCustomerId} onValueChange={(v) => { setSelectedCustomerId(v); setCurrentPage(1); }}>
                 <SelectTrigger><SelectValue placeholder="All customers" /></SelectTrigger>
                 <SelectContent>
-                  <SelectItem value="">All customers</SelectItem>
+                  <SelectItem value="all">All customers</SelectItem>
                   {eligibleCustomers.map(c => (
                     <SelectItem key={c.id} value={String(c.id)}>{c.name}</SelectItem>
                   ))}
