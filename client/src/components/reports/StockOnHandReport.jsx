@@ -33,7 +33,7 @@ export default function StockOnHandReport({ products }) {
   const PAGE_SIZE = 50;
 
   const activeProducts = useMemo(() =>
-    (products || []).filter(p => p.isActive !== false),
+    (products || []).filter(p => p.isActive === true),
     [products]
   );
 
@@ -69,11 +69,13 @@ export default function StockOnHandReport({ products }) {
 
   const handleViewAndPrint = () => {
     const now = format(new Date(), 'dd/MM/yy HH:mm');
-    const headerCells = `<th>Brand</th><th>Product</th><th>SKU</th><th>Size</th><th style="text-align:right">Qty</th><th>Status</th>`;
+    const reportDate = format(new Date(), 'dd/MM/yy');
+    const headerCells = `<th>Date</th><th>Brand</th><th>Product</th><th>SKU</th><th>Size</th><th style="text-align:right">Qty</th><th>Status</th>`;
     const bodyRows = filtered.map(p => {
       const qty = p.stockQuantity || 0;
       const status = getStatus(qty);
       return `<tr>
+        <td>${reportDate}</td>
         <td>${p.brandName || '-'}</td>
         <td>${p.name || '-'}</td>
         <td>${p.sku || '-'}</td>
