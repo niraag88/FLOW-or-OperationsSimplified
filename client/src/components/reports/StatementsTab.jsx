@@ -409,10 +409,11 @@ function InvoicesSection({ invoices, customers, companySettings }) {
   }, [invoices]);
 
   const filtered = useMemo(() => {
+    if (!selectedCustomerId) return [];
     const fromTs = dateFrom ? new Date(dateFrom).getTime() : null;
     const toTs = dateTo ? new Date(dateTo + "T23:59:59").getTime() : null;
     return enriched.filter((r) => {
-      if (selectedCustomerId && r._customerId !== selectedCustomerId) return false;
+      if (r._customerId !== selectedCustomerId) return false;
       if (statusFilter !== "all" && r._paymentStatus !== statusFilter) return false;
       if (r._date && (fromTs || toTs)) {
         const ts = new Date(r._date).getTime();
@@ -639,10 +640,11 @@ function PurchaseOrdersSection({ purchaseOrders, suppliers, companySettings }) {
   }, [purchaseOrders, companySettings, getSupplierName]);
 
   const filtered = useMemo(() => {
+    if (!selectedSupplierId) return [];
     const fromTs = dateFrom ? new Date(dateFrom).getTime() : null;
     const toTs = dateTo ? new Date(dateTo + "T23:59:59").getTime() : null;
     return enriched.filter((r) => {
-      if (selectedSupplierId && r._supplierId !== selectedSupplierId) return false;
+      if (r._supplierId !== selectedSupplierId) return false;
       if (statusFilter !== "all" && r._paymentStatus !== statusFilter) return false;
       if (r._date && (fromTs || toTs)) {
         const ts = new Date(r._date).getTime();
