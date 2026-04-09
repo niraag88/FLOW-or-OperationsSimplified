@@ -203,7 +203,7 @@ function StatementLayout({ type, entity, companySettings, records, dateFrom, dat
         </div>
         <div className="flex-1 text-right">
           <p className="text-[10px] uppercase tracking-widest text-gray-400 mb-1">
-            {type === "invoices" ? "Bill To" : "Vendor"}
+            {type === "invoices" ? "Bill To" : "Brand"}
           </p>
           <p className="font-bold text-sm text-gray-900">{entityName}</p>
           {entityAddress && <p className="text-xs text-gray-600 mt-0.5 whitespace-pre-line">{entityAddress}</p>}
@@ -362,7 +362,7 @@ function StatementPreviewModal({ open, onClose, type, entity, companySettings, r
                     remarks: "Remarks",
                   } : {
                     po_number: "PO #",
-                    supplier: "Supplier",
+                    brand: "Brand",
                     order_date: "Order Date",
                     currency: "Currency",
                     amount_orig: "Amount (Original)",
@@ -615,33 +615,27 @@ function InvoicesSection({ invoices, customers, companySettings }) {
 
 /* ── Purchase Orders section ────────────────────────────────────────────── */
 
-function PurchaseOrdersSection({ purchaseOrders, suppliers, companySettings }) {
-  const [selectedSupplierId, setSelectedSupplierId] = useState("");
+function PurchaseOrdersSection({ purchaseOrders, companySettings }) {
+  const [selectedBrandId, setSelectedBrandId] = useState("");
   const [statusFilter, setStatusFilter] = useState("all");
   const [dateFrom, setDateFrom] = useState("");
   const [dateTo, setDateTo] = useState("");
   const [showStatement, setShowStatement] = useState(false);
 
-  const eligibleSuppliers = useMemo(() => {
-    const ids = new Set(
-      purchaseOrders.map((po) => po.supplierId || po.supplier_id).filter(Boolean).map(String)
-    );
-    return (suppliers || [])
-      .filter((s) => ids.has(String(s.id)))
-      .sort((a, b) => (a.name || "").localeCompare(b.name || ""));
-  }, [purchaseOrders, suppliers]);
+  const eligibleBrands = useMemo(() => {
+    const brandMap = new Map();
+    purchaseOrders.forEach((po) => {
+      const id = po.brandId || po.brand_id;
+      const name = po.brandName || po.brand_name;
+      if (id && name) brandMap.set(String(id), { id: String(id), name });
+    });
+    return Array.from(brandMap.values()).sort((a, b) => a.name.localeCompare(b.name));
+  }, [purchaseOrders]);
 
-  const selectedSupplier = useMemo(
-    () => eligibleSuppliers.find((s) => String(s.id) === selectedSupplierId) || null,
-    [eligibleSuppliers, selectedSupplierId]
+  const selectedBrand = useMemo(
+    () => eligibleBrands.find((b) => b.id === selectedBrandId) || null,
+    [eligibleBrands, selectedBrandId]
   );
-
-  const getSupplierName = useCallback((po) => {
-    if (po.supplierName) return po.supplierName;
-    const id = po.supplierId || po.supplier_id;
-    const s = (suppliers || []).find((s) => s.id === id || s.id === Number(id));
-    return s?.name || "";
-  }, [suppliers]);
 
   const enriched = useMemo(() => {
     return purchaseOrders.map((po) => {
@@ -658,21 +652,21 @@ function PurchaseOrdersSection({ purchaseOrders, suppliers, companySettings }) {
         _aed: aed,
         _paymentStatus: ps,
         _ref: po.poNumber || po.po_number || "",
-        _supplier: getSupplierName(po),
-        _supplierId: String(po.supplierId || po.supplier_id || ""),
+        _brand: po.brandName || po.brand_name || "",
+        _brandId: String(po.brandId || po.brand_id || ""),
         _date: po.orderDate || po.order_date || "",
         _paymentDate: po.paymentMadeDate || po.payment_made_date || "",
         _remarks: po.paymentRemarks || po.payment_remarks || "",
       };
     });
-  }, [purchaseOrders, companySettings, getSupplierName]);
+  }, [purchaseOrders, companySettings]);
 
   const filtered = useMemo(() => {
-    if (!selectedSupplierId) return [];
+    if (!selectedBrandId) return [];
     const fromTs = dateFrom ? new Date(dateFrom).getTime() : null;
     const toTs = dateTo ? new Date(dateTo + "T23:59:59").getTime() : null;
     return enriched.filter((r) => {
-      if (r._supplierId !== selectedSupplierId) return false;
+      if (r._brandId !== selectedBrandId) return false;
       if (statusFilter !== "all" && r._paymentStatus !== statusFilter) return false;
       if (r._date && (fromTs || toTs)) {
         const ts = new Date(r._date).getTime();
@@ -683,10 +677,10 @@ function PurchaseOrdersSection({ purchaseOrders, suppliers, companySettings }) {
       }
       return true;
     });
-  }, [enriched, selectedSupplierId, statusFilter, dateFrom, dateTo]);
+  }, [enriched, selectedBrandId, statusFilter, dateFrom, dateTo]);
 
-  const handleSupplierChange = (val) => {
-    setSelectedSupplierId(val);
+  const handleBrandChange = (val) => {
+    setSelectedBrandId(val);
     setStatusFilter("all");
     setDateFrom("");
     setDateTo("");
@@ -694,7 +688,7 @@ function PurchaseOrdersSection({ purchaseOrders, suppliers, companySettings }) {
 
   const exportData = filtered.map((r) => ({
     po_number: r._ref,
-    supplier: r._supplier,
+    brand: r._brand,
     order_date: fmtDate(r._date),
     currency: r._currency,
     amount_orig: `${r._currency} ${fmt(r._origAmount)}`,
@@ -704,23 +698,23 @@ function PurchaseOrdersSection({ purchaseOrders, suppliers, companySettings }) {
     remarks: r._remarks,
   }));
 
-  const exportFilename = selectedSupplier
-    ? `statement_pos_${(selectedSupplier.name || "supplier").replace(/\s+/g, "_")}_${format(new Date(), "yyyyMMdd")}`
+  const exportFilename = selectedBrand
+    ? `statement_pos_${(selectedBrand.name || "brand").replace(/\s+/g, "_")}_${format(new Date(), "yyyyMMdd")}`
     : "statement_pos";
 
-  const hasActiveFilters = selectedSupplierId || statusFilter !== "all" || dateFrom || dateTo;
+  const hasActiveFilters = selectedBrandId || statusFilter !== "all" || dateFrom || dateTo;
 
   return (
     <>
       <div className="flex flex-wrap gap-3 items-end mb-5">
         <div className="flex flex-col gap-1">
-          <label className="text-xs text-gray-500 font-medium">Supplier</label>
+          <label className="text-xs text-gray-500 font-medium">Brand</label>
           <EntityCombobox
-            items={eligibleSuppliers}
-            value={selectedSupplierId}
-            onValueChange={handleSupplierChange}
-            placeholder="Search supplier…"
-            allLabel="All Suppliers"
+            items={eligibleBrands}
+            value={selectedBrandId}
+            onValueChange={handleBrandChange}
+            placeholder="Search brand…"
+            allLabel="All Brands"
           />
         </div>
 
@@ -749,7 +743,7 @@ function PurchaseOrdersSection({ purchaseOrders, suppliers, companySettings }) {
 
         {hasActiveFilters && (
           <Button variant="ghost" size="sm" className="text-gray-500 self-end"
-            onClick={() => { setSelectedSupplierId(""); setStatusFilter("all"); setDateFrom(""); setDateTo(""); }}>
+            onClick={() => { setSelectedBrandId(""); setStatusFilter("all"); setDateFrom(""); setDateTo(""); }}>
             Clear
           </Button>
         )}
@@ -757,7 +751,7 @@ function PurchaseOrdersSection({ purchaseOrders, suppliers, companySettings }) {
         <div className="ml-auto flex items-end gap-2">
           <Button
             size="sm"
-            disabled={!selectedSupplierId}
+            disabled={!selectedBrandId}
             onClick={() => setShowStatement(true)}
             className="bg-emerald-700 hover:bg-emerald-800 text-white disabled:opacity-50"
           >
@@ -770,7 +764,7 @@ function PurchaseOrdersSection({ purchaseOrders, suppliers, companySettings }) {
             filename={exportFilename}
             columns={{
               po_number: "PO #",
-              supplier: "Supplier",
+              brand: "Brand",
               order_date: "Order Date",
               currency: "Currency",
               amount_orig: "Amount (Original)",
@@ -790,7 +784,7 @@ function PurchaseOrdersSection({ purchaseOrders, suppliers, companySettings }) {
           <TableHeader>
             <TableRow className="bg-gray-50">
               <TableHead className="font-semibold">PO #</TableHead>
-              <TableHead className="font-semibold">Supplier</TableHead>
+              <TableHead className="font-semibold">Brand</TableHead>
               <TableHead className="font-semibold">Date</TableHead>
               <TableHead className="font-semibold">Currency</TableHead>
               <TableHead className="font-semibold text-right">Amount (Orig)</TableHead>
@@ -804,18 +798,18 @@ function PurchaseOrdersSection({ purchaseOrders, suppliers, companySettings }) {
             {filtered.length === 0 ? (
               <TableRow>
                 <TableCell colSpan={9} className="text-center py-10 text-gray-400">
-                  {selectedSupplierId
+                  {selectedBrandId
                     ? "No purchase orders match the current filters"
-                    : eligibleSuppliers.length === 0
-                      ? "No suppliers with purchase orders found"
-                      : "Search and select a supplier to view their purchase orders"}
+                    : eligibleBrands.length === 0
+                      ? "No brands with purchase orders found"
+                      : "Search and select a brand to view their purchase orders"}
                 </TableCell>
               </TableRow>
             ) : (
               filtered.map((r) => (
                 <TableRow key={r.id} className="hover:bg-gray-50">
                   <TableCell className="font-medium text-purple-700">{r._ref}</TableCell>
-                  <TableCell>{r._supplier}</TableCell>
+                  <TableCell>{r._brand}</TableCell>
                   <TableCell className="text-gray-600">{fmtDate(r._date)}</TableCell>
                   <TableCell>
                     <Badge variant="outline" className="text-xs">{r._currency}</Badge>
@@ -837,7 +831,7 @@ function PurchaseOrdersSection({ purchaseOrders, suppliers, companySettings }) {
         open={showStatement}
         onClose={() => setShowStatement(false)}
         type="pos"
-        entity={selectedSupplier}
+        entity={selectedBrand}
         companySettings={companySettings}
         records={filtered}
         dateFrom={dateFrom}
@@ -856,7 +850,7 @@ export default function StatementsTab({ invoices, purchaseOrders, customers, sup
   return (
     <div className="space-y-4">
       <p className="text-sm text-gray-500">
-        Generate statements of account for customers (invoices) and suppliers (purchase orders).
+        Generate statements of account for customers (invoices) and brands (purchase orders).
         Search and select an entity, apply filters, then click{" "}
         <strong>Generate Statement</strong> to preview and print.
       </p>
@@ -872,7 +866,6 @@ export default function StatementsTab({ invoices, purchaseOrders, customers, sup
       <CollapsibleSection title="Purchase Orders" icon={TrendingDown} iconColor="bg-purple-50 text-purple-600">
         <PurchaseOrdersSection
           purchaseOrders={purchaseOrders || []}
-          suppliers={suppliers || []}
           companySettings={companySettings}
         />
       </CollapsibleSection>
