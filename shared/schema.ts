@@ -797,6 +797,22 @@ export const insertBackupRunSchema = createInsertSchema(backupRuns).omit({ id: t
 export type InsertBackupRun = z.infer<typeof insertBackupRunSchema>;
 export type BackupRun = typeof backupRuns.$inferSelect;
 
+// Restore Runs table — records every database restore attempt
+export const restoreRuns = pgTable("restore_runs", {
+  id: serial("id").primaryKey(),
+  restoredAt: timestamp("restored_at").defaultNow().notNull(),
+  triggeredBy: varchar("triggered_by").references(() => users.id),
+  sourceBackupRunId: integer("source_backup_run_id").references(() => backupRuns.id),
+  sourceFilename: text("source_filename"), // for file-upload restores
+  success: boolean("success").notNull().default(false),
+  errorMessage: text("error_message"),
+  durationMs: integer("duration_ms"),
+});
+
+export const insertRestoreRunSchema = createInsertSchema(restoreRuns).omit({ id: true, restoredAt: true });
+export type InsertRestoreRun = z.infer<typeof insertRestoreRunSchema>;
+export type RestoreRun = typeof restoreRuns.$inferSelect;
+
 // Financial Years (Books) table
 export const financialYears = pgTable("financial_years", {
   id: serial("id").primaryKey(),

@@ -1,7 +1,8 @@
 import type { Express } from "express";
-import { auditLog, recycleBin, storageObjects, invoices, deliveryOrders, quotations, purchaseOrders, invoiceLineItems, deliveryOrderItems, quotationItems, purchaseOrderItems, products, brands, suppliers, customers, financialYears, backupRuns } from "@shared/schema";
+import { auditLog, recycleBin, storageObjects, invoices, deliveryOrders, quotations, purchaseOrders, invoiceLineItems, deliveryOrderItems, quotationItems, purchaseOrderItems, products, brands, suppliers, customers, financialYears, backupRuns, restoreRuns, users } from "@shared/schema";
 import { db, pool } from "../db";
 import { eq, desc, sum, inArray } from "drizzle-orm";
+import { Readable } from 'stream';
 import { execSync } from 'child_process';
 import * as XLSX from 'xlsx';
 import { requireAuth, requireRole, writeAuditLog, objectStorageClient, validateUploadInput, validatePdfMagicBytes, validateImageMagicBytes, upload, type AuthenticatedRequest } from "../middleware";
@@ -681,6 +682,131 @@ export function registerSystemRoutes(app: Express) {
     } catch (error) {
       console.error('Error downloading backup:', error);
       res.status(500).json({ error: 'Failed to download backup' });
+    }
+  });
+
+  // ─── Restore Endpoints ────────────────────────────────────────────────────
+
+  /** Shared helper: run the restore and record the outcome in restore_runs */
+  async function runRestore(opts: {
+    sqlGzStream: import('stream').Readable;
+    triggeredBy: string;
+    sourceBackupRunId?: number;
+    sourceFilename?: string;
+    res: import('express').Response;
+    actorName: string;
+  }) {
+    const { sqlGzStream, triggeredBy, sourceBackupRunId, sourceFilename, res, actorName } = opts;
+    try {
+      // @ts-ignore
+      const { restoreBackup } = await import('../../scripts/restoreBackup.js');
+      const result = await restoreBackup(sqlGzStream);
+
+      await db.insert(restoreRuns).values({
+        triggeredBy,
+        sourceBackupRunId: sourceBackupRunId ?? null,
+        sourceFilename: sourceFilename ?? null,
+        success: result.success,
+        errorMessage: result.error ?? null,
+        durationMs: result.durationMs ?? null,
+      });
+
+      const label = sourceFilename || (sourceBackupRunId ? `backup run #${sourceBackupRunId}` : 'unknown');
+      writeAuditLog({
+        actor: triggeredBy,
+        actorName,
+        targetId: 'restore',
+        targetType: 'restore_run',
+        action: 'CREATE',
+        details: `Database restore from ${label} ${result.success ? 'succeeded' : 'failed'}`,
+      });
+
+      if (result.success) {
+        return res.json({ success: true, durationMs: result.durationMs });
+      } else {
+        return res.status(500).json({ success: false, error: result.error || 'Restore failed', durationMs: result.durationMs });
+      }
+    } catch (error: any) {
+      console.error('Error during restore:', error);
+      try {
+        await db.insert(restoreRuns).values({
+          triggeredBy,
+          sourceBackupRunId: sourceBackupRunId ?? null,
+          sourceFilename: sourceFilename ?? null,
+          success: false,
+          errorMessage: error.message,
+          durationMs: null,
+        });
+      } catch (_) {}
+      return res.status(500).json({ success: false, error: error.message || 'Restore failed unexpectedly' });
+    }
+  }
+
+  /** POST /api/ops/backup-runs/:id/restore — restore from a stored cloud backup */
+  app.post('/api/ops/backup-runs/:id/restore', requireAuth(['Admin']), async (req: AuthenticatedRequest, res) => {
+    const runId = parseInt(req.params.id, 10);
+    if (isNaN(runId)) return res.status(400).json({ error: 'Invalid backup run ID' });
+
+    const [run] = await db.select().from(backupRuns).where(eq(backupRuns.id, runId)).limit(1);
+    if (!run) return res.status(404).json({ error: 'Backup run not found' });
+    if (!run.dbSuccess || !run.dbStorageKey) return res.status(400).json({ error: 'This backup run does not have a successful DB dump to restore from' });
+
+    const existsResult = await objectStorageClient.exists(run.dbStorageKey);
+    if (!existsResult.ok || !existsResult.value) {
+      return res.status(404).json({ error: 'Backup file no longer exists in storage — it may have been deleted' });
+    }
+
+    const stream = objectStorageClient.downloadAsStream(run.dbStorageKey);
+    return runRestore({
+      sqlGzStream: stream,
+      triggeredBy: req.user!.id,
+      actorName: req.user?.username || req.user!.id,
+      sourceBackupRunId: runId,
+      sourceFilename: run.dbStorageKey.split('/').pop() || run.dbStorageKey,
+      res,
+    });
+  });
+
+  /** POST /api/ops/restore-upload — restore from an uploaded .sql.gz file */
+  app.post('/api/ops/restore-upload', requireAuth(['Admin']), upload.single('file'), async (req: AuthenticatedRequest, res) => {
+    if (!req.file) return res.status(400).json({ error: 'No file uploaded. Send a .sql.gz file as multipart field "file".' });
+    if (!req.file.originalname.endsWith('.sql.gz') && !req.file.originalname.endsWith('.gz')) {
+      return res.status(400).json({ error: 'File must be a .sql.gz gzip-compressed PostgreSQL dump' });
+    }
+
+    const stream = Readable.from(req.file.buffer);
+    return runRestore({
+      sqlGzStream: stream,
+      triggeredBy: req.user!.id,
+      actorName: req.user?.username || req.user!.id,
+      sourceFilename: req.file.originalname,
+      res,
+    });
+  });
+
+  /** GET /api/ops/restore-runs — last 10 restore run records with username */
+  app.get('/api/ops/restore-runs', requireAuth(['Admin']), async (req, res) => {
+    try {
+      const rows = await db
+        .select({
+          id: restoreRuns.id,
+          restoredAt: restoreRuns.restoredAt,
+          triggeredBy: restoreRuns.triggeredBy,
+          sourceBackupRunId: restoreRuns.sourceBackupRunId,
+          sourceFilename: restoreRuns.sourceFilename,
+          success: restoreRuns.success,
+          errorMessage: restoreRuns.errorMessage,
+          durationMs: restoreRuns.durationMs,
+          username: users.username,
+        })
+        .from(restoreRuns)
+        .leftJoin(users, eq(restoreRuns.triggeredBy, users.id))
+        .orderBy(desc(restoreRuns.restoredAt))
+        .limit(10);
+      res.json({ runs: rows });
+    } catch (error) {
+      console.error('Error fetching restore runs:', error);
+      res.status(500).json({ error: 'Failed to fetch restore history' });
     }
   });
 
