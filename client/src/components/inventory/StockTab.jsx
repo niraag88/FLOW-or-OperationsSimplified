@@ -557,7 +557,7 @@ export default function StockTab({ products, loading, onStockSubTabChange }) {
                 <div className="flex items-center gap-2">
                   <Search className="w-4 h-4 text-gray-400" />
                   <Input
-                    placeholder="Search by product name, SKU, or brand..."
+                    placeholder="Search by product name, code or brand..."
                     value={currentStockFilter}
                     onChange={(e) => {
                       setCurrentStockFilter(e.target.value);
@@ -1176,7 +1176,7 @@ export default function StockTab({ products, loading, onStockSubTabChange }) {
                 <div className="flex items-center gap-2">
                   <Search className="w-4 h-4 text-gray-400" />
                   <Input
-                    placeholder="Search by product name, SKU, or brand..."
+                    placeholder="Search by product name, code or brand..."
                     value={lowStockFilter}
                     onChange={(e) => {
                       setLowStockFilter(e.target.value);
@@ -1435,7 +1435,7 @@ export default function StockTab({ products, loading, onStockSubTabChange }) {
                 <div className="flex items-center gap-2">
                   <Search className="w-4 h-4 text-gray-400" />
                   <Input
-                    placeholder="Search by product name, SKU, or brand..."
+                    placeholder="Search by product name, code or brand..."
                     value={outOfStockFilter}
                     onChange={(e) => {
                       setOutOfStockFilter(e.target.value);

@@ -968,7 +968,7 @@ export const exportPODetailToXLSX = async (poId, poNumber) => {
 
   rows.push([]);
   rows.push(['ITEMS ORDERED', '', '', '', '', '']);
-  rows.push(['Product', 'SKU', 'Qty Ordered', `Unit Price (${currency})`, `Line Total (${currency})`]);
+  rows.push(['Product', 'Product Code', 'Qty Ordered', `Unit Price (${currency})`, `Line Total (${currency})`]);
   for (const item of (d.items || [])) {
     rows.push([
       item.productName || '—',
@@ -1001,7 +1001,7 @@ export const exportPODetailToXLSX = async (poId, poNumber) => {
         grnShort ? 'Short delivery' : 'Full delivery',
         '', '',
       ]);
-      rows.push(['Product', 'SKU', 'Qty Ordered', 'Qty Received', `Unit Price (${currency})`, `Received Value (${currency})`]);
+      rows.push(['Product', 'Product Code', 'Qty Ordered', 'Qty Received', `Unit Price (${currency})`, `Received Value (${currency})`]);
       for (const item of grn.items) {
         const recQty = parseInt(item.receivedQuantity) || 0;
         const ordQty = parseInt(item.orderedQuantity) || 0;

@@ -249,7 +249,7 @@ export default function InventorySettings() {
                       <div className="flex items-center justify-between">
                         <div>
                           <h4 className="font-medium">{product.name}</h4>
-                          <p className="text-sm text-gray-500">SKU: {product.sku}</p>
+                          <p className="text-sm text-gray-500">Product Code: {product.sku}</p>
                           <p className="text-xs text-gray-500">Current: {product.stockQuantity || 0} units</p>
                         </div>
                       </div>

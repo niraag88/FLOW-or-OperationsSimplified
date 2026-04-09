@@ -174,7 +174,7 @@ export default function ExportDropdown({
       const status = stock === 0 ? "Out of Stock" : stock <= threshold ? "Low Stock" : "In Stock";
       return {
         Brand: p.brandName || "-",
-        SKU: p.sku,
+        "Product Code": p.sku,
         "Product Name": p.name,
         Size: p.size || "-",
         "Current Stock": stock,
@@ -199,7 +199,7 @@ export default function ExportDropdown({
       if (exportFmt === "xlsx") {
         exportToXLSX(rows, filename, "Current Stock");
       } else {
-        const headers = ["Brand", "SKU", "Product Name", "Size", "Current Stock", "Status", "Cost Price", "Cost Price (AED)", "Stock Value", "Stock Value (AED)"];
+        const headers = ["Brand", "Product Code", "Product Name", "Size", "Current Stock", "Status", "Cost Price", "Cost Price (AED)", "Stock Value", "Stock Value (AED)"];
         writePrintContent(pw, "Current Stock Levels", headers, rows, allProducts.length);
       }
     } catch (err) {
@@ -214,7 +214,7 @@ export default function ExportDropdown({
   const buildMovementRows = (list) =>
     list.map((m) => ({
       Date: format(new Date(m.createdAt), "dd/MM/yy"),
-      "Product SKU": m.productSku,
+      "Product Code": m.productSku,
       "Product Name": m.productName,
       "Movement Type": m.movementType,
       Quantity: m.quantity,
@@ -236,7 +236,7 @@ export default function ExportDropdown({
       if (exportFmt === "xlsx") {
         exportToXLSX(rows, filename, "Stock Movements");
       } else {
-        const headers = ["Date", "Product SKU", "Product Name", "Movement Type", "Quantity", "Previous Stock", "New Stock", "Unit Cost", "Notes"];
+        const headers = ["Date", "Product Code", "Product Name", "Movement Type", "Quantity", "Previous Stock", "New Stock", "Unit Cost", "Notes"];
         writePrintContent(pw, "Stock Movements", headers, rows, rows.length);
       }
     } catch (err) {
@@ -250,7 +250,7 @@ export default function ExportDropdown({
 
   const buildLowStockRows = (list) =>
     list.map((p) => ({
-      SKU: p.sku,
+      "Product Code": p.sku,
       "Product Name": p.name,
       "Current Stock": p.stockQuantity || 0,
       "Cost Price": formatOrigCost(p.costPrice, p.costPriceCurrency),
@@ -271,7 +271,7 @@ export default function ExportDropdown({
       if (exportFmt === "xlsx") {
         exportToXLSX(rows, filename, "Low Stock Alerts");
       } else {
-        const headers = ["SKU", "Product Name", "Current Stock", "Cost Price", "Cost Price (AED)", "Stock Value", "Stock Value (AED)"];
+        const headers = ["Product Code", "Product Name", "Current Stock", "Cost Price", "Cost Price (AED)", "Stock Value", "Stock Value (AED)"];
         writePrintContent(pw, "Low Stock Alerts", headers, rows, rows.length);
       }
     } catch (err) {
@@ -284,7 +284,7 @@ export default function ExportDropdown({
 
   const buildOutOfStockRows = (list) =>
     list.map((p) => ({
-      SKU: p.sku,
+      "Product Code": p.sku,
       "Product Name": p.name,
       Brand: p.brandName || "",
       Size: p.size || "",
@@ -304,7 +304,7 @@ export default function ExportDropdown({
       if (exportFmt === "xlsx") {
         exportToXLSX(rows, filename, "Out of Stock");
       } else {
-        const headers = ["SKU", "Product Name", "Brand", "Size", "Current Stock", "Status"];
+        const headers = ["Product Code", "Product Name", "Brand", "Size", "Current Stock", "Status"];
         writePrintContent(pw, "Out of Stock Products", headers, rows, rows.length);
       }
     } catch (err) {

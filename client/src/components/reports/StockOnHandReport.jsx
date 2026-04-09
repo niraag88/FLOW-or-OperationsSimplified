@@ -79,7 +79,7 @@ export default function StockOnHandReport({ products }) {
 
   const handleViewAndPrint = () => {
     const now = format(new Date(), 'dd/MM/yy');
-    const headerCells = `<th>SKU</th><th>Brand</th><th>Product</th><th>Size</th><th style="text-align:right">Qty</th><th>Status</th>`;
+    const headerCells = `<th>Product Code</th><th>Brand</th><th>Product</th><th>Size</th><th style="text-align:right">Qty</th><th>Status</th>`;
     const bodyRows = filtered.map(p => {
       const qty = p.stockQuantity || 0;
       const status = getStatus(qty);
@@ -136,7 +136,7 @@ export default function StockOnHandReport({ products }) {
   const handleExportXLSX = () => {
     const rows = filtered.map(p => ({
       'Brand': p.brandName || '-',
-      'SKU': p.sku || '-',
+      'Product Code': p.sku || '-',
       'Product': p.name || '-',
       'Size': p.size || '-',
       'Qty': p.stockQuantity || 0,
@@ -151,7 +151,7 @@ export default function StockOnHandReport({ products }) {
       <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
         <Card>
           <CardContent className="pt-6 text-center">
-            <p className="text-sm text-gray-500">Total SKUs</p>
+            <p className="text-sm text-gray-500">Total Products</p>
             <p className="text-2xl font-bold">{summary.total}</p>
           </CardContent>
         </Card>
@@ -213,7 +213,7 @@ export default function StockOnHandReport({ products }) {
               <div className="relative">
                 <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400 w-4 h-4" />
                 <Input
-                  placeholder="Product, SKU or brand"
+                  placeholder="Product, code or brand"
                   value={searchTerm}
                   onChange={e => { setSearchTerm(e.target.value); resetPage(); }}
                   className="pl-10"
