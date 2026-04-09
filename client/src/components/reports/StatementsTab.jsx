@@ -42,12 +42,20 @@ function StatusBadge({ status }) {
 function SummaryTiles({ records }) {
   const totals = useMemo(() => {
     let totalAed = 0, paidCount = 0, paidAed = 0, outCount = 0, outAed = 0;
+    let totalOrig = 0, paidOrig = 0, outOrig = 0;
+    let origCurrency = null;
     records.forEach((r) => {
-      totalAed += r._aed;
-      if (r._paymentStatus === "paid") { paidCount++; paidAed += r._aed; }
-      else { outCount++; outAed += r._aed; }
+      totalAed  += r._aed || 0;
+      totalOrig += r._origAmount || 0;
+      if (!origCurrency && r._currency && r._currency !== "AED") origCurrency = r._currency;
+      if (r._paymentStatus === "paid") {
+        paidCount++; paidAed += r._aed || 0; paidOrig += r._origAmount || 0;
+      } else {
+        outCount++; outAed += r._aed || 0; outOrig += r._origAmount || 0;
+      }
     });
-    return { total: records.length, totalAed, paidCount, paidAed, outCount, outAed };
+    const showOrig = Boolean(origCurrency);
+    return { total: records.length, totalAed, paidCount, paidAed, outCount, outAed, totalOrig, paidOrig, outOrig, origCurrency, showOrig };
   }, [records]);
 
   return (
@@ -55,17 +63,20 @@ function SummaryTiles({ records }) {
       <Card className="p-4">
         <p className="text-2xl font-bold text-blue-700">{totals.total}</p>
         <p className="text-sm text-gray-500">Total Records</p>
-        <p className="text-xs text-blue-600 font-medium mt-0.5">AED {fmt(totals.totalAed)}</p>
+        {totals.showOrig && <p className="text-xs text-blue-600 font-semibold mt-0.5">{totals.origCurrency} {fmt(totals.totalOrig)}</p>}
+        <p className="text-xs text-blue-500 mt-0.5">AED {fmt(totals.totalAed)}</p>
       </Card>
       <Card className="p-4">
         <p className="text-2xl font-bold text-amber-700">{totals.outCount}</p>
         <p className="text-sm text-gray-500">Outstanding</p>
-        <p className="text-xs text-amber-600 font-medium mt-0.5">AED {fmt(totals.outAed)}</p>
+        {totals.showOrig && <p className="text-xs text-amber-600 font-semibold mt-0.5">{totals.origCurrency} {fmt(totals.outOrig)}</p>}
+        <p className="text-xs text-amber-500 mt-0.5">AED {fmt(totals.outAed)}</p>
       </Card>
       <Card className="p-4">
         <p className="text-2xl font-bold text-green-700">{totals.paidCount}</p>
         <p className="text-sm text-gray-500">Paid</p>
-        <p className="text-xs text-green-600 font-medium mt-0.5">AED {fmt(totals.paidAed)}</p>
+        {totals.showOrig && <p className="text-xs text-green-600 font-semibold mt-0.5">{totals.origCurrency} {fmt(totals.paidOrig)}</p>}
+        <p className="text-xs text-green-500 mt-0.5">AED {fmt(totals.paidAed)}</p>
       </Card>
     </div>
   );
@@ -158,8 +169,14 @@ function buildStatementHtml({ type, entity, companySettings, records, dateFrom, 
   const paidAed  = records.filter((r) => r._paymentStatus === "paid").reduce((s, r) => s + (r._aed || 0), 0);
   const outAed   = records.filter((r) => r._paymentStatus !== "paid").reduce((s, r) => s + (r._aed || 0), 0);
 
+  const origCurrency = records.find((r) => r._currency && r._currency !== "AED")?._currency || null;
+  const showDual = Boolean(origCurrency);
+  const totalOrig = showDual ? records.reduce((s, r) => s + (r._origAmount || 0), 0) : 0;
+  const paidOrig  = showDual ? records.filter((r) => r._paymentStatus === "paid").reduce((s, r) => s + (r._origAmount || 0), 0) : 0;
+  const outOrig   = showDual ? records.filter((r) => r._paymentStatus !== "paid").reduce((s, r) => s + (r._origAmount || 0), 0) : 0;
+
   const entityName    = entity?.name || "—";
-  const entityAddress = type === "invoices" ? (entity?.billingAddress || entity?.address || "") : "";
+  const entityAddress = type === "invoices" ? (entity?.billingAddress || entity?.address || "") : (entity?.description || "");
   const entityTrn     = type === "invoices" ? (entity?.vatNumber || "") : "";
   const entityPhone   = type === "invoices" ? (entity?.phone || "") : (entity?.contactPhone || "");
   const entityEmail   = type === "invoices" ? (entity?.email || "") : (entity?.contactEmail || "");
@@ -185,7 +202,7 @@ function buildStatementHtml({ type, entity, companySettings, records, dateFrom, 
 
   const headerRow = type === "invoices"
     ? `<th style="${thStyle}">Invoice #</th><th style="${thC}">Date</th><th style="${thR}">Subtotal</th><th style="${thR}">VAT</th><th style="${thR}">Total (AED)</th><th style="${thC}">Status</th><th style="${thC}">Received</th>`
-    : `<th style="${thStyle}">PO #</th><th style="${thC}">Date</th><th style="${thR}">Amount (Orig)</th><th style="${thR}">Amount (AED)</th><th style="${thC}">Status</th><th style="${thC}">Payment Date</th>`;
+    : `<th style="${thStyle}">PO #</th><th style="${thC}">Date</th><th style="${thR}">Amount</th><th style="${thR}">Amount (AED)</th><th style="${thC}">Status</th><th style="${thC}">Payment Date</th>`;
 
   const dataRows = records.length === 0
     ? `<tr><td colspan="8" style="text-align:center;padding:16px;color:#9ca3af">No records</td></tr>`
@@ -282,9 +299,27 @@ function buildStatementHtml({ type, entity, companySettings, records, dateFrom, 
   <tbody>${dataRows}</tbody>
 </table>
 <div class="totals">
-  <div class="tr"><span class="tl">Outstanding</span><span class="tv">AED ${esc(fmt(outAed))}</span></div>
-  <div class="tr"><span class="tl">Paid</span><span class="tv">AED ${esc(fmt(paidAed))}</span></div>
-  <div class="tr grand"><span class="tl grand">Grand Total</span><span class="tv">AED ${esc(fmt(totalAed))}</span></div>
+  <div class="tr">
+    <span class="tl">Outstanding</span>
+    <span class="tv">
+      ${showDual ? `<div style="font-weight:600">${esc(origCurrency)} ${esc(fmt(outOrig))}</div>` : ""}
+      <div style="${showDual ? "color:#6b7280;font-weight:normal" : ""}">AED ${esc(fmt(outAed))}</div>
+    </span>
+  </div>
+  <div class="tr">
+    <span class="tl">Paid</span>
+    <span class="tv">
+      ${showDual ? `<div style="font-weight:600">${esc(origCurrency)} ${esc(fmt(paidOrig))}</div>` : ""}
+      <div style="${showDual ? "color:#6b7280;font-weight:normal" : ""}">AED ${esc(fmt(paidAed))}</div>
+    </span>
+  </div>
+  <div class="tr grand">
+    <span class="tl grand">Grand Total</span>
+    <span class="tv">
+      ${showDual ? `<div>${esc(origCurrency)} ${esc(fmt(totalOrig))}</div>` : ""}
+      <div style="${showDual ? "color:#6b7280;font-weight:normal" : ""}">AED ${esc(fmt(totalAed))}</div>
+    </span>
+  </div>
 </div>
 </body>
 </html>`;
@@ -297,8 +332,14 @@ function StatementLayout({ type, entity, companySettings, records, dateFrom, dat
   const paidAed  = records.filter((r) => r._paymentStatus === "paid").reduce((s, r) => s + (r._aed || 0), 0);
   const outAed   = records.filter((r) => r._paymentStatus !== "paid").reduce((s, r) => s + (r._aed || 0), 0);
 
+  const origCurrency = records.find((r) => r._currency && r._currency !== "AED")?._currency || null;
+  const showDual = Boolean(origCurrency);
+  const totalOrig = showDual ? records.reduce((s, r) => s + (r._origAmount || 0), 0) : 0;
+  const paidOrig  = showDual ? records.filter((r) => r._paymentStatus === "paid").reduce((s, r) => s + (r._origAmount || 0), 0) : 0;
+  const outOrig   = showDual ? records.filter((r) => r._paymentStatus !== "paid").reduce((s, r) => s + (r._origAmount || 0), 0) : 0;
+
   const entityName    = entity?.name || "—";
-  const entityAddress = type === "invoices" ? (entity?.billingAddress || entity?.address || "") : "";
+  const entityAddress = type === "invoices" ? (entity?.billingAddress || entity?.address || "") : (entity?.description || "");
   const entityTrn     = type === "invoices" ? (entity?.vatNumber || "") : "";
   const entityPhone   = type === "invoices" ? (entity?.phone || "") : (entity?.contactPhone || "");
   const entityEmail   = type === "invoices" ? (entity?.email || "") : (entity?.contactEmail || "");
@@ -372,7 +413,7 @@ function StatementLayout({ type, entity, companySettings, records, dateFrom, dat
                   <>
                     <th className="p-2 font-bold text-emerald-900 text-left">PO #</th>
                     <th className="text-center p-2 font-bold text-emerald-900">Date</th>
-                    <th className="text-right p-2 font-bold text-emerald-900">Amount (Orig)</th>
+                    <th className="text-right p-2 font-bold text-emerald-900">Amount</th>
                     <th className="text-right p-2 font-bold text-emerald-900">Amount (AED)</th>
                     <th className="text-center p-2 font-bold text-emerald-900">Status</th>
                     <th className="text-center p-2 font-bold text-emerald-900">Payment Date</th>
@@ -416,15 +457,24 @@ function StatementLayout({ type, entity, companySettings, records, dateFrom, dat
         <div className="mt-4 border-t-2 border-emerald-900 pt-3 flex flex-col items-end gap-1.5">
           <div className="flex gap-10 text-xs">
             <span className="text-gray-500 w-28 text-right">Outstanding</span>
-            <span className="font-medium w-28 text-right">AED {fmt(outAed)}</span>
+            <span className="w-36 text-right">
+              {showDual && <p className="font-semibold">{origCurrency} {fmt(outOrig)}</p>}
+              <p className={showDual ? "text-gray-400" : "font-medium"}>AED {fmt(outAed)}</p>
+            </span>
           </div>
           <div className="flex gap-10 text-xs">
             <span className="text-gray-500 w-28 text-right">Paid</span>
-            <span className="font-medium w-28 text-right">AED {fmt(paidAed)}</span>
+            <span className="w-36 text-right">
+              {showDual && <p className="font-semibold">{origCurrency} {fmt(paidOrig)}</p>}
+              <p className={showDual ? "text-gray-400" : "font-medium"}>AED {fmt(paidAed)}</p>
+            </span>
           </div>
           <div className="flex gap-10 text-sm font-bold border-t border-gray-200 pt-1.5 mt-1">
             <span className="w-28 text-right">Grand Total</span>
-            <span className="w-28 text-right">AED {fmt(totalAed)}</span>
+            <span className="w-36 text-right">
+              {showDual && <p>{origCurrency} {fmt(totalOrig)}</p>}
+              <p className={showDual ? "text-gray-400 font-normal" : ""}>AED {fmt(totalAed)}</p>
+            </span>
           </div>
         </div>
       </div>
@@ -441,15 +491,14 @@ function StatementLayout({ type, entity, companySettings, records, dateFrom, dat
 
 function StatementPreviewModal({ open, onClose, type, entity, companySettings, records, dateFrom, dateTo, statusFilter, exportData, exportFilename }) {
   const handlePrint = useCallback(() => {
-    const pw = window.open("", "_blank");
+    const html = buildStatementHtml({ type, entity, companySettings, records, dateFrom, dateTo, statusFilter });
+    const blob = new Blob([html], { type: "text/html" });
+    const url = URL.createObjectURL(blob);
+    const pw = window.open(url, "_blank");
     if (!pw) {
       alert("Please allow popups in your browser to use Print / Save PDF.");
-      return;
     }
-    pw.document.open();
-    pw.document.write(buildStatementHtml({ type, entity, companySettings, records, dateFrom, dateTo, statusFilter }));
-    pw.document.close();
-    pw.focus();
+    setTimeout(() => URL.revokeObjectURL(url), 60000);
   }, [type, entity, companySettings, records, dateFrom, dateTo, statusFilter]);
 
   const statementProps = { type, entity, companySettings, records, dateFrom, dateTo, statusFilter };
@@ -483,7 +532,7 @@ function StatementPreviewModal({ open, onClose, type, entity, companySettings, r
                   po_number: "PO #",
                   brand: "Brand",
                   order_date: "Order Date",
-                  amount_orig: "Amount (Original)",
+                  amount_orig: "Amount",
                   amount_aed: "Amount (AED)",
                   payment_status: "Payment Status",
                   payment_date: "Payment Date",
@@ -889,7 +938,7 @@ function PurchaseOrdersSection({ purchaseOrders, companySettings }) {
               po_number: "PO #",
               brand: "Brand",
               order_date: "Order Date",
-              amount_orig: "Amount (Original)",
+              amount_orig: "Amount",
               amount_aed: "Amount (AED)",
               payment_status: "Payment Status",
               payment_date: "Payment Date",
@@ -909,7 +958,7 @@ function PurchaseOrdersSection({ purchaseOrders, companySettings }) {
               <TableHead className="font-semibold">Brand</TableHead>
               <TableHead className="font-semibold">Date</TableHead>
               <TableHead className="font-semibold">Currency</TableHead>
-              <TableHead className="font-semibold text-right">Amount (Orig)</TableHead>
+              <TableHead className="font-semibold text-right">Amount</TableHead>
               <TableHead className="font-semibold text-right">Amount (AED)</TableHead>
               <TableHead className="font-semibold">Status</TableHead>
               <TableHead className="font-semibold">Payment Date</TableHead>
