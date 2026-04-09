@@ -9,7 +9,7 @@ import { Database, Play, CheckCircle, XCircle, Loader2, Clock, Download, RotateC
 import { useToast } from "@/hooks/use-toast";
 import { apiRequest } from "@/lib/queryClient";
 import { format } from "date-fns";
-import { useState, useRef } from "react";
+import { useState, useRef, useEffect } from "react";
 
 function formatBytes(bytes) {
   if (!bytes) return "—";
@@ -43,8 +43,12 @@ function StatusBadge({ success }) {
 function RestoreConfirmModal({ open, onClose, onConfirm, filename, isPending }) {
   const [typed, setTyped] = useState("");
 
+  // Reset typed confirmation whenever the modal closes (any path: cancel, success, error, programmatic)
+  useEffect(() => {
+    if (!open) setTyped("");
+  }, [open]);
+
   const handleClose = () => {
-    setTyped("");
     onClose();
   };
 
