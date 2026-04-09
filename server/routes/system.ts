@@ -650,6 +650,35 @@ export function registerSystemRoutes(app: Express) {
     }
   });
 
+  app.get('/api/ops/backup-runs/:id/download', requireAuth(['Admin']), async (req: AuthenticatedRequest, res) => {
+    try {
+      const runId = parseInt(req.params.id, 10);
+      if (isNaN(runId)) return res.status(400).json({ error: 'Invalid backup run ID' });
+
+      const [run] = await db.select().from(backupRuns).where(eq(backupRuns.id, runId)).limit(1);
+      if (!run) return res.status(404).json({ error: 'Backup run not found' });
+      if (!run.dbStorageKey) return res.status(404).json({ error: 'No database backup file associated with this run' });
+      if (!run.dbSuccess) return res.status(400).json({ error: 'This backup run did not succeed — no file to download' });
+
+      const filename = run.dbStorageKey.split('/').pop() || 'backup.sql.gz';
+
+      res.set({
+        'Content-Type': 'application/gzip',
+        'Content-Disposition': `attachment; filename="${filename}"`,
+      });
+
+      const stream = objectStorageClient.downloadAsStream(run.dbStorageKey);
+      stream.on('error', (err: Error) => {
+        console.error('Error streaming backup file from storage:', err);
+        if (!res.headersSent) res.status(500).json({ error: 'Failed to download backup file — it may have been deleted from storage' });
+      });
+      stream.pipe(res);
+    } catch (error) {
+      console.error('Error downloading backup:', error);
+      res.status(500).json({ error: 'Failed to download backup' });
+    }
+  });
+
   app.get('/api/books', requireAuth(), async (req, res) => {
     try {
       const years = await db.select().from(financialYears).orderBy(desc(financialYears.year));

@@ -2,10 +2,11 @@ import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
-import { Database, Play, CheckCircle, XCircle, Loader2, Clock } from "lucide-react";
+import { Database, Play, CheckCircle, XCircle, Loader2, Clock, Download } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import { apiRequest } from "@/lib/queryClient";
 import { format } from "date-fns";
+import { useState } from "react";
 
 function formatBytes(bytes) {
   if (!bytes) return "—";
@@ -29,6 +30,32 @@ function StatusBadge({ success }) {
 export default function BackupSettings() {
   const { toast } = useToast();
   const queryClient = useQueryClient();
+  const [downloadingId, setDownloadingId] = useState(null);
+
+  const handleDownload = async (run) => {
+    setDownloadingId(run.id);
+    try {
+      const res = await fetch(`/api/ops/backup-runs/${run.id}/download`, { credentials: "include" });
+      if (!res.ok) {
+        const err = await res.json().catch(() => ({}));
+        throw new Error(err.error || `Server returned ${res.status}`);
+      }
+      const blob = await res.blob();
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement("a");
+      const filename = run.dbStorageKey?.split("/").pop() || `backup-${run.id}.sql.gz`;
+      a.href = url;
+      a.download = filename;
+      document.body.appendChild(a);
+      a.click();
+      a.remove();
+      URL.revokeObjectURL(url);
+    } catch (err) {
+      toast({ title: "Download failed", description: err.message || "Could not download backup file.", variant: "destructive" });
+    } finally {
+      setDownloadingId(null);
+    }
+  };
 
   const { data: runsData, isLoading: runsLoading } = useQuery({
     queryKey: ["/api/ops/backup-runs"],
@@ -145,6 +172,7 @@ export default function BackupSettings() {
                     <th className="text-left px-3 py-2 text-xs font-medium text-gray-500 hidden sm:table-cell">DB File</th>
                     <th className="text-left px-3 py-2 text-xs font-medium text-gray-500 hidden sm:table-cell">DB Size</th>
                     <th className="text-left px-3 py-2 text-xs font-medium text-gray-500 hidden sm:table-cell">Objects</th>
+                    <th className="text-left px-3 py-2 text-xs font-medium text-gray-500"></th>
                   </tr>
                 </thead>
                 <tbody className="divide-y">
@@ -160,6 +188,22 @@ export default function BackupSettings() {
                       </td>
                       <td className="px-3 py-2 text-gray-500 hidden sm:table-cell">
                         {run.manifestTotalObjects != null ? run.manifestTotalObjects.toLocaleString() : "—"}
+                      </td>
+                      <td className="px-3 py-2">
+                        {run.dbSuccess && run.dbStorageKey ? (
+                          <Button
+                            size="sm"
+                            variant="outline"
+                            onClick={() => handleDownload(run)}
+                            disabled={downloadingId === run.id}
+                            className="h-7 px-2 text-xs"
+                          >
+                            {downloadingId === run.id
+                              ? <Loader2 className="w-3 h-3 animate-spin" />
+                              : <><Download className="w-3 h-3 mr-1" />Download</>
+                            }
+                          </Button>
+                        ) : null}
                       </td>
                     </tr>
                   ))}
