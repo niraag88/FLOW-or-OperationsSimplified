@@ -2665,83 +2665,6 @@
       "checkConstraints": {},
       "isRLSEnabled": false
     },
-    "public.restore_runs": {
-      "name": "restore_runs",
-      "schema": "",
-      "columns": {
-        "id": {
-          "name": "id",
-          "type": "serial",
-          "primaryKey": true,
-          "notNull": true
-        },
-        "restored_at": {
-          "name": "restored_at",
-          "type": "timestamp",
-          "primaryKey": false,
-          "notNull": true,
-          "default": "now()"
-        },
-        "triggered_by": {
-          "name": "triggered_by",
-          "type": "varchar",
-          "primaryKey": false,
-          "notNull": false
-        },
-        "source_backup_run_id": {
-          "name": "source_backup_run_id",
-          "type": "integer",
-          "primaryKey": false,
-          "notNull": false
-        },
-        "source_filename": {
-          "name": "source_filename",
-          "type": "text",
-          "primaryKey": false,
-          "notNull": false
-        },
-        "success": {
-          "name": "success",
-          "type": "boolean",
-          "primaryKey": false,
-          "notNull": true,
-          "default": false
-        },
-        "error_message": {
-          "name": "error_message",
-          "type": "text",
-          "primaryKey": false,
-          "notNull": false
-        },
-        "duration_ms": {
-          "name": "duration_ms",
-          "type": "integer",
-          "primaryKey": false,
-          "notNull": false
-        }
-      },
-      "indexes": {},
-      "foreignKeys": {
-        "restore_runs_triggered_by_users_id_fk": {
-          "name": "restore_runs_triggered_by_users_id_fk",
-          "tableFrom": "restore_runs",
-          "columnsFrom": [
-            "triggered_by"
-          ],
-          "tableTo": "users",
-          "columnsTo": [
-            "id"
-          ],
-          "onUpdate": "no action",
-          "onDelete": "no action"
-        }
-      },
-      "compositePrimaryKeys": {},
-      "uniqueConstraints": {},
-      "policies": {},
-      "checkConstraints": {},
-      "isRLSEnabled": false
-    },
     "public.signed_tokens": {
       "name": "signed_tokens",
       "schema": "",
@@ -3491,10 +3414,103 @@
       "policies": {},
       "checkConstraints": {},
       "isRLSEnabled": false
+    },
+    "ops.restore_runs": {
+      "name": "restore_runs",
+      "schema": "ops",
+      "columns": {
+        "id": {
+          "name": "id",
+          "type": "serial",
+          "primaryKey": true,
+          "notNull": true
+        },
+        "restored_at": {
+          "name": "restored_at",
+          "type": "timestamp",
+          "primaryKey": false,
+          "notNull": true,
+          "default": "now()"
+        },
+        "triggered_by": {
+          "name": "triggered_by",
+          "type": "varchar",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "source_backup_run_id": {
+          "name": "source_backup_run_id",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "source_filename": {
+          "name": "source_filename",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "success": {
+          "name": "success",
+          "type": "boolean",
+          "primaryKey": false
+        },
+        "error_message": {
+          "name": "error_message",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "duration_ms": {
+          "name": "duration_ms",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "finished_at": {
+          "name": "finished_at",
+          "type": "timestamp",
+          "primaryKey": false,
+          "notNull": false,
+          "autoincrement": false
+        },
+        "triggered_by_name": {
+          "name": "triggered_by_name",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false,
+          "autoincrement": false
+        }
+      },
+      "indexes": {},
+      "foreignKeys": {
+        "restore_runs_triggered_by_users_id_fk": {
+          "name": "restore_runs_triggered_by_users_id_fk",
+          "tableFrom": "restore_runs",
+          "columnsFrom": [
+            "triggered_by"
+          ],
+          "tableTo": "users",
+          "columnsTo": [
+            "id"
+          ],
+          "onUpdate": "no action",
+          "onDelete": "no action"
+        }
+      },
+      "compositePrimaryKeys": {},
+      "uniqueConstraints": {},
+      "policies": {},
+      "checkConstraints": {},
+      "isRLSEnabled": false
     }
   },
   "enums": {},
-  "schemas": {},
+  "schemas": {
+    "ops": {
+      "name": "ops"
+    }
+  },
   "views": {},
   "sequences": {},
   "roles": {},

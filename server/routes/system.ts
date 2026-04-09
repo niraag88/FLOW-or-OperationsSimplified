@@ -818,21 +818,58 @@ export function registerSystemRoutes(app: Express) {
     });
   });
 
-  /** POST /api/ops/restore-upload — restore from an uploaded .sql.gz file */
-  app.post('/api/ops/restore-upload', requireAuth(['Admin']), upload.single('file'), async (req: AuthenticatedRequest, res) => {
-    if (!req.file) return res.status(400).json({ error: 'No file uploaded. Send a .sql.gz file as multipart field "file".' });
-    if (!req.file.originalname.endsWith('.sql.gz') && !req.file.originalname.endsWith('.gz')) {
-      return res.status(400).json({ error: 'File must be a .sql.gz gzip-compressed PostgreSQL dump' });
+  /**
+   * POST /api/ops/restore-upload — restore from an uploaded .sql.gz file.
+   *
+   * Uses busboy to stream the multipart upload directly into restoreBackup()
+   * without buffering the entire file in memory. This prevents OOM issues
+   * with large backup files.
+   */
+  app.post('/api/ops/restore-upload', requireAuth(['Admin']), async (req: AuthenticatedRequest, res) => {
+    const contentType = req.headers['content-type'] || '';
+    if (!contentType.includes('multipart/form-data')) {
+      return res.status(400).json({ error: 'Request must be multipart/form-data' });
     }
 
-    const stream = Readable.from(req.file.buffer);
-    return runRestore({
-      sqlGzStream: stream,
-      triggeredBy: req.user!.id,
-      actorName: req.user?.username || req.user!.id,
-      sourceFilename: req.file.originalname,
-      res,
+    // @ts-ignore
+    const Busboy = (await import('busboy')).default;
+    const bb = Busboy({ headers: req.headers, limits: { files: 1 } });
+
+    let fileHandled = false;
+
+    bb.on('file', (fieldname: string, fileStream: import('stream').Readable, info: { filename: string }) => {
+      if (fieldname !== 'file') { fileStream.resume(); return; }
+      if (fileHandled) { fileStream.resume(); return; }
+      fileHandled = true;
+
+      const { filename } = info;
+      if (!filename.endsWith('.sql.gz') && !filename.endsWith('.gz')) {
+        fileStream.resume();
+        return res.status(400).json({ error: 'File must be a .sql.gz gzip-compressed PostgreSQL dump' });
+      }
+
+      // Pass the stream directly to restoreBackup — no in-memory buffering
+      runRestore({
+        sqlGzStream: fileStream,
+        triggeredBy: req.user!.id,
+        actorName: req.user?.username || req.user!.id,
+        sourceFilename: filename,
+        res,
+      });
     });
+
+    bb.on('finish', () => {
+      if (!fileHandled && !res.headersSent) {
+        res.status(400).json({ error: 'No file uploaded. Send a .sql.gz file as multipart field "file".' });
+      }
+    });
+
+    bb.on('error', (err: Error) => {
+      console.error('Busboy parse error:', err);
+      if (!res.headersSent) res.status(400).json({ error: 'Failed to parse multipart upload' });
+    });
+
+    req.pipe(bb);
   });
 
   /**
