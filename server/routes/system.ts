@@ -697,11 +697,19 @@ export function registerSystemRoutes(app: Express) {
     actorName: string;
   }) {
     const { sqlGzStream, triggeredBy, sourceBackupRunId, sourceFilename, res, actorName } = opts;
+    let result: { success: boolean; error?: string; durationMs: number } | null = null;
     try {
       // @ts-ignore
       const { restoreBackup } = await import('../../scripts/restoreBackup.js');
-      const result = await restoreBackup(sqlGzStream);
+      result = await restoreBackup(sqlGzStream);
+    } catch (importOrRunError: any) {
+      console.error('Error during restore execution:', importOrRunError);
+      result = { success: false, error: importOrRunError.message || 'Restore failed unexpectedly', durationMs: 0 };
+    }
 
+    // Best-effort: record the outcome in restore_runs.
+    // After a restore the table may be absent (old backup) — that must NOT override the actual result.
+    try {
       await db.insert(restoreRuns).values({
         triggeredBy,
         sourceBackupRunId: sourceBackupRunId ?? null,
@@ -710,7 +718,12 @@ export function registerSystemRoutes(app: Express) {
         errorMessage: result.error ?? null,
         durationMs: result.durationMs ?? null,
       });
+    } catch (auditErr) {
+      console.warn('Could not persist restore_runs record (table may be absent in restored backup):', auditErr);
+    }
 
+    // Best-effort: write audit log
+    try {
       const label = sourceFilename || (sourceBackupRunId ? `backup run #${sourceBackupRunId}` : 'unknown');
       writeAuditLog({
         actor: triggeredBy,
@@ -720,25 +733,12 @@ export function registerSystemRoutes(app: Express) {
         action: 'CREATE',
         details: `Database restore from ${label} ${result.success ? 'succeeded' : 'failed'}`,
       });
+    } catch (_) {}
 
-      if (result.success) {
-        return res.json({ success: true, durationMs: result.durationMs });
-      } else {
-        return res.status(500).json({ success: false, error: result.error || 'Restore failed', durationMs: result.durationMs });
-      }
-    } catch (error: any) {
-      console.error('Error during restore:', error);
-      try {
-        await db.insert(restoreRuns).values({
-          triggeredBy,
-          sourceBackupRunId: sourceBackupRunId ?? null,
-          sourceFilename: sourceFilename ?? null,
-          success: false,
-          errorMessage: error.message,
-          durationMs: null,
-        });
-      } catch (_) {}
-      return res.status(500).json({ success: false, error: error.message || 'Restore failed unexpectedly' });
+    if (result.success) {
+      return res.json({ success: true, durationMs: result.durationMs });
+    } else {
+      return res.status(500).json({ success: false, error: result.error || 'Restore failed', durationMs: result.durationMs });
     }
   }
 
@@ -749,6 +749,7 @@ export function registerSystemRoutes(app: Express) {
 
     const [run] = await db.select().from(backupRuns).where(eq(backupRuns.id, runId)).limit(1);
     if (!run) return res.status(404).json({ error: 'Backup run not found' });
+    if (!run.success) return res.status(400).json({ error: 'This backup run did not fully succeed — only fully successful backup runs can be restored' });
     if (!run.dbSuccess || !run.dbStorageKey) return res.status(400).json({ error: 'This backup run does not have a successful DB dump to restore from' });
 
     const existsResult = await objectStorageClient.exists(run.dbStorageKey);
@@ -784,7 +785,7 @@ export function registerSystemRoutes(app: Express) {
     });
   });
 
-  /** GET /api/ops/restore-runs — last 10 restore run records with username */
+  /** GET /api/ops/restore-runs — last 10 restore run records with username and source backup filename */
   app.get('/api/ops/restore-runs', requireAuth(['Admin']), async (req, res) => {
     try {
       const rows = await db
@@ -798,9 +799,11 @@ export function registerSystemRoutes(app: Express) {
           errorMessage: restoreRuns.errorMessage,
           durationMs: restoreRuns.durationMs,
           username: users.username,
+          backupDbFilename: backupRuns.dbFilename,
         })
         .from(restoreRuns)
         .leftJoin(users, eq(restoreRuns.triggeredBy, users.id))
+        .leftJoin(backupRuns, eq(restoreRuns.sourceBackupRunId, backupRuns.id))
         .orderBy(desc(restoreRuns.restoredAt))
         .limit(10);
       res.json({ runs: rows });
