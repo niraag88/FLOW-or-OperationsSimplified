@@ -24,13 +24,15 @@ async function restoreBackup(sqlGzStream) {
 
     // Step 1: Drop and recreate the public schema to clear all existing data.
     // The drizzle schema (migrations tracking) is separate and unaffected.
+    // ON_ERROR_STOP=1 ensures any SQL error immediately aborts with non-zero exit.
     console.log('[restore] Dropping public schema...');
-    await runPsql(dbUrl, ['--command', 'DROP SCHEMA IF EXISTS public CASCADE; CREATE SCHEMA public;']);
+    await runPsql(dbUrl, ['-v', 'ON_ERROR_STOP=1', '--command', 'DROP SCHEMA IF EXISTS public CASCADE; CREATE SCHEMA public;']);
     console.log('[restore] Public schema cleared.');
 
     // Step 2: Decompress and pipe SQL into psql
+    // ON_ERROR_STOP=1: any SQL error causes psql to exit non-zero → restore returns failure.
     console.log('[restore] Starting database restore from dump...');
-    const psql = spawn('psql', [dbUrl, '--no-password'], {
+    const psql = spawn('psql', [dbUrl, '--no-password', '-v', 'ON_ERROR_STOP=1'], {
       stdio: ['pipe', 'pipe', 'pipe'],
     });
 
@@ -81,7 +83,7 @@ async function restoreBackup(sqlGzStream) {
 /**
  * Run a psql command with given args. Rejects on non-zero exit code.
  * @param {string} dbUrl
- * @param {string[]} args - additional args after dbUrl
+ * @param {string[]} args - additional args after dbUrl (should include -v ON_ERROR_STOP=1)
  */
 function runPsql(dbUrl, args) {
   return new Promise((resolve, reject) => {

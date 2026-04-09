@@ -405,15 +405,17 @@ export default function BackupSettings() {
                                   : <><Download className="w-3 h-3 mr-1" />Download</>
                                 }
                               </Button>
-                              <Button
-                                size="sm"
-                                variant="outline"
-                                onClick={() => handleRestoreClick(run)}
-                                disabled={isRestoring}
-                                className="h-7 px-2 text-xs border-red-300 text-red-700 hover:bg-red-50"
-                              >
-                                <RotateCcw className="w-3 h-3 mr-1" />Restore
-                              </Button>
+                              {run.success && (
+                                <Button
+                                  size="sm"
+                                  variant="outline"
+                                  onClick={() => handleRestoreClick(run)}
+                                  disabled={isRestoring}
+                                  className="h-7 px-2 text-xs border-red-300 text-red-700 hover:bg-red-50"
+                                >
+                                  <RotateCcw className="w-3 h-3 mr-1" />Restore
+                                </Button>
+                              )}
                             </div>
                           ) : null}
                         </td>
