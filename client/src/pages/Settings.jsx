@@ -13,6 +13,7 @@ import BookClosingManager from "../components/settings/BookClosingManager";
 import SettingsStorage from "./SettingsStorage";
 import RetentionSettings from "../components/settings/RetentionSettings";
 import RecycleBin from "../components/settings/RecycleBin";
+import BackupSettings from "../components/settings/BackupSettings";
 import InventorySettings from "../components/settings/InventorySettings";
 
 export default function Settings() {
@@ -95,7 +96,10 @@ export default function Settings() {
           <div className="space-y-6">
             <SettingsStorage />
             {currentUser?.role === 'Admin' && (
-              <RetentionSettings currentUser={currentUser} />
+              <>
+                <BackupSettings />
+                <RetentionSettings currentUser={currentUser} />
+              </>
             )}
           </div>
         </TabsContent>

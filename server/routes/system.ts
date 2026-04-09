@@ -1,10 +1,10 @@
 import type { Express } from "express";
-import { auditLog, recycleBin, storageObjects, invoices, deliveryOrders, quotations, purchaseOrders, invoiceLineItems, deliveryOrderItems, quotationItems, purchaseOrderItems, products, brands, suppliers, customers, financialYears } from "@shared/schema";
+import { auditLog, recycleBin, storageObjects, invoices, deliveryOrders, quotations, purchaseOrders, invoiceLineItems, deliveryOrderItems, quotationItems, purchaseOrderItems, products, brands, suppliers, customers, financialYears, backupRuns } from "@shared/schema";
 import { db, pool } from "../db";
 import { eq, desc, sum, inArray } from "drizzle-orm";
 import { execSync } from 'child_process';
 import * as XLSX from 'xlsx';
-import { requireAuth, requireRole, requireOpsToken, writeAuditLog, objectStorageClient, validateUploadInput, validatePdfMagicBytes, validateImageMagicBytes, upload, type AuthenticatedRequest } from "../middleware";
+import { requireAuth, requireRole, writeAuditLog, objectStorageClient, validateUploadInput, validatePdfMagicBytes, validateImageMagicBytes, upload, type AuthenticatedRequest } from "../middleware";
 import crypto from 'crypto';
 
 export function registerSystemRoutes(app: Express) {
@@ -576,9 +576,9 @@ export function registerSystemRoutes(app: Express) {
     }
   });
 
-  app.post('/api/ops/run-backups', requireAuth(['Admin']), requireOpsToken, async (req: AuthenticatedRequest, res) => {
+  app.post('/api/ops/run-backups', requireAuth(['Admin']), async (req: AuthenticatedRequest, res) => {
     try {
-      console.log('Starting automated backup process...');
+      console.log('Starting backup process...');
       // @ts-ignore
       const { uploadBackup } = await import('../../scripts/uploadBackup.js');
       // @ts-ignore
@@ -586,6 +586,22 @@ export function registerSystemRoutes(app: Express) {
 
       const [dbResult, manifestResult] = await Promise.all([uploadBackup(), writeManifest()]);
       const success = dbResult.success && manifestResult.success;
+
+      // Record this run in the database
+      await db.insert(backupRuns).values({
+        triggeredBy: req.user!.id,
+        dbSuccess: dbResult.success,
+        dbFilename: dbResult.filename || null,
+        dbStorageKey: dbResult.storageKey || null,
+        manifestSuccess: manifestResult.success,
+        manifestFilename: manifestResult.filename || null,
+        manifestStorageKey: manifestResult.storageKey || null,
+        manifestTotalObjects: manifestResult.totalObjects || null,
+        manifestTotalSizeBytes: manifestResult.totalSize || null,
+        errorMessage: !success ? [dbResult.error, manifestResult.error].filter(Boolean).join('; ') : null,
+      });
+
+      writeAuditLog({ actor: req.user!.id, actorName: req.user?.username || String(req.user!.id), targetId: 'backup', targetType: 'backup_run', action: 'CREATE', details: `Manual backup ${success ? 'succeeded' : 'failed'}` });
 
       const response = {
         success,
@@ -608,19 +624,29 @@ export function registerSystemRoutes(app: Express) {
       };
 
       if (success) {
-        console.log('Automated backup completed successfully');
+        console.log('Backup completed successfully');
         res.status(200).json(response);
       } else {
-        console.error('Automated backup failed:', { dbResult, manifestResult });
+        console.error('Backup failed:', { dbResult, manifestResult });
         res.status(500).json(response);
       }
     } catch (error) {
-      console.error('Error running automated backups:', error);
+      console.error('Error running backups:', error);
       res.status(500).json({
         success: false,
         error: error instanceof Error ? error.message : 'Unknown error',
         timestamp: new Date().toISOString()
       });
+    }
+  });
+
+  app.get('/api/ops/backup-runs', requireAuth(['Admin']), async (req: AuthenticatedRequest, res) => {
+    try {
+      const runs = await db.select().from(backupRuns).orderBy(desc(backupRuns.ranAt)).limit(20);
+      res.json({ runs });
+    } catch (error) {
+      console.error('Error fetching backup runs:', error);
+      res.status(500).json({ error: 'Failed to fetch backup runs' });
     }
   });
 

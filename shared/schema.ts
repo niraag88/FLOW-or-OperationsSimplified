@@ -774,6 +774,26 @@ export type VatReturn = typeof vatReturns.$inferSelect;
 export type CompanySettings = typeof companySettings.$inferSelect;
 export type StorageMonitoring = typeof storageMonitoring.$inferSelect;
 
+// Backup Runs table — records every manual/automated backup attempt
+export const backupRuns = pgTable("backup_runs", {
+  id: serial("id").primaryKey(),
+  ranAt: timestamp("ran_at").defaultNow().notNull(),
+  triggeredBy: varchar("triggered_by").references(() => users.id),
+  dbSuccess: boolean("db_success").notNull(),
+  dbFilename: text("db_filename"),
+  dbStorageKey: text("db_storage_key"),
+  manifestSuccess: boolean("manifest_success").notNull(),
+  manifestFilename: text("manifest_filename"),
+  manifestStorageKey: text("manifest_storage_key"),
+  manifestTotalObjects: integer("manifest_total_objects"),
+  manifestTotalSizeBytes: bigint("manifest_total_size_bytes", { mode: "number" }),
+  errorMessage: text("error_message"),
+});
+
+export const insertBackupRunSchema = createInsertSchema(backupRuns).omit({ id: true, ranAt: true });
+export type InsertBackupRun = z.infer<typeof insertBackupRunSchema>;
+export type BackupRun = typeof backupRuns.$inferSelect;
+
 // Financial Years (Books) table
 export const financialYears = pgTable("financial_years", {
   id: serial("id").primaryKey(),

@@ -1,7 +1,7 @@
 import type { Express } from "express";
-import { users } from "@shared/schema";
+import { users, auditLog } from "@shared/schema";
 import { db } from "../db";
-import { eq } from "drizzle-orm";
+import { eq, lt, sql } from "drizzle-orm";
 import { requireAuth, requireRole, hashPassword, writeAuditLog, type AuthenticatedRequest } from "../middleware";
 import { businessStorage } from "../businessStorage";
 
@@ -58,6 +58,25 @@ export function registerSettingsRoutes(app: Express) {
     } catch (error) {
       console.error('Error saving retention settings:', error);
       res.status(500).json({ error: 'Failed to save retention settings' });
+    }
+  });
+
+  app.post('/api/settings/retention/purge', requireAuth(['Admin']), async (req: AuthenticatedRequest, res) => {
+    try {
+      const settings = await businessStorage.getCompanySettings();
+      const auditLogRetentionDays = settings?.retentionAuditLogsDays ?? 730;
+      const auditLogCutoff = new Date();
+      auditLogCutoff.setDate(auditLogCutoff.getDate() - auditLogRetentionDays);
+
+      const deleted = await db.delete(auditLog)
+        .where(lt(auditLog.timestamp, auditLogCutoff))
+        .returning({ id: auditLog.id });
+
+      writeAuditLog({ actor: req.user!.id, actorName: req.user?.username || String(req.user!.id), targetId: 'audit_log', targetType: 'retention_purge', action: 'DELETE', details: `Retention purge: deleted ${deleted.length} audit log records older than ${auditLogRetentionDays} days` });
+      res.json({ success: true, deletedAuditLogs: deleted.length, auditLogRetentionDays });
+    } catch (error) {
+      console.error('Error running retention purge:', error);
+      res.status(500).json({ error: 'Failed to run retention purge' });
     }
   });
 

@@ -23,7 +23,6 @@ const EditProduct = lazy(() => import("@/pages/EditProduct.jsx"));
 const StockCountNew = lazy(() => import("@/pages/StockCountNew.jsx"));
 const GoodsReceipts = lazy(() => import("@/pages/GoodsReceipts.jsx"));
 const Customers = lazy(() => import("@/pages/Customers.jsx"));
-const BackupDrill = lazy(() => import("@/pages/BackupDrill.jsx"));
 const Print = lazy(() => import("@/pages/Print.jsx"));
 const Quotations = lazy(() => import("@/pages/Quotations.jsx"));
 const UserManagement = lazy(() => import("@/pages/UserManagement"));
@@ -141,11 +140,6 @@ function PagesContent() {
         <Route path="/Customers" element={
           <ProtectedRoute>
             <Layout currentPageName="Customers"><Customers /></Layout>
-          </ProtectedRoute>
-        } />
-        <Route path="/BackupDrill" element={
-          <ProtectedRoute requiredRoles={['Admin']}>
-            <Layout currentPageName="Backup Drill"><BackupDrill /></Layout>
           </ProtectedRoute>
         } />
         <Route path="/Print" element={

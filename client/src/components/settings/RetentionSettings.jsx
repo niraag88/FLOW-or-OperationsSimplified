@@ -63,17 +63,24 @@ export default function RetentionSettings({ currentUser }) {
 
   const handleRunRetention = async () => {
     setLoading(true);
-    await logAuditAction("StorageSettings", "singleton", "manual_retention_run", currentUser?.email);
-    toast({
-      title: "Manual Retention Job Started",
-      description: "The backend is now processing data according to retention policies.",
-    });
-    setTimeout(() => {
-      setLoading(false);
-      toast({
-        title: "Retention Job In Progress",
+    try {
+      const response = await fetch('/api/settings/retention/purge', {
+        method: 'POST',
+        credentials: 'include',
       });
-    }, 2000);
+      if (!response.ok) throw new Error('Purge failed');
+      const result = await response.json();
+      await logAuditAction("StorageSettings", "singleton", "manual_retention_run", currentUser?.email, { deletedAuditLogs: result.deletedAuditLogs });
+      toast({
+        title: "Retention purge complete",
+        description: `Removed ${result.deletedAuditLogs} audit log records older than ${result.auditLogRetentionDays} days.`,
+      });
+    } catch (error) {
+      console.error("Error running retention purge:", error);
+      toast({ title: "Purge failed", variant: "destructive" });
+    } finally {
+      setLoading(false);
+    }
   };
 
   if (loading && settings === initialSettings) return <div>Loading...</div>;

@@ -13,8 +13,10 @@ const objectStorageClient = new Client({
 
 async function uploadBackup() {
   try {
-    const date = new Date().toISOString().split('T')[0].replace(/-/g, '');
-    const filename = `db-${date}.sql.gz`;
+    const now = new Date();
+    const dateStr = now.toISOString().split('T')[0].replace(/-/g, '');
+    const timeStr = now.toISOString().split('T')[1].substring(0, 8).replace(/:/g, '');
+    const filename = `db-${dateStr}-${timeStr}.sql.gz`;
     const tempPath = `/tmp/${filename}`;
     const storageKey = `backups/db/${filename}`;
 
