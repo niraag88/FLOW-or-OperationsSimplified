@@ -1,0 +1,152 @@
+My assessment by priority
+High priority
+1. You still have two ways of managing database structure
+
+You now have proper migrations, which is good.
+But server/index.ts still creates/alters tables at startup for:
+
+storage_objects
+signed_tokens
+
+That means schema changes are happening in two places:
+
+migrations
+startup boot code
+
+That is risky long-term because one day the two can drift apart.
+
+Why this matters
+
+When you update the app later, you want one clean source of truth for DB changes.
+
+Recommendation
+
+Move those startup table changes into proper migrations and keep server/index.ts focused on booting the app only.
+
+2. Backend architecture still has a leftover old storage layer
+
+You now clearly use:
+
+server/db.ts
+server/businessStorage.ts
+modular route files
+
+But server/storage.ts still exists and is just an old in-memory MemStorage.
+
+That is not catastrophic, but it is exactly the kind of leftover file that causes confusion later:
+
+someone edits the wrong layer
+someone assumes it is still active
+future AI tooling may touch the wrong thing
+Recommendation
+
+If it is no longer used, remove it.
+If it must stay temporarily, mark it clearly as legacy/deprecated.
+
+3. You still have hardcoded company details in export logic
+
+In client/src/components/utils/export.jsx, quotation and PO export logic still falls back to:
+
+SUPERNATURE LLC
+address
+phone
+email
+VAT details
+
+That means if company settings fail to load or a snapshot is missing, you could generate the wrong document branding/data.
+
+Why this matters
+
+This is one of the most important real-world document risks in the app.
+
+Recommendation
+
+Replace hardcoded fallback business identity with either:
+
+current company settings from DB
+a blank fallback
+or a mandatory check that blocks export if company settings are missing
+Medium priority
+4. Admin creation flow is still inconsistent
+
+You have scripts/createAdmin.js, but package.json still does not have a create-admin script.
+
+So the capability exists, but the app setup/documentation is not fully aligned.
+
+Recommendation
+
+Add a script like:
+
+"create-admin": "node scripts/createAdmin.js"
+
+or remove any references that imply it exists.
+
+5. Route naming is still inconsistent
+
+In client/src/App.tsx, you have a mix of:
+
+lowercase routes like /purchase-orders, /delivery-orders, /invoices
+uppercase routes like /Inventory, /Reports, /Settings, /Customers
+
+This is not a functional disaster, but it is messy and not ideal long-term.
+
+Recommendation
+
+Standardize routes to lowercase over time.
+
+6. Uploads still use multer.memoryStorage()
+
+Uploads are being buffered in memory, and your validation still allows fairly large PDFs.
+
+For your current usage, this is probably okay.
+But it is still a weak point if:
+
+file sizes grow
+multiple users upload at once
+you later add more file-heavy workflows
+Recommendation
+
+This is acceptable for now, but keep an eye on it.
+
+7. businessStorage.ts is now the next “big file risk”
+
+It is still large. Not as bad as the old giant route file problem, but it is the next likely pressure point.
+
+Recommendation
+
+No urgent rewrite needed.
+But future new features should go into:
+
+smaller service modules
+not more growth inside one giant storage class
+Low priority
+8. Repo still contains non-core baggage
+
+The ZIP contains:
+
+.canvas/assets
+lots of attached_assets
+prompt/history-style text files
+image exports
+
+These are not app-breaking, but they make the project noisier and less professional for:
+
+handoff
+resale
+client delivery
+long-term maintenance
+Recommendation
+
+Create a cleaner production repo version eventually.
+
+9. Some legacy naming remains
+
+Files like:
+
+client/src/api/entities.js
+client/src/api/integrations.js
+
+are still active, so I would not call them dead code.
+But they still have an old “generated/bridge layer” feel that is a bit out of line with the rest of the architecture.
+
+This is more cosmetic than urgent.
