@@ -301,7 +301,7 @@ function StatementLayout({ type, entity, companySettings, records, dateFrom, dat
 
       {/* Footer */}
       <div className="mt-6 border-t border-gray-200 pt-3 text-center text-[10px] text-gray-400">
-        Generated on {format(new Date(), "dd/MM/yyyy HH:mm")} · FLOW Business Platform
+        Generated on {format(new Date(), "dd/MM/yy")}
       </div>
     </div>
   );
@@ -309,7 +309,7 @@ function StatementLayout({ type, entity, companySettings, records, dateFrom, dat
 
 /* ── statement modal with print portal ─────────────────────────────────── */
 
-function StatementPreviewModal({ open, onClose, type, entity, companySettings, records, dateFrom, dateTo, statusFilter }) {
+function StatementPreviewModal({ open, onClose, type, entity, companySettings, records, dateFrom, dateTo, statusFilter, exportData, exportFilename }) {
   const handlePrint = useCallback(() => {
     let styleEl = document.getElementById("__stmt_print_css");
     if (!styleEl) {
@@ -346,6 +346,32 @@ function StatementPreviewModal({ open, onClose, type, entity, companySettings, r
                   <Printer className="w-4 h-4 mr-1.5" />
                   Print / Save PDF
                 </Button>
+                <ExportDropdown
+                  data={exportData || []}
+                  type="Statement"
+                  filename={exportFilename || "statement"}
+                  columns={type === "invoices" ? {
+                    invoice_number: "Invoice #",
+                    customer: "Customer",
+                    invoice_date: "Invoice Date",
+                    subtotal_aed: "Subtotal (AED)",
+                    vat_aed: "VAT (AED)",
+                    total_aed: "Total (AED)",
+                    payment_status: "Payment Status",
+                    received_date: "Received Date",
+                    remarks: "Remarks",
+                  } : {
+                    po_number: "PO #",
+                    supplier: "Supplier",
+                    order_date: "Order Date",
+                    currency: "Currency",
+                    amount_orig: "Amount (Original)",
+                    amount_aed: "Amount (AED)",
+                    payment_status: "Payment Status",
+                    payment_date: "Payment Date",
+                    remarks: "Remarks",
+                  }}
+                />
                 <Button size="sm" variant="outline" onClick={onClose}>
                   <X className="w-4 h-4 mr-1.5" />
                   Close
@@ -580,6 +606,8 @@ function InvoicesSection({ invoices, customers, companySettings }) {
         dateFrom={dateFrom}
         dateTo={dateTo}
         statusFilter={statusFilter}
+        exportData={exportData}
+        exportFilename={exportFilename}
       />
     </>
   );
@@ -815,6 +843,8 @@ function PurchaseOrdersSection({ purchaseOrders, suppliers, companySettings }) {
         dateFrom={dateFrom}
         dateTo={dateTo}
         statusFilter={statusFilter}
+        exportData={exportData}
+        exportFilename={exportFilename}
       />
     </>
   );
