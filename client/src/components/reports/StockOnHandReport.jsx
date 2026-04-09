@@ -19,6 +19,16 @@ import { exportToXLSX } from "../utils/export";
 
 const LOW_STOCK_THRESHOLD = 6;
 
+const escapeHtml = (str) => {
+  if (str == null) return '-';
+  return String(str)
+    .replace(/&/g, '&amp;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;')
+    .replace(/"/g, '&quot;')
+    .replace(/'/g, '&#39;');
+};
+
 const getStatus = (qty) => {
   if (qty === 0) return 'Out of Stock';
   if (qty <= LOW_STOCK_THRESHOLD) return 'Low Stock';
@@ -75,13 +85,13 @@ export default function StockOnHandReport({ products }) {
       const qty = p.stockQuantity || 0;
       const status = getStatus(qty);
       return `<tr>
-        <td>${reportDate}</td>
-        <td>${p.brandName || '-'}</td>
-        <td>${p.name || '-'}</td>
-        <td>${p.sku || '-'}</td>
-        <td>${p.size || '-'}</td>
+        <td>${escapeHtml(reportDate)}</td>
+        <td>${escapeHtml(p.brandName)}</td>
+        <td>${escapeHtml(p.name)}</td>
+        <td>${escapeHtml(p.sku)}</td>
+        <td>${escapeHtml(p.size)}</td>
         <td style="text-align:right">${qty}</td>
-        <td>${status}</td>
+        <td>${escapeHtml(status)}</td>
       </tr>`;
     }).join('');
 
