@@ -260,16 +260,18 @@ function buildStatementHtml({ type, entity, companySettings, records, dateFrom, 
   .tl { width:110px; text-align:right; color:#6b7280; }
   .tl.grand { color:#000; }
   .tv { width:110px; text-align:right; }
-  .footer { position:fixed; bottom:0; left:0; right:0; border-top:1px solid #e5e7eb; padding:4px 15mm; text-align:center; font-size:9px; color:#9ca3af; background:#fff; }
+  .footer { border-top:1px solid #e5e7eb; padding:8px 15mm; text-align:center; font-size:9px; color:#9ca3af; background:#fff; }
+  @media print {
+    .footer { position:fixed; bottom:0; left:0; right:0; padding:4px 15mm; }
+  }
   @media screen {
     html { background:#e8e8e8; }
-    body { max-width:900px; min-height:297mm; margin:30px auto; padding:40px 50px 50px; box-shadow:0 2px 12px rgba(0,0,0,0.15); position:relative; }
-    .footer { position:absolute; bottom:0; left:0; right:0; }
+    body { max-width:900px; min-height:297mm; margin:30px auto; padding:40px 50px 0; box-shadow:0 2px 12px rgba(0,0,0,0.15); display:flex; flex-direction:column; }
+    .footer { margin-top:auto; }
   }
 </style>
 </head>
 <body>
-<div class="footer">Generated on ${esc(today)}</div>
 <div class="header">
   ${logoHtml}
   <h1>STATEMENT OF ACCOUNT</h1>
@@ -326,6 +328,7 @@ function buildStatementHtml({ type, entity, companySettings, records, dateFrom, 
     </span>
   </div>
 </div>
+<div class="footer">Generated on ${esc(today)}</div>
 </body>
 </html>`;
 }
