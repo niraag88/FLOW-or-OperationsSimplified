@@ -247,8 +247,6 @@ export default function Reports() {
         <TabsContent value="stock" className="mt-6">
           <StockOnHandReport
             products={data.products}
-            lots={data.lots}
-            canExport={!!currentUser}
           />
         </TabsContent>
       </Tabs>
