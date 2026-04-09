@@ -35,21 +35,26 @@ export default function BackupSettings() {
   const handleDownload = async (run) => {
     setDownloadingId(run.id);
     try {
-      const res = await fetch(`/api/ops/backup-runs/${run.id}/download`, { credentials: "include" });
-      if (!res.ok) {
+      // Pre-flight check: verify the endpoint is accessible and file exists before
+      // triggering navigation, so we can show a proper error toast if not.
+      const check = await fetch(`/api/ops/backup-runs/${run.id}/download`, {
+        method: "HEAD",
+        credentials: "include",
+      });
+      if (!check.ok) {
+        // HEAD not supported — fall back to reading error from a GET
+        const res = await fetch(`/api/ops/backup-runs/${run.id}/download`, { credentials: "include" });
         const err = await res.json().catch(() => ({}));
         throw new Error(err.error || `Server returned ${res.status}`);
       }
-      const blob = await res.blob();
-      const url = URL.createObjectURL(blob);
+      // File exists — use direct anchor navigation so the browser streams it natively
+      // (no memory buffering; progress bar appears immediately for large files)
       const a = document.createElement("a");
-      const filename = run.dbStorageKey?.split("/").pop() || `backup-${run.id}.sql.gz`;
-      a.href = url;
-      a.download = filename;
+      a.href = `/api/ops/backup-runs/${run.id}/download`;
+      a.download = run.dbStorageKey?.split("/").pop() || `backup-${run.id}.sql.gz`;
       document.body.appendChild(a);
       a.click();
       a.remove();
-      URL.revokeObjectURL(url);
     } catch (err) {
       toast({ title: "Download failed", description: err.message || "Could not download backup file.", variant: "destructive" });
     } finally {
