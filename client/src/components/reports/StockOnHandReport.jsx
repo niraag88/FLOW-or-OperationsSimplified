@@ -135,8 +135,8 @@ export default function StockOnHandReport({ products }) {
 
   const handleExportXLSX = () => {
     const rows = filtered.map(p => ({
-      'SKU': p.sku || '-',
       'Brand': p.brandName || '-',
+      'SKU': p.sku || '-',
       'Product': p.name || '-',
       'Size': p.size || '-',
       'Qty': p.stockQuantity || 0,
@@ -252,6 +252,7 @@ export default function StockOnHandReport({ products }) {
               <TableHeader>
                 <TableRow>
                   <TableHead>Brand</TableHead>
+                  <TableHead>Code</TableHead>
                   <TableHead>Product</TableHead>
                   <TableHead>Size</TableHead>
                   <TableHead className="text-right">Qty</TableHead>
@@ -261,7 +262,7 @@ export default function StockOnHandReport({ products }) {
               <TableBody>
                 {paginated.length === 0 ? (
                   <TableRow>
-                    <TableCell colSpan={5} className="text-center py-12 text-gray-500">
+                    <TableCell colSpan={6} className="text-center py-12 text-gray-500">
                       No products match the selected filters.
                     </TableCell>
                   </TableRow>
@@ -271,10 +272,8 @@ export default function StockOnHandReport({ products }) {
                   return (
                     <TableRow key={p.id}>
                       <TableCell>{p.brandName || '-'}</TableCell>
-                      <TableCell>
-                        <div className="font-medium">{p.name}</div>
-                        <div className="text-xs text-gray-500">{p.sku}</div>
-                      </TableCell>
+                      <TableCell className="text-sm text-gray-700">{p.sku || '-'}</TableCell>
+                      <TableCell>{p.name || '-'}</TableCell>
                       <TableCell>{p.size || '-'}</TableCell>
                       <TableCell className={`text-right font-medium ${qty === 0 ? 'text-red-600' : ''}`}>
                         {qty}
