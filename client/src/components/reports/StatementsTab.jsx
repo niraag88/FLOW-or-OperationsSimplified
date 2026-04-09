@@ -25,7 +25,7 @@ function fmtDate(val, full = false) {
   try {
     const d = new Date(val);
     if (isNaN(d.getTime())) return "—";
-    return full ? format(d, "dd/MM/yyyy") : format(d, "dd/MM/yy");
+    return format(d, "dd/MM/yy");
   } catch {
     return "—";
   }
@@ -187,7 +187,7 @@ function buildStatementHtml({ type, entity, companySettings, records, dateFrom, 
   const periodTo    = dateTo   ? fmtDate(dateTo, true)   : null;
   const period      = periodFrom || periodTo ? `${periodFrom || "start"} – ${periodTo || "present"}` : "All time";
   const statusLabel = statusFilter === "all" ? "All" : statusFilter === "paid" ? "Paid" : "Outstanding";
-  const today       = format(new Date(), "dd/MM/yyyy");
+  const today       = format(new Date(), "dd/MM/yy");
 
   const logoHtml = companySettings?.logo
     ? `<img src="${esc(companySettings.logo)}" style="max-height:56px;max-width:150px;object-fit:contain" alt="Logo">`
@@ -205,7 +205,7 @@ function buildStatementHtml({ type, entity, companySettings, records, dateFrom, 
     : `<th style="${thStyle}">PO #</th><th style="${thC}">Date</th><th style="${thR}">Amount</th><th style="${thR}">Amount (AED)</th><th style="${thC}">Status</th><th style="${thC}">Payment Date</th>`;
 
   const dataRows = records.length === 0
-    ? `<tr><td colspan="8" style="text-align:center;padding:16px;color:#9ca3af">No records</td></tr>`
+    ? `<tr><td colspan="${type === "invoices" ? 8 : 7}" style="text-align:center;padding:16px;color:#9ca3af">No records</td></tr>`
     : records.map((r, i) => {
         const statusBg    = r._paymentStatus === "paid" ? "#dcfce7" : "#fef3c7";
         const statusColor = r._paymentStatus === "paid" ? "#166534" : "#92400e";
@@ -1025,7 +1025,7 @@ function PurchaseOrdersSection({ purchaseOrders, companySettings }) {
 
 /* ── main export ────────────────────────────────────────────────────────── */
 
-export default function StatementsTab({ invoices, purchaseOrders, customers, suppliers, companySettings }) {
+export default function StatementsTab({ invoices, purchaseOrders, customers, companySettings }) {
   return (
     <div className="space-y-4">
       <p className="text-sm text-gray-500">
