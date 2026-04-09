@@ -9,7 +9,8 @@ import {
   ShoppingCart,
   BarChart3,
   Wallet,
-  LayoutDashboard
+  LayoutDashboard,
+  BookText,
 } from "lucide-react";
 
 import OverviewReport from "../components/reports/OverviewReport";
@@ -18,6 +19,7 @@ import SalesAgedInvoicesReport from "../components/reports/SalesAgedInvoicesRepo
 import PurchasesReport from "../components/reports/PurchasesReport";
 import VATReportTab from "../components/reports/VATReportTab";
 import PaymentsLedger from "../components/reports/PaymentsLedger";
+import StatementsTab from "../components/reports/StatementsTab";
 import StockOnHandReport from "../components/reports/StockOnHandReport";
 
 function normalizeTaxTreatment(raw) {
@@ -171,6 +173,10 @@ export default function Reports() {
               <Wallet className="w-4 h-4" />
               Payments
             </TabsTrigger>
+            <TabsTrigger value="statements" className="flex items-center gap-1.5">
+              <BookText className="w-4 h-4" />
+              Statements
+            </TabsTrigger>
             <TabsTrigger value="stock" className="flex items-center gap-1.5">
               <Package className="w-4 h-4" />
               Stock
@@ -226,6 +232,16 @@ export default function Reports() {
             suppliers={data.suppliers}
             companySettings={data.companySettings}
             canExport={!!currentUser}
+          />
+        </TabsContent>
+        <TabsContent value="statements" className="mt-6">
+          <StatementsTab
+            invoices={data.invoices}
+            purchaseOrders={data.purchaseOrders}
+            customers={data.customers}
+            suppliers={data.suppliers}
+            companySettings={data.companySettings}
+            books={data.books}
           />
         </TabsContent>
         <TabsContent value="stock" className="mt-6">
