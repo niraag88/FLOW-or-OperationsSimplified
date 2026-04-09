@@ -1,0 +1,17 @@
+Okay under reports we need to look at the VAT report now. I think this might be a little outdated so we might need a bit of an overhaul of this system because it's standard rated, zero rated, exempt, out of scope. This is too many tax treatment statuses. Mind you the VAT report only applies to all the sales and all the invoices so that's the only focus that we need to have.
+Ideally we do need to have a certain, basically it only needs to pull data over here. It should pull all of the data over here:
+- date
+- invoice number
+- customer
+- currency (AED is not required because all of our sales are in AED so there's no point in AED; it should be amount)
+- it doesn't need to say X VAT although it can remain as is over here
+- VAT
+- total including VAT
+That is perfect. We want to be able to export this to XLSX or PDF or view in print, basically so it can be turned into PDF. There is some good architecture here but if you see that PDF export is not working, the error is that PDF export is a functionality coming soon. If you export to XLSX, that marginally works but I think that you will have to check because it doesn't export in XLSX format; it exports in CSV. That is not correct. That format needs to change.
+The summary totals are great at the bottom but I am thinking if that should be above the VAT report results because it's a summary. It's a brief. It's a total so it should probably be above it. The filter should work by customer. It should work by months, by a date range. It should ideally be able to pull all the data over here, whether there is VAT or not, but then instead of the currency column there can just be a VAT treatment column. It would just be whether, in the case for an international company, VAT won't apply so a relevant sign or symbol for that here, and if it's local it does apply so a relevant sign or symbol. There would be a filter here for tax treatment as well, you know, something that is, in this case, standard rated or exempt because this is for over here. We need something slightly simpler over here and we need to rework this invoice status as well. It needs to be able to show all of them here so it should be:
+- cancelled
+- delivered
+- draft
+- paid
+- submitted
+There are five over here; something like paid, paid doesn't matter over here as much. I think this needs a bit of an overhaul. The invoice paid is a slightly different status if the payment status. I think this needs a bit of an overhaul; the export functionalities need an overhaul. It: instead of export to PDF, have the same view and print format over here. Mind you this is an internal document so it doesn't need to be in that logo and company information format. Remember what I said: when something is an internal document you already have the theme and the architecture in, let's say, an inventory page when you view and print all the inventory. It has that grey, black, and white header and that is the format that you need to follow for this because the VAT report is internal. We don't have to go about submitting this to anybody so there need to be the relevant filters. I think this system needs a bit of an overhaul and it needs to be linked to all the right information in the system that is already available so have a look at how you can make an amend to this.

@@ -14,9 +14,9 @@ import {
   Lock,
   MoreHorizontal,
   ExternalLink,
-  Mail,
   Copy,
-  ChevronDown
+  ChevronDown,
+  Eye
 } from "lucide-react";
 import {
   DropdownMenu,
@@ -27,30 +27,39 @@ import {
 import { Checkbox } from "@/components/ui/checkbox";
 import { format, startOfMonth, endOfMonth, subMonths, isValid, parseISO } from "date-fns";
 import { useToast } from "@/components/ui/use-toast";
-import { exportToCsv } from "../utils/export";
+import { exportToXLSX } from "../utils/export";
 
 const fmt = (value) => new Intl.NumberFormat('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 }).format(value);
 
-const DEFAULT_STATUSES = ['submitted', 'delivered'];
+const DEFAULT_STATUSES = ['submitted', 'delivered', 'paid'];
+
+const vatLabel = (t) => {
+  if (t === 'StandardRated') return 'Standard Rated';
+  if (t === 'ZeroRated')    return 'Zero Rated';
+  if (t === 'Exempt')       return 'Exempt';
+  if (t === 'OutOfScope')   return 'Out of Scope';
+  return t || 'Standard Rated';
+};
 
 export default function VATReportTab({ invoices, customers, books, companySettings, currentUser, loading }) {
   const allStatuses = useMemo(() => {
     const set = new Set(invoices.map(i => i.status).filter(Boolean));
-    ['draft', 'submitted', 'delivered', 'paid'].forEach(s => set.add(s));
+    ['draft', 'submitted', 'delivered', 'paid', 'cancelled'].forEach(s => set.add(s));
     return [...set].sort();
   }, [invoices]);
+
   const [searchDebounced, setSearchDebounced] = useState("");
   const [searchTerm, setSearchTerm] = useState("");
+  const [selectedCustomerId, setSelectedCustomerId] = useState("");
   const { toast } = useToast();
 
   const [filters, setFilters] = useState(() => {
     try {
-      const saved = localStorage.getItem('vat-report-filters');
+      const saved = localStorage.getItem('vat-report-filters-v2');
       const defaultFilters = {
         dateFrom: format(startOfMonth(new Date()), 'yyyy-MM-dd'),
         dateTo: format(endOfMonth(new Date()), 'yyyy-MM-dd'),
         statuses: DEFAULT_STATUSES,
-        taxTreatments: ['StandardRated']
       };
       if (saved) {
         const parsed = JSON.parse(saved);
@@ -65,7 +74,6 @@ export default function VATReportTab({ invoices, customers, books, companySettin
         dateFrom: format(startOfMonth(new Date()), 'yyyy-MM-dd'),
         dateTo: format(endOfMonth(new Date()), 'yyyy-MM-dd'),
         statuses: DEFAULT_STATUSES,
-        taxTreatments: ['StandardRated']
       };
     }
   });
@@ -79,7 +87,7 @@ export default function VATReportTab({ invoices, customers, books, companySettin
   }, [searchTerm]);
 
   useEffect(() => {
-    localStorage.setItem('vat-report-filters', JSON.stringify(filters));
+    localStorage.setItem('vat-report-filters-v2', JSON.stringify(filters));
   }, [filters]);
 
   const getCustomerName = (customerId) => {
@@ -96,6 +104,13 @@ export default function VATReportTab({ invoices, customers, books, companySettin
     );
   };
 
+  const eligibleCustomers = useMemo(() => {
+    const ids = new Set(invoices.map(i => String(i.customer_id ?? i.customerId)).filter(Boolean));
+    return (customers || [])
+      .filter(c => ids.has(String(c.id)))
+      .sort((a, b) => (a.name || '').localeCompare(b.name || ''));
+  }, [invoices, customers]);
+
   const filteredInvoices = invoices.filter(invoice => {
     const dateStr = invoice.invoice_date || invoice.invoiceDate;
     const invoiceDate = dateStr ? new Date(dateStr) : null;
@@ -108,8 +123,10 @@ export default function VATReportTab({ invoices, customers, books, companySettin
 
     if (!filters.statuses.includes(invoice.status)) return false;
 
-    const treatment = invoice.tax_treatment || invoice.taxTreatment || 'StandardRated';
-    if (!filters.taxTreatments.includes(treatment)) return false;
+    if (selectedCustomerId) {
+      const custId = String(invoice.customer_id ?? invoice.customerId ?? '');
+      if (custId !== selectedCustomerId) return false;
+    }
 
     if (searchDebounced) {
       const searchLower = searchDebounced.toLowerCase();
@@ -151,16 +168,6 @@ export default function VATReportTab({ invoices, customers, books, companySettin
     setCurrentPage(1);
   };
 
-  const handleTaxTreatmentToggle = (treatment) => {
-    setFilters(prev => ({
-      ...prev,
-      taxTreatments: prev.taxTreatments.includes(treatment)
-        ? prev.taxTreatments.filter(t => t !== treatment)
-        : [...prev.taxTreatments, treatment]
-    }));
-    setCurrentPage(1);
-  };
-
   const formatDate = (dateString) => {
     if (!dateString) return '-';
     try {
@@ -184,18 +191,76 @@ export default function VATReportTab({ invoices, customers, books, companySettin
   const handleExportXLSX = () => {
     const exportData = filteredInvoices.map(invoice => {
       const custId = invoice.customer_id ?? invoice.customerId;
+      const t = invoice.tax_treatment || invoice.taxTreatment || 'StandardRated';
       return {
         'Date': formatDate(invoice.invoice_date || invoice.invoiceDate),
-        'Invoice #': invoice.invoice_number || invoice.invoiceNumber,
+        'Invoice #': invoice.invoice_number || invoice.invoiceNumber || '',
         'Customer': getCustomerName(custId),
-        'Currency': invoice.currency,
-        'Amount (ex-VAT)': fmt(invoice.subtotal || 0),
-        'VAT Amount': fmt(invoice.tax_amount || 0),
-        'Total (incl VAT)': fmt(invoice.total_amount || invoice.amount || 0),
-        'Status': invoice.status
+        'VAT Treatment': vatLabel(t),
+        'Amount (ex-VAT)': `AED ${fmt(invoice.subtotal || 0)}`,
+        'VAT Amount': `AED ${fmt(invoice.tax_amount || 0)}`,
+        'Total (incl VAT)': `AED ${fmt(invoice.total_amount || invoice.amount || 0)}`,
+        'Status': invoice.status || '',
       };
     });
-    exportToCsv(exportData, `VAT_Report_${filters.dateFrom}_to_${filters.dateTo}`);
+    exportToXLSX(exportData, `VAT_Report_${format(new Date(), 'dd-MM-yy')}`, 'VAT Report');
+  };
+
+  const handleViewAndPrint = () => {
+    const now = format(new Date(), 'dd/MM/yy HH:mm');
+    const headerCells = `<th>Date</th><th>Invoice #</th><th>Customer</th><th>VAT Treatment</th><th style="text-align:right">Amount (ex-VAT)</th><th style="text-align:right">VAT Amount</th><th style="text-align:right">Total (incl VAT)</th>`;
+    const bodyRows = filteredInvoices.map(inv => {
+      const custId = inv.customer_id ?? inv.customerId;
+      const t = inv.tax_treatment || inv.taxTreatment || 'StandardRated';
+      return `<tr>
+        <td>${formatDate(inv.invoice_date || inv.invoiceDate)}</td>
+        <td>${inv.invoice_number || inv.invoiceNumber || ''}</td>
+        <td>${getCustomerName(custId)}</td>
+        <td>${vatLabel(t)}</td>
+        <td style="text-align:right">AED ${fmt(inv.subtotal || 0)}</td>
+        <td style="text-align:right">AED ${fmt(inv.tax_amount || 0)}</td>
+        <td style="text-align:right;font-weight:600">AED ${fmt(inv.total_amount || inv.amount || 0)}</td>
+      </tr>`;
+    }).join('');
+
+    const html = `<!DOCTYPE html>
+<html>
+<head>
+<meta charset="utf-8">
+<title>VAT Report</title>
+<style>
+  body { font-family: Arial, sans-serif; margin: 20px; font-size: 12px; color: #333; }
+  .print-header { text-align: center; margin-bottom: 30px; }
+  .print-header h1 { font-size: 24px; margin-bottom: 5px; }
+  .print-header h2 { font-size: 18px; color: #666; margin-top: 0; font-weight: normal; }
+  table { width: 100%; border-collapse: collapse; margin-bottom: 30px; }
+  th, td { border: 1px solid #ddd; padding: 8px; text-align: left; }
+  th { background: #f5f5f5; font-weight: bold; }
+  td { font-size: 12px; }
+  .print-footer { margin-top: 30px; font-size: 10px; color: #666; text-align: center; }
+  @media print { body { margin: 0; } table { font-size: 10px; } }
+</style>
+</head>
+<body>
+<div class="print-header">
+  <h1>Business Operations</h1>
+  <h2>VAT Report</h2>
+</div>
+<table>
+  <thead><tr>${headerCells}</tr></thead>
+  <tbody>${bodyRows}</tbody>
+</table>
+<div class="print-footer">
+  <p>Generated: ${now} &nbsp;|&nbsp; Total records: ${filteredInvoices.length}</p>
+</div>
+</body>
+</html>`;
+
+    const blob = new Blob([html], { type: 'text/html' });
+    const url = URL.createObjectURL(blob);
+    const pw = window.open(url, '_blank');
+    if (!pw) alert('Please allow popups to use View & Print.');
+    setTimeout(() => URL.revokeObjectURL(url), 60000);
   };
 
   const handleCopyInvoiceLink = (invoice) => {
@@ -206,6 +271,7 @@ export default function VATReportTab({ invoices, customers, books, companySettin
 
   return (
     <div className="space-y-6">
+      {/* Filter card */}
       <Card>
         <CardHeader className="flex flex-row items-center justify-between">
           <div>
@@ -222,15 +288,21 @@ export default function VATReportTab({ invoices, customers, books, companySettin
                 </Button>
               </DropdownMenuTrigger>
               <DropdownMenuContent align="end">
-                <DropdownMenuItem onClick={handleExportXLSX}>Export to XLSX</DropdownMenuItem>
-                <DropdownMenuItem onClick={() => toast({ title: "PDF export", description: "PDF export feature coming soon" })}>Export to PDF</DropdownMenuItem>
+                <DropdownMenuItem onClick={handleExportXLSX}>
+                  <Download className="w-4 h-4 mr-2" />
+                  Export to XLSX
+                </DropdownMenuItem>
+                <DropdownMenuItem onClick={handleViewAndPrint}>
+                  <Eye className="w-4 h-4 mr-2" />
+                  View &amp; Print
+                </DropdownMenuItem>
               </DropdownMenuContent>
             </DropdownMenu>
           </div>
         </CardHeader>
         <CardContent className="space-y-4">
-          {/* Date filters */}
-          <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
+          {/* Date + search + customer filters */}
+          <div className="grid grid-cols-1 md:grid-cols-5 gap-4">
             <div className="space-y-2">
               <Label>From Date</Label>
               <Input
@@ -264,6 +336,18 @@ export default function VATReportTab({ invoices, customers, books, companySettin
               </Select>
             </div>
             <div className="space-y-2">
+              <Label>Customer</Label>
+              <Select value={selectedCustomerId} onValueChange={(v) => { setSelectedCustomerId(v); setCurrentPage(1); }}>
+                <SelectTrigger><SelectValue placeholder="All customers" /></SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="">All customers</SelectItem>
+                  {eligibleCustomers.map(c => (
+                    <SelectItem key={c.id} value={String(c.id)}>{c.name}</SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+            <div className="space-y-2">
               <Label>Search</Label>
               <div className="relative">
                 <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 w-4 h-4" />
@@ -277,42 +361,49 @@ export default function VATReportTab({ invoices, customers, books, companySettin
             </div>
           </div>
 
-          {/* Status + Tax Treatment filters */}
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-            <div className="space-y-2">
-              <Label>Invoice Status</Label>
-              <div className="flex flex-wrap gap-4">
-                {allStatuses.map(status => (
-                  <div key={status} className="flex items-center space-x-2">
-                    <Checkbox
-                      id={`status-${status}`}
-                      checked={filters.statuses.includes(status)}
-                      onCheckedChange={() => handleStatusToggle(status)}
-                    />
-                    <Label htmlFor={`status-${status}`} className="capitalize cursor-pointer">{status}</Label>
-                  </div>
-                ))}
-              </div>
-            </div>
-            <div className="space-y-2">
-              <Label>Tax Treatment</Label>
-              <div className="flex flex-wrap gap-4">
-                {['StandardRated', 'ZeroRated', 'Exempt', 'OutOfScope'].map(treatment => (
-                  <div key={treatment} className="flex items-center space-x-2">
-                    <Checkbox
-                      id={`tax-${treatment}`}
-                      checked={filters.taxTreatments.includes(treatment)}
-                      onCheckedChange={() => handleTaxTreatmentToggle(treatment)}
-                    />
-                    <Label htmlFor={`tax-${treatment}`} className="cursor-pointer">{treatment}</Label>
-                  </div>
-                ))}
-              </div>
+          {/* Invoice Status filter */}
+          <div className="space-y-2">
+            <Label>Invoice Status</Label>
+            <div className="flex flex-wrap gap-4">
+              {allStatuses.map(status => (
+                <div key={status} className="flex items-center space-x-2">
+                  <Checkbox
+                    id={`status-${status}`}
+                    checked={filters.statuses.includes(status)}
+                    onCheckedChange={() => handleStatusToggle(status)}
+                  />
+                  <Label htmlFor={`status-${status}`} className="capitalize cursor-pointer">{status}</Label>
+                </div>
+              ))}
             </div>
           </div>
         </CardContent>
       </Card>
 
+      {/* Summary Totals — above results */}
+      <Card>
+        <CardHeader>
+          <CardTitle>Summary Totals (AED)</CardTitle>
+        </CardHeader>
+        <CardContent>
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+            <div className="text-center">
+              <p className="text-gray-600">Total Amount (ex-VAT)</p>
+              <p className="text-2xl font-bold text-blue-600">AED {fmt(totals.subtotal)}</p>
+            </div>
+            <div className="text-center">
+              <p className="text-gray-600">Total VAT</p>
+              <p className="text-2xl font-bold text-green-600">AED {fmt(totals.tax)}</p>
+            </div>
+            <div className="text-center">
+              <p className="text-gray-600">Grand Total (incl. VAT)</p>
+              <p className="text-2xl font-bold text-purple-600">AED {fmt(totals.total)}</p>
+            </div>
+          </div>
+        </CardContent>
+      </Card>
+
+      {/* Results table */}
       <Card>
         <CardHeader>
           <CardTitle className="flex items-center justify-between">
@@ -330,7 +421,7 @@ export default function VATReportTab({ invoices, customers, books, companySettin
                   <TableHead>Date</TableHead>
                   <TableHead>Invoice #</TableHead>
                   <TableHead>Customer</TableHead>
-                  <TableHead>Currency</TableHead>
+                  <TableHead>VAT Treatment</TableHead>
                   <TableHead className="text-right">Amount (ex-VAT)</TableHead>
                   <TableHead className="text-right">VAT Amount</TableHead>
                   <TableHead className="text-right">Total (incl VAT)</TableHead>
@@ -348,6 +439,7 @@ export default function VATReportTab({ invoices, customers, books, companySettin
                   const invDate = invoice.invoice_date || invoice.invoiceDate;
                   const invNum = invoice.invoice_number || invoice.invoiceNumber;
                   const custId = invoice.customer_id ?? invoice.customerId;
+                  const t = invoice.tax_treatment || invoice.taxTreatment || 'StandardRated';
                   return (
                     <TableRow key={invoice.id}>
                       <TableCell>
@@ -361,7 +453,12 @@ export default function VATReportTab({ invoices, customers, books, companySettin
                       <TableCell className="font-medium">{invNum}</TableCell>
                       <TableCell>{getCustomerName(custId)}</TableCell>
                       <TableCell>
-                        <Badge variant="outline">{invoice.currency || 'AED'}</Badge>
+                        {t === 'StandardRated' && <Badge className="bg-green-100 text-green-800 border border-green-300 text-xs">Standard Rated</Badge>}
+                        {t === 'ZeroRated'    && <Badge className="bg-blue-100 text-blue-800 border border-blue-300 text-xs">Zero Rated</Badge>}
+                        {t === 'Exempt'       && <Badge className="bg-gray-100 text-gray-700 border border-gray-300 text-xs">Exempt</Badge>}
+                        {t !== 'StandardRated' && t !== 'ZeroRated' && t !== 'Exempt' && (
+                          <Badge variant="outline" className="text-xs">{t}</Badge>
+                        )}
                       </TableCell>
                       <TableCell className="text-right">{fmt(invoice.subtotal || 0)}</TableCell>
                       <TableCell className="text-right">{fmt(invoice.tax_amount || 0)}</TableCell>
@@ -374,9 +471,6 @@ export default function VATReportTab({ invoices, customers, books, companySettin
                           <DropdownMenuContent align="end">
                             <DropdownMenuItem onClick={() => window.open(`/Print?type=invoice&id=${invoice.id}`, '_blank')}>
                               <ExternalLink className="w-4 h-4 mr-2" />Open Invoice
-                            </DropdownMenuItem>
-                            <DropdownMenuItem onClick={() => toast({ title: "Email feature", description: "Email PDF feature coming soon" })}>
-                              <Mail className="w-4 h-4 mr-2" />Email PDF
                             </DropdownMenuItem>
                             <DropdownMenuItem onClick={() => handleCopyInvoiceLink(invoice)}>
                               <Copy className="w-4 h-4 mr-2" />Copy Link
@@ -402,29 +496,6 @@ export default function VATReportTab({ invoices, customers, books, companySettin
               </div>
             </div>
           )}
-        </CardContent>
-      </Card>
-
-      {/* Summary Totals */}
-      <Card>
-        <CardHeader>
-          <CardTitle>Summary Totals (AED)</CardTitle>
-        </CardHeader>
-        <CardContent>
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-            <div className="text-center">
-              <p className="text-gray-600">Total Amount (ex-VAT)</p>
-              <p className="text-2xl font-bold text-blue-600">AED {fmt(totals.subtotal)}</p>
-            </div>
-            <div className="text-center">
-              <p className="text-gray-600">Total VAT</p>
-              <p className="text-2xl font-bold text-green-600">AED {fmt(totals.tax)}</p>
-            </div>
-            <div className="text-center">
-              <p className="text-gray-600">Grand Total (incl. VAT)</p>
-              <p className="text-2xl font-bold text-purple-600">AED {fmt(totals.total)}</p>
-            </div>
-          </div>
         </CardContent>
       </Card>
     </div>
