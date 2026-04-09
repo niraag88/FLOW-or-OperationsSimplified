@@ -70,10 +70,10 @@ export default function RetentionSettings({ currentUser }) {
       });
       if (!response.ok) throw new Error('Purge failed');
       const result = await response.json();
-      await logAuditAction("StorageSettings", "singleton", "manual_retention_run", currentUser?.email, { deletedAuditLogs: result.deletedAuditLogs });
+      await logAuditAction("StorageSettings", "singleton", "manual_retention_run", currentUser?.email, { auditLogsDeleted: result.auditLogsDeleted, storageFilesDeleted: result.storageFilesDeleted });
       toast({
         title: "Retention purge complete",
-        description: `Removed ${result.deletedAuditLogs} audit log records older than ${result.auditLogRetentionDays} days.`,
+        description: `Removed ${result.auditLogsDeleted} audit log records (>${result.auditLogRetentionDays}d) and ${result.storageFilesDeleted} export files (>${result.exportRetentionDays}d).`,
       });
     } catch (error) {
       console.error("Error running retention purge:", error);

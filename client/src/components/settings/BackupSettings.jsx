@@ -31,11 +31,6 @@ export default function BackupSettings() {
   const { toast } = useToast();
   const queryClient = useQueryClient();
 
-  const { data: statusData } = useQuery({
-    queryKey: ["/api/ops/backup-status"],
-    staleTime: 60 * 1000,
-  });
-
   const { data: runsData, isLoading: runsLoading } = useQuery({
     queryKey: ["/api/ops/backup-runs"],
     staleTime: 30 * 1000,
@@ -44,7 +39,6 @@ export default function BackupSettings() {
   const runBackup = useMutation({
     mutationFn: () => apiRequest("POST", "/api/ops/run-backups"),
     onSuccess: (data) => {
-      queryClient.invalidateQueries({ queryKey: ["/api/ops/backup-status"] });
       queryClient.invalidateQueries({ queryKey: ["/api/ops/backup-runs"] });
       if (data.success) {
         toast({ title: "Backup completed", description: "DB dump and object manifest saved successfully." });
@@ -58,8 +52,8 @@ export default function BackupSettings() {
     },
   });
 
-  const latest = statusData || {};
-  const runs = runsData?.runs || [];
+  const runs = (runsData?.runs || []).slice(0, 10);
+  const latestRun = runs[0] || null;
 
   return (
     <Card className="border-0 shadow-lg">
@@ -74,28 +68,38 @@ export default function BackupSettings() {
       </CardHeader>
       <CardContent className="space-y-6">
 
-        {/* Last known backup status */}
+        {/* Last known backup status — sourced from backup_runs table */}
         <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
           <div className="rounded-lg border p-4 space-y-1">
             <p className="text-xs font-medium text-gray-500 uppercase tracking-wide">Latest DB Backup</p>
-            {latest.latestDbBackup ? (
+            {latestRun ? (
               <>
-                <p className="text-sm font-mono truncate">{latest.latestDbBackup.filename?.split('/').pop()}</p>
-                <p className="text-xs text-gray-500">{formatDate(latest.latestDbBackup.timestamp)} · {formatBytes(latest.latestDbBackup.size)}</p>
+                <div className="flex items-center gap-2">
+                  <StatusBadge success={latestRun.dbSuccess} />
+                  <p className="text-sm font-mono truncate">{latestRun.dbFilename?.split('/').pop() || "—"}</p>
+                </div>
+                <p className="text-xs text-gray-500">{formatDate(latestRun.ranAt)}</p>
               </>
             ) : (
-              <p className="text-sm text-gray-400">No backups found</p>
+              <p className="text-sm text-gray-400">No backups recorded yet</p>
             )}
           </div>
           <div className="rounded-lg border p-4 space-y-1">
             <p className="text-xs font-medium text-gray-500 uppercase tracking-wide">Latest Object Manifest</p>
-            {latest.latestManifestBackup ? (
+            {latestRun ? (
               <>
-                <p className="text-sm font-mono truncate">{latest.latestManifestBackup.filename?.split('/').pop()}</p>
-                <p className="text-xs text-gray-500">{formatDate(latest.latestManifestBackup.timestamp)}</p>
+                <div className="flex items-center gap-2">
+                  <StatusBadge success={latestRun.manifestSuccess} />
+                  <p className="text-sm font-mono truncate">{latestRun.manifestFilename?.split('/').pop() || "—"}</p>
+                </div>
+                <p className="text-xs text-gray-500">
+                  {formatDate(latestRun.ranAt)}
+                  {latestRun.manifestTotalObjects != null ? ` · ${latestRun.manifestTotalObjects.toLocaleString()} objects` : ""}
+                  {latestRun.manifestTotalSizeBytes ? ` · ${formatBytes(latestRun.manifestTotalSizeBytes)}` : ""}
+                </p>
               </>
             ) : (
-              <p className="text-sm text-gray-400">No manifests found</p>
+              <p className="text-sm text-gray-400">No manifests recorded yet</p>
             )}
           </div>
         </div>
@@ -160,7 +164,7 @@ export default function BackupSettings() {
             </div>
           )}
           {runs.length > 0 && (
-            <p className="text-xs text-gray-400 mt-1">Showing last {runs.length} run{runs.length !== 1 ? "s" : ""}.</p>
+            <p className="text-xs text-gray-400 mt-1">Showing last {runs.length} backup run{runs.length !== 1 ? "s" : ""}.</p>
           )}
         </div>
 

@@ -1,8 +1,8 @@
 import type { Express } from "express";
-import { users, auditLog } from "@shared/schema";
+import { users, auditLog, storageObjects } from "@shared/schema";
 import { db } from "../db";
 import { eq, lt, sql } from "drizzle-orm";
-import { requireAuth, requireRole, hashPassword, writeAuditLog, type AuthenticatedRequest } from "../middleware";
+import { requireAuth, requireRole, hashPassword, writeAuditLog, objectStorageClient, type AuthenticatedRequest } from "../middleware";
 import { businessStorage } from "../businessStorage";
 
 export function registerSettingsRoutes(app: Express) {
@@ -65,15 +65,39 @@ export function registerSettingsRoutes(app: Express) {
     try {
       const settings = await businessStorage.getCompanySettings();
       const auditLogRetentionDays = settings?.retentionAuditLogsDays ?? 730;
+      const exportRetentionDays = settings?.retentionExportsDays ?? 60;
+
+      // Purge old audit log records
       const auditLogCutoff = new Date();
       auditLogCutoff.setDate(auditLogCutoff.getDate() - auditLogRetentionDays);
-
-      const deleted = await db.delete(auditLog)
+      const deletedAuditLogs = await db.delete(auditLog)
         .where(lt(auditLog.timestamp, auditLogCutoff))
         .returning({ id: auditLog.id });
 
-      writeAuditLog({ actor: req.user!.id, actorName: req.user?.username || String(req.user!.id), targetId: 'audit_log', targetType: 'retention_purge', action: 'DELETE', details: `Retention purge: deleted ${deleted.length} audit log records older than ${auditLogRetentionDays} days` });
-      res.json({ success: true, deletedAuditLogs: deleted.length, auditLogRetentionDays });
+      // Purge old export storage objects (xlsx, csv, pdf)
+      const exportCutoff = new Date();
+      exportCutoff.setDate(exportCutoff.getDate() - exportRetentionDays);
+      const oldExports = await db.select({ key: storageObjects.key })
+        .from(storageObjects)
+        .where(lt(storageObjects.uploadedAt, exportCutoff));
+
+      let storageFilesDeleted = 0;
+      for (const obj of oldExports) {
+        // Only purge export-type files (xlsx, csv, pdf) — not permanent business documents (scans, logos)
+        const key = obj.key.toLowerCase();
+        if (key.endsWith('.xlsx') || key.endsWith('.csv') || (key.endsWith('.pdf') && key.startsWith('exports/'))) {
+          try {
+            await objectStorageClient.delete(obj.key);
+          } catch {
+            // If deletion from object storage fails, still remove the tracking record
+          }
+          await db.delete(storageObjects).where(eq(storageObjects.key, obj.key));
+          storageFilesDeleted++;
+        }
+      }
+
+      writeAuditLog({ actor: req.user!.id, actorName: req.user?.username || String(req.user!.id), targetId: 'retention', targetType: 'retention_purge', action: 'DELETE', details: `Retention purge: ${deletedAuditLogs.length} audit logs (>${auditLogRetentionDays}d), ${storageFilesDeleted} export files (>${exportRetentionDays}d)` });
+      res.json({ success: true, auditLogsDeleted: deletedAuditLogs.length, storageFilesDeleted, auditLogRetentionDays, exportRetentionDays });
     } catch (error) {
       console.error('Error running retention purge:', error);
       res.status(500).json({ error: 'Failed to run retention purge' });
