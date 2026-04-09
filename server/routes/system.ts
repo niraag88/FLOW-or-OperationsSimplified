@@ -662,6 +662,11 @@ export function registerSystemRoutes(app: Express) {
 
       const filename = run.dbStorageKey.split('/').pop() || 'backup.sql.gz';
 
+      const existsResult = await objectStorageClient.exists(run.dbStorageKey);
+      if (!existsResult.ok || !existsResult.value) {
+        return res.status(404).json({ error: 'Backup file no longer exists in storage — it may have been deleted or expired' });
+      }
+
       res.set({
         'Content-Type': 'application/gzip',
         'Content-Disposition': `attachment; filename="${filename}"`,
@@ -670,7 +675,7 @@ export function registerSystemRoutes(app: Express) {
       const stream = objectStorageClient.downloadAsStream(run.dbStorageKey);
       stream.on('error', (err: Error) => {
         console.error('Error streaming backup file from storage:', err);
-        if (!res.headersSent) res.status(500).json({ error: 'Failed to download backup file — it may have been deleted from storage' });
+        if (!res.headersSent) res.status(500).json({ error: 'Failed to stream backup file from storage' });
       });
       stream.pipe(res);
     } catch (error) {
