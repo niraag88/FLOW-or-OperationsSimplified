@@ -1173,8 +1173,8 @@ export const exportStatementToXLSX = ({ type, entity, companySettings, records, 
   const worksheet = XLSX.utils.aoa_to_sheet(rows);
 
   worksheet["!cols"] = type === "invoices"
-    ? [{ width: 5 }, { width: 14 }, { width: 12 }, { width: 16 }, { width: 14 }, { width: 16 }, { width: 14 }, { width: 14 }]
-    : [{ width: 5 }, { width: 14 }, { width: 12 }, { width: 18 }, { width: 16 }, { width: 14 }, { width: 14 }];
+    ? [{ width: 6 }, { width: 16 }, { width: 12 }, { width: 16 }, { width: 14 }, { width: 16 }, { width: 14 }, { width: 14 }]
+    : [{ width: 6 }, { width: 16 }, { width: 12 }, { width: 18 }, { width: 16 }, { width: 14 }, { width: 14 }];
 
   XLSX.utils.book_append_sheet(workbook, worksheet, "Statement");
 
