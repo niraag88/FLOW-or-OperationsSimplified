@@ -261,6 +261,10 @@ function buildStatementHtml({ type, entity, companySettings, records, dateFrom, 
   .tl.grand { color:#000; }
   .tv { width:110px; text-align:right; }
   .footer { position:fixed; bottom:0; left:0; right:0; border-top:1px solid #e5e7eb; padding:4px 15mm; text-align:center; font-size:9px; color:#9ca3af; background:#fff; }
+  @media screen {
+    html { background:#e8e8e8; }
+    body { max-width:900px; margin:30px auto; padding:40px 50px; box-shadow:0 2px 12px rgba(0,0,0,0.15); }
+  }
 </style>
 </head>
 <body>
