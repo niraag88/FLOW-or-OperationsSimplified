@@ -16,7 +16,7 @@ export default function QuotationPrintView() {
     const quotationId = routeId || urlParams.get('id');
     
     if (!quotationId) {
-      navigate('/Quotations');
+      navigate('/quotations');
       return;
     }
 
@@ -37,12 +37,12 @@ export default function QuotationPrintView() {
           }
         } else {
           console.error('Error loading quotation:', quotationResult.error);
-          navigate('/Quotations');
+          navigate('/quotations');
         }
         
       } catch (error: any) {
         console.error('Error loading data:', error);
-        navigate('/Quotations');
+        navigate('/quotations');
       } finally {
         setLoading(false);
       }

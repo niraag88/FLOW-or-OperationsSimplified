@@ -148,11 +148,11 @@ export default function Inventory() {
                 </Button>
               </DropdownMenuTrigger>
               <DropdownMenuContent align="end">
-                <DropdownMenuItem onClick={() => navigate(createPageUrl('AddProduct'))}>
+                <DropdownMenuItem onClick={() => navigate(createPageUrl('Add Product'))}>
                   <Plus className="w-4 h-4 mr-2" />
                   Add Product
                 </DropdownMenuItem>
-                <DropdownMenuItem onClick={() => navigate(createPageUrl('BulkAddProduct'))}>
+                <DropdownMenuItem onClick={() => navigate(createPageUrl('Bulk Add Product'))}>
                   <FileSpreadsheet className="w-4 h-4 mr-2" />
                   Bulk Add Products
                 </DropdownMenuItem>

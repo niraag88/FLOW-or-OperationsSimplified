@@ -492,7 +492,7 @@ export default function VATReportTab({ invoices, customers, books, companySettin
                             <Button variant="ghost" size="sm"><MoreHorizontal className="w-4 h-4" /></Button>
                           </DropdownMenuTrigger>
                           <DropdownMenuContent align="end">
-                            <DropdownMenuItem onClick={() => window.open(`/Print?type=invoice&id=${invoice.id}`, '_blank')}>
+                            <DropdownMenuItem onClick={() => window.open(`/print?type=invoice&id=${invoice.id}`, '_blank')}>
                               <ExternalLink className="w-4 h-4 mr-2" />Open Invoice
                             </DropdownMenuItem>
                             <DropdownMenuItem onClick={() => handleCopyInvoiceLink(invoice)}>

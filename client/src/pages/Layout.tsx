@@ -94,7 +94,7 @@ const navigationItems: any[] = [
       },
       {
         title: "User Management",
-        url: createPageUrl("UserManagement"),
+        url: createPageUrl("User Management"),
         icon: Users2,
         adminOnly: true
       }

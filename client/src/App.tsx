@@ -71,11 +71,12 @@ function PagesContent() {
             <Layout currentPageName="Dashboard"><Dashboard /></Layout>
           </ProtectedRoute>
         } />
-        <Route path="/Dashboard" element={
+        <Route path="/dashboard" element={
           <ProtectedRoute>
             <Layout currentPageName="Dashboard"><Dashboard /></Layout>
           </ProtectedRoute>
         } />
+        <Route path="/Dashboard" element={<Navigate to="/dashboard" replace />} />
         <Route path="/inventory" element={
           <ProtectedRoute>
             <Layout currentPageName="Inventory"><Inventory /></Layout>
@@ -107,21 +108,24 @@ function PagesContent() {
             <Layout currentPageName="Settings"><Settings /></Layout>
           </ProtectedRoute>
         } />
-        <Route path="/UserManagement" element={
+        <Route path="/user-management" element={
           <ProtectedRoute requiredRoles={['Admin', 'Manager']}>
             <Layout currentPageName="User Management"><UserManagement /></Layout>
           </ProtectedRoute>
         } />
-        <Route path="/AddProduct" element={
+        <Route path="/UserManagement" element={<Navigate to="/user-management" replace />} />
+        <Route path="/add-product" element={
           <ProtectedRoute>
             <Layout currentPageName="Add Product"><AddProduct /></Layout>
           </ProtectedRoute>
         } />
-        <Route path="/BulkAddProduct" element={
+        <Route path="/AddProduct" element={<Navigate to="/add-product" replace />} />
+        <Route path="/bulk-add-product" element={
           <ProtectedRoute>
             <Layout currentPageName="Bulk Add Products"><BulkAddProduct /></Layout>
           </ProtectedRoute>
         } />
+        <Route path="/BulkAddProduct" element={<Navigate to="/bulk-add-product" replace />} />
         <Route path="/products/edit/:id" element={
           <ProtectedRoute>
             <Layout currentPageName="Edit Product"><EditProduct /></Layout>
@@ -142,16 +146,18 @@ function PagesContent() {
             <Layout currentPageName="Customers"><Customers /></Layout>
           </ProtectedRoute>
         } />
-        <Route path="/Print" element={
+        <Route path="/print" element={
           <ProtectedRoute>
             <Print />
           </ProtectedRoute>
         } />
-        <Route path="/Quotations" element={
+        <Route path="/Print" element={<Navigate to="/print" replace />} />
+        <Route path="/quotations" element={
           <ProtectedRoute>
             <Layout currentPageName="Quotations"><Quotations /></Layout>
           </ProtectedRoute>
         } />
+        <Route path="/Quotations" element={<Navigate to="/quotations" replace />} />
         <Route path="/po-print" element={
           <ProtectedRoute>
             <POPrintView />
