@@ -17,7 +17,7 @@ import { useToast } from '@/hooks/use-toast';
 interface CreateFromExistingDialogProps {
   open: boolean;
   onClose: () => void;
-  onDocumentSelected: (document: Record<string, any>, type?: string) => void;
+  onDocumentSelected: (document: Record<string, unknown>, type?: string) => void;
 }
 
 export default function CreateFromExistingDialog({ open, onClose, onDocumentSelected }: CreateFromExistingDialogProps) {
@@ -42,7 +42,7 @@ export default function CreateFromExistingDialog({ open, onClose, onDocumentSele
         Customer.list()
       ]);
 
-      const customerMap: Record<string, any> = {};
+      const customerMap: Record<string, unknown> = {};
       customersData.forEach((customer: any) => {
         customerMap[customer.id] = customer.customer_name || customer.name;
       });

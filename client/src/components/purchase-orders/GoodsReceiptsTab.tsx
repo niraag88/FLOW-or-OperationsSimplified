@@ -41,7 +41,7 @@ interface POItem {
   size?: string | null;
 }
 
-interface PORow extends PurchaseOrder {
+export interface PORow extends PurchaseOrder {
   brandName?: string | null;
   supplierName?: string | null;
   items?: POItem[];
@@ -55,7 +55,7 @@ interface POStats {
   receivedQty?: number | null | unknown;
   lineItems?: number | null | unknown;
   totalAmount?: unknown;
-  currency?: unknown;
+  currency?: string | null;
   fxRateToAed?: unknown;
 }
 

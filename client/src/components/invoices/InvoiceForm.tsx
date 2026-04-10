@@ -54,10 +54,44 @@ interface InvoiceItem {
   line_total: number;
 }
 
+
+interface FormCustomer {
+  id: number;
+  name: string;
+  vatTreatment?: string | null;
+  type?: string | null;
+  isActive?: boolean;
+}
+
+interface FormBrand {
+  id: number;
+  name: string;
+  isActive?: boolean;
+}
+
+interface FormProduct {
+  id: number;
+  name: string;
+  sku?: string | null;
+  description?: string | null;
+  size?: string | null;
+  unitPrice?: string | number | null;
+  brandId?: number | null;
+  isActive?: boolean;
+}
+
+
+interface EditingInvoiceData {
+  [key: string]: unknown;
+  id?: number;
+  items?: InvoiceItem[];
+  attachments?: string[];
+}
+
 interface InvoiceFormProps {
   open: boolean;
   onClose: () => void;
-  editingInvoice?: Record<string, any> | null;
+  editingInvoice?: EditingInvoiceData | null;
   currentUser?: { email?: string; role?: string } | null;
   canOverride?: boolean;
   onSuccess?: () => void;
@@ -65,10 +99,10 @@ interface InvoiceFormProps {
 
 export default function InvoiceForm({ open, onClose, editingInvoice, currentUser, canOverride, onSuccess }: InvoiceFormProps) {
   const [loading, setLoading] = useState(false);
-  const [customers, setCustomers] = useState<any[]>([]);
-  const [products, setProducts] = useState<any[]>([]);
-  const [brands, setBrands] = useState<any[]>([]);
-  const [selectedCustomer, setSelectedCustomer] = useState<Record<string, any> | null>(null);
+  const [customers, setCustomers] = useState<FormCustomer[]>([]);
+  const [products, setProducts] = useState<FormProduct[]>([]);
+  const [brands, setBrands] = useState<FormBrand[]>([]);
+  const [selectedCustomer, setSelectedCustomer] = useState<FormCustomer | null>(null);
   const { toast } = useToast();
   const [formData, setFormData] = useState(getInitialFormData());
 
@@ -103,11 +137,11 @@ export default function InvoiceForm({ open, onClose, editingInvoice, currentUser
         const nextNumResp   = settled[3].status === 'fulfilled' ? settled[3].value : null;
         const fullInvResp   = settled[4].status === 'fulfilled' ? settled[4].value : null;
 
-        const filteredCustomers = (customersData as Record<string, any>[]).filter((c) => c.isActive !== false);
-        const filteredBrands    = (brandsData as Record<string, any>[]).filter((b) => b.isActive !== false);
+        const filteredCustomers = (customersData as FormCustomer[]).filter((c) => c.isActive !== false);
+        const filteredBrands    = (brandsData as FormBrand[]).filter((b) => b.isActive !== false);
 
         setCustomers(filteredCustomers);
-        setProducts(productsData);
+        setProducts(productsData as FormProduct[]);
         setBrands(filteredBrands);
 
         let nextNumber = '';
@@ -121,41 +155,41 @@ export default function InvoiceForm({ open, onClose, editingInvoice, currentUser
         if (isNew) {
           setFormData(getInitialFormData(nextNumber));
         } else if (isNewFromDocument) {
-          setFormData({
-            ...getInitialFormData(),
-            ...editingInvoice,
+          setFormData(prev => ({
+            ...prev,
+            ...(editingInvoice as Record<string, unknown>),
             invoice_number: nextNumber,
             status: 'draft',
             invoice_date: new Date().toISOString().split('T')[0],
             items: editingInvoice.items || [],
             attachments: editingInvoice.attachments || [],
-          });
+          } as typeof prev));
         } else {
-          let full: Record<string, any> | null = null;
+          let full: Record<string, unknown> | null = null;
           if (fullInvResp && fullInvResp.ok) {
             try { full = await fullInvResp.json(); } catch {}
           }
           if (full) {
-            let resolvedCustomerId = full.customer_id;
-            if (!resolvedCustomerId && full.customer_name && filteredCustomers.length > 0) {
+            let resolvedCustomerId: string | number | null = (full['customer_id'] as string | number | null) ?? null;
+            if (!resolvedCustomerId && full['customer_name'] && filteredCustomers.length > 0) {
               const matched = filteredCustomers.find((c) =>
-                c.name?.trim().toLowerCase() === full.customer_name?.trim().toLowerCase()
+                c.name?.trim().toLowerCase() === (full['customer_name'] as string)?.trim().toLowerCase()
               );
-              if (matched) resolvedCustomerId = (matched as any).id;
+              if (matched) resolvedCustomerId = matched.id;
             }
-            setFormData({
-              ...getInitialFormData(),
+            setFormData(prev => ({
+              ...prev,
               ...full,
-              customer_id: resolvedCustomerId || full.customer_id || null,
-              status: (full.status && full.status !== 'draft') ? 'submitted' : (full.status || 'draft'),
-            });
+              customer_id: String(resolvedCustomerId || full['customer_id'] || ''),
+              status: (full['status'] && full['status'] !== 'draft') ? 'submitted' : (String(full['status'] || '') || 'draft'),
+            } as typeof prev));
           } else {
-            setFormData({
-              ...getInitialFormData(),
-              ...editingInvoice,
+            setFormData(prev => ({
+              ...prev,
+              ...(editingInvoice as Record<string, unknown>),
               items: editingInvoice.items || [],
               attachments: editingInvoice.attachments || [],
-            });
+            } as typeof prev));
           }
         }
       } catch (error: unknown) {
@@ -172,7 +206,7 @@ export default function InvoiceForm({ open, onClose, editingInvoice, currentUser
   useEffect(() => {
     // Effect to update the selected customer object whenever the customer_id in formData changes
     if (formData.customer_id && customers.length > 0) {
-      const customer = customers.find((c: Record<string, unknown>) => c.id === formData.customer_id);
+      const customer = customers.find((c) => String(c.id) === String(formData.customer_id)) ?? null;
       setSelectedCustomer(customer);
     } else if (!formData.customer_id) {
       setSelectedCustomer(null);
@@ -187,7 +221,7 @@ export default function InvoiceForm({ open, onClose, editingInvoice, currentUser
       // Handle customer change logic
       if (field === 'customer_id') {
         const customerId = parseInt(String(value));
-        const customer = customers.find((c: Record<string, any>) => c.id === customerId);
+        const customer = customers.find((c) => c.id === customerId);
         updatedData.customer_id = String(customerId);
         
         let taxTreatment = "StandardRated";
@@ -252,7 +286,7 @@ export default function InvoiceForm({ open, onClose, editingInvoice, currentUser
     newItems[index] = { ...newItems[index], [field]: value };
 
     if (isChangingBrand) {
-      const brand = brands.find((b: Record<string, any>) => b.id === value);
+      const brand = brands.find((b) => b.id === value);
       newItems[index] = {
         ...newItems[index],
         brand_name: brand?.name || "",
@@ -265,7 +299,7 @@ export default function InvoiceForm({ open, onClose, editingInvoice, currentUser
       };
     } else if (field === 'brand_id') {
       // Just update brand_name without clearing other fields
-      const brand = brands.find((b: Record<string, any>) => b.id === value);
+      const brand = brands.find((b) => b.id === value);
       newItems[index] = {
         ...newItems[index],
         brand_name: brand?.name || "",
@@ -273,14 +307,14 @@ export default function InvoiceForm({ open, onClose, editingInvoice, currentUser
     }
 
     if (field === 'product_id' && value) {
-      const product = products.find((p: Record<string, any>) => p.id === value);
+      const product = products.find((p) => p.id === value);
       if (product) {
         newItems[index] = {
           ...newItems[index],
           product_code: product.sku || "",
           description: `${product.name || ''}${product.description ? ` - ${product.description}` : ''}`,
           size: product.size || "",
-          unit_price: product.unitPrice || 0
+          unit_price: Number(product.unitPrice) || 0
         };
       }
     }
@@ -297,7 +331,7 @@ export default function InvoiceForm({ open, onClose, editingInvoice, currentUser
 
   const getFilteredProducts = (brandId: string | number) => {
     if (!brandId) return [];
-    return products.filter((product: Record<string, unknown>) => Number(product.brand_id ?? product.brandId) === Number(brandId));
+    return products.filter((product) => Number(product.brandId) === Number(brandId));
   };
 
   const removeItem = (index: number) => {
@@ -354,7 +388,7 @@ export default function InvoiceForm({ open, onClose, editingInvoice, currentUser
       const isEditingExisting = editingInvoice && editingInvoice.id;
       
       if (isEditingExisting) {
-        result = await InvoiceEntity.update(editingInvoice.id, invoiceData);
+        result = await InvoiceEntity.update(editingInvoice.id!, invoiceData);
         
         toast({
           title: "Success",
@@ -386,7 +420,7 @@ export default function InvoiceForm({ open, onClose, editingInvoice, currentUser
   };
 
   // Determine if the form is editable
-  const isCurrentlyEditable = !editingInvoice || !editingInvoice.id || canOverride || ['draft', 'submitted'].includes(editingInvoice?.status);
+  const isCurrentlyEditable = !editingInvoice || !editingInvoice.id || canOverride || ['draft', 'submitted'].includes(String(editingInvoice?.status || ''));
 
   return (
     <Dialog open={open} onOpenChange={onClose}>
@@ -422,7 +456,7 @@ export default function InvoiceForm({ open, onClose, editingInvoice, currentUser
                 <SelectContent>
                   {customers.map((c) => (
                     <SelectItem key={c.id} value={c.id.toString()}>
-                      {c.customer_name || c.name}{c.type ? ` (${c.type})` : ''}
+                      {c.name}{c.type ? ` (${c.type})` : ''}
                     </SelectItem>
                   ))}
                 </SelectContent>

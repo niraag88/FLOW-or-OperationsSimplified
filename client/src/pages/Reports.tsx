@@ -56,14 +56,14 @@ function normalizeInvoice(inv: any) {
 
 export default function Reports() {
   const [data, setData] = useState({
-    products: [] as any[],
-    lots: [] as any[],
-    purchaseOrders: [] as any[],
-    goodsReceipts: [] as any[],
-    invoices: [] as any[],
-    customers: [] as any[],
-    suppliers: [] as any[],
-    books: [] as any[],
+    products: [] as unknown[],
+    lots: [] as unknown[],
+    purchaseOrders: [] as unknown[],
+    goodsReceipts: [] as unknown[],
+    invoices: [] as unknown[],
+    customers: [] as unknown[],
+    suppliers: [] as unknown[],
+    books: [] as unknown[],
     companySettings: null,
   });
   const [loading, setLoading] = useState(true);
@@ -102,7 +102,7 @@ export default function Reports() {
         invoices: invoicesData,
         customers: dashboardData.customers,
         suppliers: dashboardData.suppliers,
-        books: Array.isArray(booksData) ? booksData : [] as any[],
+        books: Array.isArray(booksData) ? booksData : [],
         companySettings: dashboardData.companySettings,
       });
     } catch (error: any) {

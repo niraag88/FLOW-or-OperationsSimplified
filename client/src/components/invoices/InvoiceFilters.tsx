@@ -17,7 +17,7 @@ interface InvoiceFiltersProps {
   dateRange: string | Record<string, unknown>;
   setDateRange: (range: string | Record<string, unknown>) => void;
   resetPagination: () => void;
-  customers?: Record<string, any>[];
+  customers?: { id: number; name: string; [key: string]: unknown }[];
   paymentStatusFilter: string;
   setPaymentStatusFilter: (status: string) => void;
 }
@@ -264,10 +264,10 @@ export default function InvoiceFilters({ selectedStatuses, setSelectedStatuses, 
             </Badge>
           ))}
           {selectedCustomers.map((customerId: number) => {
-            const customer = customers.find((c: any) => c.id === customerId);
+            const customer = customers.find((c) => c.id === customerId);
             return (
               <Badge key={customerId} variant="secondary" className="gap-1">
-                Customer: {customer?.customer_name || customer?.name}
+                Customer: {customer?.name ?? ''}
                 <X 
                   className="h-3 w-3 cursor-pointer" 
                   onClick={() => {

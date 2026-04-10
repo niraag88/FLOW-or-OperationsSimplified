@@ -18,9 +18,9 @@ import UploadFileDialog from "../common/UploadFileDialog";
 import type { DeliveryOrder } from "@shared/schema";
 
 interface DOActionsDropdownProps {
-  doOrder: Record<string, any>;
+  doOrder: DeliveryOrder;
   canEdit: boolean;
-  onEdit: (doOrder: Record<string, any>) => void;
+  onEdit: (doOrder: DeliveryOrder) => void;
   onRefresh: () => void;
   currentUser?: { email?: string; role?: string } | null;
 }
@@ -41,10 +41,10 @@ export default function DOActionsDropdown({ doOrder, canEdit, onEdit, onRefresh,
       await exportDeliveryOrderToXLSX(fullDO);
       toast({
         title: 'Export Successful',
-        description: `Delivery Order ${fullDO.do_number || doOrder.do_number} exported to Excel.`
+        description: `Delivery Order ${fullDO.do_number || doOrder.orderNumber} exported to Excel.`
       });
-    } catch (error: any) {
-      console.error('XLSX export error:', error);
+    } catch (error: unknown) {
+      console.error('XLSX export error:', error instanceof Error ? error.message : error);
       toast({
         title: 'Export Failed', 
         description: 'Failed to export delivery order to Excel. Please try again.',
@@ -62,12 +62,12 @@ export default function DOActionsDropdown({ doOrder, canEdit, onEdit, onRefresh,
       await DOEntity.delete(doOrder.id);
       toast({
         title: 'Delivery Order Deleted',
-        description: `${doOrder.do_number} has been moved to the recycle bin.`
+        description: `${doOrder.orderNumber} has been moved to the recycle bin.`
       });
       setShowDeleteDialog(false);
       onRefresh();
-    } catch (error: any) {
-      console.error('Error deleting delivery order:', error);
+    } catch (error: unknown) {
+      console.error('Error deleting delivery order:', error instanceof Error ? error.message : error);
       toast({
         title: 'Delete Failed',
         description: 'Failed to delete the delivery order. Please try again.',
@@ -76,7 +76,8 @@ export default function DOActionsDropdown({ doOrder, canEdit, onEdit, onRefresh,
     }
   };
 
-  const handleUploadSuccess = async (storageKey: any) => {
+  const handleUploadSuccess = async (storageKey?: string) => {
+    if (!storageKey) return;
     try {
       const res = await fetch(`/api/delivery-orders/${doOrder.id}/scan-key`, {
         method: 'PATCH',
@@ -89,8 +90,8 @@ export default function DOActionsDropdown({ doOrder, canEdit, onEdit, onRefresh,
         throw new Error(data.error || 'Failed to link file to delivery order');
       }
       onRefresh();
-    } catch (error: any) {
-      console.error('Error saving scan key:', error);
+    } catch (error: unknown) {
+      console.error('Error saving scan key:', error instanceof Error ? error.message : error);
       toast({
         title: 'Warning',
         description: 'File uploaded but failed to link it to the delivery order.',
@@ -100,7 +101,7 @@ export default function DOActionsDropdown({ doOrder, canEdit, onEdit, onRefresh,
   };
 
   const handleViewFile = async () => {
-    const scanKey = doOrder.scanKey || doOrder.scan_key;
+    const scanKey = doOrder.scanKey;
     if (!scanKey) return;
     try {
       const res = await fetch(`/api/storage/signed-get?key=${encodeURIComponent(scanKey)}`, {
@@ -109,8 +110,8 @@ export default function DOActionsDropdown({ doOrder, canEdit, onEdit, onRefresh,
       const data = await res.json();
       if (!res.ok) throw new Error(data.error || 'Failed to get download link');
       window.open(data.url, '_blank');
-    } catch (error: any) {
-      console.error('Error viewing file:', error);
+    } catch (error: unknown) {
+      console.error('Error viewing file:', error instanceof Error ? error.message : error);
       toast({
         title: 'Error',
         description: 'Could not retrieve the file. Please try again.',
@@ -131,14 +132,14 @@ export default function DOActionsDropdown({ doOrder, canEdit, onEdit, onRefresh,
       }
       toast({ title: 'File Removed', description: 'The attachment has been removed.' });
       onRefresh();
-    } catch (error: any) {
-      console.error('Error removing file:', error);
+    } catch (error: unknown) {
+      console.error('Error removing file:', error instanceof Error ? error.message : error);
       toast({ title: 'Error', description: 'Could not remove the file. Please try again.', variant: 'destructive' });
     }
   };
 
-  const hasScanKey = !!(doOrder.scanKey || doOrder.scan_key);
-  const doNumber = doOrder.do_number || doOrder.orderNumber || `do-${doOrder.id}`;
+  const hasScanKey = !!(doOrder.scanKey);
+  const doNumber = doOrder.orderNumber || `do-${doOrder.id}`;
   const canDelete = ['Admin', 'Manager'].includes(currentUser?.role ?? '');
 
   return (

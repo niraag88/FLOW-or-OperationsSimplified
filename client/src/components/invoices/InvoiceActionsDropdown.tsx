@@ -19,10 +19,10 @@ import UploadFileDialog from "../common/UploadFileDialog";
 import type { Invoice } from "@shared/schema";
 
 interface InvoiceActionsDropdownProps {
-  invoice: Record<string, any>;
+  invoice: Invoice;
   canEdit: boolean;
   canOverride: boolean;
-  onEdit: (invoice: Record<string, any>) => void;
+  onEdit: (invoice: Invoice) => void;
   onRefresh: () => void;
   currentUser?: { email?: string; role?: string } | null;
 }
@@ -69,7 +69,7 @@ export default function InvoiceActionsDropdown({ invoice, canEdit, canOverride, 
       await InvoiceEntity.delete(invoice.id);
       toast({
         title: 'Invoice Deleted',
-        description: `${invoice.invoice_number} has been moved to the recycle bin.`
+        description: `${invoice.invoiceNumber} has been moved to the recycle bin.`
       });
       setShowDeleteDialog(false);
       onRefresh();
@@ -133,7 +133,7 @@ export default function InvoiceActionsDropdown({ invoice, canEdit, canOverride, 
   };
 
   const handleViewFile = async () => {
-    const scanKey = invoice.scanKey || invoice.scan_key;
+    const scanKey = invoice.scanKey || invoice.scanKey;
     if (!scanKey) return;
     try {
       const res = await fetch(`/api/storage/signed-get?key=${encodeURIComponent(scanKey)}`, {
@@ -186,8 +186,8 @@ export default function InvoiceActionsDropdown({ invoice, canEdit, canOverride, 
     }
   };
 
-  const hasScanKey = !!(invoice.scanKey || invoice.scan_key);
-  const invoiceNumber = invoice.invoiceNumber || invoice.invoice_number || `inv-${invoice.id}`;
+  const hasScanKey = !!(invoice.scanKey || invoice.scanKey);
+  const invoiceNumber = invoice.invoiceNumber || invoice.invoiceNumber || `inv-${invoice.id}`;
 
   return (
     <>
@@ -216,7 +216,7 @@ export default function InvoiceActionsDropdown({ invoice, canEdit, canOverride, 
           {!isCancelled && (
             <>
               <DropdownMenuSeparator />
-              {invoice.paymentStatus !== 'paid' && invoice.payment_status !== 'paid' ? (
+              {invoice.paymentStatus !== 'paid' && invoice.paymentStatus !== 'paid' ? (
                 <DropdownMenuItem onClick={() => setShowMarkPaidDialog(true)} className="text-green-700 focus:text-green-700">
                   <CheckCircle className="w-4 h-4 mr-2" />
                   Mark as Paid

@@ -12,7 +12,7 @@ import { DeliveryOrder } from "@/api/entities";
 import { Customer } from "@/api/entities";
 import DOList from "../components/delivery-orders/DOList";
 import DOForm from "../components/delivery-orders/DOForm";
-import DOFilters from "../components/delivery-orders/DOFilters";
+import DOFilters, { CustomDateRange } from "../components/delivery-orders/DOFilters";
 import DOQuickViewModal from "../components/delivery-orders/DOQuickViewModal";
 import CreateFromExistingDialog from "../components/delivery-orders/CreateFromExistingDialog";
 import ExportDropdown from "../components/common/ExportDropdown";
@@ -36,12 +36,6 @@ interface FinancialYear {
   endDate: string;
 }
 
-interface DateRange extends Record<string, unknown> {
-  type?: string;
-  startDate?: string;
-  endDate?: string;
-}
-
 export default function DeliveryOrders() {
   const [customers, setCustomers] = useState<CustomerEntity[]>([]);
   const [searchTerm, setSearchTerm] = useState("");
@@ -50,7 +44,7 @@ export default function DeliveryOrders() {
   const [selectedStatuses, setSelectedStatuses] = useState<string[]>([]);
   const [selectedCustomers, setSelectedCustomers] = useState<number[]>([]);
   const [selectedTaxTreatments, setSelectedTaxTreatments] = useState<string[]>([]);
-  const [dateRange, setDateRange] = useState<string | DateRange>("all");
+  const [dateRange, setDateRange] = useState<string | CustomDateRange>("all");
   const [showCreateFromExistingDialog, setShowCreateFromExistingDialog] = useState(false);
   const [financialYears, setFinancialYears] = useState<FinancialYear[]>([]);
   const [quickViewDoId, setQuickViewDoId] = useState<number | null>(null);
@@ -111,7 +105,7 @@ export default function DeliveryOrders() {
         else if (dateRange === 'week') { const s = new Date(today); s.setDate(today.getDate() - today.getDay()); s.setHours(0,0,0,0); params.set('dateFrom', toStr(s)); }
         else if (dateRange === 'month') params.set('dateFrom', toStr(new Date(today.getFullYear(), today.getMonth(), 1)));
         else if (dateRange === 'quarter') { const q = Math.floor(today.getMonth() / 3); params.set('dateFrom', toStr(new Date(today.getFullYear(), q * 3, 1))); }
-        else if (typeof dateRange === 'object' && (dateRange as DateRange).type === 'custom') { params.set('dateFrom', toStr(new Date(String((dateRange as DateRange).startDate || '')))); params.set('dateTo', toStr(new Date(String((dateRange as DateRange).endDate || '')))); }
+        else if (typeof dateRange === 'object' && (dateRange as CustomDateRange).type === 'custom') { params.set('dateFrom', toStr(new Date(String((dateRange as CustomDateRange).startDate || '')))); params.set('dateTo', toStr(new Date(String((dateRange as CustomDateRange).endDate || '')))); }
       }
       if (excludeYearsKey) params.set('excludeYears', excludeYearsKey);
       const r = await fetch(`/api/delivery-orders?${params}`, { credentials: 'include' });
@@ -151,7 +145,7 @@ export default function DeliveryOrders() {
     setEditingDO(null);
   };
 
-  const handleDocumentSelect = async (document: Record<string, any>, documentType: string = '') => {
+  const handleDocumentSelect = async (document: Record<string, unknown>, documentType: string = '') => {
     if (documentType !== 'quotation') return;
 
     // Fetch the full quotation with line items, and the live customer list in parallel
@@ -175,7 +169,7 @@ export default function DeliveryOrders() {
       console.warn(`⚠️ DO handleDocumentSelect: Customer ID ${rawCustomerId} not found in customer list.`);
     }
 
-    const vatAmount = parseFloat(fullQuotation.vatAmount || fullQuotation.vat_amount || 0);
+    const vatAmount = parseFloat(String(fullQuotation['vatAmount'] || fullQuotation['vat_amount'] || 0));
     const taxTreatment = vatAmount > 0 ? 'StandardRated' : 'ZeroRated';
     const taxRate = vatAmount > 0 ? 0.05 : 0;
 
@@ -183,27 +177,27 @@ export default function DeliveryOrders() {
       do_number: '',
       customer_id: validCustomer ? rawCustomerId : null,
       order_date: new Date().toISOString().split('T')[0],
-      reference: fullQuotation.reference || '',
-      reference_date: fullQuotation.referenceDate ? String(fullQuotation.referenceDate).split('T')[0] : (fullQuotation.reference_date || ''),
+      reference: String(fullQuotation['reference'] || ''),
+      reference_date: fullQuotation['referenceDate'] ? String(fullQuotation['referenceDate']).split('T')[0] : String(fullQuotation['reference_date'] || ''),
       status: 'draft',
-      currency: fullQuotation.currency || 'AED',
+      currency: String(fullQuotation['currency'] || 'AED'),
       tax_treatment: taxTreatment,
       tax_rate: taxRate,
-      subtotal: parseFloat(fullQuotation.totalAmount || fullQuotation.subtotal || 0),
+      subtotal: parseFloat(String(fullQuotation['totalAmount'] || fullQuotation['subtotal'] || 0)),
       tax_amount: vatAmount,
-      total_amount: parseFloat(fullQuotation.grandTotal || fullQuotation.total_amount || 0),
-      remarks: `Based on Quotation #${fullQuotation.quoteNumber || fullQuotation.quotation_number || ''}\n${fullQuotation.notes || ''}`.trim(),
+      total_amount: parseFloat(String(fullQuotation['grandTotal'] || fullQuotation['total_amount'] || 0)),
+      remarks: `Based on Quotation #${String(fullQuotation['quoteNumber'] || fullQuotation['quotation_number'] || '')}\n${String(fullQuotation['notes'] || '')}`.trim(),
       show_remarks: false,
-      items: ((fullQuotation as Record<string, any>).items || []).map((item: Record<string, any>) => ({
-        product_id: item.productId ?? item.product_id ?? null,
-        brand_id: item.brandId ?? item.brand_id ?? null,
-        brand_name: item.brandName || item.brand_name || '',
-        product_code: item.productCode || item.product_code || '',
-        description: item.description || '',
-        size: item.size || '',
-        quantity: Number(item.quantity) || 1,
-        unit_price: parseFloat(item.unitPrice ?? item.unit_price ?? 0),
-        line_total: parseFloat(item.lineTotal ?? item.line_total ?? 0),
+      items: (fullQuotation['items'] as Record<string, unknown>[] || []).map((item: Record<string, unknown>) => ({
+        product_id: (item['productId'] ?? item['product_id'] ?? null) as number | null,
+        brand_id: (item['brandId'] ?? item['brand_id'] ?? null) as number | null,
+        brand_name: String(item['brandName'] || item['brand_name'] || ''),
+        product_code: String(item['productCode'] || item['product_code'] || ''),
+        description: String(item['description'] || ''),
+        size: String(item['size'] || ''),
+        quantity: Number(item['quantity']) || 1,
+        unit_price: parseFloat(String(item['unitPrice'] ?? item['unit_price'] ?? 0)),
+        line_total: parseFloat(String(item['lineTotal'] ?? item['line_total'] ?? 0)),
       })),
     };
 
@@ -235,7 +229,7 @@ export default function DeliveryOrders() {
       else if (dateRange === 'week') { const s = new Date(today); s.setDate(today.getDate() - today.getDay()); s.setHours(0,0,0,0); params.set('dateFrom', toStr(s)); }
       else if (dateRange === 'month') params.set('dateFrom', toStr(new Date(today.getFullYear(), today.getMonth(), 1)));
       else if (dateRange === 'quarter') { const q = Math.floor(today.getMonth() / 3); params.set('dateFrom', toStr(new Date(today.getFullYear(), q * 3, 1))); }
-      else if (typeof dateRange === 'object' && dateRange.type === 'custom') { params.set('dateFrom', toStr(new Date(String((dateRange as DateRange).startDate || '')))); params.set('dateTo', toStr(new Date(String((dateRange as DateRange).endDate || '')))); }
+      else if (typeof dateRange === 'object' && dateRange.type === 'custom') { params.set('dateFrom', toStr(new Date(String((dateRange as CustomDateRange).startDate || '')))); params.set('dateTo', toStr(new Date(String((dateRange as CustomDateRange).endDate || '')))); }
     }
     const r = await fetch(`/api/delivery-orders?${params}`, { credentials: 'include' });
     const result = await r.json();
@@ -315,7 +309,7 @@ export default function DeliveryOrders() {
           dateRange={dateRange}
           setDateRange={setDateRange}
           resetPagination={resetPagination}
-          customers={availableCustomers}
+          customers={availableCustomers.map(c => ({ ...c, name: c.name || '' }))}
         />
       </div>
 

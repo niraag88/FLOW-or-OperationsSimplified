@@ -11,7 +11,8 @@ import { Plus, Search } from "lucide-react";
 import { PurchaseOrder } from "@/api/entities";
 import POList from "../components/purchase-orders/POList";
 import POForm from "../components/purchase-orders/POForm";
-import GoodsReceiptsTab from "../components/purchase-orders/GoodsReceiptsTab";
+import GoodsReceiptsTab, { PORow } from "../components/purchase-orders/GoodsReceiptsTab";
+import type { GoodsReceipt as SchemaGoodsReceipt } from "@shared/schema";
 import POFilters from "../components/purchase-orders/POFilters";
 import ExportDropdown from "../components/common/ExportDropdown";
 import POQuickViewModal from "../components/purchase-orders/POQuickViewModal";
@@ -27,17 +28,6 @@ interface PurchaseOrder {
   [key: string]: unknown;
 }
 
-interface GoodsReceipt {
-  id: number;
-  poId?: number;
-  po_id?: number;
-  status?: string;
-  grn_number?: string;
-  purchase_order_id?: number;
-  delivery_note_ref?: string;
-  [key: string]: unknown;
-}
-
 interface FinancialYear {
   id: number;
   status: string;
@@ -46,8 +36,8 @@ interface FinancialYear {
 }
 
 export default function PurchaseOrders() {
-  const [allPOs, setAllPOs] = useState<PurchaseOrder[]>([]);
-  const [goodsReceipts, setGoodsReceipts] = useState<GoodsReceipt[]>([]);
+  const [allPOs, setAllPOs] = useState<PORow[]>([]);
+  const [goodsReceipts, setGoodsReceipts] = useState<SchemaGoodsReceipt[]>([]);
   const [searchTerm, setSearchTerm] = useState("");
   const [activeTab, setActiveTab] = useState("purchase-orders");
   const [showPOForm, setShowPOForm] = useState(false);
@@ -134,13 +124,7 @@ export default function PurchaseOrders() {
       .then(r => r.json())
       .then(data => {
         const grns = Array.isArray(data) ? data : [];
-        setGoodsReceipts((grns as Record<string, any>[]).map((grn): GoodsReceipt => ({
-          ...grn,
-          id: grn.id as number,
-          grn_number: grn.receiptNumber ?? grn.grn_number,
-          purchase_order_id: grn.poId ?? grn.purchase_order_id,
-          delivery_note_ref: grn.notes ?? grn.delivery_note_ref,
-        })));
+        setGoodsReceipts(grns as SchemaGoodsReceipt[]);
       })
       .catch(() => {});
   };
@@ -230,9 +214,9 @@ export default function PurchaseOrders() {
     return Array.isArray(result) ? result : (result.data || []);
   };
 
-  const filteredGRNs = goodsReceipts.filter((grn: GoodsReceipt) =>
-    grn.grn_number?.toLowerCase().includes(searchTerm.toLowerCase()) ||
-    grn.delivery_note_ref?.toLowerCase().includes(searchTerm.toLowerCase())
+  const filteredGRNs = goodsReceipts.filter((grn: SchemaGoodsReceipt) =>
+    grn.receiptNumber?.toLowerCase().includes(searchTerm.toLowerCase()) ||
+    grn.notes?.toLowerCase().includes(searchTerm.toLowerCase())
   );
 
   // For Goods Receipts export - we'll manage the export state here 
@@ -240,8 +224,8 @@ export default function PurchaseOrders() {
   const [showClosedReceipts, setShowClosedReceipts] = useState(false);
   
   const getGoodsReceiptsExportData = () => {
-    const openPOs = allPOs.filter((po: PurchaseOrder) => po.status === 'submitted');
-    const closedPOs = allPOs.filter((po: PurchaseOrder) => po.status === 'closed');
+    const openPOs = allPOs.filter((po) => po.status === 'submitted');
+    const closedPOs = allPOs.filter((po) => po.status === 'closed');
     
     if (showOpenReceipts && !showClosedReceipts) {
       return openPOs;
@@ -446,8 +430,8 @@ export default function PurchaseOrders() {
 
         <TabsContent value="goods-receipts" className="mt-6">
           <GoodsReceiptsTab 
-            purchaseOrders={allPOs as any}
-            goodsReceipts={goodsReceipts as any}
+            purchaseOrders={allPOs}
+            goodsReceipts={goodsReceipts}
             loading={loading}
             canEdit={canEdit}
             currentUser={currentUser}

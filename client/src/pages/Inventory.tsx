@@ -16,25 +16,30 @@ import {
 import { Plus, ChevronDown, FileSpreadsheet, ClipboardList } from "lucide-react";
 import ProductsTab from "../components/inventory/ProductsTab";
 import StockTab from "../components/inventory/StockTab";
-import ExportDropdown from "../components/inventory/ExportDropdown";
+import ExportDropdown, { StockMovement } from "../components/inventory/ExportDropdown";
+import type { Product } from "@shared/schema";
 
 const STALE_3MIN = 3 * 60 * 1000;
 
 export default function Inventory() {
   const navigate = useNavigate();
-  const [uniqueBrands, setUniqueBrands] = useState<any[]>([]);
-  const [uniqueSizes, setUniqueSizes] = useState<any[]>([]);
+  const [uniqueBrands, setUniqueBrands] = useState<string[]>([]);
+  const [uniqueSizes, setUniqueSizes] = useState<string[]>([]);
   const [searchTerm, setSearchTerm] = useState("");
   const [activeTab, setActiveTab] = useState("products");
-  const [selectedBrands, setSelectedBrands] = useState<any[]>([]);
-  const [selectedSizes, setSelectedSizes] = useState<any[]>([]);
+  const [selectedBrands, setSelectedBrands] = useState<string[]>([]);
+  const [selectedSizes, setSelectedSizes] = useState<string[]>([]);
   const [currentPage, setCurrentPage] = useState(1);
   const [itemsPerPage, setItemsPerPage] = useState(50);
   const [stockSubTab, setStockSubTab] = useState("stock-levels");
-  const [stockSubTabData, setStockSubTabData] = useState({
-    stockMovements: [] as any[],
-    lowStockProducts: [] as any[],
-    outOfStockProducts: [] as any[]
+  const [stockSubTabData, setStockSubTabData] = useState<{
+    stockMovements: StockMovement[];
+    lowStockProducts: Product[];
+    outOfStockProducts: Product[];
+  }>({
+    stockMovements: [],
+    lowStockProducts: [],
+    outOfStockProducts: []
   });
   const [lowStockThreshold, setLowStockThreshold] = useState(6);
   const [fxRates, setFxRates] = useState({ gbpToAed: 4.85, usdToAed: 3.6725, inrToAed: 0.044 });
@@ -46,7 +51,7 @@ export default function Inventory() {
   // Load filter options (brands + sizes) and company settings once on mount
   useEffect(() => {
     fetch('/api/products/filter-options', { credentials: 'include' })
-      .then(r => r.ok ? r.json() : { brands: [] as any[], sizes: [] })
+      .then(r => r.ok ? r.json() : { brands: [] as string[], sizes: [] as string[] })
       .then(data => {
         setUniqueBrands(data.brands || []);
         setUniqueSizes(data.sizes || []);
@@ -93,7 +98,8 @@ export default function Inventory() {
     queryClient.invalidateQueries({ queryKey: ['/api/dashboard'] });
   };
 
-  const handleStockSubTabChange = (subTab: any, stockMovements: any, lowStockProducts: any, outOfStockProducts: any) => {
+  const handleStockSubTabChange = (subTab: string, ...args: unknown[]) => {
+    const [stockMovements = [], lowStockProducts = [], outOfStockProducts = []] = args as [StockMovement[], Product[], Product[]];
     setStockSubTab(subTab);
     setStockSubTabData({ stockMovements, lowStockProducts, outOfStockProducts });
   };

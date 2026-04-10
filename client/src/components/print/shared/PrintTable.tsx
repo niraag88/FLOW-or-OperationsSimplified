@@ -1,10 +1,32 @@
+interface PrintTableHeader {
+  label: string;
+  align?: string;
+}
+
+interface PrintTableItem {
+  product_code?: string;
+  description?: string;
+  size?: string;
+  quantity?: number | string;
+  unit_price?: number | string;
+  line_total?: number | string;
+}
+
+interface PrintTableProps {
+  headers?: PrintTableHeader[];
+  items?: PrintTableItem[];
+  currency?: string;
+  showSize?: boolean;
+  colSpan?: number;
+}
+
 export default function PrintTable({ 
-  headers = [] as any[],
-  items = [] as any[],
+  headers = [],
+  items = [],
   currency = 'AED',
   showSize = false,
   colSpan = 5
-}) {
+}: PrintTableProps) {
   return (
     <section className="mb-8">
       <table className="w-full border-collapse print-table">
@@ -44,10 +66,10 @@ export default function PrintTable({
                   {item.quantity}
                 </td>
                 <td className="text-right py-3 px-4 border-r border-gray-200">
-                  {(parseFloat(item.unit_price) || 0).toFixed(2)}
+                  {(parseFloat(String(item.unit_price)) || 0).toFixed(2)}
                 </td>
                 <td className="text-right py-3 px-4 font-medium">
-                  {(parseFloat(item.line_total) || 0).toFixed(2)}
+                  {(parseFloat(String(item.line_total)) || 0).toFixed(2)}
                 </td>
               </tr>
             ))

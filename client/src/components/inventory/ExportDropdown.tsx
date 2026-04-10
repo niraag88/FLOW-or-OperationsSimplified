@@ -14,7 +14,7 @@ import { format } from "date-fns";
 import type { Product } from "@shared/schema";
 
 
-interface StockMovement {
+export interface StockMovement {
   createdAt: string | Date;
   productSku?: string;
   productName?: string;

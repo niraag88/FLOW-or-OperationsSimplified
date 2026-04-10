@@ -17,7 +17,7 @@ import type { Invoice } from "@shared/schema";
 interface MarkPaidDialogProps {
   open: boolean;
   onClose: () => void;
-  invoice: Record<string, any> | null;
+  invoice: Invoice | null;
   onSuccess: () => void;
 }
 
@@ -27,11 +27,11 @@ export default function MarkPaidDialog({ open, onClose, invoice, onSuccess }: Ma
   const [paymentReceivedDate, setPaymentReceivedDate] = useState("");
   const [paymentRemarks, setPaymentRemarks] = useState("");
 
-  const isEditing = !!(invoice?.paymentReceivedDate || invoice?.payment_received_date);
+  const isEditing = !!invoice?.paymentReceivedDate;
 
   useEffect(() => {
     if (open && invoice) {
-      const existingDate = invoice.paymentReceivedDate || invoice.payment_received_date;
+      const existingDate = invoice.paymentReceivedDate;
       if (existingDate) {
         try {
           setPaymentReceivedDate(new Date(existingDate).toISOString().split('T')[0]);
@@ -41,11 +41,11 @@ export default function MarkPaidDialog({ open, onClose, invoice, onSuccess }: Ma
       } else {
         setPaymentReceivedDate(new Date().toISOString().split('T')[0]);
       }
-      setPaymentRemarks(invoice.paymentRemarks || invoice.payment_remarks || "");
+      setPaymentRemarks(invoice.paymentRemarks || "");
     }
   }, [open, invoice]);
 
-  const handleSubmit = async (e: any) => {
+  const handleSubmit = async (e: React.FormEvent<HTMLFormElement>) => {
     e.preventDefault();
     if (!invoice) return;
     setLoading(true);
@@ -66,7 +66,7 @@ export default function MarkPaidDialog({ open, onClose, invoice, onSuccess }: Ma
       }
       toast({
         title: isEditing ? 'Payment Updated' : 'Payment Recorded',
-        description: `Invoice ${invoice.invoiceNumber || invoice.invoice_number} payment details saved.`,
+        description: `Invoice ${invoice.invoiceNumber || invoice.invoiceNumber} payment details saved.`,
       });
       onSuccess();
       onClose();
@@ -92,8 +92,8 @@ export default function MarkPaidDialog({ open, onClose, invoice, onSuccess }: Ma
           </DialogTitle>
           <DialogDescription>
             {isEditing
-              ? `Update payment details for invoice ${invoice.invoiceNumber || invoice.invoice_number}`
-              : `Record payment for invoice ${invoice.invoiceNumber || invoice.invoice_number}`}
+              ? `Update payment details for invoice ${invoice.invoiceNumber || invoice.invoiceNumber}`
+              : `Record payment for invoice ${invoice.invoiceNumber || invoice.invoiceNumber}`}
           </DialogDescription>
         </DialogHeader>
 

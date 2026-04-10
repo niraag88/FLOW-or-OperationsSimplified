@@ -15,27 +15,27 @@ interface DOListProps {
   loading: boolean;
   canEdit: boolean;
   currentUser?: { email?: string; role?: string } | null;
-  onEdit: (doOrder: Record<string, any>) => void;
+  onEdit: (doOrder: DeliveryOrder) => void;
   onRefresh: () => void;
   onQuickView: (id: number) => void;
 }
 
 export default function DOList({ deliveryOrders, totalCount, loading, canEdit, currentUser, onEdit, onRefresh, onQuickView }: DOListProps) {
-  const getCustomerName = (doOrder: any) => {
-    return doOrder.customer_name || doOrder.customerName || 'Unknown Customer';
+  const getCustomerName = (doOrder: DeliveryOrder) => {
+    return doOrder.customerName || 'Unknown Customer';
   };
   
-  const formatDate = (dateString: any) => {
+  const formatDate = (dateString: string | Date | null | undefined) => {
     if (!dateString) return '-';
     try {
-      const date = typeof dateString === 'string' ? parseISO(dateString) : new Date(dateString);
+      const date = typeof dateString === 'string' ? parseISO(dateString) : (dateString instanceof Date ? dateString : new Date(String(dateString)));
       return isValid(date) ? format(date, 'dd/MM/yy') : '-';
-    } catch (error: any) {
+    } catch {
       return '-';
     }
   };
 
-  const getStatusColor = (status: any) => {
+  const getStatusColor = (status: string | null | undefined) => {
     switch (status?.toLowerCase()) {
       case 'draft': return 'bg-gray-100 text-gray-800';
       case 'submitted': return 'bg-blue-100 text-blue-800';
@@ -44,19 +44,19 @@ export default function DOList({ deliveryOrders, totalCount, loading, canEdit, c
     }
   };
 
-  const getStatusLabel = (status: any) => {
+  const getStatusLabel = (status: string | null | undefined) => {
     if (!status) return '';
     if (status.toLowerCase() === 'submitted') return 'SUBMITTED';
     return status.replace(/_/g, ' ').toUpperCase();
   };
 
-  const formatCurrency = (amount: any, currency = 'AED') => {
+  const formatCurrency = (amount: string | number | null | undefined, currency = 'AED') => {
     const formatter = new Intl.NumberFormat('en-US', {
       style: 'decimal',
       minimumFractionDigits: 2,
       maximumFractionDigits: 2
     });
-    return `${currency} ${formatter.format(amount || 0)}`;
+    return `${currency} ${formatter.format(Number(amount) || 0)}`;
   };
 
   const isInitialLoad = loading && (!deliveryOrders || deliveryOrders.length === 0);
@@ -112,7 +112,7 @@ export default function DOList({ deliveryOrders, totalCount, loading, canEdit, c
               </TableRow>
             </TableHeader>
             <TableBody>
-              {deliveryOrders.map((doOrder: any) => (
+              {deliveryOrders.map((doOrder) => (
                 <TableRow key={doOrder.id} className="hover:bg-gray-50">
                   <TableCell className="font-medium">
                     <span className="flex items-center gap-1">
@@ -120,24 +120,24 @@ export default function DOList({ deliveryOrders, totalCount, loading, canEdit, c
                         onClick={() => onQuickView && onQuickView(doOrder.id)}
                         className="text-blue-600 hover:text-blue-800 hover:underline font-medium text-sm text-left"
                       >
-                        {doOrder.do_number}
+                        {doOrder.orderNumber}
                       </button>
-                      {(doOrder.scanKey || doOrder.scan_key) && (
+                      {(doOrder.scanKey) && (
                         <Paperclip className="w-3 h-3 text-blue-500 shrink-0" aria-label="Attachment" />
                       )}
                     </span>
                   </TableCell>
                   <TableCell>{getCustomerName(doOrder)}</TableCell>
-                  <TableCell>{formatDate(doOrder.order_date)}</TableCell>
+                  <TableCell>{formatDate(doOrder.orderDate)}</TableCell>
                   <TableCell>{doOrder.reference || '-'}</TableCell>
                   <TableCell>
-                    {formatCurrency(doOrder.subtotal || 0, doOrder.currency)}
+                    {formatCurrency(doOrder.subtotal || 0, doOrder.currency ?? 'AED')}
                   </TableCell>
                   <TableCell>
-                    {formatCurrency(doOrder.tax_amount || 0, doOrder.currency)}
+                    {formatCurrency(doOrder.taxAmount || 0, doOrder.currency ?? 'AED')}
                   </TableCell>
                   <TableCell>
-                    {formatCurrency(doOrder.total_amount || 0, doOrder.currency)}
+                    {formatCurrency(doOrder.totalAmount || 0, doOrder.currency ?? 'AED')}
                   </TableCell>
                   <TableCell>
                     <Badge className={`${getStatusColor(doOrder.status)} border`}>

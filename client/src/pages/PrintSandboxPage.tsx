@@ -361,7 +361,7 @@ export default function PrintSandboxPage() {
         </div>
       </Card>
 
-      <style {...{jsx: true} as any}>{`
+      <style>{`
         .bg-grid-pattern {
           background-image: 
             linear-gradient(to right, #e5e7eb 1px, transparent 1px),

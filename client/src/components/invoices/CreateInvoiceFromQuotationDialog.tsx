@@ -51,7 +51,7 @@ export default function CreateInvoiceFromQuotationDialog({ open, onClose, onQuot
       );
 
       // Create a map for quick customer lookup
-      const customerMap: Record<string, any> = {};
+      const customerMap: Record<string, unknown> = {};
       customersData.forEach((customer: any) => {
         customerMap[customer.id] = customer.name || customer.customer_name;
       });

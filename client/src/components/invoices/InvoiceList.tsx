@@ -19,18 +19,18 @@ interface InvoiceListProps {
   canEdit: boolean;
   canOverride: boolean;
   currentUser?: { email?: string; role?: string } | null;
-  onEdit: (invoice: Record<string, any>) => void;
+  onEdit: (invoice: Invoice) => void;
   onRefresh: () => void;
   onQuickView: (id: number) => void;
 }
 
 export default function InvoiceList({ invoices, totalCount, loading, canEdit, canOverride, currentUser, onEdit, onRefresh, onQuickView }: InvoiceListProps) {
   const [showEditPaymentDialog, setShowEditPaymentDialog] = useState(false);
-  const [editPaymentInvoice, setEditPaymentInvoice] = useState<any>(null);
+  const [editPaymentInvoice, setEditPaymentInvoice] = useState<Invoice | null>(null);
 
-  const getCustomerName = (invoice: any) => invoice.customer_name || invoice.customerName || 'Unknown Customer';
+  const getCustomerName = (invoice: Invoice) => invoice.customerName || 'Unknown Customer';
 
-  const formatDate = (dateString: any) => {
+  const formatDate = (dateString: string | Date | null | undefined) => {
     if (!dateString) return '-';
     try {
       const date = new Date(dateString);
@@ -41,7 +41,7 @@ export default function InvoiceList({ invoices, totalCount, loading, canEdit, ca
     }
   };
 
-  const formatShortDate = (dateString: any) => {
+  const formatShortDate = (dateString: string | Date | null | undefined) => {
     if (!dateString) return '-';
     try {
       const date = new Date(dateString);
@@ -52,7 +52,7 @@ export default function InvoiceList({ invoices, totalCount, loading, canEdit, ca
     }
   };
 
-  const getStatusColor = (status: any) => {
+  const getStatusColor = (status: string | null | undefined) => {
     switch (status?.toLowerCase()) {
       case 'draft': return 'bg-gray-100 text-gray-800';
       case 'submitted':
@@ -63,22 +63,22 @@ export default function InvoiceList({ invoices, totalCount, loading, canEdit, ca
     }
   };
 
-  const formatCurrency = (amount: any, currency = 'AED') => {
+  const formatCurrency = (amount: string | number | null | undefined, currency = 'AED') => {
     const formatter = new Intl.NumberFormat('en-US', {
       style: 'decimal',
       minimumFractionDigits: 2,
       maximumFractionDigits: 2
     });
-    return `${currency} ${formatter.format(amount || 0)}`;
+    return `${currency} ${formatter.format(Number(amount) || 0)}`;
   };
 
-  const canPerformActions = (invoice: any) => {
+  const canPerformActions = (invoice: Invoice) => {
     if (!canEdit) return false;
     if (canOverride) return true;
     return ['draft', 'submitted'].includes(invoice.status);
   };
 
-  const handleEditPayment = (invoice: any) => {
+  const handleEditPayment = (invoice: Invoice) => {
     setEditPaymentInvoice(invoice);
     setShowEditPaymentDialog(true);
   };
@@ -138,11 +138,11 @@ export default function InvoiceList({ invoices, totalCount, loading, canEdit, ca
                 </TableRow>
               </TableHeader>
               <TableBody>
-                {invoices.map((invoice: any) => {
+                {invoices.map((invoice) => {
                   const isCancelled = invoice.status === 'cancelled';
-                  const ps = invoice.paymentStatus || invoice.payment_status || 'outstanding';
-                  const paidDate = invoice.paymentReceivedDate || invoice.payment_received_date;
-                  const remarks = invoice.paymentRemarks || invoice.payment_remarks;
+                  const ps = invoice.paymentStatus || 'outstanding';
+                  const paidDate = invoice.paymentReceivedDate;
+                  const remarks = invoice.paymentRemarks;
                   const formattedPayDate = formatDate(paidDate);
 
                   return (
@@ -153,32 +153,32 @@ export default function InvoiceList({ invoices, totalCount, loading, canEdit, ca
                             onClick={() => onQuickView && onQuickView(invoice.id)}
                             className="text-blue-600 hover:text-blue-800 hover:underline font-medium text-left transition-colors"
                           >
-                            {invoice.invoiceNumber || invoice.invoice_number || '-'}
+                            {invoice.invoiceNumber || '-'}
                           </button>
-                          {(invoice.scanKey || invoice.scan_key) && (
+                          {(invoice.scanKey) && (
                             <Paperclip className="w-3 h-3 text-blue-500 shrink-0" aria-label="Attachment" />
                           )}
                         </div>
                       </TableCell>
                       <TableCell>{getCustomerName(invoice)}</TableCell>
-                      <TableCell>{formatShortDate(invoice.invoiceDate || invoice.invoice_date || invoice.createdAt)}</TableCell>
+                      <TableCell>{formatShortDate(invoice.invoiceDate || invoice.createdAt)}</TableCell>
                       <TableCell>{invoice.reference || '-'}</TableCell>
                       <TableCell>
                         {(() => {
-                          const total = parseFloat(invoice.total_amount ?? invoice.totalAmount ?? invoice.amount ?? 0) || 0;
-                          const tax = parseFloat(invoice.tax_amount ?? invoice.taxAmount ?? invoice.vatAmount ?? 0) || 0;
-                          const subtotal = parseFloat(invoice.subtotal ?? 0) || (total - tax);
-                          return formatCurrency(subtotal, invoice.currency);
+                          const total = parseFloat(String(invoice.amount ?? 0)) || 0;
+                          const tax = parseFloat(String(invoice.vatAmount ?? 0)) || 0;
+                          const subtotal = total - tax;
+                          return formatCurrency(subtotal, invoice.currency ?? 'AED');
                         })()}
                       </TableCell>
                       <TableCell>
                         {(() => {
-                          const tax = parseFloat(invoice.tax_amount ?? invoice.taxAmount ?? invoice.vatAmount ?? 0) || 0;
-                          return formatCurrency(tax, invoice.currency);
+                          const tax = parseFloat(String(invoice.vatAmount ?? 0)) || 0;
+                          return formatCurrency(tax, invoice.currency ?? 'AED');
                         })()}
                       </TableCell>
                       <TableCell>
-                        {formatCurrency(invoice.total_amount || invoice.totalAmount || invoice.amount || 0, invoice.currency)}
+                        {formatCurrency(invoice.amount || 0, invoice.currency ?? 'AED')}
                       </TableCell>
                       <TableCell>
                         <Badge className={`${getStatusColor(invoice.status)} border`}>

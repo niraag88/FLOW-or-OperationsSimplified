@@ -530,7 +530,7 @@ export default function Invoices() {
           dateRange={dateRange}
           setDateRange={setDateRange}
           resetPagination={resetPagination}
-          customers={availableCustomers}
+          customers={availableCustomers.map(c => ({ ...c, name: c.name || '' }))}
           paymentStatusFilter={paymentStatusFilter}
           setPaymentStatusFilter={setPaymentStatusFilter}
         />

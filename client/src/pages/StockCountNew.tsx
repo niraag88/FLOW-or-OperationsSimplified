@@ -170,7 +170,7 @@ export default function StockCountNew() {
               <div className="text-center">
                 <p className="text-gray-500">Total Quantity</p>
                 <Badge className="bg-blue-100 text-blue-800 mt-1">
-                  {(totalQuantity as any).toLocaleString()}
+                  {Number(totalQuantity).toLocaleString()}
                 </Badge>
               </div>
             </div>

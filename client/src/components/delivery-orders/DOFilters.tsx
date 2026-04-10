@@ -10,6 +10,13 @@ import { Badge } from "@/components/ui/badge";
 import { format } from "date-fns";
 import { cn } from "@/lib/utils";
 
+
+export interface CustomDateRange {
+  type: "custom";
+  startDate: Date;
+  endDate: Date;
+}
+
 interface DOFiltersProps {
   selectedStatuses: string[];
   setSelectedStatuses: React.Dispatch<React.SetStateAction<string[]>>;
@@ -17,24 +24,24 @@ interface DOFiltersProps {
   setSelectedCustomers: React.Dispatch<React.SetStateAction<number[]>>;
   selectedTaxTreatments: string[];
   setSelectedTaxTreatments: React.Dispatch<React.SetStateAction<string[]>>;
-  dateRange: string | Record<string, unknown>;
-  setDateRange: (range: string | Record<string, any>) => void;
+  dateRange: string | CustomDateRange;
+  setDateRange: (range: string | CustomDateRange) => void;
   resetPagination: () => void;
-  customers?: Record<string, any>[];
+  customers?: { id: number; name: string; [key: string]: unknown }[];
 }
 
 export default function DOFilters({ selectedStatuses, setSelectedStatuses, selectedCustomers, setSelectedCustomers, selectedTaxTreatments, setSelectedTaxTreatments, dateRange, setDateRange, resetPagination, customers = [] }: DOFiltersProps) {
   const [dateRangeOpen, setDateRangeOpen] = useState(false);
-  const [customStartDate, setCustomStartDate] = useState<any>(null);
-  const [customEndDate, setCustomEndDate] = useState<any>(null);
+  const [customStartDate, setCustomStartDate] = useState<Date | undefined>(undefined);
+  const [customEndDate, setCustomEndDate] = useState<Date | undefined>(undefined);
 
   const clearFilters = () => {
     setSelectedStatuses([]);
     setSelectedCustomers([]);
     setSelectedTaxTreatments([]);
     setDateRange("all");
-    setCustomStartDate(null);
-    setCustomEndDate(null);
+    setCustomStartDate(undefined);
+    setCustomEndDate(undefined);
     resetPagination();
   };
 
@@ -52,10 +59,10 @@ export default function DOFilters({ selectedStatuses, setSelectedStatuses, selec
     { value: 'ZeroRated', label: 'Zero Rated (0%)' },
   ];
 
-  const handleDateRangeChange = (value: any) => {
+  const handleDateRangeChange = (value: string) => {
     if (value !== 'custom') {
-      setCustomStartDate(null);
-      setCustomEndDate(null);
+      setCustomStartDate(undefined);
+      setCustomEndDate(undefined);
     }
     setDateRange(value);
     resetPagination();
@@ -63,8 +70,8 @@ export default function DOFilters({ selectedStatuses, setSelectedStatuses, selec
 
   const handleCustomDateRange = () => {
     if (customStartDate && customEndDate) {
-      const customRange = {
-        type: 'custom',
+      const customRange: CustomDateRange = {
+        type: 'custom' as const,
         startDate: customStartDate,
         endDate: customEndDate
       };
@@ -240,7 +247,7 @@ export default function DOFilters({ selectedStatuses, setSelectedStatuses, selec
                     mode="single"
                     selected={customStartDate}
                     onSelect={setCustomStartDate}
-                    disabled={(date) => date > new Date() || (customEndDate && date > customEndDate)}
+                    disabled={(date) => date > new Date() || !!(customEndDate && date > customEndDate)}
                     initialFocus
                   />
                 </div>
@@ -250,7 +257,7 @@ export default function DOFilters({ selectedStatuses, setSelectedStatuses, selec
                     mode="single"
                     selected={customEndDate}
                     onSelect={setCustomEndDate}
-                    disabled={(date) => date > new Date() || (customStartDate && date < customStartDate)}
+                    disabled={(date) => date > new Date() || !!(customStartDate && date < customStartDate)}
                     initialFocus
                   />
                 </div>
