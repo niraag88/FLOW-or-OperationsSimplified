@@ -18,12 +18,12 @@ import { DeliveryOrder as DOEntity } from "@/api/entities";
 import { Product as ProductEntity } from "@/api/entities";
 import { Customer as CustomerEntity } from "@/api/entities";
 import { Brand as BrandEntity } from "@/api/entities";
-import type { DeliveryOrder } from "@shared/schema";
+import type { DeliveryOrder, Customer, Brand, Product } from "@shared/schema";
 import { Card } from "@/components/ui/card";
 
 const toNum = (v: unknown): number => parseFloat(String(v)) || 0;
 
-const normalizeDoData = (data: Record<string, any>) => ({
+const normalizeDoData = (data: Record<string, unknown>) => ({
   ...data,
   subtotal: toNum(data.subtotal),
   tax_amount: toNum(data.tax_amount),
@@ -64,17 +64,17 @@ interface DOItem {
 interface DOFormProps {
   open: boolean;
   onClose: () => void;
-  editingDO?: Record<string, any> | null;
+  editingDO?: Record<string, unknown> | null;
   currentUser?: { email?: string; role?: string } | null;
   onSuccess?: () => void;
 }
 
 export default function DOForm({ open, onClose, editingDO, currentUser, onSuccess }: DOFormProps) {
   const [loading, setLoading] = useState(false);
-  const [customers, setCustomers] = useState<any[]>([]);
-  const [products, setProducts] = useState<any[]>([]);
-  const [brands, setBrands] = useState<any[]>([]);
-  const [selectedCustomer, setSelectedCustomer] = useState<any>(null);
+  const [customers, setCustomers] = useState<Customer[]>([]);
+  const [products, setProducts] = useState<Product[]>([]);
+  const [brands, setBrands] = useState<Brand[]>([]);
+  const [selectedCustomer, setSelectedCustomer] = useState<Customer | null>(null);
 
   const [formData, setFormData] = useState(getInitialDOFormData);
 
@@ -106,9 +106,9 @@ export default function DOForm({ open, onClose, editingDO, currentUser, onSucces
           : Promise.resolve(null),
       ]);
 
-      const customersData = (settled[0].status === 'fulfilled' ? (settled[0].value || []) : []) as Record<string, any>[];
-      const productsData  = (settled[1].status === 'fulfilled' ? (settled[1].value || []) : []) as Record<string, any>[];
-      const brandsData    = (settled[2].status === 'fulfilled' ? (settled[2].value || []) : []) as Record<string, any>[];
+      const customersData = (settled[0].status === 'fulfilled' ? (settled[0].value || []) : []) as Customer[];
+      const productsData  = (settled[1].status === 'fulfilled' ? (settled[1].value || []) : []) as Product[];
+      const brandsData    = (settled[2].status === 'fulfilled' ? (settled[2].value || []) : []) as Brand[];
       const nextNumResp   = settled[3].status === 'fulfilled' ? settled[3].value : null;
       const fullDOResp    = settled[4].status === 'fulfilled' ? settled[4].value : null;
 
@@ -131,7 +131,7 @@ export default function DOForm({ open, onClose, editingDO, currentUser, onSucces
         setFormData(prev => ({ ...prev, do_number: nextNumber }));
       } else if (isNewFromDocument) {
         // New DO created from existing document — customer_id already validated by handleDocumentSelect
-        const customer = filteredCustomers.find((c: Record<string, any>) => c.id === editingDO.customer_id);
+        const customer = filteredCustomers.find((c) => c.id === editingDO.customer_id);
         setSelectedCustomer(customer || null);
         setFormData(normalizeDoData({
           ...getInitialDOFormData(),
@@ -141,12 +141,12 @@ export default function DOForm({ open, onClose, editingDO, currentUser, onSucces
         }) as Parameters<typeof setFormData>[0]);
       } else {
         // Editing an existing DO — fetch full DO data
-        let full: Record<string, any> | null = null;
+        let full: Record<string, unknown> | null = null;
         if (fullDOResp && fullDOResp.ok) {
           try { full = await fullDOResp.json(); } catch {}
         }
         if (full) {
-          const customer = filteredCustomers.find((c: Record<string, any>) => c.id === full.customer_id);
+          const customer = filteredCustomers.find((c) => c.id === full.customer_id);
           setSelectedCustomer(customer || null);
           setFormData(normalizeDoData({
             ...getInitialDOFormData(),
@@ -155,7 +155,7 @@ export default function DOForm({ open, onClose, editingDO, currentUser, onSucces
           }) as Parameters<typeof setFormData>[0]);
         } else {
           // Fallback to passed data
-          const customer = filteredCustomers.find((c: Record<string, any>) => c.id === editingDO.customer_id);
+          const customer = filteredCustomers.find((c) => c.id === editingDO.customer_id);
           setSelectedCustomer(customer || null);
           setFormData(normalizeDoData({ ...getInitialDOFormData(), ...editingDO, items: editingDO.items || [] }) as Parameters<typeof setFormData>[0]);
         }
@@ -174,13 +174,13 @@ export default function DOForm({ open, onClose, editingDO, currentUser, onSucces
       // Handle customer change logic
       if (field === 'customer_id') {
         const customerId = parseInt(String(value));
-        const customer = customers.find((c: Record<string, any>) => c.id === customerId);
-        setSelectedCustomer(customer);
+        const customer = customers.find((c) => c.id === customerId);
+        setSelectedCustomer(customer ?? null);
         
         let taxTreatment = "StandardRated";
         let taxRate = 0.05;
         
-        if (customer && (customer.vatTreatment === "ZeroRated" || customer.vatTreatment === "International" || customer.type === "International")) {
+        if (customer && (customer.vatTreatment === "ZeroRated" || customer.vatTreatment === "International" || (customer as Record<string, unknown>).type === "International")) {
           taxTreatment = "ZeroRated";
           taxRate = 0;
         }
@@ -235,7 +235,7 @@ export default function DOForm({ open, onClose, editingDO, currentUser, onSucces
     newItems[index] = { ...newItems[index], [field]: value };
 
     if (field === 'brand_id') {
-      const brand = brands.find((b: Record<string, any>) => b.id === value);
+      const brand = brands.find((b) => b.id === value);
       newItems[index] = {
         ...newItems[index],
         brand_name: brand?.name || "",
@@ -249,14 +249,14 @@ export default function DOForm({ open, onClose, editingDO, currentUser, onSucces
     }
 
     if (field === 'product_id' && value) {
-      const product = products.find((p: Record<string, any>) => p.id === value);
+      const product = products.find((p) => p.id === value);
       if (product) {
         newItems[index] = {
           ...newItems[index],
           product_code: product.sku || "",
           description: `${product.name || ''}${product.description ? ` - ${product.description}` : ''}`,
-          size: product.size || "",
-          unit_price: product.unitPrice || 0
+          size: product.size ?? "",
+          unit_price: parseFloat(String(product.unitPrice || 0)) || 0
         };
       }
     }
@@ -272,7 +272,7 @@ export default function DOForm({ open, onClose, editingDO, currentUser, onSucces
 
   const getFilteredProducts = (brandId: string | number) => {
     if (!brandId) return [];
-    return products.filter((product: Record<string, any>) => String(product.brandId) === String(brandId));
+    return products.filter((product) => String(product.brandId) === String(brandId));
   };
 
   const removeItem = (index: number) => {
@@ -300,7 +300,7 @@ export default function DOForm({ open, onClose, editingDO, currentUser, onSucces
       };
 
       if (editingDO && editingDO.id) {
-        await DOEntity.update(editingDO.id, doData);
+        await DOEntity.update(editingDO.id as string | number, doData);
       } else {
         await DOEntity.create(doData);
       }
@@ -347,7 +347,7 @@ export default function DOForm({ open, onClose, editingDO, currentUser, onSucces
                   <SelectValue placeholder="Select customer" />
                 </SelectTrigger>
                 <SelectContent>
-                  {customers.map((c: Record<string, any>) => (
+                  {customers.map((c) => (
                     <SelectItem key={c.id} value={c.id.toString()}>
                       {c.name}
                     </SelectItem>
@@ -432,7 +432,7 @@ export default function DOForm({ open, onClose, editingDO, currentUser, onSucces
                             <SelectValue placeholder="Select brand" />
                           </SelectTrigger>
                           <SelectContent>
-                            {brands.map((b: Record<string, any>) => (
+                            {brands.map((b) => (
                               <SelectItem key={b.id} value={b.id.toString()}>{b.name}</SelectItem>
                             ))}
                           </SelectContent>
@@ -450,7 +450,7 @@ export default function DOForm({ open, onClose, editingDO, currentUser, onSucces
                             <SelectValue placeholder="Select product" />
                           </SelectTrigger>
                           <SelectContent>
-                            {getFilteredProducts(item.brand_id).map((p: Record<string, any>) => (
+                            {getFilteredProducts(item.brand_id).map((p) => (
                               <SelectItem key={p.id} value={p.id.toString()}>
                                 <div className="flex flex-col">
                                   <p className="font-medium truncate">{p.name}{p.size ? ` (${p.size})` : ''}</p>

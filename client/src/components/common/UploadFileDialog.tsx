@@ -17,11 +17,11 @@ const ALLOWED_TYPES = {
   'image/png': { ext: 'png', label: 'PNG' },
 };
 
-function getFileExtension(mimeType: any) {
+function getFileExtension(mimeType: string) {
   return ALLOWED_TYPES[mimeType as keyof typeof ALLOWED_TYPES]?.ext || 'pdf';
 }
 
-function buildStorageKey(recordType: any, documentNumber: any, file: any) {
+function buildStorageKey(recordType: string, documentNumber: string | undefined, file: File) {
   const year = new Date().getFullYear();
   const safeName = (documentNumber || 'doc').replace(/[^a-zA-Z0-9\-_]/g, '-');
   const origName = file.name.replace(/[^a-zA-Z0-9._-]/g, '-').toLowerCase();
@@ -40,14 +40,14 @@ interface UploadFileDialogProps {
 
 export default function UploadFileDialog({ open, onClose, onSuccess, recordType, recordId, documentNumber, maxSizeMB = 2 }: UploadFileDialogProps) {
   const { toast } = useToast();
-  const [selectedFile, setSelectedFile] = useState<any>(null);
+  const [selectedFile, setSelectedFile] = useState<File | null>(null);
   const [uploading, setUploading] = useState(false);
   const [error, setError] = useState('');
   const inputRef = useRef<HTMLInputElement>(null);
 
   const maxSizeBytes = maxSizeMB * 1024 * 1024;
 
-  const handleFileChange = (e: any) => {
+  const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     setError('');
     if (!file) return;
@@ -97,9 +97,9 @@ export default function UploadFileDialog({ open, onClose, onSuccess, recordType,
       toast({ title: 'File uploaded', description: 'The attachment has been saved.' });
       onSuccess?.(storageKey);
       handleClose();
-    } catch (err: any) {
+    } catch (err: unknown) {
       console.error('Upload error:', err);
-      setError(err.message || 'Upload failed. Please try again.');
+      setError(err instanceof Error ? err.message : 'Upload failed. Please try again.');
     } finally {
       setUploading(false);
     }

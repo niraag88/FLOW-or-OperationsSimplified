@@ -50,7 +50,7 @@ export default function InvoiceActionsDropdown({ invoice, canEdit, canOverride, 
         title: 'Export Successful',
         description: `Invoice ${invoiceNum} exported to Excel.`
       });
-    } catch (error: any) {
+    } catch (error: unknown) {
       console.error('XLSX export error:', error);
       toast({
         title: 'Export Failed', 
@@ -73,7 +73,7 @@ export default function InvoiceActionsDropdown({ invoice, canEdit, canOverride, 
       });
       setShowDeleteDialog(false);
       onRefresh();
-    } catch (error: any) {
+    } catch (error: unknown) {
       console.error('Error deleting invoice:', error);
       toast({
         title: 'Delete Failed',
@@ -99,17 +99,17 @@ export default function InvoiceActionsDropdown({ invoice, canEdit, canOverride, 
       });
       setShowCancelDialog(false);
       onRefresh();
-    } catch (error: any) {
+    } catch (error: unknown) {
       console.error('Error cancelling invoice:', error);
       toast({
         title: 'Cancellation Failed',
-        description: error.message || 'Failed to cancel the invoice. Please try again.',
+        description: error instanceof Error ? error.message : 'Failed to cancel the invoice. Please try again.',
         variant: 'destructive',
       });
     }
   };
 
-  const handleUploadSuccess = async (storageKey: any) => {
+  const handleUploadSuccess = async (storageKey?: string) => {
     try {
       const res = await fetch(`/api/invoices/${invoice.id}/scan-key`, {
         method: 'PATCH',
@@ -122,7 +122,7 @@ export default function InvoiceActionsDropdown({ invoice, canEdit, canOverride, 
         throw new Error(data.error || 'Failed to link file to invoice');
       }
       onRefresh();
-    } catch (error: any) {
+    } catch (error: unknown) {
       console.error('Error saving scan key:', error);
       toast({
         title: 'Warning',
@@ -142,7 +142,7 @@ export default function InvoiceActionsDropdown({ invoice, canEdit, canOverride, 
       const data = await res.json();
       if (!res.ok) throw new Error(data.error || 'Failed to get download link');
       window.open(data.url, '_blank');
-    } catch (error: any) {
+    } catch (error: unknown) {
       console.error('Error viewing file:', error);
       toast({
         title: 'Error',
@@ -164,7 +164,7 @@ export default function InvoiceActionsDropdown({ invoice, canEdit, canOverride, 
       }
       toast({ title: 'File Removed', description: 'The attachment has been removed.' });
       onRefresh();
-    } catch (error: any) {
+    } catch (error: unknown) {
       console.error('Error removing file:', error);
       toast({ title: 'Error', description: 'Could not remove the file. Please try again.', variant: 'destructive' });
     }
@@ -181,8 +181,8 @@ export default function InvoiceActionsDropdown({ invoice, canEdit, canOverride, 
       if (!res.ok) throw new Error('Failed to update payment status');
       toast({ title: 'Updated', description: `Invoice ${invoiceNumber} marked as outstanding.` });
       onRefresh();
-    } catch (error: any) {
-      toast({ title: 'Error', description: error.message, variant: 'destructive' });
+    } catch (error: unknown) {
+      toast({ title: 'Error', description: error instanceof Error ? error.message : 'An error occurred.', variant: 'destructive' });
     }
   };
 
