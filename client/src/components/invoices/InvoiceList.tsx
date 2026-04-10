@@ -129,9 +129,9 @@ export default function InvoiceList({ invoices, totalCount, loading, canEdit, ca
                   <TableHead>Customer</TableHead>
                   <TableHead>Invoice Date</TableHead>
                   <TableHead>Reference</TableHead>
-                  <TableHead>Subtotal</TableHead>
-                  <TableHead>VAT</TableHead>
-                  <TableHead>Total</TableHead>
+                  <TableHead className="text-right">Subtotal</TableHead>
+                  <TableHead className="text-right">VAT</TableHead>
+                  <TableHead className="text-right">Total</TableHead>
                   <TableHead>Status</TableHead>
                   <TableHead>Payment</TableHead>
                   <TableHead>Actions</TableHead>
@@ -163,7 +163,7 @@ export default function InvoiceList({ invoices, totalCount, loading, canEdit, ca
                       <TableCell>{getCustomerName(invoice)}</TableCell>
                       <TableCell>{formatShortDate(invoice.invoiceDate || invoice.createdAt)}</TableCell>
                       <TableCell>{invoice.reference || '-'}</TableCell>
-                      <TableCell>
+                      <TableCell className="text-right">
                         {(() => {
                           const total = parseFloat(String(invoice.amount ?? 0)) || 0;
                           const tax = parseFloat(String(invoice.vatAmount ?? 0)) || 0;
@@ -171,13 +171,13 @@ export default function InvoiceList({ invoices, totalCount, loading, canEdit, ca
                           return formatCurrency(subtotal, invoice.currency ?? 'AED');
                         })()}
                       </TableCell>
-                      <TableCell>
+                      <TableCell className="text-right">
                         {(() => {
                           const tax = parseFloat(String(invoice.vatAmount ?? 0)) || 0;
                           return formatCurrency(tax, invoice.currency ?? 'AED');
                         })()}
                       </TableCell>
-                      <TableCell>
+                      <TableCell className="text-right">
                         {formatCurrency(invoice.amount || 0, invoice.currency ?? 'AED')}
                       </TableCell>
                       <TableCell>

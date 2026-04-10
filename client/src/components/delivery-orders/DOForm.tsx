@@ -343,7 +343,7 @@ export default function DOForm({ open, onClose, editingDO, currentUser, onSucces
             <div className="space-y-2">
               <Label htmlFor="customer">Customer *</Label>
               <Select value={formData.customer_id ? formData.customer_id.toString() : ''} onValueChange={(value) => handleInputChange('customer_id', value)} disabled={!isEditable}>
-                <SelectTrigger>
+                <SelectTrigger id="customer">
                   <SelectValue placeholder="Select customer" />
                 </SelectTrigger>
                 <SelectContent>
@@ -358,7 +358,7 @@ export default function DOForm({ open, onClose, editingDO, currentUser, onSucces
             <div className="space-y-2">
               <Label htmlFor="status">Status</Label>
               <Select value={formData.status} onValueChange={(value) => handleInputChange('status', value)} disabled={!isEditable}>
-                <SelectTrigger>
+                <SelectTrigger id="status">
                   <SelectValue />
                 </SelectTrigger>
                 <SelectContent>

@@ -104,9 +104,9 @@ export default function DOList({ deliveryOrders, totalCount, loading, canEdit, c
                 <TableHead>Customer</TableHead>
                 <TableHead>Order Date</TableHead>
                 <TableHead>Reference</TableHead>
-                <TableHead>Subtotal</TableHead>
-                <TableHead>VAT</TableHead>
-                <TableHead>Total</TableHead>
+                <TableHead className="text-right">Subtotal</TableHead>
+                <TableHead className="text-right">VAT</TableHead>
+                <TableHead className="text-right">Total</TableHead>
                 <TableHead>Status</TableHead>
                 <TableHead>Actions</TableHead>
               </TableRow>
@@ -130,13 +130,13 @@ export default function DOList({ deliveryOrders, totalCount, loading, canEdit, c
                   <TableCell>{getCustomerName(doOrder)}</TableCell>
                   <TableCell>{formatDate(doOrder.orderDate)}</TableCell>
                   <TableCell>{doOrder.reference || '-'}</TableCell>
-                  <TableCell>
+                  <TableCell className="text-right">
                     {formatCurrency(doOrder.subtotal || 0, doOrder.currency ?? 'AED')}
                   </TableCell>
-                  <TableCell>
+                  <TableCell className="text-right">
                     {formatCurrency(doOrder.taxAmount || 0, doOrder.currency ?? 'AED')}
                   </TableCell>
-                  <TableCell>
+                  <TableCell className="text-right">
                     {formatCurrency(doOrder.totalAmount || 0, doOrder.currency ?? 'AED')}
                   </TableCell>
                   <TableCell>

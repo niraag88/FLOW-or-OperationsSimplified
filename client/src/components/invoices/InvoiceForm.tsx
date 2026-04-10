@@ -450,7 +450,7 @@ export default function InvoiceForm({ open, onClose, editingInvoice, currentUser
             <div className="space-y-2">
               <Label htmlFor="customer">Customer *</Label>
               <Select value={formData.customer_id ? formData.customer_id.toString() : ''} onValueChange={(value) => handleInputChange('customer_id', value)} disabled={!isCurrentlyEditable}>
-                <SelectTrigger>
+                <SelectTrigger id="customer">
                   <SelectValue placeholder="Select customer" />
                 </SelectTrigger>
                 <SelectContent>
@@ -610,7 +610,7 @@ export default function InvoiceForm({ open, onClose, editingInvoice, currentUser
                       <div className="space-y-2">
                         <Label>Total</Label>
                         <div className="flex items-center gap-2">
-                          <span className="font-medium">{(item.line_total || 0).toFixed(2)} AED</span>
+                          <span className="font-medium">AED {(item.line_total || 0).toFixed(2)}</span>
                           {isCurrentlyEditable && (
                             <Button 
                               type="button" 

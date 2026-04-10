@@ -567,16 +567,26 @@ export default function POForm({ open, onClose, editingPO, currentUser, onSucces
 
             {formData.items.length > 0 && (
               <div className="rounded-md border overflow-x-auto">
-                <Table>
+                <Table className="table-fixed w-full min-w-[760px]">
+                  <colgroup>
+                    <col className="w-[190px]" />
+                    <col className="w-[110px]" />
+                    <col />
+                    <col className="w-[80px]" />
+                    <col className="w-[80px]" />
+                    <col className="w-[120px]" />
+                    <col className="w-[110px]" />
+                    {canEdit && <col className="w-10" />}
+                  </colgroup>
                   <TableHeader>
                     <TableRow>
                       <TableHead>Product</TableHead>
-                      <TableHead>Product Code</TableHead>
+                      <TableHead>Code</TableHead>
                       <TableHead>Description</TableHead>
                       <TableHead>Size</TableHead>
-                      <TableHead>Quantity</TableHead>
-                      <TableHead>Unit Price ({currency})</TableHead>
-                      <TableHead>Line Total ({currency})</TableHead>
+                      <TableHead className="text-right">Qty</TableHead>
+                      <TableHead className="text-right">Unit Price ({currency})</TableHead>
+                      <TableHead className="text-right">Line Total ({currency})</TableHead>
                       {canEdit && <TableHead></TableHead>}
                     </TableRow>
                   </TableHeader>
@@ -601,13 +611,13 @@ export default function POForm({ open, onClose, editingPO, currentUser, onSucces
                             </SelectContent>
                           </Select>
                         </TableCell>
-                        <TableCell>{item.productSku}</TableCell>
+                        <TableCell className="text-sm text-gray-600">{item.productSku}</TableCell>
                         <TableCell>
                           <Input
                             value={item.productName}
                             onChange={(e) => updateItem(index, 'productName', e.target.value)}
                             disabled={!canEdit}
-                            className="min-w-[140px]"
+                            className="w-full"
                             placeholder="Description"
                           />
                         </TableCell>
@@ -616,7 +626,7 @@ export default function POForm({ open, onClose, editingPO, currentUser, onSucces
                             value={item.size || ''}
                             onChange={(e) => updateItem(index, 'size', e.target.value)}
                             disabled={!canEdit}
-                            className="w-24"
+                            className="w-full"
                             placeholder="Size"
                           />
                         </TableCell>
@@ -627,7 +637,7 @@ export default function POForm({ open, onClose, editingPO, currentUser, onSucces
                             value={item.quantity}
                             onChange={(e) => updateItem(index, 'quantity', parseInt(e.target.value) || 0)}
                             disabled={!canEdit}
-                            className="w-20"
+                            className="w-full text-right"
                           />
                         </TableCell>
                         <TableCell>
@@ -637,10 +647,10 @@ export default function POForm({ open, onClose, editingPO, currentUser, onSucces
                             value={item.unitPrice}
                             onChange={(e) => updateItem(index, 'unitPrice', parseFloat(e.target.value) || 0)}
                             disabled={!canEdit}
-                            className="w-24"
+                            className="w-full text-right"
                           />
                         </TableCell>
-                        <TableCell>{item.lineTotal.toFixed(2)}</TableCell>
+                        <TableCell className="text-right font-medium">{item.lineTotal.toFixed(2)}</TableCell>
                         {canEdit && (
                           <TableCell>
                             <Button

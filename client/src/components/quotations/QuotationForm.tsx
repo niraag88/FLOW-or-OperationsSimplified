@@ -466,7 +466,7 @@ export default function QuotationForm({ open, onClose, editingQuotation, current
             <div className="space-y-2">
               <Label htmlFor="customer">Customer *</Label>
               <Select value={formData.customer_id ? formData.customer_id.toString() : ''} onValueChange={(value) => handleInputChange('customer_id', value)} disabled={!isEditable}>
-                <SelectTrigger>
+                <SelectTrigger id="customer">
                   <SelectValue placeholder="Select customer" />
                 </SelectTrigger>
                 <SelectContent>
@@ -557,16 +557,25 @@ export default function QuotationForm({ open, onClose, editingQuotation, current
             </div>
 
             {formData.items.length > 0 && (
-              <div className="rounded-md border">
-                <Table>
+              <div className="rounded-md border overflow-x-auto">
+                <Table className="table-fixed w-full min-w-[680px]">
+                  <colgroup>
+                    <col className="w-[140px]" />
+                    <col className="w-[180px]" />
+                    <col />
+                    <col className="w-[90px]" />
+                    <col className="w-[130px]" />
+                    <col className="w-[110px]" />
+                    {isEditable && <col className="w-10" />}
+                  </colgroup>
                   <TableHeader>
                     <TableRow>
                       <TableHead>Brand</TableHead>
                       <TableHead>Product</TableHead>
                       <TableHead>Description</TableHead>
-                      <TableHead>Quantity</TableHead>
-                      <TableHead>Unit Price (AED)</TableHead>
-                      <TableHead>Line Total (AED)</TableHead>
+                      <TableHead className="text-right">Qty</TableHead>
+                      <TableHead className="text-right">Unit Price (AED)</TableHead>
+                      <TableHead className="text-right">Line Total (AED)</TableHead>
                       {isEditable && <TableHead></TableHead>}
                     </TableRow>
                   </TableHeader>
@@ -622,7 +631,7 @@ export default function QuotationForm({ open, onClose, editingQuotation, current
                             value={item.quantity}
                             onChange={(e) => updateItem(index, 'quantity', e.target.value)}
                             disabled={!isEditable}
-                            className="w-20"
+                            className="w-full text-right"
                           />
                         </TableCell>
                         <TableCell>
@@ -632,10 +641,10 @@ export default function QuotationForm({ open, onClose, editingQuotation, current
                             value={item.unit_price}
                             onChange={(e) => updateItem(index, 'unit_price', e.target.value)}
                             disabled={!isEditable}
-                            className="w-24"
+                            className="w-full text-right"
                           />
                         </TableCell>
-                        <TableCell>{(item.line_total || 0).toFixed(2)}</TableCell>
+                        <TableCell className="text-right font-medium">{(item.line_total || 0).toFixed(2)}</TableCell>
                         {isEditable && (
                           <TableCell>
                             <Button
