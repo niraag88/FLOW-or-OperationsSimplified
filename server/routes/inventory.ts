@@ -80,7 +80,7 @@ export function registerInventoryRoutes(app: Express) {
         return res.status(400).json({ error: 'Movements array is required' });
       }
 
-      const results = [];
+      const results: any[] = [];
 
       for (const movement of movements) {
         const { productId, quantity, movementType, notes } = movement;

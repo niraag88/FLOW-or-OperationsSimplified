@@ -546,8 +546,8 @@ export function registerSystemRoutes(app: Express) {
       const dbBackupsResult = await objectStorageClient.list({ prefix: 'backups/db/' });
       const manifestBackupsResult = await objectStorageClient.list({ prefix: 'backups/objects/' });
 
-      let latestDbBackup = null;
-      let latestManifestBackup = null;
+      let latestDbBackup: any = null;
+      let latestManifestBackup: any = null;
 
       if (dbBackupsResult.ok && dbBackupsResult.value.length > 0) {
         latestDbBackup = dbBackupsResult.value

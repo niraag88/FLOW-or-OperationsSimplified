@@ -54,10 +54,10 @@ export default function AuditLogTable() {
 
   const logs = data ?? [];
 
-  const users = Array.from(new Set(logs.map(l => l.actorName).filter(Boolean))).sort();
-  const targetTypes = Array.from(new Set(logs.map(l => l.targetType))).sort();
+  const users = Array.from(new Set(logs.map((l: any) => l.actorName).filter(Boolean))).sort();
+  const targetTypes = Array.from(new Set(logs.map((l: any) => l.targetType))).sort();
 
-  const filtered = logs.filter(log => {
+  const filtered = logs.filter((log: any) => {
     if (userFilter !== 'all' && log.actorName !== userFilter) return false;
     if (actionFilter !== 'all' && log.action !== actionFilter) return false;
     if (typeFilter !== 'all' && log.targetType !== typeFilter) return false;
@@ -102,7 +102,7 @@ export default function AuditLogTable() {
           </SelectTrigger>
           <SelectContent>
             <SelectItem value="all">All users</SelectItem>
-            {users.map(u => (
+            {users.map((u: any) => (
               <SelectItem key={u} value={u}>{u}</SelectItem>
             ))}
           </SelectContent>
@@ -114,7 +114,7 @@ export default function AuditLogTable() {
           </SelectTrigger>
           <SelectContent>
             <SelectItem value="all">All actions</SelectItem>
-            {KNOWN_ACTIONS.map(a => (
+            {KNOWN_ACTIONS.map((a: any) => (
               <SelectItem key={a} value={a}>{a}</SelectItem>
             ))}
           </SelectContent>
@@ -126,7 +126,7 @@ export default function AuditLogTable() {
           </SelectTrigger>
           <SelectContent>
             <SelectItem value="all">All types</SelectItem>
-            {targetTypes.map(t => (
+            {targetTypes.map((t: any) => (
               <SelectItem key={t} value={t}>{t}</SelectItem>
             ))}
           </SelectContent>
@@ -169,7 +169,7 @@ export default function AuditLogTable() {
               </TableRow>
             </TableHeader>
             <TableBody>
-              {filtered.map(log => (
+              {filtered.map((log: any) => (
                 <TableRow key={log.id} className="hover:bg-gray-50 dark:hover:bg-gray-800">
                   <TableCell className="text-xs text-gray-500 whitespace-nowrap align-top pt-3">
                     {formatLogDate(log.timestamp)}

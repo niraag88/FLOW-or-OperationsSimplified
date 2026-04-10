@@ -365,7 +365,7 @@ export default function UserManagement() {
                 </CardHeader>
                 <CardContent>
                   <div className="text-2xl font-bold text-green-600">
-                    {users.filter(u => u.active).length}
+                    {users.filter((u: any) => u.active).length}
                   </div>
                 </CardContent>
               </Card>
@@ -377,7 +377,7 @@ export default function UserManagement() {
                 </CardHeader>
                 <CardContent>
                   <div className="text-2xl font-bold text-red-600">
-                    {users.filter(u => !u.active).length}
+                    {users.filter((u: any) => !u.active).length}
                   </div>
                 </CardContent>
               </Card>
@@ -448,7 +448,7 @@ export default function UserManagement() {
                               <div className="flex items-center gap-2">
                                 <Button
                                   variant="outline"
-                                  size="sm"
+                                  
                                   onClick={() => { setEditingUser(u); setEditPassword(''); }}
                                   data-testid={`button-edit-${u.username}`}
                                 >
@@ -457,7 +457,7 @@ export default function UserManagement() {
                                 {u.id !== user?.id && (
                                   <Button
                                     variant="outline"
-                                    size="sm"
+                                    
                                     onClick={() => handleDeleteUser(u.id, u.username)}
                                     disabled={deleteUserMutation.isPending}
                                     data-testid={`button-delete-${u.username}`}

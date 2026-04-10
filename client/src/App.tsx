@@ -8,30 +8,30 @@ import { AuthProvider, useAuth } from "@/hooks/useAuth";
 import { ProtectedRoute } from "@/components/ProtectedRoute";
 
 import LoginPage from "@/pages/LoginPage";
-import Layout from "@/pages/Layout.jsx";
+import Layout from "@/pages/Layout";
 
-const Dashboard = lazy(() => import("@/pages/Dashboard.jsx"));
-const Inventory = lazy(() => import("@/pages/Inventory.jsx"));
-const PurchaseOrders = lazy(() => import("@/pages/PurchaseOrders.jsx"));
-const DeliveryOrders = lazy(() => import("@/pages/DeliveryOrders.jsx"));
-const Invoices = lazy(() => import("@/pages/Invoices.jsx"));
-const Reports = lazy(() => import("@/pages/Reports.jsx"));
-const Settings = lazy(() => import("@/pages/Settings.jsx"));
-const AddProduct = lazy(() => import("@/pages/AddProduct.jsx"));
-const BulkAddProduct = lazy(() => import("@/pages/BulkAddProduct.jsx"));
-const EditProduct = lazy(() => import("@/pages/EditProduct.jsx"));
-const StockCountNew = lazy(() => import("@/pages/StockCountNew.jsx"));
-const GoodsReceipts = lazy(() => import("@/pages/GoodsReceipts.jsx"));
-const Customers = lazy(() => import("@/pages/Customers.jsx"));
-const Print = lazy(() => import("@/pages/Print.jsx"));
-const Quotations = lazy(() => import("@/pages/Quotations.jsx"));
+const Dashboard = lazy(() => import("@/pages/Dashboard"));
+const Inventory = lazy(() => import("@/pages/Inventory"));
+const PurchaseOrders = lazy(() => import("@/pages/PurchaseOrders"));
+const DeliveryOrders = lazy(() => import("@/pages/DeliveryOrders"));
+const Invoices = lazy(() => import("@/pages/Invoices"));
+const Reports = lazy(() => import("@/pages/Reports"));
+const Settings = lazy(() => import("@/pages/Settings"));
+const AddProduct = lazy(() => import("@/pages/AddProduct"));
+const BulkAddProduct = lazy(() => import("@/pages/BulkAddProduct"));
+const EditProduct = lazy(() => import("@/pages/EditProduct"));
+const StockCountNew = lazy(() => import("@/pages/StockCountNew"));
+const GoodsReceipts = lazy(() => import("@/pages/GoodsReceipts"));
+const Customers = lazy(() => import("@/pages/Customers"));
+const Print = lazy(() => import("@/pages/Print"));
+const Quotations = lazy(() => import("@/pages/Quotations"));
 const UserManagement = lazy(() => import("@/pages/UserManagement"));
-const POPrintView = lazy(() => import("@/components/purchase-orders/POPrintView.jsx"));
-const QuotationPrintView = lazy(() => import("@/components/quotations/QuotationPrintView.jsx"));
-const QuotationsListPrintView = lazy(() => import("@/components/quotations/QuotationsListPrintView.jsx"));
-const InvoicePrintView = lazy(() => import("@/components/invoices/InvoicePrintView.jsx"));
-const InvoicesListPrintView = lazy(() => import("@/components/invoices/InvoicesListPrintView.jsx"));
-const DOPrintView = lazy(() => import("@/components/delivery-orders/DOPrintView.jsx"));
+const POPrintView = lazy(() => import("@/components/purchase-orders/POPrintView"));
+const QuotationPrintView = lazy(() => import("@/components/quotations/QuotationPrintView"));
+const QuotationsListPrintView = lazy(() => import("@/components/quotations/QuotationsListPrintView"));
+const InvoicePrintView = lazy(() => import("@/components/invoices/InvoicePrintView"));
+const InvoicesListPrintView = lazy(() => import("@/components/invoices/InvoicesListPrintView"));
+const DOPrintView = lazy(() => import("@/components/delivery-orders/DOPrintView"));
 
 const PageSpinner = () => (
   <div className="min-h-screen flex items-center justify-center">
