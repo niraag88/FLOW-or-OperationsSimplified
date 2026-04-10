@@ -85,7 +85,7 @@ export default function POTemplate({ data, brand, settings }) {
       <NotesSection title="Terms & Conditions" content={data.terms_conditions} />
 
       <SignatureSection
-        leftSignatureLabel={`For ${settings?.company_name || 'Supernature'}`}
+        leftSignatureLabel={`For ${settings?.company_name || ''}`}
         rightSignatureLabel={`For ${brand?.name || 'Supplier'}`}
       />
     </PrintPage>

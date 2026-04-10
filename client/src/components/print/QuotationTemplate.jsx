@@ -88,7 +88,7 @@ export default function QuotationTemplate({ data, customer, settings }) {
       <NotesSection title="Remarks" content={data.remarks} />
 
       <SignatureSection
-        leftSignatureLabel={`For ${settings?.companyName || 'Supernature'}`}
+        leftSignatureLabel={`For ${settings?.companyName || ''}`}
         rightSignatureLabel="For Customer"
       />
     </PrintPage>
