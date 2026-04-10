@@ -14,9 +14,4 @@ async function _uploadFile({ file }: { file: File }): Promise<UploadResult> {
 }
 
 export const UploadFile = _uploadFile;
-
-export const InvokeLLM = (): Promise<{ success: boolean }> => Promise.resolve({ success: true });
-export const SendEmail = (): Promise<{ success: boolean }> => Promise.resolve({ success: true });
-export const GenerateImage = (): Promise<{ success: boolean; url: string }> => Promise.resolve({ success: true, url: '#' });
-export const ExtractDataFromUploadedFile = (): Promise<{ success: boolean; data: Record<string, unknown> }> => Promise.resolve({ success: true, data: {} });
-export const Core = { InvokeLLM, SendEmail, UploadFile, GenerateImage, ExtractDataFromUploadedFile };
+export const Core = { UploadFile };

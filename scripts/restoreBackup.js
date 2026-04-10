@@ -4,9 +4,58 @@ import { spawn } from 'child_process';
 import { createGunzip } from 'zlib';
 
 /**
+ * Validates that a readable stream starts with gzip magic bytes (0x1f 0x8b).
+ * Reads the first chunk, checks the header, then pushes it back so the stream
+ * is still fully readable by the caller.
+ *
+ * This preflight runs BEFORE any destructive DROP, so a corrupt or wrong file
+ * is rejected cleanly without touching the live database.
+ *
+ * @param {import('stream').Readable} stream
+ * @returns {Promise<void>} Resolves if valid gzip, rejects with a descriptive error if not.
+ */
+async function validateGzipHeader(stream) {
+  return new Promise((resolve, reject) => {
+    let settled = false;
+
+    const onData = (chunk) => {
+      if (settled) return;
+      settled = true;
+      stream.removeListener('data', onData);
+      stream.removeListener('error', onError);
+
+      if (chunk.length < 2 || chunk[0] !== 0x1f || chunk[1] !== 0x8b) {
+        const b0 = chunk[0] !== undefined ? `0x${chunk[0].toString(16).padStart(2, '0')}` : '(empty)';
+        const b1 = chunk[1] !== undefined ? `0x${chunk[1].toString(16).padStart(2, '0')}` : '(empty)';
+        reject(new Error(
+          `Invalid file: not a valid gzip archive. Expected magic bytes 0x1f 0x8b, got ${b0} ${b1}. ` +
+          'The database has not been modified.'
+        ));
+        return;
+      }
+
+      // Push the chunk back so the full stream is still readable downstream.
+      stream.unshift(chunk);
+      resolve();
+    };
+
+    const onError = (err) => {
+      if (settled) return;
+      settled = true;
+      stream.removeListener('data', onData);
+      reject(err);
+    };
+
+    stream.once('data', onData);
+    stream.once('error', onError);
+  });
+}
+
+/**
  * Restores the PostgreSQL database from a readable stream of a .sql.gz file.
  *
  * Strategy:
+ *   0. Preflight: Validate gzip magic bytes before any destructive work.
  *   1. Drop the public schema (all app tables) and recreate it — clears existing data.
  *   2. Pipe: sqlGzStream → gunzip → psql, loading all SQL statements from the dump.
  *
@@ -21,6 +70,12 @@ async function restoreBackup(sqlGzStream) {
   try {
     const dbUrl = process.env.DATABASE_URL;
     if (!dbUrl) throw new Error('DATABASE_URL environment variable is not set');
+
+    // Step 0: Preflight — validate gzip header before doing any destructive work.
+    // A corrupt, truncated, or wrong file will be rejected here; the DB is untouched.
+    console.log('[restore] Validating gzip header...');
+    await validateGzipHeader(sqlGzStream);
+    console.log('[restore] Gzip header valid — proceeding with restore.');
 
     // Step 1: Drop and recreate the public schema to clear all existing data.
     // The drizzle schema (migrations tracking) is separate and unaffected.

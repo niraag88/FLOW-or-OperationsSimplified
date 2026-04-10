@@ -77,7 +77,7 @@ function RestoreConfirmModal({ open, onClose, onConfirm, filename, isPending }: 
                 </p>
               )}
               <p className="text-gray-600">
-                After restore completes you will be logged out automatically and need to log back in.
+                After restore completes, a confirmation banner will appear. You will need to log out and log back in manually to continue.
               </p>
               <div>
                 <p className="text-gray-700 font-medium mb-1">Type <span className="font-mono text-red-700">RESTORE</span> to confirm:</p>
