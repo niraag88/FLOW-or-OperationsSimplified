@@ -191,7 +191,7 @@ export default function StockCountNew() {
                 <TableHead>Product Code</TableHead>
                 <TableHead>Product Name</TableHead>
                 <TableHead>Size</TableHead>
-                <TableHead className="w-32">Quantity</TableHead>
+                <TableHead className="w-32 text-right">Quantity</TableHead>
               </TableRow>
             </TableHeader>
             <TableBody>
@@ -201,14 +201,14 @@ export default function StockCountNew() {
                   <TableCell>{product.sku}</TableCell>
                   <TableCell>{product.name}</TableCell>
                   <TableCell>{product.size || '-'}</TableCell>
-                  <TableCell>
+                  <TableCell className="text-right">
                     <Input
                       type="number"
                       min="0"
                       max="9999"
                       value={quantities[product.id] || 0}
                       onChange={(e) => handleQuantityChange(product.id, e.target.value)}
-                      className="w-24"
+                      className="w-24 text-right ml-auto"
                       placeholder="0"
                       data-testid={`input-quantity-${product.id}`}
                     />
