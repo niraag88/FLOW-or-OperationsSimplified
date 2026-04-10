@@ -2,65 +2,78 @@
 
 import { spawn } from 'child_process';
 import { createGunzip } from 'zlib';
-import { Readable } from 'stream';
 
 /**
- * Collects all chunks from a readable stream into a single Buffer.
+ * Validates the first 2 bytes of a stream are gzip magic bytes (0x1f 0x8b).
+ * Uses paused-mode reading so no data is discarded. After validation, the
+ * 2 bytes are unshifted back so the full stream is intact for downstream piping.
+ * Runs BEFORE any destructive DROP SCHEMA — a bad file is rejected cleanly.
  * @param {import('stream').Readable} stream
- * @returns {Promise<Buffer>}
- */
-function bufferStream(stream) {
-  return new Promise((resolve, reject) => {
-    const chunks = [];
-    stream.on('data', (chunk) => chunks.push(chunk));
-    stream.on('error', reject);
-    stream.on('end', () => resolve(Buffer.concat(chunks)));
-  });
-}
-
-/**
- * Validates a Buffer is a complete, decompressible gzip archive.
- * Checks magic bytes, then does a dry-run gunzip to /dev/null so truncated
- * or corrupt archives are caught BEFORE the destructive DROP SCHEMA.
- * @param {Buffer} buf
  * @returns {Promise<void>}
  */
-function validateGzip(buf) {
-  if (buf.length < 2) {
-    return Promise.reject(new Error('Empty file: not a valid gzip archive. The database has not been modified.'));
-  }
-  if (buf[0] !== 0x1f || buf[1] !== 0x8b) {
-    const b0 = `0x${buf[0].toString(16).padStart(2, '0')}`;
-    const b1 = `0x${buf[1].toString(16).padStart(2, '0')}`;
-    return Promise.reject(new Error(
-      `Invalid file: not a valid gzip archive. Expected magic bytes 0x1f 0x8b, got ${b0} ${b1}. The database has not been modified.`
-    ));
-  }
+function validateGzipHeader(stream) {
+  stream.pause();
 
   return new Promise((resolve, reject) => {
-    const gunzip = createGunzip();
     let settled = false;
-    gunzip.on('error', (err) => {
+
+    const cleanup = () => {
+      stream.removeListener('readable', tryRead);
+      stream.removeListener('error', onError);
+      stream.removeListener('end', onEnd);
+    };
+
+    const tryRead = () => {
       if (settled) return;
+      const head = stream.read(2);
+      if (head === null) return;
       settled = true;
-      reject(new Error(`Corrupt gzip archive: ${err.message}. The database has not been modified.`));
-    });
-    gunzip.on('finish', () => {
-      if (settled) return;
-      settled = true;
+      cleanup();
+
+      if (head.length < 2 || head[0] !== 0x1f || head[1] !== 0x8b) {
+        const b0 = head[0] !== undefined ? `0x${head[0].toString(16).padStart(2, '0')}` : '(empty)';
+        const b1 = head[1] !== undefined ? `0x${head[1].toString(16).padStart(2, '0')}` : '(empty)';
+        reject(new Error(
+          `Invalid file: not a valid gzip archive. Expected magic bytes 0x1f 0x8b, got ${b0} ${b1}. The database has not been modified.`
+        ));
+        return;
+      }
+
+      stream.unshift(head);
       resolve();
-    });
-    Readable.from(buf).pipe(gunzip);
-    gunzip.resume(); // drain output to /dev/null; errors still propagate
+    };
+
+    const onError = (err) => {
+      if (settled) return;
+      settled = true;
+      cleanup();
+      reject(err);
+    };
+
+    const onEnd = () => {
+      if (settled) return;
+      settled = true;
+      cleanup();
+      reject(new Error('Empty file: stream ended before gzip header could be read. The database has not been modified.'));
+    };
+
+    stream.on('readable', tryRead);
+    stream.on('error', onError);
+    stream.on('end', onEnd);
+    tryRead();
   });
 }
 
 /**
  * Restores the PostgreSQL database from a readable stream of a .sql.gz file.
  *
- * Preflight: buffers the stream, validates magic bytes, and performs a full
- * dry-run gunzip decompression before issuing DROP SCHEMA. A corrupt,
- * truncated, or non-gzip file is rejected without touching the live database.
+ * Preflight: validates gzip magic bytes in paused-mode before DROP SCHEMA,
+ * so a wrong or empty file is rejected without touching the database.
+ * Corruption/truncation during actual decompression fails the restore after DROP,
+ * with the error surfaced to the caller via the returned result object.
+ *
+ * The `drizzle` schema (migration tracking) is in a separate schema and is
+ * NOT affected by DROP SCHEMA public CASCADE.
  *
  * @param {import('stream').Readable} sqlGzStream
  * @returns {Promise<{ success: boolean, error?: string, durationMs: number }>}
@@ -72,29 +85,21 @@ async function restoreBackup(sqlGzStream) {
     const dbUrl = process.env.DATABASE_URL;
     if (!dbUrl) throw new Error('DATABASE_URL environment variable is not set');
 
-    // Buffer the entire compressed file so we can validate before DROP.
-    console.log('[restore] Buffering upload...');
-    const buf = await bufferStream(sqlGzStream);
-    console.log(`[restore] Buffered ${buf.length} bytes. Validating gzip integrity...`);
+    console.log('[restore] Validating gzip header...');
+    await validateGzipHeader(sqlGzStream);
+    console.log('[restore] Gzip header valid — proceeding with restore.');
 
-    // Full gzip validation: magic bytes + complete dry-run decompression.
-    // No DROP issued until this passes.
-    await validateGzip(buf);
-    console.log('[restore] Gzip validation passed — proceeding with restore.');
-
-    // Drop and recreate public schema (drizzle schema is separate and unaffected).
     console.log('[restore] Dropping public schema...');
     await runPsql(dbUrl, ['-v', 'ON_ERROR_STOP=1', '--command', 'DROP SCHEMA IF EXISTS public CASCADE; CREATE SCHEMA public;']);
     console.log('[restore] Public schema cleared.');
 
-    // Stream the validated buffer through gunzip into psql.
     console.log('[restore] Starting database restore from dump...');
     const psql = spawn('psql', [dbUrl, '--no-password', '-v', 'ON_ERROR_STOP=1'], {
       stdio: ['pipe', 'pipe', 'pipe'],
     });
 
     const gunzip = createGunzip();
-    Readable.from(buf).pipe(gunzip).pipe(psql.stdin);
+    sqlGzStream.pipe(gunzip).pipe(psql.stdin);
 
     let stderr = '';
     let stdout = '';
@@ -104,6 +109,11 @@ async function restoreBackup(sqlGzStream) {
     gunzip.on('error', (err) => {
       console.error('[restore] Gunzip error:', err.message);
       psql.stdin.destroy(err);
+    });
+
+    sqlGzStream.on('error', (err) => {
+      console.error('[restore] Stream error:', err.message);
+      gunzip.destroy(err);
     });
 
     const exitCode = await new Promise((resolve) => { psql.on('close', resolve); });
