@@ -8,6 +8,7 @@ import { Skeleton } from "@/components/ui/skeleton";
 import { Eye, Edit2, Download, Paperclip, FileText, ExternalLink } from "lucide-react";
 import { formatDate } from "@/utils/dateUtils";
 import { formatCurrency } from "@/utils/currency";
+import type { DeliveryOrder } from "@shared/schema";
 import { useToast } from "@/hooks/use-toast";
 import { exportDeliveryOrderToXLSX } from "../utils/export";
 
@@ -25,7 +26,7 @@ const STATUS_LABELS = {
   cancelled: "CANCELLED",
 };
 
-function Section({ title, children }: any) {
+function Section({ title, children }: { title: string; children: React.ReactNode }) {
   return (
     <div>
       <h3 className="text-sm font-semibold text-gray-500 uppercase tracking-wide mb-3">{title}</h3>
@@ -34,7 +35,7 @@ function Section({ title, children }: any) {
   );
 }
 
-function DocLink({ label, scanKey, onView }: any) {
+function DocLink({ label, scanKey, onView }: { label: string; scanKey: string; onView: (key: string) => void }) {
   return (
     <button
       onClick={() => onView(scanKey)}
@@ -47,7 +48,15 @@ function DocLink({ label, scanKey, onView }: any) {
   );
 }
 
-export default function DOQuickViewModal({ doId, open, onClose, canEdit, onEdit }: any) {
+interface DOQuickViewModalProps {
+  doId: number | null;
+  open: boolean;
+  onClose: () => void;
+  canEdit: boolean;
+  onEdit: (doOrder: DeliveryOrder) => void;
+}
+
+export default function DOQuickViewModal({ doId, open, onClose, canEdit, onEdit }: DOQuickViewModalProps) {
   const [detail, setDetail] = useState<any>(null);
   const [loading, setLoading] = useState(false);
   const { toast } = useToast();

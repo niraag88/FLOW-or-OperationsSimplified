@@ -2,7 +2,12 @@
 import React from 'react';
 import { format, isValid, parseISO } from 'date-fns';
 
-export default function InvoiceTemplate({ data, customer, settings }: any) {
+interface InvoiceTemplateProps {
+  data: Record<string, any>;
+  customer: Record<string, any>;
+  settings: Record<string, any>;
+}
+export default function InvoiceTemplate({ data, customer, settings }: InvoiceTemplateProps) {
   const formatDate = (dateString: any) => {
     if (!dateString) return '';
     try {

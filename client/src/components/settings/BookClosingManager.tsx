@@ -21,7 +21,11 @@ import { Lock, Unlock, AlertTriangle, PlusCircle, Download } from 'lucide-react'
 import { format, getYear, isValid, parseISO } from 'date-fns';
 import { useToast } from "@/hooks/use-toast";
 
-export default function BookClosingManager({ currentUser }: any) {
+interface BookClosingManagerProps {
+  currentUser?: { email?: string; role?: string } | null;
+}
+
+export default function BookClosingManager({ currentUser }: BookClosingManagerProps) {
   const [books, setBooks] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
   const [newYear, setNewYear] = useState<any>(getYear(new Date()));

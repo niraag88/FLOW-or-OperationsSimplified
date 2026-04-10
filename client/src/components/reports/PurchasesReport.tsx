@@ -31,7 +31,7 @@ function getPeriodBounds(period: any, customFrom: any, customTo: any) {
   return null;
 }
 
-function SummaryTile({ label, value, sub = null, color }: any) {
+function SummaryTile({ label, value, sub = null, color }: { label: string; value: string | number; sub?: string | null; color?: string }) {
   return (
     <Card className="p-4">
       <p className="text-sm text-gray-500">{label}</p>
@@ -41,7 +41,14 @@ function SummaryTile({ label, value, sub = null, color }: any) {
   );
 }
 
-export default function PurchasesReport({ purchaseOrders, suppliers, companySettings, canExport }: any) {
+interface PurchasesReportProps {
+  purchaseOrders: any[];
+  suppliers: any[];
+  companySettings: Record<string, unknown> | null;
+  canExport: boolean;
+}
+
+export default function PurchasesReport({ purchaseOrders, suppliers, companySettings, canExport }: PurchasesReportProps) {
   const [period, setPeriod] = useState<any>("all");
   const [customFrom, setCustomFrom] = useState("");
   const [customTo, setCustomTo] = useState("");

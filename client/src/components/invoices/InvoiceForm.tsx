@@ -14,10 +14,11 @@ import { Textarea } from "@/components/ui/textarea";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Switch } from "@/components/ui/switch";
 import { Plus, Trash2 } from "lucide-react";
-import { Invoice } from "@/api/entities";
-import { Product } from "@/api/entities";
-import { Customer } from "@/api/entities";
-import { Brand } from "@/api/entities";
+import { Invoice as InvoiceEntity } from "@/api/entities";
+import { Product as ProductEntity } from "@/api/entities";
+import { Customer as CustomerEntity } from "@/api/entities";
+import { Brand as BrandEntity } from "@/api/entities";
+import type { Invoice } from "@shared/schema";
 import { Card } from "@/components/ui/card";
 import { useToast } from "@/hooks/use-toast";
 
@@ -41,7 +42,16 @@ const getInitialFormData = (invoiceNumber = '') => ({
 });
 
 
-export default function InvoiceForm({ open, onClose, editingInvoice, currentUser, canOverride, onSuccess }: any) {
+interface InvoiceFormProps {
+  open: boolean;
+  onClose: () => void;
+  editingInvoice?: Record<string, any> | null;
+  currentUser?: { email?: string; role?: string } | null;
+  canOverride?: boolean;
+  onSuccess?: () => void;
+}
+
+export default function InvoiceForm({ open, onClose, editingInvoice, currentUser, canOverride, onSuccess }: InvoiceFormProps) {
   const [loading, setLoading] = useState(false);
   const [customers, setCustomers] = useState<any[]>([]);
   const [products, setProducts] = useState<any[]>([]);
@@ -64,9 +74,9 @@ export default function InvoiceForm({ open, onClose, editingInvoice, currentUser
         const needsNextNumber = isNew || isNewFromDocument;
 
         const settled = await Promise.allSettled([
-          Customer.list(),
-          Product.list(),
-          Brand.list(),
+          CustomerEntity.list(),
+          ProductEntity.list(),
+          BrandEntity.list(),
           needsNextNumber
             ? fetch('/api/invoices/next-number', { credentials: 'include' })
             : Promise.resolve(null),
@@ -332,7 +342,7 @@ export default function InvoiceForm({ open, onClose, editingInvoice, currentUser
       const isEditingExisting = editingInvoice && editingInvoice.id;
       
       if (isEditingExisting) {
-        result = await Invoice.update(editingInvoice.id, invoiceData);
+        result = await InvoiceEntity.update(editingInvoice.id, invoiceData);
         
         toast({
           title: "Success",
@@ -340,7 +350,7 @@ export default function InvoiceForm({ open, onClose, editingInvoice, currentUser
           variant: "default",
         });
       } else {
-        result = await Invoice.create(invoiceData);
+        result = await InvoiceEntity.create(invoiceData);
         
         toast({
           title: "Success",
@@ -349,7 +359,7 @@ export default function InvoiceForm({ open, onClose, editingInvoice, currentUser
         });
       }
       
-      onSuccess();
+      onSuccess?.();
       onClose();
     } catch (error: any) {
       console.error("Error saving invoice:", error);

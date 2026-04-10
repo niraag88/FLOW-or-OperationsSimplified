@@ -1031,7 +1031,7 @@ export const exportPODetailToXLSX = async (poId: any, poNumber: any) => {
 
 /* ── Statement of Account XLSX export ──────────────────────────────────── */
 
-export const exportStatementToXLSX = ({ type, entity, companySettings, records, dateFrom, dateTo, statusFilter }: any) => {
+export const exportStatementToXLSX = ({ type, entity, companySettings, records, dateFrom, dateTo, statusFilter }: { type: string; entity: Record<string, any> | null; companySettings: Record<string, any> | null; records: Record<string, any>[]; dateFrom: string; dateTo: string; statusFilter: string }) => {
   const fmtAmt = (v: any) => new Intl.NumberFormat("en-US", { minimumFractionDigits: 2, maximumFractionDigits: 2 }).format(v || 0);
   const fmtD   = (val: any) => {
     if (!val) return "—";

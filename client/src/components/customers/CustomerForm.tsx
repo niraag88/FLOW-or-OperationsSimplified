@@ -12,8 +12,17 @@ import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Switch } from "@/components/ui/switch";
-import { Customer } from "@/api/entities";
+import { Customer as CustomerEntity } from "@/api/entities";
+import type { Customer } from "@shared/schema";
 import { logAuditAction } from "../utils/auditLogger";
+
+interface CustomerFormProps {
+  open: boolean;
+  onClose: () => void;
+  editingCustomer?: Record<string, any> | null;
+  currentUser?: { email?: string; role?: string } | null;
+  onSuccess?: () => void;
+}
 
 // ISO 3166-1 alpha-2 country codes (common ones)
 const COUNTRIES = [
@@ -46,7 +55,7 @@ const COUNTRIES = [
   { code: 'KR', name: 'South Korea' }
 ].sort((a: any, b: any) => a.name.localeCompare(b.name));
 
-export default function CustomerForm({ open, onClose, editingCustomer, currentUser, onSuccess }: any) {
+export default function CustomerForm({ open, onClose, editingCustomer, currentUser, onSuccess }: CustomerFormProps) {
   const [loading, setLoading] = useState(false);
   const [formData, setFormData] = useState({
     name: "",
@@ -68,10 +77,10 @@ export default function CustomerForm({ open, onClose, editingCustomer, currentUs
   useEffect(() => {
     if (editingCustomer) {
       setFormData({
-        ...editingCustomer,
+        ...(editingCustomer as any),
         vat_treatment_default: editingCustomer.vat_treatment_default || "", // Convert null to empty string for UI
         credit_limit: editingCustomer.credit_limit || 0
-      });
+      } as typeof formData);
     } else {
       setFormData({
         name: "",
@@ -133,10 +142,10 @@ export default function CustomerForm({ open, onClose, editingCustomer, currentUs
         const oldVatTreatment = editingCustomer.vat_treatment_default;
         const newVatTreatment = customerData.vat_treatment_default;
         
-        await Customer.update(editingCustomer.id, customerData);
+        await CustomerEntity.update(editingCustomer.id, customerData);
         
         if (oldVatTreatment !== newVatTreatment) {
-          await logAuditAction("Customer", editingCustomer.id, "vat_treatment_change", currentUser.email, {
+          await logAuditAction("Customer", editingCustomer.id, "vat_treatment_change", currentUser?.email || '', {
             vat_treatment_default: {
               from: oldVatTreatment,
               to: newVatTreatment
@@ -144,7 +153,7 @@ export default function CustomerForm({ open, onClose, editingCustomer, currentUs
           });
         }
       } else {
-        const newCustomer = await Customer.create(customerData);
+        const newCustomer = await CustomerEntity.create(customerData);
         await logAuditAction("Customer", (newCustomer as any).id, "create", (currentUser as any)?.email || '', {
           name: customerData.name,
           country_code: customerData.country_code,
@@ -152,7 +161,7 @@ export default function CustomerForm({ open, onClose, editingCustomer, currentUs
         });
       }
       
-      onSuccess();
+      onSuccess?.();
       onClose();
     } catch (error: any) {
       console.error("Error saving customer:", error);

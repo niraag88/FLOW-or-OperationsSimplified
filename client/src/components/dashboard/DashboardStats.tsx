@@ -45,7 +45,11 @@ const computeChange = (items: any) => {
   return { label: "No change", type: "neutral" };
 };
 
-export default function DashboardStats({ data }: any) {
+interface DashboardStatsProps {
+  data: Record<string, any>;
+}
+
+export default function DashboardStats({ data }: DashboardStatsProps) {
   const stats = [
     {
       title: "Products",

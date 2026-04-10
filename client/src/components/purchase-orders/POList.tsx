@@ -12,8 +12,20 @@ import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover
 import MarkPOPaidDialog from "./MarkPOPaidDialog";
 import POActionsDropdown from "./POActionsDropdown";
 import { formatCurrency } from "@/utils/currency";
+import type { PurchaseOrder } from "@shared/schema";
 
-export default function POList({ purchaseOrders, totalCount, loading, canEdit, currentUser, onEdit, onRefresh, onQuickView }: any) {
+interface POListProps {
+  purchaseOrders: PurchaseOrder[];
+  totalCount: number;
+  loading: boolean;
+  canEdit: boolean;
+  currentUser?: { email?: string; role?: string } | null;
+  onEdit: (po: Record<string, any>) => void;
+  onRefresh: () => void;
+  onQuickView: (id: number) => void;
+}
+
+export default function POList({ purchaseOrders, totalCount, loading, canEdit, currentUser, onEdit, onRefresh, onQuickView }: POListProps) {
   const [showEditPaymentDialog, setShowEditPaymentDialog] = useState(false);
   const [editPaymentPO, setEditPaymentPO] = useState<any>(null);
 

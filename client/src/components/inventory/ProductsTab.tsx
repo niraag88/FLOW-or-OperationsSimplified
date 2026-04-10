@@ -15,6 +15,33 @@ import { Product, RecycleBin, AuditLog, User } from "@/api/entities";
 import { formatCurrency } from "@/utils/currency";
 import { logAuditAction } from "../utils/auditLogger";
 import SimpleConfirmDialog from "../common/SimpleConfirmDialog";
+import type { Product as ProductType } from "@shared/schema";
+
+interface ProductsTabProps {
+  products: ProductType[];
+  paginatedProducts: ProductType[];
+  totalProducts: number;
+  loading: boolean;
+  canEdit: boolean;
+  canDelete: boolean;
+  onRefresh: () => void;
+  searchTerm: string;
+  setSearchTerm: React.Dispatch<React.SetStateAction<string>>;
+  selectedBrands: string[];
+  setSelectedBrands: React.Dispatch<React.SetStateAction<string[]>>;
+  selectedSizes: string[];
+  setSelectedSizes: React.Dispatch<React.SetStateAction<string[]>>;
+  uniqueBrands: string[];
+  uniqueSizes: string[];
+  resetPagination: () => void;
+  currentPage: number;
+  setCurrentPage: React.Dispatch<React.SetStateAction<number>>;
+  itemsPerPage: number;
+  setItemsPerPage: React.Dispatch<React.SetStateAction<number>>;
+  totalPages: number;
+  startIndex: number;
+  endIndex: number;
+}
 
 export default function ProductsTab({ 
   products, 
@@ -40,7 +67,7 @@ export default function ProductsTab({
   totalPages,
   startIndex,
   endIndex
-}: any) {
+}: ProductsTabProps) {
   const navigate = useNavigate();
 
   // State variables for SimpleConfirmDialog

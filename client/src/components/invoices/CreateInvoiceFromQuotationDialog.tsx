@@ -14,7 +14,13 @@ import { Customer } from '@/api/entities';
 import { Quotation } from '@/api/entities';
 import { useToast } from '@/hooks/use-toast';
 
-export default function CreateInvoiceFromQuotationDialog({ open, onClose, onQuotationSelected }: any) {
+interface CreateInvoiceFromQuotationDialogProps {
+  open: boolean;
+  onClose: () => void;
+  onQuotationSelected: (quotation: Record<string, unknown>) => void;
+}
+
+export default function CreateInvoiceFromQuotationDialog({ open, onClose, onQuotationSelected }: CreateInvoiceFromQuotationDialogProps) {
   const [loading, setLoading] = useState(false);
   const [submittedQuotations, setSubmittedQuotations] = useState<any[]>([]);
   const [selectedQuotationId, setSelectedQuotationId] = useState('');

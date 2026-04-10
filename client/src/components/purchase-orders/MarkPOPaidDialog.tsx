@@ -14,8 +14,16 @@ import { CheckCircle, Pencil, AlertTriangle } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import { formatCurrency } from "@/utils/currency";
 import { computeReconciliation } from "@/utils/poReconciliation";
+import type { PurchaseOrder } from "@shared/schema";
 
-export default function MarkPOPaidDialog({ open, onClose, po, onSuccess }: any) {
+interface MarkPOPaidDialogProps {
+  open: boolean;
+  onClose: () => void;
+  po: Record<string, any> | null;
+  onSuccess: () => void;
+}
+
+export default function MarkPOPaidDialog({ open, onClose, po, onSuccess }: MarkPOPaidDialogProps) {
   const { toast } = useToast();
   const [loading, setLoading] = useState(false);
   const [paymentMadeDate, setPaymentMadeDate] = useState("");

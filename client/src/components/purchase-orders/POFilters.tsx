@@ -9,7 +9,13 @@ import { Brand } from "@/api/entities"; // Changed from Supplier
 import { format } from "date-fns";
 import { cn } from "@/lib/utils";
 
-export default function POFilters({ filters, onFiltersChange, onFilterChange }: any) {
+interface POFiltersProps {
+  filters: Record<string, string>;
+  onFiltersChange: React.Dispatch<React.SetStateAction<Record<string, string>>>;
+  onFilterChange?: () => void;
+}
+
+export default function POFilters({ filters, onFiltersChange, onFilterChange }: POFiltersProps) {
   const [brands, setBrands] = useState<any[]>([]); // Changed from suppliers
   const [dateRangeOpen, setDateRangeOpen] = useState(false);
   const [customStartDate, setCustomStartDate] = useState<any>(null);

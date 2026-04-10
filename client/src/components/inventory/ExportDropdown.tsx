@@ -11,6 +11,22 @@ import { Download, Eye } from "lucide-react";
 import { exportToXLSX } from "../utils/export";
 import { formatCurrency } from "@/utils/currency";
 import { format } from "date-fns";
+import type { Product } from "@shared/schema";
+
+interface ExportDropdownProps {
+  products: Product[];
+  totalProducts: number;
+  activeTab: string;
+  stockSubTab: string;
+  stockMovements: unknown[];
+  lowStockProducts: Product[];
+  outOfStockProducts: Product[];
+  searchTerm: string;
+  selectedBrands: string[];
+  selectedSizes: string[];
+  lowStockThreshold: number;
+  fxRates: Record<string, number>;
+}
 
 export default function ExportDropdown({
   products,
@@ -25,7 +41,7 @@ export default function ExportDropdown({
   selectedSizes,
   lowStockThreshold,
   fxRates,
-}: any) {
+}: ExportDropdownProps) {
   const [isExporting, setIsExporting] = useState(false);
 
   // Fetch ALL matching products from the server (respects active filters, ignores pagination)

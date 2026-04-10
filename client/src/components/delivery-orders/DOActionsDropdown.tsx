@@ -13,10 +13,19 @@ import { useToast } from "@/hooks/use-toast";
 import { exportDeliveryOrderToXLSX } from "../utils/export";
 import { format, isValid, parseISO } from 'date-fns';
 import SimpleConfirmDialog from "../common/SimpleConfirmDialog";
-import { DeliveryOrder } from "@/api/entities";
+import { DeliveryOrder as DOEntity } from "@/api/entities";
 import UploadFileDialog from "../common/UploadFileDialog";
+import type { DeliveryOrder } from "@shared/schema";
 
-export default function DOActionsDropdown({ doOrder, canEdit, onEdit, onRefresh, currentUser }: any) {
+interface DOActionsDropdownProps {
+  doOrder: Record<string, any>;
+  canEdit: boolean;
+  onEdit: (doOrder: Record<string, any>) => void;
+  onRefresh: () => void;
+  currentUser?: { email?: string; role?: string } | null;
+}
+
+export default function DOActionsDropdown({ doOrder, canEdit, onEdit, onRefresh, currentUser }: DOActionsDropdownProps) {
   const { toast } = useToast();
   const [showDeleteDialog, setShowDeleteDialog] = useState(false);
   const [showUploadDialog, setShowUploadDialog] = useState(false);
@@ -50,7 +59,7 @@ export default function DOActionsDropdown({ doOrder, canEdit, onEdit, onRefresh,
 
   const handleDelete = async () => {
     try {
-      await DeliveryOrder.delete(doOrder.id);
+      await DOEntity.delete(doOrder.id);
       toast({
         title: 'Delivery Order Deleted',
         description: `${doOrder.do_number} has been moved to the recycle bin.`
@@ -130,7 +139,7 @@ export default function DOActionsDropdown({ doOrder, canEdit, onEdit, onRefresh,
 
   const hasScanKey = !!(doOrder.scanKey || doOrder.scan_key);
   const doNumber = doOrder.do_number || doOrder.orderNumber || `do-${doOrder.id}`;
-  const canDelete = ['Admin', 'Manager'].includes(currentUser?.role);
+  const canDelete = ['Admin', 'Manager'].includes(currentUser?.role ?? '');
 
   return (
     <>

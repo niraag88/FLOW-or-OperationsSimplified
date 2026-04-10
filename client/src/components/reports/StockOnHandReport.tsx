@@ -35,7 +35,11 @@ const getStatus = (qty: any) => {
   return 'In Stock';
 };
 
-export default function StockOnHandReport({ products }: any) {
+interface StockOnHandReportProps {
+  products: unknown[];
+}
+
+export default function StockOnHandReport({ products }: StockOnHandReportProps) {
   const [searchTerm, setSearchTerm] = useState("");
   const [selectedBrand, setSelectedBrand] = useState<any>("all");
   const [selectedStatus, setSelectedStatus] = useState<any>("all");

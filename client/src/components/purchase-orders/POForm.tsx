@@ -20,9 +20,10 @@ import { Textarea } from "@/components/ui/textarea";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Plus, Trash2, PackageCheck, AlertTriangle, Paperclip, FileText, ExternalLink, ChevronDown, ChevronRight } from "lucide-react";
-import { Brand } from "@/api/entities";
-import { Product } from "@/api/entities";
-import { PurchaseOrder } from "@/api/entities";
+import { Brand as BrandEntity } from "@/api/entities";
+import { Product as ProductEntity } from "@/api/entities";
+import { PurchaseOrder as POEntity } from "@/api/entities";
+import type { PurchaseOrder } from "@shared/schema";
 import { formatDate } from "@/utils/dateUtils";
 import { getRateToAed, formatCurrency, SUPPORTED_CURRENCIES } from "@/utils/currency";
 import { computeReconciliation } from "@/utils/poReconciliation";
@@ -30,7 +31,15 @@ import { useToast } from "@/hooks/use-toast";
 import { queryClient } from "@/lib/queryClient";
 import { format } from "date-fns";
 
-export default function POForm({ open, onClose, editingPO, currentUser, onSuccess }: any) {
+interface POFormProps {
+  open: boolean;
+  onClose: () => void;
+  editingPO?: Record<string, any> | null;
+  currentUser?: { email?: string; role?: string } | null;
+  onSuccess?: () => void;
+}
+
+export default function POForm({ open, onClose, editingPO, currentUser, onSuccess }: POFormProps) {
   const [loading, setLoading] = useState(false);
   const [brands, setBrands] = useState<any[]>([]);
   const [products, setProducts] = useState<any[]>([]);
@@ -101,7 +110,7 @@ export default function POForm({ open, onClose, editingPO, currentUser, onSucces
   const handleConfirmPoDocDelete = async () => {
     setConfirmPoDocDeleteOpen(false);
     try {
-      const res = await fetch(`/api/purchase-orders/${editingPO.id}/scan-key`, {
+      const res = await fetch(`/api/purchase-orders/${editingPO?.id}/scan-key`, {
         method: 'DELETE',
         credentials: 'include',
       });
@@ -120,8 +129,8 @@ export default function POForm({ open, onClose, editingPO, currentUser, onSucces
   const loadInitialData = async () => {
     try {
       const settled = await Promise.allSettled([
-        Brand.list(),
-        Product.list(),
+        BrandEntity.list(),
+        ProductEntity.list(),
         fetch('/api/company-settings', { credentials: 'include' }),
         editingPO ? Promise.resolve(null) : fetch('/api/purchase-orders/next-number', { credentials: 'include' })
       ]);
@@ -336,12 +345,12 @@ export default function POForm({ open, onClose, editingPO, currentUser, onSucces
       };
 
       if (editingPO) {
-        await PurchaseOrder.update(editingPO.id, submitData);
+        await POEntity.update(editingPO.id, submitData);
       } else {
-        await PurchaseOrder.create(submitData);
+        await POEntity.create(submitData);
       }
       
-      onSuccess();
+      onSuccess?.();
       onClose();
       resetForm();
     } catch (error: any) {

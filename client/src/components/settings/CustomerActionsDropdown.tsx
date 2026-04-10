@@ -9,16 +9,23 @@ import {
 import { Button } from "@/components/ui/button";
 import { MoreHorizontal, Edit2, Trash2 } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
-import { Customer } from "@/api/entities";
+import { Customer as CustomerEntity } from "@/api/entities";
 import SimpleConfirmDialog from "../common/SimpleConfirmDialog";
+import type { Customer } from "@shared/schema";
 
-export default function CustomerActionsDropdown({ customer, onEdit, onRefresh }: any) {
+interface CustomerActionsDropdownProps {
+  customer: Customer;
+  onEdit: (customer: Customer) => void;
+  onRefresh: () => void;
+}
+
+export default function CustomerActionsDropdown({ customer, onEdit, onRefresh }: CustomerActionsDropdownProps) {
   const { toast } = useToast();
   const [showDeleteDialog, setShowDeleteDialog] = useState(false);
 
   const handleDelete = async () => {
     try {
-      await Customer.delete(customer.id);
+      await CustomerEntity.delete(customer.id);
 
       toast({
         title: 'Customer Deleted',

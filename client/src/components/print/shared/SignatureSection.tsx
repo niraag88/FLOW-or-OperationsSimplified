@@ -1,7 +1,11 @@
+interface SignatureSectionProps {
+  leftSignatureLabel: string;
+  rightSignatureLabel: string;
+}
 export default function SignatureSection({
   leftSignatureLabel,
   rightSignatureLabel
-}: any) {
+}: SignatureSectionProps) {
   return (
     <section className="mt-auto pt-8 border-t print-signature">
       <div className="grid grid-cols-2 gap-8">

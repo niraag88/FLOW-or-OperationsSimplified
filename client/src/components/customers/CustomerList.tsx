@@ -5,8 +5,18 @@ import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Users, Edit2, Globe, CreditCard } from "lucide-react";
 import { Skeleton } from "@/components/ui/skeleton";
+import type { Customer } from "@shared/schema";
 
-export default function CustomerList({ customers, loading, canEdit, onEdit, currentUser, onRefresh }: any) {
+interface CustomerListProps {
+  customers: Customer[];
+  loading: boolean;
+  canEdit: boolean;
+  onEdit: (customer: Customer) => void;
+  currentUser?: { email: string } | null;
+  onRefresh: () => void;
+}
+
+export default function CustomerList({ customers, loading, canEdit, onEdit, currentUser, onRefresh }: CustomerListProps) {
   
   const getVatTreatmentBadge = (customer: any) => {
     const vatTreatment = customer.vat_treatment_default;

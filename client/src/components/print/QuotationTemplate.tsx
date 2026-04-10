@@ -7,7 +7,12 @@ import TotalsSummary from './shared/TotalsSummary';
 import NotesSection from './shared/NotesSection';
 import SignatureSection from './shared/SignatureSection';
 
-export default function QuotationTemplate({ data, customer, settings }: any) {
+interface QuotationTemplateProps {
+  data: Record<string, any>;
+  customer: Record<string, any>;
+  settings: Record<string, any>;
+}
+export default function QuotationTemplate({ data, customer, settings }: QuotationTemplateProps) {
   const formatDate = (dateString: any) => {
     if (!dateString) return '';
     try {

@@ -10,8 +10,21 @@ import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import InvoiceActionsDropdown from "./InvoiceActionsDropdown";
 import MarkPaidDialog from "./MarkPaidDialog";
+import type { Invoice } from "@shared/schema";
 
-export default function InvoiceList({ invoices, totalCount, loading, canEdit, canOverride, currentUser, onEdit, onRefresh, onQuickView }: any) {
+interface InvoiceListProps {
+  invoices: Invoice[];
+  totalCount: number;
+  loading: boolean;
+  canEdit: boolean;
+  canOverride: boolean;
+  currentUser?: { email?: string; role?: string } | null;
+  onEdit: (invoice: Record<string, any>) => void;
+  onRefresh: () => void;
+  onQuickView: (id: number) => void;
+}
+
+export default function InvoiceList({ invoices, totalCount, loading, canEdit, canOverride, currentUser, onEdit, onRefresh, onQuickView }: InvoiceListProps) {
   const [showEditPaymentDialog, setShowEditPaymentDialog] = useState(false);
   const [editPaymentInvoice, setEditPaymentInvoice] = useState<any>(null);
 

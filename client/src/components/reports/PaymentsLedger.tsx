@@ -23,14 +23,14 @@ function fmtDate(val: any) {
   }
 }
 
-function PaymentStatusBadge({ status }: any) {
+function PaymentStatusBadge({ status }: { status: string }) {
   if (status === "paid") {
     return <Badge className="bg-green-100 text-green-800 border-green-300 font-medium text-xs">Paid</Badge>;
   }
   return <Badge className="bg-amber-100 text-amber-800 border-amber-300 font-medium text-xs">Outstanding</Badge>;
 }
 
-function SummaryTiles({ records, label }: any) {
+function SummaryTiles({ records, label }: { records: any[]; label: string }) {
   const totals = useMemo(() => {
     const byCurrency: Record<string, any> = {};
     let totalAed = 0;
@@ -111,7 +111,7 @@ function SummaryTiles({ records, label }: any) {
   );
 }
 
-function CollapsibleSection({ title, icon: Icon, iconColor, children, defaultOpen = false }: any) {
+function CollapsibleSection({ title, icon: Icon, iconColor, children, defaultOpen = false }: { title: string; icon: React.ElementType; iconColor: string; children: React.ReactNode; defaultOpen?: boolean }) {
   const [open, setOpen] = useState(defaultOpen);
 
   return (
@@ -141,7 +141,7 @@ function CollapsibleSection({ title, icon: Icon, iconColor, children, defaultOpe
   );
 }
 
-function LedgerFilters({ paymentFilter, setPaymentFilter, dateFrom, setDateFrom, dateTo, setDateTo, search, setSearch, searchPlaceholder }: any) {
+function LedgerFilters({ paymentFilter, setPaymentFilter, dateFrom, setDateFrom, dateTo, setDateTo, search, setSearch, searchPlaceholder }: { paymentFilter: string; setPaymentFilter: (v: string) => void; dateFrom: string; setDateFrom: (v: string) => void; dateTo: string; setDateTo: (v: string) => void; search: string; setSearch: (v: string) => void; searchPlaceholder: string }) {
   return (
     <div className="flex flex-wrap gap-3 flex-1">
       <Select value={paymentFilter} onValueChange={setPaymentFilter}>
@@ -198,7 +198,7 @@ function LedgerFilters({ paymentFilter, setPaymentFilter, dateFrom, setDateFrom,
   );
 }
 
-function SalesPaymentsSection({ invoices, companySettings, canExport }: any) {
+function SalesPaymentsSection({ invoices, companySettings, canExport }: { invoices: Record<string, any>[]; companySettings: Record<string, any> | null; canExport: boolean }) {
   const [paymentFilter, setPaymentFilter] = useState<any>("all");
   const [dateFrom, setDateFrom] = useState("");
   const [dateTo, setDateTo] = useState("");
@@ -328,7 +328,7 @@ function SalesPaymentsSection({ invoices, companySettings, canExport }: any) {
   );
 }
 
-function PurchasesPaymentsSection({ purchaseOrders, suppliers, companySettings, canExport }: any) {
+function PurchasesPaymentsSection({ purchaseOrders, suppliers, companySettings, canExport }: { purchaseOrders: Record<string, any>[]; suppliers: Record<string, any>[]; companySettings: Record<string, any> | null; canExport: boolean }) {
   const [paymentFilter, setPaymentFilter] = useState<any>("all");
   const [dateFrom, setDateFrom] = useState("");
   const [dateTo, setDateTo] = useState("");
@@ -480,7 +480,15 @@ function PurchasesPaymentsSection({ purchaseOrders, suppliers, companySettings, 
   );
 }
 
-export default function PaymentsLedger({ invoices, purchaseOrders, suppliers, companySettings, canExport }: any) {
+interface PaymentsLedgerProps {
+  invoices: any[];
+  purchaseOrders: any[];
+  suppliers: any[];
+  companySettings: Record<string, any> | null;
+  canExport: boolean;
+}
+
+export default function PaymentsLedger({ invoices, purchaseOrders, suppliers, companySettings, canExport }: PaymentsLedgerProps) {
   return (
     <div className="space-y-4">
       <CollapsibleSection

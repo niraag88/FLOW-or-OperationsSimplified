@@ -1,4 +1,5 @@
 import React, { useState, useEffect } from "react";
+import type { Product } from "@shared/schema";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Badge } from "@/components/ui/badge";
@@ -12,7 +13,16 @@ import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover
 import { Checkbox } from "@/components/ui/checkbox";
 import { format } from "date-fns";
 
-export default function StockTab({ products, loading, onStockSubTabChange, canEdit, currentUser, onRefresh }: any) {
+interface StockTabProps {
+  products: Product[];
+  loading: boolean;
+  onStockSubTabChange: (tab: string, ...args: any[]) => void;
+  canEdit: boolean;
+  currentUser?: { email?: string; role?: string } | null;
+  onRefresh: () => void;
+}
+
+export default function StockTab({ products, loading, onStockSubTabChange, canEdit, currentUser, onRefresh }: StockTabProps) {
   const [stockData, setStockData] = useState<any>(null);
   const [stockMovements, setStockMovements] = useState<any[]>([]);
   const [loadingStock, setLoadingStock] = useState(true);
@@ -307,14 +317,22 @@ export default function StockTab({ products, loading, onStockSubTabChange, canEd
   };
 
   // Reusable pagination controls component
-  const PaginationControls = ({ paginationData, currentPage, setPage, perPage, setPerPage, type, itemName }: any) => {
+  const PaginationControls = ({ paginationData, currentPage, setPage, perPage, setPerPage, type, itemName }: {
+    paginationData: { totalItems: number; totalPages: number; startIndex?: number; endIndex?: number };
+    currentPage: number;
+    setPage: React.Dispatch<React.SetStateAction<number>>;
+    perPage: number;
+    setPerPage: React.Dispatch<React.SetStateAction<number>>;
+    type: string;
+    itemName: string;
+  }) => {
     if (paginationData.totalItems === 0) return null;
 
     return (
       <div className="flex items-center justify-between mt-6 pt-4 border-t">
         <div className="flex items-center gap-2">
           <span className="text-sm text-gray-700">
-            Showing {paginationData.startIndex + 1} to {paginationData.endIndex} of {paginationData.totalItems} {itemName}
+            Showing {(paginationData.startIndex ?? 0) + 1} to {paginationData.endIndex ?? paginationData.totalItems} of {paginationData.totalItems} {itemName}
           </span>
         </div>
         

@@ -28,6 +28,20 @@ import { format } from "date-fns";
 import { useToast } from "@/hooks/use-toast";
 import SimpleConfirmDialog from "../common/SimpleConfirmDialog";
 import { formatCurrency } from "@/utils/currency";
+import type { PurchaseOrder, GoodsReceipt } from "@shared/schema";
+
+interface GoodsReceiptsTabProps {
+  purchaseOrders: PurchaseOrder[];
+  goodsReceipts: GoodsReceipt[];
+  loading: boolean;
+  canEdit: boolean;
+  currentUser?: { email?: string; role?: string } | null;
+  onRefresh: () => void;
+  showOpenReceipts: boolean;
+  setShowOpenReceipts: React.Dispatch<React.SetStateAction<boolean>>;
+  showClosedReceipts: boolean;
+  setShowClosedReceipts: React.Dispatch<React.SetStateAction<boolean>>;
+}
 
 export default function GoodsReceiptsTab({ 
   purchaseOrders, 
@@ -40,7 +54,7 @@ export default function GoodsReceiptsTab({
   setShowOpenReceipts,
   showClosedReceipts,
   setShowClosedReceipts
-}: any) {
+}: GoodsReceiptsTabProps) {
   const [receivingQuantities, setReceivingQuantities] = useState<any>({});
   const [processingPO, setProcessingPO] = useState<any>(null);
   const [showCloseConfirm, setShowCloseConfirm] = useState(false);

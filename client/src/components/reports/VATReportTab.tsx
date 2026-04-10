@@ -41,7 +41,16 @@ const vatLabel = (t: any) => {
   return t || 'Standard Rated';
 };
 
-export default function VATReportTab({ invoices, customers, books, companySettings, currentUser, loading }: any) {
+interface VATReportTabProps {
+  invoices: any[];
+  customers: any[];
+  books: any[];
+  companySettings: Record<string, any> | null;
+  currentUser?: Record<string, any> | null;
+  loading: boolean;
+}
+
+export default function VATReportTab({ invoices, customers, books, companySettings, currentUser, loading }: VATReportTabProps) {
   const allStatuses = useMemo(() => {
     const set = new Set(invoices.map((i: any) => i.status).filter(Boolean));
     ['draft', 'submitted', 'delivered', 'paid', 'cancelled'].forEach((s: any) => set.add(s));

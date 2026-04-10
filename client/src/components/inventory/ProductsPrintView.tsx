@@ -1,7 +1,13 @@
 import React, { useEffect } from 'react';
 import { format } from 'date-fns';
+import type { Product } from "@shared/schema";
 
-export default function ProductsPrintView({ products, onClose }: any) {
+interface ProductsPrintViewProps {
+  products: Product[];
+  onClose: () => void;
+}
+
+export default function ProductsPrintView({ products, onClose }: ProductsPrintViewProps) {
   useEffect(() => {
     // Trigger print dialog when component mounts
     const timer = setTimeout(() => {

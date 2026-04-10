@@ -7,7 +7,12 @@ import TotalsSummary from './shared/TotalsSummary';
 import NotesSection from './shared/NotesSection';
 import SignatureSection from './shared/SignatureSection';
 
-export default function POTemplate({ data, brand, settings }: any) {
+interface POTemplateProps {
+  data: Record<string, any>;
+  brand: Record<string, any>;
+  settings: Record<string, any>;
+}
+export default function POTemplate({ data, brand, settings }: POTemplateProps) {
   const formatDate = (dateString: any) => {
     if (!dateString) return '';
     try {

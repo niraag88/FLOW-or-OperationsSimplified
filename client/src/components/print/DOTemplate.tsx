@@ -1,7 +1,12 @@
 import React from 'react';
 import { format, isValid, parseISO } from 'date-fns';
 
-export default function DOTemplate({ data, customer, settings }: any) {
+interface DOTemplateProps {
+  data: Record<string, any>;
+  customer: Record<string, any>;
+  settings: Record<string, any>;
+}
+export default function DOTemplate({ data, customer, settings }: DOTemplateProps) {
   const formatDate = (dateString: any) => {
     if (!dateString) return '';
     try {

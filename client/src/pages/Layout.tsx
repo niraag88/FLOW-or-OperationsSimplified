@@ -173,7 +173,12 @@ const getTimeAgo = (date: any) => {
   return `${diffInDays}d ago`;
 };
 
-export default function Layout({ children, currentPageName = "" }: any) {
+interface LayoutProps {
+  children: React.ReactNode;
+  currentPageName?: string;
+}
+
+export default function Layout({ children, currentPageName = "" }: LayoutProps) {
   const location = useLocation();
   const { user, logout } = useAuth();
   const [mobileMenuOpen, setMobileMenuOpen] = React.useState(false);

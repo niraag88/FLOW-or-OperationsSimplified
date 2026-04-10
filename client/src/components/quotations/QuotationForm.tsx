@@ -15,14 +15,27 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Switch } from "@/components/ui/switch";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Plus, Trash2 } from "lucide-react";
-import { Quotation } from "@/api/entities";
-import { Product } from "@/api/entities";
-import { Customer } from "@/api/entities";
-import { Brand } from "@/api/entities";
+import { Quotation as QuotationEntity } from "@/api/entities";
+import { Product as ProductEntity } from "@/api/entities";
+import { Customer as CustomerEntity } from "@/api/entities";
+import { Brand as BrandEntity } from "@/api/entities";
+import type { Quotation } from "@shared/schema";
 import { Card } from "@/components/ui/card";
 import { useToast } from "@/hooks/use-toast";
 
-export default function QuotationForm({ open, onClose, editingQuotation, currentUser, canOverride, onSuccess, preloadedCustomers, preloadedProducts, preloadedBrands }: any) {
+interface QuotationFormProps {
+  open: boolean;
+  onClose: () => void;
+  editingQuotation?: Record<string, any> | null;
+  currentUser?: { email?: string; role?: string } | null;
+  canOverride?: boolean;
+  onSuccess?: () => void;
+  preloadedCustomers?: any[];
+  preloadedProducts?: any[];
+  preloadedBrands?: any[];
+}
+
+export default function QuotationForm({ open, onClose, editingQuotation, currentUser, canOverride, onSuccess, preloadedCustomers, preloadedProducts, preloadedBrands }: QuotationFormProps) {
   const [loading, setLoading] = useState(false);
   const [customers, setCustomers] = useState<any[]>([]);
   const [products, setProducts] = useState<any[]>([]);
@@ -64,7 +77,7 @@ export default function QuotationForm({ open, onClose, editingQuotation, current
       // Use preloaded data if available, otherwise fetch from API (fallback)
       let customersData, productsData, brandsData;
       
-      if (preloadedCustomers?.length > 0 && preloadedProducts?.length > 0 && preloadedBrands?.length > 0) {
+      if ((preloadedCustomers?.length ?? 0) > 0 && (preloadedProducts?.length ?? 0) > 0 && (preloadedBrands?.length ?? 0) > 0) {
         // Use preloaded data for better performance
         customersData = preloadedCustomers;
         productsData = preloadedProducts;
@@ -72,20 +85,20 @@ export default function QuotationForm({ open, onClose, editingQuotation, current
       } else {
         // Fallback to API calls if preloaded data not available
         [customersData, productsData, brandsData] = await Promise.all([
-          Customer.list().catch(() => []),
-          Product.list().catch(() => []),
-          Brand.list().catch(() => [])
+          CustomerEntity.list().catch(() => []),
+          ProductEntity.list().catch(() => []),
+          BrandEntity.list().catch(() => [])
         ]);
       }
 
-      setCustomers(customersData.filter((c: any) => c.is_active !== false));
-      setProducts(productsData);
-      setBrands(brandsData.filter((b: any) => b.isActive !== false));
+      setCustomers((customersData ?? []).filter((c: any) => c.is_active !== false));
+      setProducts(productsData ?? []);
+      setBrands((brandsData ?? []).filter((b: any) => b.isActive !== false));
 
       if (editingQuotation) {
         
         // 🟢 Use passed editingQuotation data immediately (like POForm does)
-        const customer = customersData.find((c: any) => c.id === editingQuotation.customerId);
+        const customer = (customersData ?? []).find((c: any) => c.id === editingQuotation.customerId);
         setSelectedCustomer(customer);
         
         // Set basic form data immediately from passed quotation
@@ -125,8 +138,8 @@ export default function QuotationForm({ open, onClose, editingQuotation, current
             
             const formattedItems = items.map((item: any) => {
               // Look up product details to get brand information
-              const product = productsData.find((p: any) => p.id === (item.productId || item.product_id));
-              const brand = brandsData.find((b: any) => b.id === product?.brandId);
+              const product = (productsData ?? []).find((p: any) => p.id === (item.productId || item.product_id));
+              const brand = (brandsData ?? []).find((b: any) => b.id === product?.brandId);
               
               return {
                 product_id: (item.productId || item.product_id || "").toString(),
@@ -375,7 +388,7 @@ export default function QuotationForm({ open, onClose, editingQuotation, current
 
       let result;
       if (editingQuotation && editingQuotation.id) {
-        result = await Quotation.update(editingQuotation.id, quotationData);
+        result = await QuotationEntity.update(editingQuotation.id, quotationData);
         
         toast({
           title: "Success",
@@ -383,7 +396,7 @@ export default function QuotationForm({ open, onClose, editingQuotation, current
           variant: "default",
         });
       } else {
-        result = await Quotation.create(quotationData);
+        result = await QuotationEntity.create(quotationData);
         
         toast({
           title: "Success",
@@ -392,7 +405,7 @@ export default function QuotationForm({ open, onClose, editingQuotation, current
         });
       }
       
-      onSuccess();
+      onSuccess?.();
       onClose();
     } catch (error: any) {
       console.error("Error saving quotation:", error);

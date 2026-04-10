@@ -88,7 +88,7 @@ export function TopNavigation() {
             <div className="relative">
               <Button
                 variant="ghost"
-                
+                size="sm"
                 className="text-slate-300 hover:text-white p-2"
                 data-testid="notification-bell"
               >

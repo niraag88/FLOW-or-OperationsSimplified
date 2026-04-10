@@ -7,8 +7,22 @@ import { FileText } from "lucide-react";
 import { Skeleton } from "@/components/ui/skeleton";
 import { format, isValid, parseISO } from "date-fns";
 import QuotationActionsDropdown from "./QuotationActionsDropdown";
+import type { Quotation } from "@shared/schema";
 
-export default function QuotationList({ quotations, totalCount, loading, canEdit, canCreate, canOverride, currentUser, onEdit, onRefresh, onQuickView }: any) {
+interface QuotationListProps {
+  quotations: Quotation[];
+  totalCount: number;
+  loading: boolean;
+  canEdit: boolean;
+  canCreate: boolean;
+  canOverride: boolean;
+  currentUser?: { email?: string; role?: string } | null;
+  onEdit: (quotation: Record<string, any>) => void;
+  onRefresh: () => void;
+  onQuickView: (id: number) => void;
+}
+
+export default function QuotationList({ quotations, totalCount, loading, canEdit, canCreate, canOverride, currentUser, onEdit, onRefresh, onQuickView }: QuotationListProps) {
   const getCustomerName = (quotation: any) => {
     return quotation.customerName || quotation.customer_name || 'Unknown Customer';
   };

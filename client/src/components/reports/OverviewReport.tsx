@@ -10,7 +10,7 @@ import { getRateToAed } from "@/utils/currency";
 const fmt = (v: any) =>
   new Intl.NumberFormat("en-US", { minimumFractionDigits: 2, maximumFractionDigits: 2 }).format(v);
 
-function KpiTile({ icon: Icon, iconBg, label, value, sub, valueColor }: any) {
+function KpiTile({ icon: Icon, iconBg, label, value, sub, valueColor }: { icon: React.ElementType; iconBg: string; label: string; value: string | number; sub?: string; valueColor?: string }) {
   return (
     <Card className="p-5">
       <div className="flex items-start gap-4">
@@ -27,7 +27,13 @@ function KpiTile({ icon: Icon, iconBg, label, value, sub, valueColor }: any) {
   );
 }
 
-export default function OverviewReport({ invoices, purchaseOrders, companySettings }: any) {
+interface OverviewReportProps {
+  invoices: any[];
+  purchaseOrders: any[];
+  companySettings: Record<string, unknown> | null;
+}
+
+export default function OverviewReport({ invoices, purchaseOrders, companySettings }: OverviewReportProps) {
   const getFxRate = (po: any) => {
     const stored = parseFloat(po.fxRateToAed || po.fx_rate_to_aed);
     if (!isNaN(stored) && stored > 0) return stored;

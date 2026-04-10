@@ -7,13 +7,17 @@ import { Save, Trash, Clock } from "lucide-react";
 import { logAuditAction } from "../utils/auditLogger";
 import { useToast } from "@/hooks/use-toast";
 
+interface RetentionSettingsProps {
+  currentUser?: { email?: string; role?: string } | null;
+}
+
 const initialSettings = {
   retention_exports_days: 60,
   retention_audit_logs_days: 730,
   lifecycle_cold_storage_after_days: 30,
 };
 
-export default function RetentionSettings({ currentUser }: any) {
+export default function RetentionSettings({ currentUser }: RetentionSettingsProps) {
   const [settings, setSettings] = useState(initialSettings);
   const [loading, setLoading] = useState(false);
   const { toast } = useToast();

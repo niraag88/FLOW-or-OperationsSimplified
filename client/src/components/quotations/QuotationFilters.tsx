@@ -9,8 +9,20 @@ import { Checkbox } from "@/components/ui/checkbox";
 import { Badge } from "@/components/ui/badge";
 import { format } from "date-fns";
 import { cn } from "@/lib/utils";
+import type { Customer } from "@shared/schema";
 
-export default function QuotationFilters({ selectedStatuses, setSelectedStatuses, selectedCustomers, setSelectedCustomers, dateRange, setDateRange, resetPagination, customers = [] as any[] }: any) {
+interface QuotationFiltersProps {
+  selectedStatuses: string[];
+  setSelectedStatuses: React.Dispatch<React.SetStateAction<string[]>>;
+  selectedCustomers: string[];
+  setSelectedCustomers: React.Dispatch<React.SetStateAction<string[]>>;
+  dateRange: string;
+  setDateRange: (range: string | Record<string, any>) => void;
+  resetPagination: () => void;
+  customers?: Record<string, any>[];
+}
+
+export default function QuotationFilters({ selectedStatuses, setSelectedStatuses, selectedCustomers, setSelectedCustomers, dateRange, setDateRange, resetPagination, customers = [] }: QuotationFiltersProps) {
   const [dateRangeOpen, setDateRangeOpen] = useState(false);
   const [customStartDate, setCustomStartDate] = useState<any>(null);
   const [customEndDate, setCustomEndDate] = useState<any>(null);

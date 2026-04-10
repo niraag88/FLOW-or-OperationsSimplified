@@ -4,7 +4,11 @@ import { Badge } from "@/components/ui/badge";
 import { format, subDays, isAfter, parseISO } from "date-fns";
 import { ShoppingCart, Truck, FileText, Clock } from "lucide-react";
 
-export default function RecentActivity({ data }: any) {
+interface RecentActivityProps {
+  data: Record<string, unknown[]>;
+}
+
+export default function RecentActivity({ data }: RecentActivityProps) {
   const sevenDaysAgo = subDays(new Date(), 7);
 
   const parseDate = (val: any) => {
@@ -120,7 +124,7 @@ export default function RecentActivity({ data }: any) {
                     {activity.status?.replace(/_/g, ' ')}
                   </Badge>
                   <p className="text-xs text-gray-400 mt-1">
-                    {format(activity.date, 'dd/MM/yy')}
+                    {activity.date ? format(new Date(activity.date as string | number | Date), 'dd/MM/yy') : ''}
                   </p>
                 </div>
               </div>

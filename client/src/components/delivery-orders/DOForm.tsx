@@ -14,10 +14,11 @@ import { Textarea } from "@/components/ui/textarea";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Switch } from "@/components/ui/switch";
 import { Plus, Trash2 } from "lucide-react";
-import { DeliveryOrder } from "@/api/entities";
-import { Product } from "@/api/entities";
-import { Customer } from "@/api/entities";
-import { Brand } from "@/api/entities";
+import { DeliveryOrder as DOEntity } from "@/api/entities";
+import { Product as ProductEntity } from "@/api/entities";
+import { Customer as CustomerEntity } from "@/api/entities";
+import { Brand as BrandEntity } from "@/api/entities";
+import type { DeliveryOrder } from "@shared/schema";
 import { Card } from "@/components/ui/card";
 
 const toNum = (v: any) => parseFloat(v) || 0;
@@ -48,7 +49,15 @@ const getInitialDOFormData = () => ({
   items: [] as any[]
 });
 
-export default function DOForm({ open, onClose, editingDO, currentUser, onSuccess }: any) {
+interface DOFormProps {
+  open: boolean;
+  onClose: () => void;
+  editingDO?: Record<string, any> | null;
+  currentUser?: { email?: string; role?: string } | null;
+  onSuccess?: () => void;
+}
+
+export default function DOForm({ open, onClose, editingDO, currentUser, onSuccess }: DOFormProps) {
   const [loading, setLoading] = useState(false);
   const [customers, setCustomers] = useState<any[]>([]);
   const [products, setProducts] = useState<any[]>([]);
@@ -74,9 +83,9 @@ export default function DOForm({ open, onClose, editingDO, currentUser, onSucces
       const needsNextNumber = isNew || isNewFromDocument;
 
       const settled = await Promise.allSettled([
-        Customer.list(),
-        Product.list(),
-        Brand.list(),
+        CustomerEntity.list(),
+        ProductEntity.list(),
+        BrandEntity.list(),
         needsNextNumber
           ? fetch('/api/delivery-orders/next-number', { credentials: 'include' })
           : Promise.resolve(null),
@@ -279,12 +288,12 @@ export default function DOForm({ open, onClose, editingDO, currentUser, onSucces
       };
 
       if (editingDO && editingDO.id) {
-        await DeliveryOrder.update(editingDO.id, doData);
+        await DOEntity.update(editingDO.id, doData);
       } else {
-        await DeliveryOrder.create(doData);
+        await DOEntity.create(doData);
       }
       
-      onSuccess();
+      onSuccess?.();
       onClose();
     } catch (error: any) {
       console.error("Error saving DO:", error);

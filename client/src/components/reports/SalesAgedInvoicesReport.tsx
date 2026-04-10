@@ -38,7 +38,7 @@ function getPeriodBounds(period: any, customFrom: any, customTo: any) {
   return null;
 }
 
-function SummaryTile({ label, value, color }: any) {
+function SummaryTile({ label, value, color }: { label: string; value: string | number; color?: string }) {
   return (
     <Card className="p-4">
       <p className="text-sm text-gray-500">{label}</p>
@@ -47,7 +47,13 @@ function SummaryTile({ label, value, color }: any) {
   );
 }
 
-export default function SalesAgedInvoicesReport({ invoices, customers, canExport }: any) {
+interface SalesAgedInvoicesReportProps {
+  invoices: any[];
+  customers: any[];
+  canExport: boolean;
+}
+
+export default function SalesAgedInvoicesReport({ invoices, customers, canExport }: SalesAgedInvoicesReportProps) {
   const [period, setPeriod] = useState<any>("all");
   const [customFrom, setCustomFrom] = useState("");
   const [customTo, setCustomTo] = useState("");

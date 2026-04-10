@@ -10,7 +10,20 @@ import { Badge } from "@/components/ui/badge";
 import { format } from "date-fns";
 import { cn } from "@/lib/utils";
 
-export default function DOFilters({ selectedStatuses, setSelectedStatuses, selectedCustomers, setSelectedCustomers, selectedTaxTreatments, setSelectedTaxTreatments, dateRange, setDateRange, resetPagination, customers = [] as any[] }: any) {
+interface DOFiltersProps {
+  selectedStatuses: string[];
+  setSelectedStatuses: React.Dispatch<React.SetStateAction<string[]>>;
+  selectedCustomers: string[];
+  setSelectedCustomers: React.Dispatch<React.SetStateAction<string[]>>;
+  selectedTaxTreatments: string[];
+  setSelectedTaxTreatments: React.Dispatch<React.SetStateAction<string[]>>;
+  dateRange: string;
+  setDateRange: (range: string | Record<string, any>) => void;
+  resetPagination: () => void;
+  customers?: Record<string, any>[];
+}
+
+export default function DOFilters({ selectedStatuses, setSelectedStatuses, selectedCustomers, setSelectedCustomers, selectedTaxTreatments, setSelectedTaxTreatments, dateRange, setDateRange, resetPagination, customers = [] }: DOFiltersProps) {
   const [dateRangeOpen, setDateRangeOpen] = useState(false);
   const [customStartDate, setCustomStartDate] = useState<any>(null);
   const [customEndDate, setCustomEndDate] = useState<any>(null);

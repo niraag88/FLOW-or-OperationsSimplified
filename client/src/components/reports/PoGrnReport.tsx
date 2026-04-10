@@ -13,7 +13,15 @@ import { cn } from "@/lib/utils";
 import ExportDropdown from "../common/ExportDropdown";
 import { getRateToAed } from "@/utils/currency";
 
-export default function PoGrnReport({ purchaseOrders, goodsReceipts, suppliers = [] as any[], companySettings, canExport }: any) {
+interface PoGrnReportProps {
+  purchaseOrders: any[];
+  goodsReceipts: any[];
+  suppliers?: any[];
+  companySettings: Record<string, any> | null;
+  canExport: boolean;
+}
+
+export default function PoGrnReport({ purchaseOrders, goodsReceipts, suppliers = [], companySettings, canExport }: PoGrnReportProps) {
   // PO section filter state
   const [poSelectedStatuses, setPoSelectedStatuses] = useState<any[]>([]);
   const [poSelectedSuppliers, setPoSelectedSuppliers] = useState<any[]>([]);
@@ -278,7 +286,7 @@ export default function PoGrnReport({ purchaseOrders, goodsReceipts, suppliers =
   ];
 
   // Reusable supplier filter popover content
-  const SupplierFilterPopover = ({ selected, setSelected, onReset, idPrefix }: any) => (
+  const SupplierFilterPopover = ({ selected, setSelected, onReset, idPrefix }: { selected: string[]; setSelected: React.Dispatch<React.SetStateAction<string[]>>; onReset: () => void; idPrefix: string }) => (
     <Popover>
       <PopoverTrigger asChild>
         <Button variant="outline" className="justify-between w-48">
@@ -312,7 +320,7 @@ export default function PoGrnReport({ purchaseOrders, goodsReceipts, suppliers =
   );
 
   // Reusable date range filter
-  const DateRangeFilter = ({ dateRange, onDateRangeChange, dateRangeOpen, setDateRangeOpen, customRange, pendingRange, setPendingRange, applyCustomRange, formatRange }: any) => (
+  const DateRangeFilter = ({ dateRange, onDateRangeChange, dateRangeOpen, setDateRangeOpen, customRange, pendingRange, setPendingRange, applyCustomRange, formatRange }: { dateRange: string; onDateRangeChange: (v: string) => void; dateRangeOpen: boolean; setDateRangeOpen: (v: boolean) => void; customRange: any; pendingRange: any; setPendingRange: React.Dispatch<React.SetStateAction<any>>; applyCustomRange: () => void; formatRange: () => string }) => (
     <>
       <Select value={typeof dateRange === 'object' ? 'custom' : dateRange} onValueChange={onDateRangeChange}>
         <SelectTrigger className="w-32">

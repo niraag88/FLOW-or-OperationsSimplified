@@ -10,6 +10,7 @@ import { formatDate } from "@/utils/dateUtils";
 import { formatCurrency } from "@/utils/currency";
 import { useToast } from "@/hooks/use-toast";
 import { exportQuotationToXLSX } from "../utils/export";
+import type { Quotation } from "@shared/schema";
 
 const STATUS_COLORS = {
   draft: "bg-gray-100 text-gray-800",
@@ -22,7 +23,7 @@ const STATUS_COLORS = {
   rejected: "bg-red-100 text-red-800",
 };
 
-function Section({ title, children }: any) {
+function Section({ title, children }: { title: string; children: React.ReactNode }) {
   return (
     <div>
       <h3 className="text-sm font-semibold text-gray-500 uppercase tracking-wide mb-3">{title}</h3>
@@ -33,7 +34,16 @@ function Section({ title, children }: any) {
 
 const NON_EDITABLE_STATUSES = ['accepted', 'rejected', 'invoiced', 'converted'];
 
-export default function QuotationQuickViewModal({ quotationId, open, onClose, canEdit, canOverride, onEdit }: any) {
+interface QuotationQuickViewModalProps {
+  quotationId: number | null;
+  open: boolean;
+  onClose: () => void;
+  canEdit: boolean;
+  canOverride: boolean;
+  onEdit: (quotation: Quotation) => void;
+}
+
+export default function QuotationQuickViewModal({ quotationId, open, onClose, canEdit, canOverride, onEdit }: QuotationQuickViewModalProps) {
   const [detail, setDetail] = useState<any>(null);
   const [loading, setLoading] = useState(false);
   const { toast } = useToast();

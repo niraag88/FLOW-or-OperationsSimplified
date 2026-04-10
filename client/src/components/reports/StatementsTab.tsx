@@ -34,13 +34,13 @@ function fmtDate(val: any, full = false) {
 
 /* ── small shared components ────────────────────────────────────────────── */
 
-function StatusBadge({ status }: any) {
+function StatusBadge({ status }: { status: string }) {
   if (status === "paid")
     return <Badge className="bg-green-100 text-green-800 border-green-300 text-xs font-medium">Paid</Badge>;
   return <Badge className="bg-amber-100 text-amber-800 border-amber-300 text-xs font-medium">Outstanding</Badge>;
 }
 
-function SummaryTiles({ records }: any) {
+function SummaryTiles({ records }: { records: any[] }) {
   const totals = useMemo(() => {
     let totalAed = 0, paidCount = 0, paidAed = 0, outCount = 0, outAed = 0;
     let totalOrig = 0, paidOrig = 0, outOrig = 0;
@@ -83,7 +83,7 @@ function SummaryTiles({ records }: any) {
   );
 }
 
-function CollapsibleSection({ title, icon: Icon, iconColor, children }: any) {
+function CollapsibleSection({ title, icon: Icon, iconColor, children }: { title: string; icon: React.ElementType; iconColor: string; children: React.ReactNode }) {
   const [open, setOpen] = useState(false);
   return (
     <Card className="border-0 shadow-lg overflow-hidden">
@@ -106,7 +106,7 @@ function CollapsibleSection({ title, icon: Icon, iconColor, children }: any) {
 
 /* ── searchable combobox ────────────────────────────────────────────────── */
 
-function EntityCombobox({ items, value, onValueChange, placeholder = "Select…", allLabel = "All" }: any) {
+function EntityCombobox({ items, value, onValueChange, placeholder = "Select…", allLabel = "All" }: { items: Record<string, any>[]; value: string; onValueChange: (v: string) => void; placeholder?: string; allLabel?: string }) {
   const [popOpen, setPopOpen] = useState(false);
   const selected = items.find((i: any) => String(i.id) === value) || null;
   return (
@@ -165,7 +165,7 @@ function esc(s: any) {
 
 /* ── buildStatementHtml — plain HTML string for window.open print ────────── */
 
-function buildStatementHtml({ type, entity, companySettings, records, dateFrom, dateTo, statusFilter }: any) {
+function buildStatementHtml({ type, entity, companySettings, records, dateFrom, dateTo, statusFilter }: { type: string; entity: Record<string, any> | null; companySettings: Record<string, any> | null; records: any[]; dateFrom: string; dateTo: string; statusFilter: string }) {
   const totalAed = records.reduce((s: any, r: any) => s + (r._aed || 0), 0);
   const paidAed  = records.filter((r: any) => r._paymentStatus === "paid").reduce((s: any, r: any) => s + (r._aed || 0), 0);
   const outAed   = records.filter((r: any) => r._paymentStatus !== "paid").reduce((s: any, r: any) => s + (r._aed || 0), 0);
@@ -336,7 +336,7 @@ function buildStatementHtml({ type, entity, companySettings, records, dateFrom, 
 
 /* ── statement layout (shared between modal preview and print portal) ───── */
 
-function StatementLayout({ type, entity, companySettings, records, dateFrom, dateTo, statusFilter }: any) {
+function StatementLayout({ type, entity, companySettings, records, dateFrom, dateTo, statusFilter }: { type: string; entity: Record<string, any> | null; companySettings: Record<string, any> | null; records: any[]; dateFrom: string; dateTo: string; statusFilter: string }) {
   const totalAed = records.reduce((s: any, r: any) => s + (r._aed || 0), 0);
   const paidAed  = records.filter((r: any) => r._paymentStatus === "paid").reduce((s: any, r: any) => s + (r._aed || 0), 0);
   const outAed   = records.filter((r: any) => r._paymentStatus !== "paid").reduce((s: any, r: any) => s + (r._aed || 0), 0);
@@ -498,7 +498,7 @@ function StatementLayout({ type, entity, companySettings, records, dateFrom, dat
 
 /* ── statement preview modal ────────────────────────────────────────────── */
 
-function StatementPreviewModal({ open, onClose, type, entity, companySettings, records, dateFrom, dateTo, statusFilter }: any) {
+function StatementPreviewModal({ open, onClose, type, entity, companySettings, records, dateFrom, dateTo, statusFilter }: { open: boolean; onClose: () => void; type: string; entity: Record<string, any> | null; companySettings: Record<string, any> | null; records: any[]; dateFrom: string; dateTo: string; statusFilter: string }) {
   const handlePrint = useCallback(() => {
     const html = buildStatementHtml({ type, entity, companySettings, records, dateFrom, dateTo, statusFilter });
     const blob = new Blob([html], { type: "text/html" });
@@ -549,7 +549,7 @@ function StatementPreviewModal({ open, onClose, type, entity, companySettings, r
 
 /* ── Invoices section ───────────────────────────────────────────────────── */
 
-function InvoicesSection({ invoices, customers, companySettings }: any) {
+function InvoicesSection({ invoices, customers, companySettings }: { invoices: Record<string, any>[]; customers: Record<string, any>[]; companySettings: Record<string, any> | null }) {
   const [selectedCustomerId, setSelectedCustomerId] = useState("");
   const [statusFilter, setStatusFilter] = useState<any>("all");
   const [dateFrom, setDateFrom] = useState("");
@@ -771,7 +771,7 @@ function InvoicesSection({ invoices, customers, companySettings }: any) {
 
 /* ── Purchase Orders section ────────────────────────────────────────────── */
 
-function PurchaseOrdersSection({ purchaseOrders, companySettings }: any) {
+function PurchaseOrdersSection({ purchaseOrders, companySettings }: { purchaseOrders: Record<string, any>[]; companySettings: Record<string, any> | null }) {
   const [selectedBrandId, setSelectedBrandId] = useState("");
   const [statusFilter, setStatusFilter] = useState<any>("all");
   const [dateFrom, setDateFrom] = useState("");
@@ -1005,7 +1005,16 @@ function PurchaseOrdersSection({ purchaseOrders, companySettings }: any) {
 
 /* ── main export ────────────────────────────────────────────────────────── */
 
-export default function StatementsTab({ invoices, purchaseOrders, customers, companySettings, suppliers, books }: any) {
+interface StatementsTabProps {
+  invoices: any[];
+  purchaseOrders: any[];
+  customers: any[];
+  companySettings: Record<string, any> | null;
+  suppliers: any[];
+  books: any[];
+}
+
+export default function StatementsTab({ invoices, purchaseOrders, customers, companySettings, suppliers, books }: StatementsTabProps) {
   return (
     <div className="space-y-4">
       <p className="text-sm text-gray-500">

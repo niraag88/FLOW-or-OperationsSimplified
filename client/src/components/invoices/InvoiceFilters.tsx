@@ -9,7 +9,20 @@ import { Badge } from "@/components/ui/badge";
 import { format } from "date-fns";
 import { cn } from "@/lib/utils";
 
-export default function InvoiceFilters({ selectedStatuses, setSelectedStatuses, selectedCustomers, setSelectedCustomers, dateRange, setDateRange, resetPagination, customers = [] as any[], paymentStatusFilter, setPaymentStatusFilter }: any) {
+interface InvoiceFiltersProps {
+  selectedStatuses: string[];
+  setSelectedStatuses: React.Dispatch<React.SetStateAction<string[]>>;
+  selectedCustomers: string[];
+  setSelectedCustomers: React.Dispatch<React.SetStateAction<string[]>>;
+  dateRange: string;
+  setDateRange: (range: string | Record<string, any>) => void;
+  resetPagination: () => void;
+  customers?: Record<string, any>[];
+  paymentStatusFilter: string;
+  setPaymentStatusFilter: (status: string) => void;
+}
+
+export default function InvoiceFilters({ selectedStatuses, setSelectedStatuses, selectedCustomers, setSelectedCustomers, dateRange, setDateRange, resetPagination, customers = [], paymentStatusFilter, setPaymentStatusFilter }: InvoiceFiltersProps) {
   const [dateRangeOpen, setDateRangeOpen] = useState(false);
   const [customStartDate, setCustomStartDate] = useState<any>(null);
   const [customEndDate, setCustomEndDate] = useState<any>(null);

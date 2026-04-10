@@ -12,11 +12,22 @@ import { MoreHorizontal, Edit2, Download, Trash2, Eye } from "lucide-react";
 import { exportToCsv, exportQuotationToXLSX } from "../utils/export";
 import { format, isValid, parseISO } from 'date-fns';
 import { useToast } from "@/hooks/use-toast";
-import { Quotation } from "@/api/entities";
+import { Quotation as QuotationEntity } from "@/api/entities";
 import SimpleConfirmDialog from "../common/SimpleConfirmDialog";
+import type { Quotation } from "@shared/schema";
 
 
-export default function QuotationActionsDropdown({ quotation, canEdit, canCreate, canOverride, onEdit, onRefresh, currentUser }: any) {
+interface QuotationActionsDropdownProps {
+  quotation: Record<string, any>;
+  canEdit: boolean;
+  canCreate: boolean;
+  canOverride: boolean;
+  onEdit: (quotation: Record<string, any>) => void;
+  onRefresh: () => void;
+  currentUser?: { email?: string; role?: string } | null;
+}
+
+export default function QuotationActionsDropdown({ quotation, canEdit, canCreate, canOverride, onEdit, onRefresh, currentUser }: QuotationActionsDropdownProps) {
   const { toast } = useToast();
   const [showDeleteDialog, setShowDeleteDialog] = useState(false);
 
@@ -65,7 +76,7 @@ export default function QuotationActionsDropdown({ quotation, canEdit, canCreate
 
   const handleDelete = async () => {
     try {
-      await Quotation.delete(quotation.id);
+      await QuotationEntity.delete(quotation.id);
 
       toast({
         title: 'Quotation Deleted',

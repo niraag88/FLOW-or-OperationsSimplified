@@ -14,8 +14,17 @@ import { exportPODetailToXLSX, printPOGRNSummary } from "../utils/export";
 import SimpleConfirmDialog from "../common/SimpleConfirmDialog";
 import MarkPOPaidDialog from "./MarkPOPaidDialog";
 import UploadFileDialog from "../common/UploadFileDialog";
+import type { PurchaseOrder } from "@shared/schema";
 
-export default function POActionsDropdown({ po, canEdit, onEdit, onRefresh, currentUser }: any) {
+interface POActionsDropdownProps {
+  po: Record<string, any>;
+  canEdit: boolean;
+  onEdit: (po: Record<string, any>) => void;
+  onRefresh: () => void;
+  currentUser?: { email?: string; role?: string } | null;
+}
+
+export default function POActionsDropdown({ po, canEdit, onEdit, onRefresh, currentUser }: POActionsDropdownProps) {
   const { toast } = useToast();
   const [showDeleteDialog, setShowDeleteDialog] = useState(false);
   const [showMarkPaidDialog, setShowMarkPaidDialog] = useState(false);

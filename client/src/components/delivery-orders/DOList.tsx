@@ -7,8 +7,20 @@ import { Truck, Paperclip } from "lucide-react";
 import { Skeleton } from "@/components/ui/skeleton";
 import { format, isValid, parseISO } from "date-fns";
 import DOActionsDropdown from "./DOActionsDropdown";
+import type { DeliveryOrder } from "@shared/schema";
 
-export default function DOList({ deliveryOrders, totalCount, loading, canEdit, currentUser, onEdit, onRefresh, onQuickView }: any) {
+interface DOListProps {
+  deliveryOrders: DeliveryOrder[];
+  totalCount: number;
+  loading: boolean;
+  canEdit: boolean;
+  currentUser?: { email?: string; role?: string } | null;
+  onEdit: (doOrder: Record<string, any>) => void;
+  onRefresh: () => void;
+  onQuickView: (id: number) => void;
+}
+
+export default function DOList({ deliveryOrders, totalCount, loading, canEdit, currentUser, onEdit, onRefresh, onQuickView }: DOListProps) {
   const getCustomerName = (doOrder: any) => {
     return doOrder.customer_name || doOrder.customerName || 'Unknown Customer';
   };

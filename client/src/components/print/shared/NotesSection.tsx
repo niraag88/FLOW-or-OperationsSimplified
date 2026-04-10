@@ -1,7 +1,12 @@
+interface NotesSectionProps {
+  title?: string;
+  content?: string;
+}
+
 export default function NotesSection({ 
   title = "Notes", 
   content 
-}: any) {
+}: NotesSectionProps) {
   if (!content) return null;
   
   return (

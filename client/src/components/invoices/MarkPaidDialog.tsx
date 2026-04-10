@@ -12,8 +12,16 @@ import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { CheckCircle, Pencil } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
+import type { Invoice } from "@shared/schema";
 
-export default function MarkPaidDialog({ open, onClose, invoice, onSuccess }: any) {
+interface MarkPaidDialogProps {
+  open: boolean;
+  onClose: () => void;
+  invoice: Record<string, any> | null;
+  onSuccess: () => void;
+}
+
+export default function MarkPaidDialog({ open, onClose, invoice, onSuccess }: MarkPaidDialogProps) {
   const { toast } = useToast();
   const [loading, setLoading] = useState(false);
   const [paymentReceivedDate, setPaymentReceivedDate] = useState("");

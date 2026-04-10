@@ -1,7 +1,12 @@
 import React from 'react';
 import { format } from 'date-fns';
 
-export default function StockCountTemplate({ data, settings }: any) {
+interface StockCountTemplateProps {
+  data: Record<string, any>;
+  settings: Record<string, any>;
+}
+
+export default function StockCountTemplate({ data, settings }: StockCountTemplateProps) {
   const formatDate = (dateString: any) => {
     if (!dateString) return '';
     return format(new Date(dateString), 'dd/MM/yy');

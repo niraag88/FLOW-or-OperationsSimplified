@@ -29,7 +29,7 @@ function formatDuration(ms: any) {
   return `${(ms / 1000).toFixed(1)}s`;
 }
 
-function StatusBadge({ success }: any) {
+function StatusBadge({ success }: { success: boolean }) {
   if (success === null || success === undefined) return null;
   return success
     ? <Badge className="bg-emerald-100 text-emerald-800 border-emerald-200"><CheckCircle className="w-3 h-3 mr-1 inline" />OK</Badge>
@@ -40,7 +40,7 @@ function StatusBadge({ success }: any) {
  * Confirmation modal for destructive restore actions.
  * Requires the user to type "RESTORE" before the confirm button activates.
  */
-function RestoreConfirmModal({ open, onClose, onConfirm, filename, isPending }: any) {
+function RestoreConfirmModal({ open, onClose, onConfirm, filename, isPending }: { open: boolean; onClose: () => void; onConfirm: () => void; filename: string; isPending: boolean }) {
   const [typed, setTyped] = useState("");
 
   // Reset typed confirmation whenever the modal closes (any path: cancel, success, error, programmatic)

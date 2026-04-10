@@ -1,3 +1,14 @@
+interface PrintHeaderProps {
+  documentTitle: string;
+  documentNumber?: string;
+  documentDate?: string;
+  logoUrl?: string;
+  companyName?: string;
+  companyAddress?: string;
+  companyPhone?: string;
+  companyEmail?: string;
+  companyTrn?: string;
+}
 export default function PrintHeader({
   documentTitle,
   documentNumber,
@@ -8,7 +19,7 @@ export default function PrintHeader({
   companyPhone,
   companyEmail,
   companyTrn
-}: any) {
+}: PrintHeaderProps) {
   return (
     <header className="flex justify-between items-start mb-10 border-b-2 border-gray-300 pb-6">
       <div>
