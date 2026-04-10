@@ -22,8 +22,16 @@ async function uploadBackup() {
 
     console.log(`Starting database backup: ${filename}`);
 
-    // Run pg_dump and pipe to gzip
-    const pgDump = spawn('pg_dump', [process.env.DATABASE_URL, '--no-owner', '--no-privileges'], {
+    // Run pg_dump and pipe to gzip.
+    // --exclude-schema=ops: the ops schema holds restore_runs which must survive
+    // restores; including it in the dump would cause restores to overwrite it,
+    // defeating the purpose of placing it in a separate schema.
+    const pgDump = spawn('pg_dump', [
+      process.env.DATABASE_URL,
+      '--no-owner',
+      '--no-privileges',
+      '--exclude-schema=ops',
+    ], {
       stdio: ['ignore', 'pipe', 'inherit']
     });
 
@@ -33,8 +41,17 @@ async function uploadBackup() {
     const fs = await import('fs');
     const writeStream = fs.createWriteStream(tempPath);
 
-    // Pipeline: pg_dump -> gzip -> file
+    // Pipeline: pg_dump stdout -> gzip -> temp file.
+    // pipeline() resolves when stdout closes, but that is not the same as
+    // pg_dump exiting successfully. We must explicitly check the exit code
+    // so a failed/partial dump is never silently recorded as a success.
     await pipeline(pgDump.stdout, gzip, writeStream);
+
+    // Wait for pg_dump to exit and verify it succeeded.
+    const pgDumpExitCode = await new Promise((resolve) => pgDump.on('close', resolve));
+    if (pgDumpExitCode !== 0) {
+      throw new Error(`pg_dump exited with code ${pgDumpExitCode} — dump may be partial or corrupt`);
+    }
 
     console.log(`Database dump created: ${tempPath}`);
 
