@@ -1,6 +1,7 @@
 #!/usr/bin/env node
 
 import { spawn } from 'child_process';
+import { once } from 'events';
 import { createReadStream } from 'fs';
 import { pipeline } from 'stream/promises';
 import { createGzip } from 'zlib';
@@ -41,16 +42,26 @@ async function uploadBackup() {
     const fs = await import('fs');
     const writeStream = fs.createWriteStream(tempPath);
 
+    // Register the close listener BEFORE the pipeline starts so we cannot
+    // miss the 'close' event if pg_dump exits before the gzip/file stream
+    // finishes flushing. once() returns a single-resolution promise and
+    // automatically removes the listener after firing.
+    const pgDumpClosed = once(pgDump, 'close');
+
     // Pipeline: pg_dump stdout -> gzip -> temp file.
     // pipeline() resolves when stdout closes, but that is not the same as
-    // pg_dump exiting successfully. We must explicitly check the exit code
-    // so a failed/partial dump is never silently recorded as a success.
+    // pg_dump exiting successfully. We check the exit code below.
     await pipeline(pgDump.stdout, gzip, writeStream);
 
-    // Wait for pg_dump to exit and verify it succeeded.
-    const pgDumpExitCode = await new Promise((resolve) => pgDump.on('close', resolve));
+    // Await the close event (already guaranteed to fire — listener was
+    // registered before the pipeline). Destructure [code, signal] from once().
+    const [pgDumpExitCode, pgDumpSignal] = await pgDumpClosed;
     if (pgDumpExitCode !== 0) {
-      throw new Error(`pg_dump exited with code ${pgDumpExitCode} — dump may be partial or corrupt`);
+      throw new Error(
+        `pg_dump exited with code ${pgDumpExitCode}` +
+        (pgDumpSignal ? ` (signal: ${pgDumpSignal})` : '') +
+        ' — dump may be partial or corrupt'
+      );
     }
 
     console.log(`Database dump created: ${tempPath}`);
