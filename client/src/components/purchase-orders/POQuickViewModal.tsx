@@ -55,7 +55,7 @@ function DocLink({ label, scanKey, onView }: { label: string; scanKey: string; o
 }
 
 export default function POQuickViewModal({ poId, open, onClose }: POQuickViewModalProps) {
-  const [detail, setDetail] = useState<any>(null);
+  const [detail, setDetail] = useState<Record<string, any> | null>(null);
   const [loading, setLoading] = useState(false);
   const [confirmDeleteOpen, setConfirmDeleteOpen] = useState(false);
   const { toast } = useToast();
@@ -96,7 +96,7 @@ export default function POQuickViewModal({ poId, open, onClose }: POQuickViewMod
         credentials: 'include',
       });
       if (!res.ok) throw new Error('Failed to remove document');
-      setDetail((prev: any) => prev ? { ...prev, supplierScanKey: null } : prev);
+      setDetail((prev) => prev ? { ...prev, supplierScanKey: null } : prev);
       queryClient.invalidateQueries({ queryKey: ['/api/purchase-orders'] });
       toast({ title: 'Document Removed', description: 'The document has been removed from the purchase order.' });
     } catch {

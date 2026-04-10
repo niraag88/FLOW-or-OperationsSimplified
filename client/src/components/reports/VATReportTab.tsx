@@ -62,7 +62,8 @@ export default function VATReportTab({ invoices, customers, books, companySettin
   const [selectedCustomerId, setSelectedCustomerId] = useState<any>("all");
   const { toast } = useToast();
 
-  const [filters, setFilters] = useState(() => {
+  interface VATFilters { dateFrom: string; dateTo: string; statuses: string[] }
+  const [filters, setFilters] = useState<VATFilters>(() => {
     try {
       const saved = localStorage.getItem('vat-report-filters-v2');
       const defaultFilters = {
@@ -159,7 +160,7 @@ export default function VATReportTab({ invoices, customers, books, companySettin
 
   const handleQuickDateRange = (months: any) => {
     const date = subMonths(new Date(), months);
-    setFilters((prev: any) => ({
+    setFilters((prev) => ({
       ...prev,
       dateFrom: format(startOfMonth(date), 'yyyy-MM-dd'),
       dateTo: format(endOfMonth(date), 'yyyy-MM-dd')
@@ -168,7 +169,7 @@ export default function VATReportTab({ invoices, customers, books, companySettin
   };
 
   const handleStatusToggle = (status: any) => {
-    setFilters((prev: any) => ({
+    setFilters((prev) => ({
       ...prev,
       statuses: prev.statuses.includes(status)
         ? prev.statuses.filter((s: any) => s !== status)
@@ -318,7 +319,7 @@ export default function VATReportTab({ invoices, customers, books, companySettin
               <Input
                 type="date"
                 value={filters.dateFrom}
-                onChange={(e) => { setFilters((prev: any) => ({ ...prev, dateFrom: e.target.value })); setCurrentPage(1); }}
+                onChange={(e) => { setFilters((prev) => ({ ...prev, dateFrom: e.target.value })); setCurrentPage(1); }}
               />
             </div>
             <div className="space-y-2">
@@ -326,7 +327,7 @@ export default function VATReportTab({ invoices, customers, books, companySettin
               <Input
                 type="date"
                 value={filters.dateTo}
-                onChange={(e) => { setFilters((prev: any) => ({ ...prev, dateTo: e.target.value })); setCurrentPage(1); }}
+                onChange={(e) => { setFilters((prev) => ({ ...prev, dateTo: e.target.value })); setCurrentPage(1); }}
               />
             </div>
             <div className="space-y-2">

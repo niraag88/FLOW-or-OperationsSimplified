@@ -21,9 +21,9 @@ import { Brand as BrandEntity } from "@/api/entities";
 import type { DeliveryOrder } from "@shared/schema";
 import { Card } from "@/components/ui/card";
 
-const toNum = (v: any) => parseFloat(v) || 0;
+const toNum = (v: unknown): number => parseFloat(String(v)) || 0;
 
-const normalizeDoData = (data: any) => ({
+const normalizeDoData = (data: Record<string, any>) => ({
   ...data,
   subtotal: toNum(data.subtotal),
   tax_amount: toNum(data.tax_amount),
@@ -46,8 +46,20 @@ const getInitialDOFormData = () => ({
   total_amount: 0,
   remarks: "",
   show_remarks: false,
-  items: [] as any[]
+  items: [] as DOItem[]
 });
+
+interface DOItem {
+  brand_id: string | number;
+  brand_name: string;
+  product_id: string | number;
+  product_code: string;
+  description: string;
+  size: string;
+  quantity: number;
+  unit_price: number;
+  line_total: number;
+}
 
 interface DOFormProps {
   open: boolean;
@@ -94,14 +106,14 @@ export default function DOForm({ open, onClose, editingDO, currentUser, onSucces
           : Promise.resolve(null),
       ]);
 
-      const customersData = settled[0].status === 'fulfilled' ? (settled[0].value || []) : [];
-      const productsData  = settled[1].status === 'fulfilled' ? (settled[1].value || []) : [];
-      const brandsData    = settled[2].status === 'fulfilled' ? (settled[2].value || []) : [];
+      const customersData = (settled[0].status === 'fulfilled' ? (settled[0].value || []) : []) as Record<string, any>[];
+      const productsData  = (settled[1].status === 'fulfilled' ? (settled[1].value || []) : []) as Record<string, any>[];
+      const brandsData    = (settled[2].status === 'fulfilled' ? (settled[2].value || []) : []) as Record<string, any>[];
       const nextNumResp   = settled[3].status === 'fulfilled' ? settled[3].value : null;
       const fullDOResp    = settled[4].status === 'fulfilled' ? settled[4].value : null;
 
-      const filteredCustomers = customersData.filter((c: any) => c.isActive !== false);
-      const filteredBrands    = brandsData.filter((b: any) => b.isActive !== false);
+      const filteredCustomers = customersData.filter((c) => c.isActive !== false);
+      const filteredBrands    = brandsData.filter((b) => b.isActive !== false);
 
       setCustomers(filteredCustomers);
       setProducts(productsData);
@@ -119,50 +131,50 @@ export default function DOForm({ open, onClose, editingDO, currentUser, onSucces
         setFormData(prev => ({ ...prev, do_number: nextNumber }));
       } else if (isNewFromDocument) {
         // New DO created from existing document — customer_id already validated by handleDocumentSelect
-        const customer = filteredCustomers.find((c: any) => c.id === editingDO.customer_id);
+        const customer = filteredCustomers.find((c: Record<string, any>) => c.id === editingDO.customer_id);
         setSelectedCustomer(customer || null);
         setFormData(normalizeDoData({
           ...getInitialDOFormData(),
           ...editingDO,
           do_number: nextNumber,
           items: editingDO.items || [],
-        }));
+        }) as Parameters<typeof setFormData>[0]);
       } else {
         // Editing an existing DO — fetch full DO data
-        let full: any = null;
+        let full: Record<string, any> | null = null;
         if (fullDOResp && fullDOResp.ok) {
           try { full = await fullDOResp.json(); } catch {}
         }
         if (full) {
-          const customer = filteredCustomers.find((c: any) => c.id === full.customer_id);
+          const customer = filteredCustomers.find((c: Record<string, any>) => c.id === full.customer_id);
           setSelectedCustomer(customer || null);
           setFormData(normalizeDoData({
             ...getInitialDOFormData(),
             ...full,
             items: full.items || []
-          }));
+          }) as Parameters<typeof setFormData>[0]);
         } else {
           // Fallback to passed data
-          const customer = filteredCustomers.find((c: any) => c.id === editingDO.customer_id);
+          const customer = filteredCustomers.find((c: Record<string, any>) => c.id === editingDO.customer_id);
           setSelectedCustomer(customer || null);
-          setFormData(normalizeDoData({ ...getInitialDOFormData(), ...editingDO, items: editingDO.items || [] }));
+          setFormData(normalizeDoData({ ...getInitialDOFormData(), ...editingDO, items: editingDO.items || [] }) as Parameters<typeof setFormData>[0]);
         }
       }
-    } catch (error: any) {
+    } catch (error: unknown) {
       console.error("Error loading data:", error);
     } finally {
       setLoading(false);
     }
   };
 
-  const handleInputChange = (field: any, value: any) => {
+  const handleInputChange = (field: string, value: unknown) => {
     setFormData(prev => {
       let newState = { ...prev, [field]: value };
 
       // Handle customer change logic
       if (field === 'customer_id') {
-        const customerId = parseInt(value);
-        const customer = customers.find((c: any) => c.id === customerId);
+        const customerId = parseInt(String(value));
+        const customer = customers.find((c: Record<string, any>) => c.id === customerId);
         setSelectedCustomer(customer);
         
         let taxTreatment = "StandardRated";
@@ -175,7 +187,7 @@ export default function DOForm({ open, onClose, editingDO, currentUser, onSucces
         
         newState = { 
           ...newState, 
-          customer_id: customerId as any, 
+          customer_id: String(customerId), 
           tax_treatment: taxTreatment, 
           tax_rate: taxRate 
         };
@@ -185,7 +197,7 @@ export default function DOForm({ open, onClose, editingDO, currentUser, onSucces
   };
 
   useEffect(() => {
-    const subtotal = formData.items.reduce((sum: any, item: any) => sum + (item.line_total || 0), 0);
+    const subtotal = formData.items.reduce((sum: number, item: DOItem) => sum + (item.line_total || 0), 0);
     const taxAmount = formData.tax_treatment === 'StandardRated' ? subtotal * formData.tax_rate : 0;
     const totalAmount = subtotal + taxAmount;
     
@@ -212,18 +224,18 @@ export default function DOForm({ open, onClose, editingDO, currentUser, onSucces
     setFormData(prev => ({ ...prev, items: [...prev.items, newItem] }));
   };
 
-  const updateItem = (index: any, field: any, value: any) => {
+  const updateItem = (index: number, field: keyof DOItem, value: string | number) => {
     const newItems = [...formData.items];
     
     // Convert string values to numbers for ID fields
     if (field === 'brand_id' || field === 'product_id') {
-      value = parseInt(value);
+      value = parseInt(String(value));
     }
     
     newItems[index] = { ...newItems[index], [field]: value };
 
     if (field === 'brand_id') {
-      const brand = brands.find((b: any) => b.id === value);
+      const brand = brands.find((b: Record<string, any>) => b.id === value);
       newItems[index] = {
         ...newItems[index],
         brand_name: brand?.name || "",
@@ -237,7 +249,7 @@ export default function DOForm({ open, onClose, editingDO, currentUser, onSucces
     }
 
     if (field === 'product_id' && value) {
-      const product = products.find((p: any) => p.id === value);
+      const product = products.find((p: Record<string, any>) => p.id === value);
       if (product) {
         newItems[index] = {
           ...newItems[index],
@@ -250,27 +262,27 @@ export default function DOForm({ open, onClose, editingDO, currentUser, onSucces
     }
 
     if (['quantity', 'unit_price'].includes(field) || field === 'product_id') {
-      const quantity = field === 'quantity' ? (parseInt(value) || 0) : (newItems[index].quantity || 0);
-      const unitPrice = field === 'unit_price' ? (parseFloat(value) || 0) : (newItems[index].unit_price || 0);
+      const quantity = field === 'quantity' ? (parseInt(String(value)) || 0) : (newItems[index].quantity || 0);
+      const unitPrice = field === 'unit_price' ? (parseFloat(String(value)) || 0) : (newItems[index].unit_price || 0);
       newItems[index].line_total = quantity * unitPrice;
     }
 
     setFormData(prev => ({ ...prev, items: newItems }));
   };
 
-  const getFilteredProducts = (brandId: any) => {
+  const getFilteredProducts = (brandId: string | number) => {
     if (!brandId) return [];
-    return products.filter((product: any) => String(product.brandId) === String(brandId));
+    return products.filter((product: Record<string, any>) => String(product.brandId) === String(brandId));
   };
 
-  const removeItem = (index: any) => {
+  const removeItem = (index: number) => {
     setFormData(prev => ({ 
       ...prev, 
       items: prev.items.filter((_, i) => i !== index) 
     }));
   };
 
-  const handleSubmit = async (e: any) => {
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!formData.customer_id || !formData.do_number) return;
 
@@ -281,7 +293,7 @@ export default function DOForm({ open, onClose, editingDO, currentUser, onSucces
         subtotal: parseFloat(formData.subtotal.toFixed(2)),
         tax_amount: parseFloat(formData.tax_amount.toFixed(2)),
         total_amount: parseFloat(formData.total_amount.toFixed(2)),
-        items: formData.items.map((item: any) => ({
+        items: formData.items.map((item: DOItem) => ({
           ...item,
           line_total: parseFloat((item.line_total || 0).toFixed(2))
         }))
@@ -295,7 +307,7 @@ export default function DOForm({ open, onClose, editingDO, currentUser, onSucces
       
       onSuccess?.();
       onClose();
-    } catch (error: any) {
+    } catch (error: unknown) {
       console.error("Error saving DO:", error);
     } finally {
       setLoading(false);
@@ -335,7 +347,7 @@ export default function DOForm({ open, onClose, editingDO, currentUser, onSucces
                   <SelectValue placeholder="Select customer" />
                 </SelectTrigger>
                 <SelectContent>
-                  {customers.map((c: any) => (
+                  {customers.map((c: Record<string, any>) => (
                     <SelectItem key={c.id} value={c.id.toString()}>
                       {c.name}
                     </SelectItem>

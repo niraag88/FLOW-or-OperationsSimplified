@@ -55,12 +55,12 @@ export default function GoodsReceiptsTab({
   showClosedReceipts,
   setShowClosedReceipts
 }: GoodsReceiptsTabProps) {
-  const [receivingQuantities, setReceivingQuantities] = useState<any>({});
+  const [receivingQuantities, setReceivingQuantities] = useState<Record<string, number>>({});
   const [processingPO, setProcessingPO] = useState<any>(null);
   const [showCloseConfirm, setShowCloseConfirm] = useState(false);
   const [closingPO, setClosingPO] = useState<any>(null);
   const [selectedPOForReceive, setSelectedPOForReceive] = useState<any>(null);
-  const [receiveQuantities, setReceiveQuantities] = useState<any>({});
+  const [receiveQuantities, setReceiveQuantities] = useState<Record<string, number>>({});
   const [receiveNotes, setReceiveNotes] = useState('');
   const [receiveDate, setReceiveDate] = useState(() => new Date().toISOString().slice(0, 10));
   // State is now managed by parent component for context-aware export
@@ -184,14 +184,14 @@ export default function GoodsReceiptsTab({
   };
 
   const handleQuantityChange = (poId: any, itemIndex: any, quantity: any) => {
-    setReceivingQuantities((prev: any) => ({
+    setReceivingQuantities((prev) => ({
       ...prev,
       [`${poId}-${itemIndex}`]: parseInt(quantity) || 0
     }));
   };
 
   const handleReceiveQuantityChange = (itemId: any, value: any) => {
-    setReceiveQuantities((prev: any) => ({
+    setReceiveQuantities((prev) => ({
       ...prev,
       [itemId]: value === '' ? '' : Math.max(0, parseInt(value) || 0)
     }));

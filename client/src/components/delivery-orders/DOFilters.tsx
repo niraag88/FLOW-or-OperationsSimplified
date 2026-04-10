@@ -104,9 +104,9 @@ export default function DOFilters({ selectedStatuses, setSelectedStatuses, selec
                       checked={selectedStatuses.includes(value)}
                       onCheckedChange={(checked) => {
                         if (checked) {
-                          setSelectedStatuses((prev: any) => [...prev, value]);
+                          setSelectedStatuses((prev: string[]) => [...prev, value]);
                         } else {
-                          setSelectedStatuses((prev: any) => prev.filter((s: any) => s !== value));
+                          setSelectedStatuses((prev: string[]) => prev.filter((s: string) => s !== value));
                         }
                         resetPagination();
                       }}
@@ -143,9 +143,9 @@ export default function DOFilters({ selectedStatuses, setSelectedStatuses, selec
                       checked={selectedCustomers.includes(customer.id)}
                       onCheckedChange={(checked) => {
                         if (checked) {
-                          setSelectedCustomers((prev: any) => [...prev, customer.id]);
+                          setSelectedCustomers((prev: string[]) => [...prev, customer.id]);
                         } else {
-                          setSelectedCustomers((prev: any) => prev.filter((id: any) => id !== customer.id));
+                          setSelectedCustomers((prev: string[]) => prev.filter((id: string) => id !== customer.id));
                         }
                         resetPagination();
                       }}
@@ -182,9 +182,9 @@ export default function DOFilters({ selectedStatuses, setSelectedStatuses, selec
                       checked={selectedTaxTreatments.includes(value)}
                       onCheckedChange={(checked) => {
                         if (checked) {
-                          setSelectedTaxTreatments((prev: any) => [...prev, value]);
+                          setSelectedTaxTreatments((prev: string[]) => [...prev, value]);
                         } else {
-                          setSelectedTaxTreatments((prev: any) => prev.filter((t: any) => t !== value));
+                          setSelectedTaxTreatments((prev: string[]) => prev.filter((t: string) => t !== value));
                         }
                         resetPagination();
                       }}
@@ -287,7 +287,7 @@ export default function DOFilters({ selectedStatuses, setSelectedStatuses, selec
                 <X 
                   className="h-3 w-3 cursor-pointer" 
                   onClick={() => {
-                    setSelectedStatuses((prev: any) => prev.filter((s: any) => s !== status));
+                    setSelectedStatuses((prev: string[]) => prev.filter((s: string) => s !== status));
                     resetPagination();
                   }}
                 />
@@ -302,7 +302,7 @@ export default function DOFilters({ selectedStatuses, setSelectedStatuses, selec
                 <X 
                   className="h-3 w-3 cursor-pointer" 
                   onClick={() => {
-                    setSelectedCustomers((prev: any) => prev.filter((id: any) => id !== customerId));
+                    setSelectedCustomers((prev: string[]) => prev.filter((id: string) => id !== customerId));
                     resetPagination();
                   }}
                 />
@@ -317,7 +317,7 @@ export default function DOFilters({ selectedStatuses, setSelectedStatuses, selec
                 <X 
                   className="h-3 w-3 cursor-pointer" 
                   onClick={() => {
-                    setSelectedTaxTreatments((prev: any) => prev.filter((t: any) => t !== treatment));
+                    setSelectedTaxTreatments((prev: string[]) => prev.filter((t: string) => t !== treatment));
                     resetPagination();
                   }}
                 />

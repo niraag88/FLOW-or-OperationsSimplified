@@ -92,9 +92,9 @@ export default function QuotationFilters({ selectedStatuses, setSelectedStatuses
                       checked={selectedStatuses.includes(status)}
                       onCheckedChange={(checked) => {
                         if (checked) {
-                          setSelectedStatuses((prev: any) => [...prev, status]);
+                          setSelectedStatuses((prev: string[]) => [...prev, status]);
                         } else {
-                          setSelectedStatuses((prev: any) => prev.filter((s: any) => s !== status));
+                          setSelectedStatuses((prev: string[]) => prev.filter((s: string) => s !== status));
                         }
                         resetPagination();
                       }}
@@ -131,9 +131,9 @@ export default function QuotationFilters({ selectedStatuses, setSelectedStatuses
                       checked={selectedCustomers.includes(customer.id)}
                       onCheckedChange={(checked) => {
                         if (checked) {
-                          setSelectedCustomers((prev: any) => [...prev, customer.id]);
+                          setSelectedCustomers((prev: string[]) => [...prev, customer.id]);
                         } else {
-                          setSelectedCustomers((prev: any) => prev.filter((id: any) => id !== customer.id));
+                          setSelectedCustomers((prev: string[]) => prev.filter((id: string) => id !== customer.id));
                         }
                         resetPagination();
                       }}
@@ -234,7 +234,7 @@ export default function QuotationFilters({ selectedStatuses, setSelectedStatuses
               <X 
                 className="h-3 w-3 cursor-pointer" 
                 onClick={() => {
-                  setSelectedStatuses((prev: any) => prev.filter((s: any) => s !== status));
+                  setSelectedStatuses((prev: string[]) => prev.filter((s: string) => s !== status));
                   resetPagination();
                 }}
               />
@@ -248,7 +248,7 @@ export default function QuotationFilters({ selectedStatuses, setSelectedStatuses
                 <X 
                   className="h-3 w-3 cursor-pointer" 
                   onClick={() => {
-                    setSelectedCustomers((prev: any) => prev.filter((id: any) => id !== customerId));
+                    setSelectedCustomers((prev: string[]) => prev.filter((id: string) => id !== customerId));
                     resetPagination();
                   }}
                 />

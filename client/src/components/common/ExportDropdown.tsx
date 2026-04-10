@@ -11,35 +11,42 @@ import { Download, Eye } from "lucide-react";
 import { exportToXLSX } from "../utils/export";
 import { format } from 'date-fns';
 
-export default function ExportDropdown({ 
-  data = [] as any[], 
-  type = "Data", 
-  filename = "export",
-  columns = {} as any,
-  isLoading = false,
-  onExternalDocumentClick = null as any,
-  fetchAllData = null as any,
-  totalCount = null as any,
-  onViewAndPrint = null as any,
-}: {
-  data?: any[];
+interface ColumnConfig {
+  label: string;
+  transform?: (value: unknown, item: Record<string, unknown>) => unknown;
+}
+
+interface ExportDropdownProps {
+  data?: Record<string, unknown>[];
   type?: string;
   filename?: string;
-  columns?: any;
+  columns?: Record<string, string | ColumnConfig>;
   isLoading?: boolean;
-  onExternalDocumentClick?: any;
-  fetchAllData?: any;
-  totalCount?: any;
-  onViewAndPrint?: any;
-}) {
+  onExternalDocumentClick?: ((row: Record<string, unknown>) => void) | null;
+  fetchAllData?: (() => Promise<Record<string, unknown>[]>) | null;
+  totalCount?: number | null;
+  onViewAndPrint?: (() => void) | null;
+}
+
+export default function ExportDropdown({ 
+  data = [],
+  type = "Data", 
+  filename = "export",
+  columns = {},
+  isLoading = false,
+  onExternalDocumentClick = null,
+  fetchAllData = null,
+  totalCount = null,
+  onViewAndPrint = null,
+}: ExportDropdownProps) {
   const [isExporting, setIsExporting] = useState(false);
 
-  const getExportData = (sourceData: any) => {
+  const getExportData = (sourceData: Record<string, unknown>[]): Record<string, unknown>[] => {
     const src = sourceData || data;
     if (!src || src.length === 0) return [];
-    return src.map((item: any) => {
-      const exportItem: Record<string, any> = {};
-      Object.keys(columns).forEach((key: any) => {
+    return src.map((item: Record<string, unknown>) => {
+      const exportItem: Record<string, unknown> = {};
+      Object.keys(columns).forEach((key: string) => {
         const columnConfig = columns[key];
         if (typeof columnConfig === 'string') {
           exportItem[columnConfig] = item[key] || '';
@@ -52,7 +59,7 @@ export default function ExportDropdown({
     });
   };
 
-  const openPrintWindow = () => {
+  const openPrintWindow = (): Window | null => {
     const pw = window.open('', '_blank');
     if (!pw) {
       alert('Please allow popups in your browser to use View & Print.');
@@ -63,11 +70,11 @@ export default function ExportDropdown({
     return pw;
   };
 
-  const writePrintContent = (pw: any, subtitle: any, headers: any, rows: any, total: any) => {
+  const writePrintContent = (pw: Window, subtitle: string, headers: string[], rows: Record<string, unknown>[], total: number) => {
     const now = format(new Date(), 'dd/MM/yy HH:mm');
-    const headerCells = headers.map((h: any) => `<th>${h}</th>`).join('');
+    const headerCells = headers.map((h: string) => `<th>${h}</th>`).join('');
     const bodyRows = rows
-      .map((row: any) => `<tr>${headers.map((h: any) => `<td>${String(row[h] ?? '')}</td>`).join('')}</tr>`)
+      .map((row: Record<string, unknown>) => `<tr>${headers.map((h: string) => `<td>${String(row[h] ?? '')}</td>`).join('')}</tr>`)
       .join('');
 
     pw.document.open();
@@ -116,7 +123,7 @@ export default function ExportDropdown({
 
     setIsExporting(true);
     try {
-      let exportSource = data;
+      let exportSource: Record<string, unknown>[] = data;
       if (fetchAllData) {
         exportSource = await fetchAllData();
       }
@@ -133,18 +140,21 @@ export default function ExportDropdown({
       if (exportFormat === 'xlsx') {
         exportToXLSX(exportData, exportFilename, type);
       } else {
-        const headers = Object.values(columns).map((col: any) =>
+        const headers = Object.values(columns).map((col: string | ColumnConfig) =>
           typeof col === 'string' ? col : col.label
         );
-        writePrintContent(pw, type, headers, exportData, exportData.length);
+        if (pw) writePrintContent(pw, type, headers, exportData, exportData.length);
       }
-    } catch (error: any) {
+    } catch (error: unknown) {
       console.error('Export error:', error);
       if (pw) pw.close();
     } finally {
       setIsExporting(false);
     }
   };
+
+  // Suppress unused variable warning for onExternalDocumentClick
+  void onExternalDocumentClick;
 
   const exportCount = totalCount !== null ? totalCount : (data?.length || 0);
   const disabled = isLoading || isExporting;

@@ -209,9 +209,9 @@ export default function ProductsTab({
                             checked={selectedBrands.includes(brand)}
                             onCheckedChange={(checked) => {
                               if (checked) {
-                                setSelectedBrands((prev: any) => [...prev, brand]);
+                                setSelectedBrands((prev: string[]) => [...prev, brand]);
                               } else {
-                                setSelectedBrands((prev: any) => prev.filter((b: any) => b !== brand));
+                                setSelectedBrands((prev: string[]) => prev.filter((b: string) => b !== brand));
                               }
                               resetPagination();
                             }}
@@ -248,9 +248,9 @@ export default function ProductsTab({
                             checked={selectedSizes.includes(size)}
                             onCheckedChange={(checked) => {
                               if (checked) {
-                                setSelectedSizes((prev: any) => [...prev, size]);
+                                setSelectedSizes((prev: string[]) => [...prev, size]);
                               } else {
-                                setSelectedSizes((prev: any) => prev.filter((s: any) => s !== size));
+                                setSelectedSizes((prev: string[]) => prev.filter((s: string) => s !== size));
                               }
                               resetPagination();
                             }}
@@ -294,7 +294,7 @@ export default function ProductsTab({
                     <X 
                       className="h-3 w-3 cursor-pointer" 
                       onClick={() => {
-                        setSelectedBrands((prev: any) => prev.filter((b: any) => b !== brand));
+                        setSelectedBrands((prev: string[]) => prev.filter((b: string) => b !== brand));
                         resetPagination();
                       }}
                     />
@@ -306,7 +306,7 @@ export default function ProductsTab({
                     <X 
                       className="h-3 w-3 cursor-pointer" 
                       onClick={() => {
-                        setSelectedSizes((prev: any) => prev.filter((s: any) => s !== size));
+                        setSelectedSizes((prev: string[]) => prev.filter((s: string) => s !== size));
                         resetPagination();
                       }}
                     />
@@ -426,7 +426,7 @@ export default function ProductsTab({
                         <Button
                           variant="outline"
                           
-                          onClick={() => setCurrentPage((prev: any) => Math.max(1, prev - 1))}
+                          onClick={() => setCurrentPage((prev: number) => Math.max(1, prev - 1))}
                           disabled={currentPage === 1}
                         >
                           Previous
@@ -462,7 +462,7 @@ export default function ProductsTab({
                         <Button
                           variant="outline"
                           
-                          onClick={() => setCurrentPage((prev: any) => Math.min(totalPages, prev + 1))}
+                          onClick={() => setCurrentPage((prev: number) => Math.min(totalPages, prev + 1))}
                           disabled={currentPage === totalPages}
                         >
                           Next

@@ -365,7 +365,7 @@ export default function StockTab({ products, loading, onStockSubTabChange, canEd
               <Button
                 variant="outline"
                 
-                onClick={() => setPage((prev: any) => Math.max(1, prev - 1))}
+                onClick={() => setPage((prev: number) => Math.max(1, prev - 1))}
                 disabled={currentPage === 1}
               >
                 Previous
@@ -401,7 +401,7 @@ export default function StockTab({ products, loading, onStockSubTabChange, canEd
               <Button
                 variant="outline"
                 
-                onClick={() => setPage((prev: any) => Math.min(paginationData.totalPages, prev + 1))}
+                onClick={() => setPage((prev: number) => Math.min(paginationData.totalPages, prev + 1))}
                 disabled={currentPage === paginationData.totalPages}
               >
                 Next

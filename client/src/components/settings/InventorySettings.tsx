@@ -17,7 +17,7 @@ export default function InventorySettings() {
   const [isSaving, setIsSaving] = useState(false);
   const [showInitialStock, setShowInitialStock] = useState(false);
   const [products, setProducts] = useState<any[]>([]);
-  const [initialStockData, setInitialStockData] = useState<any>({});
+  const [initialStockData, setInitialStockData] = useState<Record<string, { quantity: number; notes: string }>>({});
 
   const { toast } = useToast();
 
@@ -72,7 +72,7 @@ export default function InventorySettings() {
   };
 
   const handleStockChange = (productId: any, field: any, value: any) => {
-    setInitialStockData((prev: any) => ({
+    setInitialStockData((prev) => ({
       ...prev,
       [productId]: {
         ...prev[productId],

@@ -35,7 +35,7 @@ export default function POFilters({ filters, onFiltersChange, onFilterChange }: 
   };
 
   const handleFilterChange = (field: any, value: any) => {
-    onFiltersChange((prev: any) => ({
+    onFiltersChange((prev) => ({
       ...prev,
       [field]: value
     }));

@@ -53,7 +53,7 @@ const COUNTRIES = [
   { code: 'CN', name: 'China' },
   { code: 'JP', name: 'Japan' },
   { code: 'KR', name: 'South Korea' }
-].sort((a: any, b: any) => a.name.localeCompare(b.name));
+].sort((a: { code: string; name: string }, b: { code: string; name: string }) => a.name.localeCompare(b.name));
 
 export default function CustomerForm({ open, onClose, editingCustomer, currentUser, onSuccess }: CustomerFormProps) {
   const [loading, setLoading] = useState(false);
@@ -77,7 +77,7 @@ export default function CustomerForm({ open, onClose, editingCustomer, currentUs
   useEffect(() => {
     if (editingCustomer) {
       setFormData({
-        ...(editingCustomer as any),
+        ...editingCustomer,
         vat_treatment_default: editingCustomer.vat_treatment_default || "", // Convert null to empty string for UI
         credit_limit: editingCustomer.credit_limit || 0
       } as typeof formData);
@@ -101,8 +101,8 @@ export default function CustomerForm({ open, onClose, editingCustomer, currentUs
     }
   }, [editingCustomer, open]);
 
-  const handleCountryChange = (countryCode: any) => {
-    const country = COUNTRIES.find((c: any) => c.code === countryCode);
+  const handleCountryChange = (countryCode: string) => {
+    const country = COUNTRIES.find((c) => c.code === countryCode);
     setFormData(prev => ({
       ...prev,
       country_code: countryCode,
@@ -126,7 +126,7 @@ export default function CustomerForm({ open, onClose, editingCustomer, currentUs
     }
   };
 
-  const handleSubmit = async (e: any) => {
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setLoading(true);
 
@@ -154,7 +154,7 @@ export default function CustomerForm({ open, onClose, editingCustomer, currentUs
         }
       } else {
         const newCustomer = await CustomerEntity.create(customerData);
-        await logAuditAction("Customer", (newCustomer as any).id, "create", (currentUser as any)?.email || '', {
+        await logAuditAction("Customer", (newCustomer as Record<string, unknown>).id as number, "create", currentUser?.email || '', {
           name: customerData.name,
           country_code: customerData.country_code,
           vat_treatment_default: customerData.vat_treatment_default
@@ -163,7 +163,7 @@ export default function CustomerForm({ open, onClose, editingCustomer, currentUs
       
       onSuccess?.();
       onClose();
-    } catch (error: any) {
+    } catch (error: unknown) {
       console.error("Error saving customer:", error);
     } finally {
       setLoading(false);
@@ -255,7 +255,7 @@ export default function CustomerForm({ open, onClose, editingCustomer, currentUs
                     <SelectValue placeholder="Select country" />
                   </SelectTrigger>
                   <SelectContent>
-                    {COUNTRIES.map((country: any) => (
+                    {COUNTRIES.map((country) => (
                       <SelectItem key={country.code} value={country.code}>
                         {country.name} ({country.code})
                       </SelectItem>

@@ -304,7 +304,7 @@ export default function PoGrnReport({ purchaseOrders, goodsReceipts, suppliers =
                   id={`${idPrefix}-supplier-${supplier.id}`}
                   checked={selected.includes(supplier.id)}
                   onCheckedChange={(checked) => {
-                    setSelected((prev: any) => checked ? [...prev, supplier.id] : prev.filter((id: any) => id !== supplier.id));
+                    setSelected((prev) => checked ? [...prev, supplier.id] : prev.filter((id) => id !== supplier.id));
                     onReset();
                   }}
                 />
@@ -502,7 +502,7 @@ export default function PoGrnReport({ purchaseOrders, goodsReceipts, suppliers =
                 return (
                   <Badge key={supplierId} variant="secondary" className="gap-1">
                     Supplier: {supplier?.name}
-                    <X className="h-3 w-3 cursor-pointer" onClick={() => { setPoSelectedSuppliers(prev => prev.filter((id: any) => id !== supplierId)); setCurrentPage(1); }} />
+                    <X className="h-3 w-3 cursor-pointer" onClick={() => { setPoSelectedSuppliers(prev => prev.filter((id) => id !== supplierId)); setCurrentPage(1); }} />
                   </Badge>
                 );
               })}
@@ -628,7 +628,7 @@ export default function PoGrnReport({ purchaseOrders, goodsReceipts, suppliers =
                 return (
                   <Badge key={supplierId} variant="secondary" className="gap-1">
                     Supplier: {supplier?.name}
-                    <X className="h-3 w-3 cursor-pointer" onClick={() => { setGrnSelectedSuppliers(prev => prev.filter((id: any) => id !== supplierId)); setGrnCurrentPage(1); }} />
+                    <X className="h-3 w-3 cursor-pointer" onClick={() => { setGrnSelectedSuppliers(prev => prev.filter((id) => id !== supplierId)); setGrnCurrentPage(1); }} />
                   </Badge>
                 );
               })}
