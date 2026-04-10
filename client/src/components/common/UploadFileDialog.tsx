@@ -154,7 +154,7 @@ export default function UploadFileDialog({ open, onClose, onSuccess, recordType,
               </div>
               <Button
                 variant="ghost"
-                
+                size="sm"
                 onClick={() => { setSelectedFile(null); if (inputRef.current) inputRef.current.value = ''; }}
               >
                 <X className="w-4 h-4" />

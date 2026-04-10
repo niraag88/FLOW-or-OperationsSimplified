@@ -623,7 +623,7 @@ export default function QuotationForm({ open, onClose, editingQuotation, current
                             <Button
                               type="button"
                               variant="ghost"
-                              
+                                                            size="sm"
                               onClick={() => removeItem(index)}
                             >
                               <Trash2 className="w-4 h-4" />

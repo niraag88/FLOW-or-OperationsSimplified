@@ -274,7 +274,7 @@ export default function BookClosingManager({ currentUser }: BookClosingManagerPr
                           </AlertDialog>
                           <Button
                             variant="secondary"
-                            
+                                                        size="sm"
                             onClick={() => handleExportYear(book)}
                             disabled={exportingId === book.id}
                           >

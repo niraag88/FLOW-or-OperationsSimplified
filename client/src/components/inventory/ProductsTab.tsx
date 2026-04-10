@@ -94,7 +94,7 @@ export default function ProductsTab({
         document_id: productToDelete.id,
         document_number: productToDelete.name,
         document_data: productToDelete,
-        deleted_by: (user as any)?.email || 'unknown',
+        deleted_by: (user as { email?: string })?.email || 'unknown',
         deleted_date: new Date().toISOString(),
         reason: 'Deleted from UI',
         original_status: productToDelete.isActive ? 'Active' : 'Inactive',
@@ -106,7 +106,7 @@ export default function ProductsTab({
         entity_type: 'Product',
         entity_id: productToDelete.id,
         action: 'deleted',
-        user_email: (user as any)?.email || 'unknown',
+        user_email: (user as { email?: string })?.email || 'unknown',
         changes: { 
           product_name: productToDelete.name,
           deletion_reason: 'Deleted from UI',
@@ -272,7 +272,7 @@ export default function ProductsTab({
               {(selectedBrands.length > 0 || selectedSizes.length > 0) && (
                 <Button 
                   variant="ghost" 
-                   
+                  size="sm" 
                   onClick={() => {
                     setSelectedBrands([]);
                     setSelectedSizes([]);
@@ -358,7 +358,7 @@ export default function ProductsTab({
                             <DropdownMenu>
                               <DropdownMenuTrigger asChild>
                                 <Button
-                                  
+                                  size="sm"
                                   variant="ghost"
                                   className="h-8 w-8 p-0"
                                 >
@@ -425,7 +425,7 @@ export default function ProductsTab({
                       <div className="flex items-center gap-2">
                         <Button
                           variant="outline"
-                          
+                          size="sm"
                           onClick={() => setCurrentPage((prev: number) => Math.max(1, prev - 1))}
                           disabled={currentPage === 1}
                         >
@@ -449,7 +449,7 @@ export default function ProductsTab({
                               <Button
                                 key={pageNumber}
                                 variant={currentPage === pageNumber ? "default" : "outline"}
-                                
+                                size="sm"
                                 className="w-8 h-8 p-0"
                                 onClick={() => setCurrentPage(pageNumber)}
                               >
@@ -461,7 +461,7 @@ export default function ProductsTab({
                         
                         <Button
                           variant="outline"
-                          
+                          size="sm"
                           onClick={() => setCurrentPage((prev: number) => Math.min(totalPages, prev + 1))}
                           disabled={currentPage === totalPages}
                         >

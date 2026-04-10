@@ -364,7 +364,7 @@ export default function StockTab({ products, loading, onStockSubTabChange, canEd
             <div className="flex items-center gap-2">
               <Button
                 variant="outline"
-                
+                size="sm"
                 onClick={() => setPage((prev: number) => Math.max(1, prev - 1))}
                 disabled={currentPage === 1}
               >
@@ -388,7 +388,7 @@ export default function StockTab({ products, loading, onStockSubTabChange, canEd
                     <Button
                       key={pageNumber}
                       variant={currentPage === pageNumber ? "default" : "outline"}
-                      
+                                            size="sm"
                       className="w-8 h-8 p-0"
                       onClick={() => setPage(pageNumber)}
                     >
@@ -400,7 +400,7 @@ export default function StockTab({ products, loading, onStockSubTabChange, canEd
               
               <Button
                 variant="outline"
-                
+                size="sm"
                 onClick={() => setPage((prev: number) => Math.min(paginationData.totalPages, prev + 1))}
                 disabled={currentPage === paginationData.totalPages}
               >
@@ -757,7 +757,7 @@ export default function StockTab({ products, loading, onStockSubTabChange, canEd
                   {(selectedStockBrands.length > 0 || selectedStockSizes.length > 0 || selectedStockStatus.length > 0 || stockLevelFilter.min || stockLevelFilter.max) && (
                     <Button 
                       variant="ghost" 
-                       
+                                              size="sm"
                       onClick={() => {
                         setSelectedStockBrands([]);
                         setSelectedStockSizes([]);
@@ -1040,7 +1040,7 @@ export default function StockTab({ products, loading, onStockSubTabChange, canEd
                   {(selectedMovementBrands.length > 0 || selectedMovementTypes.length > 0 || movementDateFilter.start || movementDateFilter.end) && (
                     <Button 
                       variant="ghost" 
-                       
+                                              size="sm"
                       onClick={() => {
                         setSelectedMovementBrands([]);
                         setSelectedMovementTypes([]);
@@ -1333,7 +1333,7 @@ export default function StockTab({ products, loading, onStockSubTabChange, canEd
                   {(selectedLowStockBrands.length > 0 || selectedLowStockSizes.length > 0 || lowStockRange.min || lowStockRange.max) && (
                     <Button 
                       variant="ghost" 
-                       
+                                              size="sm"
                       onClick={() => {
                         setSelectedLowStockBrands([]);
                         setSelectedLowStockSizes([]);
@@ -1549,7 +1549,7 @@ export default function StockTab({ products, loading, onStockSubTabChange, canEd
                   {(selectedOutOfStockBrands.length > 0 || selectedOutOfStockSizes.length > 0) && (
                     <Button 
                       variant="ghost" 
-                       
+                                              size="sm"
                       onClick={() => {
                         setSelectedOutOfStockBrands([]);
                         setSelectedOutOfStockSizes([]);

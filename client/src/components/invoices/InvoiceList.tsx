@@ -220,7 +220,7 @@ export default function InvoiceList({ invoices, totalCount, loading, canEdit, ca
                                 </div>
                                 {canEdit && (
                                   <Button
-                                    
+                                    size="sm"
                                     variant="outline"
                                     className="w-full text-xs h-7"
                                     onClick={() => handleEditPayment(invoice)}

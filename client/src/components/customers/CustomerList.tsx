@@ -136,7 +136,7 @@ export default function CustomerList({ customers, loading, canEdit, onEdit, curr
                     {canEdit && (
                       <Button
                         variant="ghost"
-                        
+                        size="sm"
                         onClick={() => onEdit(customer)}
                       >
                         <Edit2 className="w-4 h-4" />
@@ -196,7 +196,7 @@ export default function CustomerList({ customers, loading, canEdit, onEdit, curr
                 <div className="flex justify-end pt-3 border-t border-gray-200">
                   <Button
                     variant="outline"
-                    
+                    size="sm"
                     onClick={() => onEdit(customer)}
                   >
                     <Edit2 className="w-4 h-4 mr-2" />

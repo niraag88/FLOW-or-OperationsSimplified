@@ -358,7 +358,7 @@ export default function RecycleBinComponent() {
                         <div className="flex items-center gap-2">
                           {item.can_restore && (
                             <Button
-                              
+                              size="sm"
                               variant="outline"
                               onClick={() => {
                                 setSelectedItem(item);
@@ -372,7 +372,7 @@ export default function RecycleBinComponent() {
                           )}
                           {canPermanentlyDelete && (
                             <Button
-                              
+                              size="sm"
                               variant="outline"
                               onClick={() => {
                                 setSelectedItem(item);

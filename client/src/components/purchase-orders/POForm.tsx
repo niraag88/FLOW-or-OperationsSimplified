@@ -635,7 +635,7 @@ export default function POForm({ open, onClose, editingPO, currentUser, onSucces
                             <Button
                               type="button"
                               variant="ghost"
-                              
+                                                            size="sm"
                               onClick={() => removeItem(index)}
                               data-testid={`button-remove-item-${index}`}
                             >
@@ -796,7 +796,7 @@ export default function POForm({ open, onClose, editingPO, currentUser, onSucces
                                   <Button
                                     type="button"
                                     variant="ghost"
-                                    
+                                                                        size="sm"
                                     className="h-7 px-2 text-blue-600 hover:text-blue-800"
                                     onClick={() => handleViewDoc(grn.scanKey1)}
                                   >
@@ -820,7 +820,7 @@ export default function POForm({ open, onClose, editingPO, currentUser, onSucces
                                 <Button
                                   type="button"
                                   variant="ghost"
-                                  
+                                                                    size="sm"
                                   className="h-7 px-2 text-blue-600 hover:text-blue-800"
                                   onClick={() => handleViewDoc(poScanKey)}
                                 >
@@ -830,7 +830,7 @@ export default function POForm({ open, onClose, editingPO, currentUser, onSucces
                                 <Button
                                   type="button"
                                   variant="ghost"
-                                  
+                                                                    size="sm"
                                   className="h-7 px-2 text-red-500 hover:text-red-700"
                                   onClick={handleDeletePoDoc}
                                 >
@@ -856,7 +856,7 @@ export default function POForm({ open, onClose, editingPO, currentUser, onSucces
                                   <Button
                                     type="button"
                                     variant="ghost"
-                                    
+                                                                        size="sm"
                                     className="h-7 px-2 text-blue-600 hover:text-blue-800"
                                     onClick={() => handleViewDoc(key)}
                                   >

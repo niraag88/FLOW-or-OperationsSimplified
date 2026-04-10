@@ -230,8 +230,7 @@ export default function CustomerManagement() {
                             <Switch
                               checked={customer.isActive}
                               onCheckedChange={() => handleToggleActive(customer)}
-                              
-                            />
+                                                          />
                             <span className={customer.isActive ? 'text-green-600' : 'text-gray-400'}>
                               {customer.isActive ? 'Active' : 'Inactive'}
                             </span>
@@ -265,8 +264,7 @@ export default function CustomerManagement() {
                             <Switch
                               checked={customer.isActive}
                               onCheckedChange={() => handleToggleActive(customer)}
-                              
-                            />
+                                                          />
                             <span className={`text-xs ${customer.isActive ? 'text-green-600' : 'text-gray-400'}`}>
                               {customer.isActive ? 'Active' : 'Inactive'}
                             </span>

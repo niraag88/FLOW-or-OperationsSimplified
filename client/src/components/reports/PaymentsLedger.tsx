@@ -187,7 +187,7 @@ function LedgerFilters({ paymentFilter, setPaymentFilter, dateFrom, setDateFrom,
       {(paymentFilter !== "all" || dateFrom || dateTo || search) && (
         <Button
           variant="ghost"
-          
+                    size="sm"
           onClick={() => { setPaymentFilter("all"); setDateFrom(""); setDateTo(""); setSearch(""); }}
           className="text-gray-500"
         >

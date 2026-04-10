@@ -569,7 +569,7 @@ export default function InvoiceForm({ open, onClose, editingInvoice, currentUser
                             <Button 
                               type="button" 
                               variant="ghost" 
-                               
+                                                              size="sm"
                               onClick={() => removeItem(index)}
                             >
                               <Trash2 className="w-4 h-4 text-red-500" />

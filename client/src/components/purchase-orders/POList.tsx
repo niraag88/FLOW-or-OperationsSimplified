@@ -208,7 +208,7 @@ export default function POList({ purchaseOrders, totalCount, loading, canEdit, c
                                 </div>
                                 {canEdit && (
                                   <Button
-                                    
+                                    size="sm"
                                     variant="outline"
                                     className="w-full text-xs h-7"
                                     onClick={() => handleEditPayment(po)}

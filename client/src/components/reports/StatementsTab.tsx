@@ -527,11 +527,11 @@ function StatementPreviewModal({ open, onClose, type, entity, companySettings, r
                 <Printer className="w-4 h-4 mr-1.5" />
                 Print / Save PDF
               </Button>
-              <Button  variant="outline" onClick={handleExportXlsx}>
+              <Button size="sm" variant="outline" onClick={handleExportXlsx}>
                 <Download className="w-4 h-4 mr-1.5" />
                 Export to XLSX
               </Button>
-              <Button  variant="outline" onClick={onClose}>
+              <Button size="sm" variant="outline" onClick={onClose}>
                 <X className="w-4 h-4 mr-1.5" />
                 Close
               </Button>
@@ -681,7 +681,7 @@ function InvoicesSection({ invoices, customers, companySettings }: { invoices: R
 
         <div className="ml-auto flex items-end gap-2">
           <Button
-            
+                        size="sm"
             disabled={!selectedCustomerId}
             onClick={() => setShowStatement(true)}
             className="bg-emerald-700 hover:bg-emerald-800 text-white disabled:opacity-50"
@@ -912,7 +912,7 @@ function PurchaseOrdersSection({ purchaseOrders, companySettings }: { purchaseOr
 
         <div className="ml-auto flex items-end gap-2">
           <Button
-            
+                        size="sm"
             disabled={!selectedBrandId}
             onClick={() => setShowStatement(true)}
             className="bg-emerald-700 hover:bg-emerald-800 text-white disabled:opacity-50"

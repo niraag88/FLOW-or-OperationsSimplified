@@ -195,7 +195,7 @@ export default function CompanySettingsComponent() {
             {isAdmin && !isEditMode && (
               <Button
                 variant="outline"
-                
+                                size="sm"
                 onClick={handleEdit}
                 className="flex items-center gap-2"
               >
@@ -206,7 +206,7 @@ export default function CompanySettingsComponent() {
             {isAdmin && isEditMode && (
               <Button
                 variant="outline"
-                
+                                size="sm"
                 onClick={handleCancel}
                 disabled={loading}
                 className="flex items-center gap-2"

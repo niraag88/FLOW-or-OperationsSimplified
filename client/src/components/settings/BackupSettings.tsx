@@ -398,7 +398,7 @@ export default function BackupSettings() {
                           {run.dbSuccess && run.dbStorageKey ? (
                             <div className="flex items-center gap-1">
                               <Button
-                                
+                                size="sm"
                                 variant="outline"
                                 onClick={() => handleDownload(run)}
                                 disabled={downloadingId === run.id}
@@ -411,7 +411,7 @@ export default function BackupSettings() {
                               </Button>
                               {run.success && (
                                 <Button
-                                  
+                                  size="sm"
                                   variant="outline"
                                   onClick={() => handleRestoreClick(run)}
                                   disabled={isRestoring}

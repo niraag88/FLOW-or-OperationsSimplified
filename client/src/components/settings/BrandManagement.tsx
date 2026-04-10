@@ -276,7 +276,6 @@ export default function BrandManagement() {
                             <Switch
                               checked={brand.isActive}
                               onCheckedChange={() => handleToggleActive(brand)}
-                              
                             />
                             <span className={`text-xs ${brand.isActive ? 'text-green-600' : 'text-gray-400'}`}>
                               {brand.isActive ? 'Active' : 'Inactive'}

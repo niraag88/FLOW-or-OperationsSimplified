@@ -501,7 +501,7 @@ export default function DOForm({ open, onClose, editingDO, currentUser, onSucces
                             <Button 
                               type="button" 
                               variant="ghost" 
-                               
+                                                              size="sm"
                               onClick={() => removeItem(index)}
                             >
                               <Trash2 className="w-4 h-4 text-red-500" />
