@@ -1,0 +1,127 @@
+1. Restore is still destructive before validation
+
+File: scripts/restoreBackup.js
+
+Right now the restore flow does this:
+
+drops the public schema
+recreates public
+then pipes the uploaded or stored dump into psql
+
+That means if:
+
+the uploaded .sql.gz file is wrong
+the gzip is corrupt
+the SQL is incomplete
+the dump is from an incompatible state
+
+then the app can end up with an empty or partially restored database after the drop.
+
+That is the biggest remaining risk in the whole app.
+
+What I want instead
+
+Before dropping the live schema, the app should do one of these:
+
+restore into a temporary database first and only proceed if it succeeds
+or do a stronger preflight validation of the uploaded backup before destructive restore
+or make restore explicitly a last-resort admin operation with even stronger safeguards and warnings
+
+For a business app, this matters a lot.
+
+Medium-priority issues
+2. Backup UI says automatic logout, but the code does not do that
+
+File: client/src/components/settings/BackupSettings.tsx
+
+The confirmation text says the user will be logged out automatically after restore.
+
+But the actual behavior is:
+
+show success banner
+ask the user to click and log in again manually
+
+That is not a dangerous bug, but it is an operational mismatch in a sensitive workflow.
+
+Fix either:
+
+the wording
+or the actual behavior
+3. Dead code still exists
+
+These look unused in the ZIP:
+
+client/src/components/Layout.tsx
+client/src/components/TopNavigation.tsx
+client/src/components/RecentActivity.tsx
+
+They are not just unused — some of them still contain old placeholder behavior and hardcoded user display values.
+
+That will not break production today, but it is exactly the kind of leftover code that causes confusion later.
+
+4. TopNavigation.tsx still contains hardcoded personal data
+
+File: client/src/components/TopNavigation.tsx
+
+It still includes:
+
+Niraag Sheth
+NS
+
+It appears to be dead code, so this is not a live runtime issue if it is truly unused.
+But if it ever gets imported again by mistake, it becomes a real bug.
+
+So either:
+
+remove it
+or strip the hardcoded values
+5. Company logo upload still does not match the storage design
+
+Files:
+
+client/src/components/settings/CompanySettings.tsx
+client/src/api/integrations.ts
+
+Your schema suggests logo should be an object-storage key, but the current flow still uses FileReader and stores a data URL/base64 string.
+
+It works, but it is not a clean long-term approach because it:
+
+bloats database data
+bloats backups
+doesn’t match the rest of your storage model
+
+This is not a rollout blocker, but I would still improve it.
+
+6. client/src/api/integrations.ts still contains fake success stubs
+
+That file still exports placeholder functions like:
+
+InvokeLLM
+SendEmail
+GenerateImage
+ExtractDataFromUploadedFile
+
+They are not currently the main problem because they look unused, but they are still the kind of code that can silently pretend something succeeded.
+
+I would either:
+
+remove them
+or make them throw explicit “not implemented” errors
+7. No tests for backup/restore flows
+
+Your E2E suite is a good sign, but I do not see tests covering:
+
+backup runs
+restore from cloud backup
+restore from uploaded backup
+retention purge
+
+These are some of the most dangerous operational paths in the app, so they deserve at least basic coverage.
+
+Low-priority issues
+
+These do not stop implementation, but I would still clean them:
+
+route casing is still mixed in App.tsx
+.canvas and attached_assets are still bundled into the project export
+multer.memoryStorage() is still in use, which is okay for your current file volume, but not ideal for bigger uploads later
