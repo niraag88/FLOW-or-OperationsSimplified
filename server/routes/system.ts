@@ -4,6 +4,8 @@ import { db, pool } from "../db";
 import { eq, desc, sum, inArray } from "drizzle-orm";
 import { Readable } from 'stream';
 import { execSync } from 'child_process';
+import { createWriteStream, createReadStream, unlink } from 'fs';
+import { tmpdir } from 'os';
 import * as XLSX from 'xlsx';
 import { requireAuth, requireRole, writeAuditLog, objectStorageClient, validateUploadInput, validatePdfMagicBytes, validateImageMagicBytes, upload, type AuthenticatedRequest } from "../middleware";
 import crypto from 'crypto';
@@ -821,9 +823,15 @@ export function registerSystemRoutes(app: Express) {
   /**
    * POST /api/ops/restore-upload — restore from an uploaded .sql.gz file.
    *
-   * Uses busboy to stream the multipart upload directly into restoreBackup()
-   * without buffering the entire file in memory. This prevents OOM issues
-   * with large backup files.
+   * Buffers the upload to a temp file on disk before calling runRestore().
+   * This ensures the busboy fileSize limit check completes BEFORE any
+   * destructive DROP SCHEMA action begins, eliminating the race condition
+   * where a truncated oversized file could start a restore.
+   *
+   * Flow:
+   *   1. Pipe fileStream → temp file via createWriteStream
+   *   2. On writeStream 'finish': check limit flag → 413 or runRestore
+   *   3. Always delete the temp file in a finally block after runRestore
    */
   app.post('/api/ops/restore-upload', requireAuth(['Admin']), async (req: AuthenticatedRequest, res) => {
     const contentType = req.headers['content-type'] || '';
@@ -831,11 +839,21 @@ export function registerSystemRoutes(app: Express) {
       return res.status(400).json({ error: 'Request must be multipart/form-data' });
     }
 
+    const cleanupTemp = (path: string) => {
+      unlink(path, (err) => {
+        if (err && (err as NodeJS.ErrnoException).code !== 'ENOENT') {
+          console.error('Failed to delete temp restore file:', err.message);
+        }
+      });
+    };
+
     // @ts-ignore
     const Busboy = (await import('busboy')).default;
     const bb = Busboy({ headers: req.headers, limits: { files: 1, fileSize: 500 * 1024 * 1024 } });
 
     let fileHandled = false;
+    const triggeredBy = req.user!.id;
+    const actorName = req.user?.username || req.user!.id;
 
     bb.on('file', (fieldname: string, fileStream: import('stream').Readable, info: { filename: string }) => {
       if (fieldname !== 'file') { fileStream.resume(); return; }
@@ -848,19 +866,49 @@ export function registerSystemRoutes(app: Express) {
         return res.status(400).json({ error: 'File must be a .sql.gz gzip-compressed PostgreSQL dump' });
       }
 
+      const tempPath = `${tmpdir()}/restore-upload-${crypto.randomUUID()}.sql.gz`;
+      const ws = createWriteStream(tempPath);
+      let hitSizeLimit = false;
+
       fileStream.on('limit', () => {
+        hitSizeLimit = true;
         fileStream.resume();
-        if (!res.headersSent) res.status(413).json({ error: 'File too large. Maximum size is 500 MB.' });
       });
 
-      // Pass the stream directly to restoreBackup — no in-memory buffering
-      runRestore({
-        sqlGzStream: fileStream,
-        triggeredBy: req.user!.id,
-        actorName: req.user?.username || req.user!.id,
-        sourceFilename: filename,
-        res,
+      fileStream.on('error', (err: Error) => {
+        console.error('Upload stream read error:', err.message);
+        ws.destroy();
+        cleanupTemp(tempPath);
+        if (!res.headersSent) res.status(500).json({ error: 'Failed to receive uploaded file' });
       });
+
+      ws.on('error', (err: Error) => {
+        console.error('Temp file write error:', err.message);
+        cleanupTemp(tempPath);
+        if (!res.headersSent) res.status(500).json({ error: 'Failed to buffer uploaded file' });
+      });
+
+      ws.on('finish', async () => {
+        if (hitSizeLimit) {
+          cleanupTemp(tempPath);
+          if (!res.headersSent) res.status(413).json({ error: 'File too large. Maximum size is 500 MB.' });
+          return;
+        }
+
+        try {
+          await runRestore({
+            sqlGzStream: createReadStream(tempPath),
+            triggeredBy,
+            actorName,
+            sourceFilename: filename,
+            res,
+          });
+        } finally {
+          cleanupTemp(tempPath);
+        }
+      });
+
+      fileStream.pipe(ws);
     });
 
     bb.on('finish', () => {
