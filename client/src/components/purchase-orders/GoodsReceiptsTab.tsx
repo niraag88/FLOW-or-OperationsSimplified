@@ -339,7 +339,7 @@ export default function GoodsReceiptsTab({
               {isClosedSection ? (
                 <DropdownMenu>
                   <DropdownMenuTrigger asChild>
-                    <Button variant="ghost"  className="h-8 w-8 p-0">
+                    <Button variant="ghost" size="sm" className="h-8 w-8 p-0">
                       <MoreHorizontal className="h-4 w-4" />
                     </Button>
                   </DropdownMenuTrigger>
@@ -362,7 +362,7 @@ export default function GoodsReceiptsTab({
                 </DropdownMenu>
               ) : (
                 <Button
-                  
+                  size="sm"
                   onClick={() => openReceiveDialog(po)}
                   disabled={!canEdit || processingPO === po.id}
                   className="bg-emerald-600 hover:bg-emerald-700"
@@ -836,7 +836,7 @@ export default function GoodsReceiptsTab({
                             </td>
                             <td className="p-2 align-middle" style={{width: '90px'}}>
                               <Button
-                                
+                                size="sm"
                                 onClick={() => openReceiveDialog(po)}
                                 disabled={!canEdit || processingPO === po.id}
                                 className="bg-emerald-600 hover:bg-emerald-700"
@@ -1023,7 +1023,7 @@ export default function GoodsReceiptsTab({
                               <td className="p-2 align-middle" style={{width: '80px'}}>
                                 <DropdownMenu>
                                   <DropdownMenuTrigger asChild>
-                                    <Button variant="ghost"  className="h-8 w-8 p-0">
+                                    <Button variant="ghost" size="sm" className="h-8 w-8 p-0">
                                       <MoreHorizontal className="h-4 w-4" />
                                     </Button>
                                   </DropdownMenuTrigger>
@@ -1272,7 +1272,7 @@ export default function GoodsReceiptsTab({
 
       <SimpleConfirmDialog
         open={showCloseConfirm}
-        onClose={setShowCloseConfirm}
+        onClose={() => setShowCloseConfirm(false)}
         title="Force Close Purchase Order"
         description={`Are you sure you want to manually close ${closingPO?.poNumber}? This should only be done if you are not expecting any more items. This action cannot be undone.`}
         onConfirm={handleConfirmForceClose}

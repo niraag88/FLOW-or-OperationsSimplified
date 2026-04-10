@@ -222,16 +222,16 @@ export default function QuotationQuickViewModal({ quotationId, open, onClose, ca
         {!loading && detail && (
           <div className="flex items-center justify-end gap-2 pt-4 border-t mt-2">
             {canActOnQuotation && (
-              <Button variant="outline"  onClick={handleEdit}>
+              <Button variant="outline" size="sm" onClick={handleEdit}>
                 <Edit2 className="w-3.5 h-3.5 mr-1.5" />
                 Edit
               </Button>
             )}
-            <Button variant="outline"  onClick={handleExportXLSX}>
+            <Button variant="outline" size="sm" onClick={handleExportXLSX}>
               <Download className="w-3.5 h-3.5 mr-1.5" />
               Export XLSX
             </Button>
-            <Button  onClick={handleViewPrint} className="bg-purple-600 hover:bg-purple-700 text-white">
+            <Button size="sm" onClick={handleViewPrint} className="bg-purple-600 hover:bg-purple-700 text-white">
               <Eye className="w-3.5 h-3.5 mr-1.5" />
               View & Print
             </Button>

@@ -523,7 +523,7 @@ function StatementPreviewModal({ open, onClose, type, entity, companySettings, r
           <DialogTitle className="flex items-center justify-between pr-2">
             <span>Statement of Account Preview</span>
             <div className="flex gap-2">
-              <Button  onClick={handlePrint} className="bg-emerald-700 hover:bg-emerald-800 text-white">
+              <Button size="sm" onClick={handlePrint} className="bg-emerald-700 hover:bg-emerald-800 text-white">
                 <Printer className="w-4 h-4 mr-1.5" />
                 Print / Save PDF
               </Button>
@@ -673,7 +673,7 @@ function InvoicesSection({ invoices, customers, companySettings }: any) {
         </div>
 
         {hasActiveFilters && (
-          <Button variant="ghost"  className="text-gray-500 self-end"
+          <Button variant="ghost" size="sm" className="text-gray-500 self-end"
             onClick={() => { setSelectedCustomerId(""); setStatusFilter("all"); setDateFrom(""); setDateTo(""); }}>
             Clear
           </Button>
@@ -904,7 +904,7 @@ function PurchaseOrdersSection({ purchaseOrders, companySettings }: any) {
         </div>
 
         {hasActiveFilters && (
-          <Button variant="ghost"  className="text-gray-500 self-end"
+          <Button variant="ghost" size="sm" className="text-gray-500 self-end"
             onClick={() => { setSelectedBrandId(""); setStatusFilter("all"); setDateFrom(""); setDateTo(""); }}>
             Clear
           </Button>

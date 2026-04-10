@@ -479,7 +479,7 @@ export default function VATReportTab({ invoices, customers, books, companySettin
                       <TableCell>
                         <DropdownMenu>
                           <DropdownMenuTrigger asChild>
-                            <Button variant="ghost" ><MoreHorizontal className="w-4 h-4" /></Button>
+                            <Button variant="ghost" size="sm"><MoreHorizontal className="w-4 h-4" /></Button>
                           </DropdownMenuTrigger>
                           <DropdownMenuContent align="end">
                             <DropdownMenuItem onClick={() => window.open(`/Print?type=invoice&id=${invoice.id}`, '_blank')}>
@@ -503,9 +503,9 @@ export default function VATReportTab({ invoices, customers, books, companySettin
                 Showing {((currentPage - 1) * pageSize) + 1} to {Math.min(currentPage * pageSize, filteredInvoices.length)} of {filteredInvoices.length} results
               </p>
               <div className="flex items-center gap-2">
-                <Button variant="outline"  onClick={() => setCurrentPage(prev => Math.max(1, prev - 1))} disabled={currentPage === 1}>Previous</Button>
+                <Button variant="outline" size="sm" onClick={() => setCurrentPage(prev => Math.max(1, prev - 1))} disabled={currentPage === 1}>Previous</Button>
                 <span className="text-sm">Page {currentPage} of {totalPages}</span>
-                <Button variant="outline"  onClick={() => setCurrentPage(prev => Math.min(totalPages, prev + 1))} disabled={currentPage === totalPages}>Next</Button>
+                <Button variant="outline" size="sm" onClick={() => setCurrentPage(prev => Math.min(totalPages, prev + 1))} disabled={currentPage === totalPages}>Next</Button>
               </div>
             </div>
           )}

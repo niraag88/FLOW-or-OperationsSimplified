@@ -240,7 +240,7 @@ export default function BookClosingManager({ currentUser }: any) {
                     <TableCell>{getStatusBadge(book.status)}</TableCell>
                     <TableCell>
                       {book.status === 'Open' ? (
-                        <Button onClick={() => handleCloseYear(book)}  variant="destructive">
+                        <Button onClick={() => handleCloseYear(book)} size="sm" variant="destructive">
                           <Lock className="w-4 h-4 mr-2" />
                           Close Year
                         </Button>
@@ -248,7 +248,7 @@ export default function BookClosingManager({ currentUser }: any) {
                         <div className="flex items-center gap-2 flex-wrap">
                           <AlertDialog>
                             <AlertDialogTrigger asChild>
-                              <Button variant="outline" >
+                              <Button variant="outline" size="sm">
                                 <Unlock className="w-4 h-4 mr-2" />
                                 Reopen
                               </Button>

@@ -871,7 +871,7 @@ export default function StockTab({ products, loading, onStockSubTabChange, canEd
                   <History className="w-5 h-5" />
                   Recent Stock Movements ({paginatedMovements.totalItems})
                 </CardTitle>
-                <Button variant="outline"  onClick={loadStockMovements} disabled={loadingMovements}>
+                <Button variant="outline" size="sm" onClick={loadStockMovements} disabled={loadingMovements}>
                   <RefreshCw className={`w-4 h-4 mr-1 ${loadingMovements ? 'animate-spin' : ''}`} />
                   Refresh
                 </Button>

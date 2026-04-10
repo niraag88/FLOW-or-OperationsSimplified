@@ -226,7 +226,7 @@ export default function BulkAddProduct() {
   return (
     <div className="max-w-4xl mx-auto p-4 md:p-6 space-y-6">
       <div className="flex items-center gap-3">
-        <Button variant="ghost"  onClick={() => navigate(createPageUrl("Inventory"))}>
+        <Button variant="ghost" size="sm" onClick={() => navigate(createPageUrl("Inventory"))}>
           <ArrowLeft className="w-4 h-4 mr-1" />
           Back
         </Button>

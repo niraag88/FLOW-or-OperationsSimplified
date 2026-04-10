@@ -241,16 +241,14 @@ export default function BrandManagement() {
                         </TableCell>
                         <TableCell>
                           <div className="flex items-center gap-2">
-                            <Button 
-                               
+                            <Button size="sm"
                               variant="ghost" 
                               onClick={() => handleEdit(brand)}
                             >
                               <Edit2 className="w-3 h-3" />
                             </Button>
                             {canDelete && (
-                              <Button 
-                                 
+                              <Button size="sm"
                                 variant="ghost" 
                                 className="text-red-500 hover:text-red-600"
                                 onClick={() => handleDeleteClick(brand)}
@@ -286,12 +284,11 @@ export default function BrandManagement() {
                           </div>
                         </div>
                         <div className="flex gap-2 flex-shrink-0">
-                          <Button  variant="ghost" onClick={() => handleEdit(brand)}>
+                          <Button size="sm" variant="ghost" onClick={() => handleEdit(brand)}>
                             <Edit2 className="w-3 h-3" />
                           </Button>
                           {canDelete && (
-                            <Button 
-                               
+                            <Button size="sm"
                               variant="ghost" 
                               className="text-red-500"
                               onClick={() => handleDeleteClick(brand)}

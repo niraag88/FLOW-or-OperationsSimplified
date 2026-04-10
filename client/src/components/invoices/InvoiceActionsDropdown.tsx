@@ -183,7 +183,7 @@ export default function InvoiceActionsDropdown({ invoice, canEdit, canOverride, 
     <>
       <DropdownMenu>
         <DropdownMenuTrigger asChild>
-          <Button variant="ghost" >
+          <Button variant="ghost" size="sm">
             <MoreHorizontal className="w-4 h-4" />
           </Button>
         </DropdownMenuTrigger>

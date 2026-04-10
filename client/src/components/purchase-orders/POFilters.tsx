@@ -174,9 +174,8 @@ export default function POFilters({ filters, onFiltersChange, onFilterChange }: 
                 </div>
               </div>
               <div className="flex justify-end gap-2 pt-2 border-t">
-                <Button variant="outline"  onClick={() => setDateRangeOpen(false)}>Cancel</Button>
-                <Button 
-                   
+                <Button variant="outline" size="sm" onClick={() => setDateRangeOpen(false)}>Cancel</Button>
+                <Button size="sm"
                   onClick={handleCustomDateRange}
                   disabled={!customStartDate || !customEndDate}
                 >
@@ -189,7 +188,7 @@ export default function POFilters({ filters, onFiltersChange, onFilterChange }: 
       )}
 
       {hasActiveFilters && (
-        <Button variant="ghost"  onClick={clearFilters}>
+        <Button variant="ghost" size="sm" onClick={clearFilters}>
           <X className="w-4 h-4" />
         </Button>
       )}

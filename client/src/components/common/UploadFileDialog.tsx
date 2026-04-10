@@ -28,7 +28,17 @@ function buildStorageKey(recordType: any, documentNumber: any, file: any) {
   return `${recordType}/${year}/${safeName}/${Date.now()}-${origName}`;
 }
 
-export default function UploadFileDialog({ open, onClose, onSuccess, recordType, recordId, documentNumber, maxSizeMB = 2 }: any) {
+interface UploadFileDialogProps {
+  open: boolean;
+  onClose: () => void;
+  onSuccess?: (storageKey?: string) => void;
+  recordType: string;
+  recordId: number | string;
+  documentNumber?: string;
+  maxSizeMB?: number;
+}
+
+export default function UploadFileDialog({ open, onClose, onSuccess, recordType, recordId, documentNumber, maxSizeMB = 2 }: UploadFileDialogProps) {
   const { toast } = useToast();
   const [selectedFile, setSelectedFile] = useState<any>(null);
   const [uploading, setUploading] = useState(false);
@@ -85,7 +95,7 @@ export default function UploadFileDialog({ open, onClose, onSuccess, recordType,
       }
 
       toast({ title: 'File uploaded', description: 'The attachment has been saved.' });
-      onSuccess(storageKey);
+      onSuccess?.(storageKey);
       handleClose();
     } catch (err: any) {
       console.error('Upload error:', err);

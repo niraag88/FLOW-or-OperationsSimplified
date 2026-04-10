@@ -10,6 +10,17 @@ import {
   AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
 
+interface SimpleConfirmDialogProps {
+  open: boolean;
+  onClose: () => void;
+  onConfirm: () => void | Promise<void>;
+  title?: string;
+  description?: string;
+  confirmText?: string;
+  cancelText?: string;
+  confirmVariant?: "default" | "destructive";
+}
+
 export default function SimpleConfirmDialog({
   open,
   onClose,
@@ -19,7 +30,7 @@ export default function SimpleConfirmDialog({
   confirmText = "Yes, Confirm",
   cancelText = "No, Cancel",
   confirmVariant = "default"
-}: any) {
+}: SimpleConfirmDialogProps) {
   return (
     <AlertDialog open={open} onOpenChange={onClose}>
       <AlertDialogContent>

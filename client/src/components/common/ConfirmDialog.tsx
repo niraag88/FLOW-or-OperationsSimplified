@@ -10,6 +10,17 @@ import {
   AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
 
+interface ConfirmDialogProps {
+  open: boolean;
+  onOpenChange: (open: boolean) => void;
+  title: string;
+  description: string;
+  confirmText?: string;
+  cancelText?: string;
+  onConfirm: () => void;
+  variant?: "default" | "destructive" | "warning";
+}
+
 export default function ConfirmDialog({ 
   open, 
   onOpenChange, 
@@ -19,7 +30,7 @@ export default function ConfirmDialog({
   cancelText = "Cancel", 
   onConfirm,
   variant = "default"
-}: any) {
+}: ConfirmDialogProps) {
   const getButtonClass = () => {
     switch (variant) {
       case "destructive":

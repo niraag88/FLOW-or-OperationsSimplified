@@ -41,7 +41,7 @@ export default function CustomerActionsDropdown({ customer, onEdit, onRefresh }:
     <>
       <DropdownMenu>
         <DropdownMenuTrigger asChild>
-          <Button variant="ghost" >
+          <Button variant="ghost" size="sm">
             <MoreHorizontal className="w-4 h-4" />
           </Button>
         </DropdownMenuTrigger>

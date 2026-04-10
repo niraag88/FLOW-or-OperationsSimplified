@@ -238,7 +238,7 @@ export default function Layout({ children, currentPageName = "" }: any) {
             <div className="flex items-center gap-2 sm:gap-4 min-w-0">
               <Button
                 variant="ghost"
-               
+                size="sm"
                 className="lg:hidden text-gray-300 hover:text-white hover:bg-slate-800 p-2"
                 onClick={() => setMobileMenuOpen(!mobileMenuOpen)}
               >
@@ -316,7 +316,7 @@ export default function Layout({ children, currentPageName = "" }: any) {
             <div className="flex items-center gap-2 sm:gap-4 flex-shrink-0">
               <DropdownMenu onOpenChange={(open) => { if(open) setNotificationCount(0); }}>
                 <DropdownMenuTrigger asChild>
-                  <Button variant="ghost" className="text-gray-300 hover:text-white hover:bg-slate-800 relative p-2">
+                  <Button variant="ghost" size="sm" className="text-gray-300 hover:text-white hover:bg-slate-800 relative p-2">
                     <Bell className="w-4 h-4 sm:w-5 sm:h-5" />
                     {notificationCount > 0 && (
                       <Badge className="absolute -top-1 -right-1 w-4 h-4 sm:w-5 sm:h-5 p-0 flex items-center justify-center bg-amber-500 text-xs">
@@ -351,7 +351,7 @@ export default function Layout({ children, currentPageName = "" }: any) {
 
               <DropdownMenu>
                 <DropdownMenuTrigger asChild>
-                  <Button variant="ghost" className="text-gray-300 hover:text-white hover:bg-slate-800 flex items-center gap-1 sm:gap-2 p-2">
+                  <Button variant="ghost" size="sm" className="text-gray-300 hover:text-white hover:bg-slate-800 flex items-center gap-1 sm:gap-2 p-2">
                     <User className="w-4 h-4 sm:w-5 sm:h-5" />
                     <span className="hidden sm:inline text-sm truncate max-w-[100px]">
                       {currentUser?.full_name}

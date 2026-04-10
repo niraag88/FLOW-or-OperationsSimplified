@@ -352,8 +352,8 @@ export default function PoGrnReport({ purchaseOrders, goodsReceipts, suppliers =
               initialFocus
             />
             <div className="flex justify-end gap-2 p-3 border-t">
-              <Button variant="outline"  onClick={() => setDateRangeOpen(false)}>Cancel</Button>
-              <Button  onClick={applyCustomRange} disabled={!pendingRange.from || !pendingRange.to}>Apply</Button>
+              <Button variant="outline" size="sm" onClick={() => setDateRangeOpen(false)}>Cancel</Button>
+              <Button size="sm" onClick={applyCustomRange} disabled={!pendingRange.from || !pendingRange.to}>Apply</Button>
             </div>
           </PopoverContent>
         </Popover>
@@ -475,7 +475,7 @@ export default function PoGrnReport({ purchaseOrders, goodsReceipts, suppliers =
               formatRange={formatPoDateRange}
             />
             {hasPoFilters && (
-              <Button variant="ghost"  onClick={clearPoFilters}>
+              <Button variant="ghost" size="sm" onClick={clearPoFilters}>
                 <X className="w-4 h-4" />
               </Button>
             )}
@@ -567,9 +567,9 @@ export default function PoGrnReport({ purchaseOrders, goodsReceipts, suppliers =
                 </div>
                 {totalPages > 1 && (
                   <div className="flex items-center gap-2">
-                    <Button variant="outline"  onClick={() => setCurrentPage(prev => Math.max(1, prev - 1))} disabled={currentPage === 1}>Previous</Button>
+                    <Button variant="outline" size="sm" onClick={() => setCurrentPage(prev => Math.max(1, prev - 1))} disabled={currentPage === 1}>Previous</Button>
                     <span className="text-sm">Page {currentPage} of {totalPages}</span>
-                    <Button variant="outline"  onClick={() => setCurrentPage(prev => Math.min(totalPages, prev + 1))} disabled={currentPage === totalPages}>Next</Button>
+                    <Button variant="outline" size="sm" onClick={() => setCurrentPage(prev => Math.min(totalPages, prev + 1))} disabled={currentPage === totalPages}>Next</Button>
                   </div>
                 )}
               </div>
@@ -607,7 +607,7 @@ export default function PoGrnReport({ purchaseOrders, goodsReceipts, suppliers =
               formatRange={formatGrnDateRange}
             />
             {hasGrnFilters && (
-              <Button variant="ghost"  onClick={clearGrnFilters}>
+              <Button variant="ghost" size="sm" onClick={clearGrnFilters}>
                 <X className="w-4 h-4" />
               </Button>
             )}
@@ -700,9 +700,9 @@ export default function PoGrnReport({ purchaseOrders, goodsReceipts, suppliers =
                 </div>
                 {grnTotalPages > 1 && (
                   <div className="flex items-center gap-2">
-                    <Button variant="outline"  onClick={() => setGrnCurrentPage(prev => Math.max(1, prev - 1))} disabled={grnCurrentPage === 1}>Previous</Button>
+                    <Button variant="outline" size="sm" onClick={() => setGrnCurrentPage(prev => Math.max(1, prev - 1))} disabled={grnCurrentPage === 1}>Previous</Button>
                     <span className="text-sm">Page {grnCurrentPage} of {grnTotalPages}</span>
-                    <Button variant="outline"  onClick={() => setGrnCurrentPage(prev => Math.min(grnTotalPages, prev + 1))} disabled={grnCurrentPage === grnTotalPages}>Next</Button>
+                    <Button variant="outline" size="sm" onClick={() => setGrnCurrentPage(prev => Math.min(grnTotalPages, prev + 1))} disabled={grnCurrentPage === grnTotalPages}>Next</Button>
                   </div>
                 )}
               </div>
