@@ -829,9 +829,10 @@ export function registerSystemRoutes(app: Express) {
    * where a truncated oversized file could start a restore.
    *
    * Flow:
-   *   1. Pipe fileStream → temp file via createWriteStream
-   *   2. On writeStream 'finish': check limit flag → 413 or runRestore
-   *   3. Always delete the temp file in a finally block after runRestore
+   *   1. bb.on('file'): pipe fileStream → temp file; track hitSizeLimit flag
+   *   2. bb.on('finish'): await writePromise (disk flush confirmed), then
+   *      check hitSizeLimit → 413, or call runRestore from createReadStream
+   *   3. cleanupTemp() is called in all exit paths including bb.on('error')
    */
   app.post('/api/ops/restore-upload', requireAuth(['Admin']), async (req: AuthenticatedRequest, res) => {
     const contentType = req.headers['content-type'] || '';
@@ -839,21 +840,34 @@ export function registerSystemRoutes(app: Express) {
       return res.status(400).json({ error: 'Request must be multipart/form-data' });
     }
 
-    const cleanupTemp = (path: string) => {
-      unlink(path, (err) => {
-        if (err && (err as NodeJS.ErrnoException).code !== 'ENOENT') {
-          console.error('Failed to delete temp restore file:', err.message);
-        }
-      });
-    };
-
     // @ts-ignore
     const Busboy = (await import('busboy')).default;
     const bb = Busboy({ headers: req.headers, limits: { files: 1, fileSize: 500 * 1024 * 1024 } });
 
-    let fileHandled = false;
     const triggeredBy = req.user!.id;
     const actorName = req.user?.username || req.user!.id;
+
+    let fileHandled = false;
+    let tempPath: string | null = null;
+    let hitSizeLimit = false;
+    let sourceFilename = '';
+
+    // Resolves when the write stream finishes flushing to disk; rejects on error.
+    // Default to resolved so bb.on('finish') can always await it safely when
+    // no file event fired (e.g. wrong field name, extension error paths).
+    let writePromise: Promise<void> = Promise.resolve();
+
+    const cleanupTemp = () => {
+      if (tempPath) {
+        const p = tempPath;
+        tempPath = null;
+        unlink(p, (err) => {
+          if (err && (err as NodeJS.ErrnoException).code !== 'ENOENT') {
+            console.error('Failed to delete temp restore file:', err.message);
+          }
+        });
+      }
+    };
 
     bb.on('file', (fieldname: string, fileStream: import('stream').Readable, info: { filename: string }) => {
       if (fieldname !== 'file') { fileStream.resume(); return; }
@@ -863,62 +877,69 @@ export function registerSystemRoutes(app: Express) {
       const { filename } = info;
       if (!filename.endsWith('.sql.gz')) {
         fileStream.resume();
-        return res.status(400).json({ error: 'File must be a .sql.gz gzip-compressed PostgreSQL dump' });
+        res.status(400).json({ error: 'File must be a .sql.gz gzip-compressed PostgreSQL dump' });
+        return;
       }
 
-      const tempPath = `${tmpdir()}/restore-upload-${crypto.randomUUID()}.sql.gz`;
+      sourceFilename = filename;
+      tempPath = `${tmpdir()}/restore-upload-${crypto.randomUUID()}.sql.gz`;
       const ws = createWriteStream(tempPath);
-      let hitSizeLimit = false;
 
       fileStream.on('limit', () => {
         hitSizeLimit = true;
         fileStream.resume();
       });
 
-      fileStream.on('error', (err: Error) => {
-        console.error('Upload stream read error:', err.message);
-        ws.destroy();
-        cleanupTemp(tempPath);
-        if (!res.headersSent) res.status(500).json({ error: 'Failed to receive uploaded file' });
-      });
-
-      ws.on('error', (err: Error) => {
-        console.error('Temp file write error:', err.message);
-        cleanupTemp(tempPath);
-        if (!res.headersSent) res.status(500).json({ error: 'Failed to buffer uploaded file' });
-      });
-
-      ws.on('finish', async () => {
-        if (hitSizeLimit) {
-          cleanupTemp(tempPath);
-          if (!res.headersSent) res.status(413).json({ error: 'File too large. Maximum size is 500 MB.' });
-          return;
-        }
-
-        try {
-          await runRestore({
-            sqlGzStream: createReadStream(tempPath),
-            triggeredBy,
-            actorName,
-            sourceFilename: filename,
-            res,
-          });
-        } finally {
-          cleanupTemp(tempPath);
-        }
+      writePromise = new Promise<void>((resolve, reject) => {
+        fileStream.on('error', reject);
+        ws.on('error', reject);
+        ws.on('finish', resolve);
       });
 
       fileStream.pipe(ws);
     });
 
-    bb.on('finish', () => {
-      if (!fileHandled && !res.headersSent) {
-        res.status(400).json({ error: 'No file uploaded. Send a .sql.gz file as multipart field "file".' });
+    bb.on('finish', async () => {
+      if (!fileHandled) {
+        if (!res.headersSent) res.status(400).json({ error: 'No file uploaded. Send a .sql.gz file as multipart field "file".' });
+        return;
+      }
+
+      // Extension-check already sent a 400 — nothing more to do
+      if (res.headersSent) return;
+
+      // Wait for the upload to be fully flushed to disk before any destructive action
+      try {
+        await writePromise;
+      } catch (err: any) {
+        console.error('Error staging upload to temp file:', err.message);
+        cleanupTemp();
+        if (!res.headersSent) res.status(500).json({ error: 'Failed to buffer uploaded file' });
+        return;
+      }
+
+      if (hitSizeLimit) {
+        cleanupTemp();
+        if (!res.headersSent) res.status(413).json({ error: 'File too large. Maximum size is 500 MB.' });
+        return;
+      }
+
+      try {
+        await runRestore({
+          sqlGzStream: createReadStream(tempPath!),
+          triggeredBy,
+          actorName,
+          sourceFilename,
+          res,
+        });
+      } finally {
+        cleanupTemp();
       }
     });
 
     bb.on('error', (err: Error) => {
       console.error('Busboy parse error:', err);
+      cleanupTemp();
       if (!res.headersSent) res.status(400).json({ error: 'Failed to parse multipart upload' });
     });
 
