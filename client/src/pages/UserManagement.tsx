@@ -334,7 +334,7 @@ export default function UserManagement() {
       </div>
 
       <Tabs defaultValue="users">
-        <TabsList>
+        <TabsList className="grid grid-cols-2 w-full">
           <TabsTrigger value="users" className="flex items-center gap-2">
             <Users className="h-4 w-4" />
             Users

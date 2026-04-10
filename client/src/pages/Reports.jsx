@@ -147,39 +147,39 @@ export default function Reports() {
       </div>
 
       <Tabs defaultValue="overview" className="w-full">
-        <div className="overflow-x-auto">
-          <TabsList className="inline-flex min-w-max w-full">
-            <TabsTrigger value="overview" className="flex items-center gap-1.5">
-              <LayoutDashboard className="w-4 h-4" />
-              Overview
+        <div className="w-full overflow-x-auto">
+          <TabsList className="grid grid-cols-8 min-w-[720px] sm:min-w-0 sm:w-full">
+            <TabsTrigger value="overview" className="flex items-center gap-1.5 text-xs sm:text-sm px-2 sm:px-3">
+              <LayoutDashboard className="w-4 h-4 shrink-0" />
+              <span>Overview</span>
             </TabsTrigger>
-            <TabsTrigger value="po_vs_grn" className="flex items-center gap-1.5">
-              <ShoppingCart className="w-4 h-4" />
-              PO vs GRN
+            <TabsTrigger value="po_vs_grn" className="flex items-center gap-1.5 text-xs sm:text-sm px-2 sm:px-3">
+              <ShoppingCart className="w-4 h-4 shrink-0" />
+              <span>PO vs GRN</span>
             </TabsTrigger>
-            <TabsTrigger value="sales_and_aging" className="flex items-center gap-1.5">
-              <FileText className="w-4 h-4" />
-              Sales &amp; Invoices
+            <TabsTrigger value="sales_and_aging" className="flex items-center gap-1.5 text-xs sm:text-sm px-2 sm:px-3">
+              <FileText className="w-4 h-4 shrink-0" />
+              <span>Sales &amp; Invoices</span>
             </TabsTrigger>
-            <TabsTrigger value="purchases" className="flex items-center gap-1.5">
-              <ShoppingCart className="w-4 h-4" />
-              Purchases
+            <TabsTrigger value="purchases" className="flex items-center gap-1.5 text-xs sm:text-sm px-2 sm:px-3">
+              <ShoppingCart className="w-4 h-4 shrink-0" />
+              <span>Purchases</span>
             </TabsTrigger>
-            <TabsTrigger value="vat_report" className="flex items-center gap-1.5">
-              <FileText className="w-4 h-4" />
-              VAT Report
+            <TabsTrigger value="vat_report" className="flex items-center gap-1.5 text-xs sm:text-sm px-2 sm:px-3">
+              <FileText className="w-4 h-4 shrink-0" />
+              <span>VAT Report</span>
             </TabsTrigger>
-            <TabsTrigger value="payments" className="flex items-center gap-1.5">
-              <Wallet className="w-4 h-4" />
-              Payments
+            <TabsTrigger value="payments" className="flex items-center gap-1.5 text-xs sm:text-sm px-2 sm:px-3">
+              <Wallet className="w-4 h-4 shrink-0" />
+              <span>Payments</span>
             </TabsTrigger>
-            <TabsTrigger value="statements" className="flex items-center gap-1.5">
-              <BookText className="w-4 h-4" />
-              Statements
+            <TabsTrigger value="statements" className="flex items-center gap-1.5 text-xs sm:text-sm px-2 sm:px-3">
+              <BookText className="w-4 h-4 shrink-0" />
+              <span>Statements</span>
             </TabsTrigger>
-            <TabsTrigger value="stock" className="flex items-center gap-1.5">
-              <Package className="w-4 h-4" />
-              Stock
+            <TabsTrigger value="stock" className="flex items-center gap-1.5 text-xs sm:text-sm px-2 sm:px-3">
+              <Package className="w-4 h-4 shrink-0" />
+              <span>Stock</span>
             </TabsTrigger>
           </TabsList>
         </div>

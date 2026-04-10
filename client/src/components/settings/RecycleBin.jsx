@@ -280,23 +280,25 @@ export default function RecycleBinComponent() {
 
       {/* Tabs */}
       <Tabs value={activeTab} onValueChange={setActiveTab}>
-        <TabsList>
-          <TabsTrigger value="all">
-            All ({deletedItems.length})
-          </TabsTrigger>
-          <TabsTrigger value="PurchaseOrder">
-            Purchase Orders ({tabCounts.PurchaseOrder || 0})
-          </TabsTrigger>
-          <TabsTrigger value="Invoice">
-            Invoices ({tabCounts.Invoice || 0})
-          </TabsTrigger>
-          <TabsTrigger value="DeliveryOrder">
-            Delivery Orders ({tabCounts.DeliveryOrder || 0})
-          </TabsTrigger>
-          <TabsTrigger value="Quotation">
-            Quotations ({tabCounts.Quotation || 0})
-          </TabsTrigger>
-        </TabsList>
+        <div className="w-full overflow-x-auto">
+          <TabsList className="grid grid-cols-5 min-w-[540px] sm:min-w-0 sm:w-full">
+            <TabsTrigger value="all" className="text-xs sm:text-sm px-2 sm:px-3">
+              All ({deletedItems.length})
+            </TabsTrigger>
+            <TabsTrigger value="PurchaseOrder" className="text-xs sm:text-sm px-2 sm:px-3">
+              Purchase Orders ({tabCounts.PurchaseOrder || 0})
+            </TabsTrigger>
+            <TabsTrigger value="Invoice" className="text-xs sm:text-sm px-2 sm:px-3">
+              Invoices ({tabCounts.Invoice || 0})
+            </TabsTrigger>
+            <TabsTrigger value="DeliveryOrder" className="text-xs sm:text-sm px-2 sm:px-3">
+              Delivery Orders ({tabCounts.DeliveryOrder || 0})
+            </TabsTrigger>
+            <TabsTrigger value="Quotation" className="text-xs sm:text-sm px-2 sm:px-3">
+              Quotations ({tabCounts.Quotation || 0})
+            </TabsTrigger>
+          </TabsList>
+        </div>
 
         <TabsContent value={activeTab} className="mt-6">
           <Card>
