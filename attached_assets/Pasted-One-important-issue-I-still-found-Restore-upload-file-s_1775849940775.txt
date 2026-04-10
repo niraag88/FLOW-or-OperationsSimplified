@@ -1,0 +1,99 @@
+One important issue I still found
+Restore upload file-size limit can still trigger a dangerous path
+
+File: server/routes/system.ts
+
+This is the one thing I would still fix.
+
+Why
+
+In the restore-upload route, you do this:
+
+create a busboy stream with fileSize limit
+as soon as the uploaded file starts streaming, you immediately call runRestore(...)
+separately, you listen for the limit event on the same file stream and return 413 File too large
+
+The problem is:
+
+runRestore() has already started using the stream before the size-limit outcome is known.
+
+That means if somebody uploads a file larger than the 500 MB limit:
+
+busboy can emit limit
+the response can return 413
+but the restore stream may already have started processing a truncated file
+
+And since your restore script:
+
+validates only the gzip header first
+then drops public
+then restores
+
+you could still end up with:
+
+a truncated restore stream
+after destructive restore has already begun
+Why this matters
+
+This is not a cosmetic issue.
+This is the single most meaningful remaining operational risk I can see in the ZIP.
+
+What I would do
+
+Do not call runRestore() directly on the live busboy file stream.
+
+Safer options:
+
+stream the upload to a temporary file first
+let busboy finish completely
+confirm the stream did not hit the size limit
+then restore from that temp file
+
+or, if you want to keep streaming architecture:
+
+use a flag so that if limit fires, the restore path is aborted before destructive action
+but this is harder to guarantee correctly than temp-file staging
+
+For this specific route, I would strongly prefer temp-file staging.
+
+Other things I found, but they are lower priority
+1. Two runtime console.log() calls still exist in backup flow
+
+File: server/routes/system.ts
+
+You still have:
+
+Starting backup process...
+Backup completed successfully
+
+These are not a bug.
+They are just production noise.
+
+My recommendation:
+
+either leave them
+or gate them behind environment-aware logging
+
+This is not a blocker.
+
+2. StorageUsage.tsx looks unused
+
+File: client/src/components/settings/StorageUsage.tsx
+
+It still exists, but I do not see it used from the actual Settings page anymore.
+
+That is not dangerous, but it looks like leftover code.
+
+3. StockCountTemplate.tsx still falls back to "Company Name"
+
+File: client/src/components/print/StockCountTemplate.tsx
+
+This is low risk, but it means if company settings are empty, that printout can still show a generic label.
+
+This is not the same kind of hardcoded branding problem you had before.
+But if you want document outputs to be fully professional, I would eventually either:
+
+require company settings before printing
+or use blank output instead of "Company Name"
+
+Not urgent.
