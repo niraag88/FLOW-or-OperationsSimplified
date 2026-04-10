@@ -1,0 +1,90 @@
+1. client/src/index.ts looks like dead duplicate code
+
+You have:
+
+client/src/index.ts
+client/src/utils/index.ts
+
+Both define the same createPageUrl() helper.
+
+Your app imports from @/utils, not from client/src/index.ts.
+
+So client/src/index.ts looks like a leftover duplicate and should probably be removed to avoid confusion.
+
+2. Restore upload route is still slightly loose
+
+File: server/routes/system.ts
+
+The route says restore must come from a .sql.gz file, but the code accepts:
+
+.sql.gz
+or plain .gz
+
+That is not a disaster, but it is a mismatch between:
+
+UI expectation
+error wording
+actual accepted input
+
+I would tighten that so the rule is exact and predictable.
+
+Also, there is still no explicit file size limit on the restore upload stream. Since this is admin-only and streamed, it is not a major flaw, but adding a sensible limit would be safer.
+
+3. multer.memoryStorage() is still in use
+
+File: server/middleware.ts
+
+For your real current usage, I think this is still acceptable.
+
+So I am not pushing this as a rollout blocker.
+
+But it remains a weak point if:
+
+uploads get bigger
+multiple users upload at once
+you later expand file-heavy workflows
+4. Two files are still complexity hotspots
+
+Files:
+
+server/businessStorage.ts
+server/routes/system.ts
+
+They are not broken, but they are still the biggest concentration points in the codebase.
+
+That means future fragility is most likely to appear there.
+
+I would not rewrite them now, but I would treat them as:
+
+“be careful when editing”
+“new features should not keep piling into these forever”
+5. Project baggage is still bundled
+
+The ZIP still includes:
+
+.canvas/assets
+attached_assets
+
+This does not hurt runtime behavior, but it does make the project less clean for:
+
+deployment
+handoff
+resale
+long-term maintenance
+
+Not urgent, just worth cleaning eventually.
+
+Low-priority observations
+Route casing is still mixed
+
+App.tsx is cleaner, but route naming still mixes lowercase and uppercase conventions.
+
+Not dangerous, just not fully polished.
+
+Base64 logo storage is still there
+
+As we already discussed, I agree this is acceptable for now.
+
+No obvious broken fake stubs remain
+
+client/src/api/integrations.ts is now much narrower and no longer looks like it’s pretending to do a bunch of fake integrations. That concern is largely gone.
