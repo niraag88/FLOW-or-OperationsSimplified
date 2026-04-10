@@ -1,0 +1,97 @@
+1. Reframe restore in the UI
+
+Do not present it as a normal admin action.
+
+Use language like:
+
+Emergency Restore
+Disaster Recovery Restore
+Last-resort operation
+
+And in the confirmation modal, say clearly:
+
+this will replace the current live operational data
+take a fresh backup of the current state before continuing
+all current users will need to log in again
+only use this when recovery is necessary
+2. Stronger confirmation requirements
+
+For something this destructive, I would require all of these:
+
+typed confirmation phrase such as
+EMERGENCY RESTORE
+checkbox:
+I confirm I have taken a fresh backup of the current system
+display the backup being restored:
+filename
+created date/time
+size
+show the most recent successful current backup date/time on screen before restore
+
+This is high-value and low-risk.
+
+3. Encourage or require a fresh backup first
+
+Your point here is exactly right.
+
+The most common disaster will not be “gzip technically invalid.”
+It will be: operator clicks restore too casually.
+
+Best version:
+
+add a button in the modal: Take Fresh Backup First
+after success, enable Emergency Restore
+
+Even better:
+
+backend can warn or block restore if there is no successful backup from the last few hours, unless the user explicitly overrides with a force confirmation
+
+That would be a very strong operational safeguard.
+
+4. Partial Option 2 only if it stays simple
+
+I agree this is optional, not essential.
+
+A practical improvement would be:
+
+for uploaded restore files, buffer to a temp file
+validate gzip
+validate decompressed prefix starts with PostgreSQL dump header
+then restore from that temp file
+
+That is worthwhile, but I would class it as nice hardening, not the core fix.
+
+My revised conclusion
+
+Based on your explanation, I would now classify the restore system like this:
+
+Acceptable for internal implementation
+
+Yes — with Emergency Restore framing and stronger operator warnings
+
+Still not perfect
+
+Also yes — but the remaining imperfection is now more about operational safeguards than architecture
+
+That is a much healthier place to be.
+
+So where I land now
+
+I would remove this from the “must redesign” category.
+
+I would replace it with:
+
+Must harden the restore workflow as an emergency-only operation.
+
+That is the right decision for your environment.
+
+Final recommendation
+
+Do this now:
+
+rename restore to Emergency Restore
+add explicit warning text
+require typed confirmation
+strongly instruct backup first
+ideally add a Take Fresh Backup First step
+optionally add PostgreSQL dump-header validation later
