@@ -3,9 +3,10 @@ import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/com
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Input } from "@/components/ui/input";
+import { Checkbox } from "@/components/ui/checkbox";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter } from "@/components/ui/dialog";
 import { Alert, AlertDescription } from "@/components/ui/alert";
-import { Database, Play, CheckCircle, XCircle, Loader2, Clock, Download, RotateCcw, Upload, AlertTriangle, History } from "lucide-react";
+import { Database, Play, CheckCircle, XCircle, Loader2, Clock, Download, RotateCcw, Upload, AlertTriangle, History, ShieldAlert } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import { apiRequest } from "@/lib/queryClient";
 import { format } from "date-fns";
@@ -36,72 +37,157 @@ function StatusBadge({ success }: { success: boolean }) {
     : <Badge variant="destructive"><XCircle className="w-3 h-3 mr-1 inline" />Failed</Badge>;
 }
 
-/**
- * Confirmation modal for destructive restore actions.
- * Requires the user to type "RESTORE" before the confirm button activates.
- */
-function RestoreConfirmModal({ open, onClose, onConfirm, filename, isPending }: { open: boolean; onClose: () => void; onConfirm: () => void; filename: string; isPending: boolean }) {
-  const [typed, setTyped] = useState("");
+interface RestoreConfirmModalProps {
+  open: boolean;
+  onClose: () => void;
+  onConfirm: () => void;
+  filename: string;
+  isPending: boolean;
+  run?: any;
+  file?: any;
+  latestSuccessfulBackup?: any;
+  onTakeBackup: () => void;
+  backupPending: boolean;
+  backupJustTaken: boolean;
+}
 
-  // Reset typed confirmation whenever the modal closes (any path: cancel, success, error, programmatic)
+function RestoreConfirmModal({
+  open, onClose, onConfirm, filename, isPending,
+  run, file,
+  latestSuccessfulBackup, onTakeBackup, backupPending, backupJustTaken,
+}: RestoreConfirmModalProps) {
+  const [typed, setTyped] = useState("");
+  const [confirmed, setConfirmed] = useState(false);
+
   useEffect(() => {
-    if (!open) setTyped("");
+    if (!open) {
+      setTyped("");
+      setConfirmed(false);
+    }
   }, [open]);
 
-  const handleClose = () => {
-    onClose();
-  };
-
-  const handleConfirm = () => {
-    if (typed !== "RESTORE") return;
-    onConfirm();
-  };
+  const canConfirm = typed === "EMERGENCY RESTORE" && confirmed && !isPending;
 
   return (
-    <Dialog open={open} onOpenChange={(v) => { if (!v) handleClose(); }}>
-      <DialogContent className="max-w-md">
+    <Dialog open={open} onOpenChange={(v) => { if (!v && !isPending) onClose(); }}>
+      <DialogContent className="max-w-lg">
         <DialogHeader>
           <DialogTitle className="flex items-center gap-2 text-red-700">
-            <AlertTriangle className="w-5 h-5" />
-            Confirm Database Restore
+            <ShieldAlert className="w-5 h-5" />
+            Emergency Restore — Disaster Recovery
           </DialogTitle>
           <DialogDescription asChild>
-            <div className="space-y-3 text-sm">
-              <div className="rounded-lg bg-red-50 border border-red-200 p-3 text-red-800">
-                <strong>This will permanently replace all current data.</strong>
-                <p className="mt-1">Every record in the database — invoices, products, customers, purchase orders, delivery orders, users, settings — will be overwritten with the contents of the selected backup. This cannot be undone.</p>
+            <div className="space-y-4 text-sm">
+
+              {/* Warning panel */}
+              <div className="rounded-lg bg-red-50 border border-red-200 p-3 text-red-800 space-y-1">
+                <p className="font-semibold">This is a last-resort disaster recovery operation.</p>
+                <ul className="list-disc list-inside space-y-0.5 text-red-700 mt-1">
+                  <li>All current live data will be permanently replaced</li>
+                  <li>Every invoice, product, customer, PO, DO, user and setting will be overwritten</li>
+                  <li>All active users will be logged out and must log in again</li>
+                  <li>This action cannot be undone</li>
+                  <li>Only proceed if you are performing disaster recovery</li>
+                </ul>
               </div>
-              {filename && (
-                <p className="text-gray-600">
-                  Restoring from: <span className="font-mono font-medium text-gray-900">{filename}</span>
-                </p>
-              )}
-              <p className="text-gray-600">
-                After restore completes, a confirmation banner will appear. You will need to log out and log back in manually to continue.
-              </p>
+
+              {/* Backup being restored */}
+              <div className="rounded-lg border border-gray-200 p-3 bg-gray-50 space-y-1">
+                <p className="text-xs font-medium text-gray-500 uppercase tracking-wide">Restoring from</p>
+                <p className="font-mono text-sm font-medium text-gray-900 break-all">{filename || "—"}</p>
+                {run && (
+                  <p className="text-xs text-gray-500">
+                    Created: {formatDate(run.ranAt)}
+                    {run.dbFileSize ? ` · ${formatBytes(run.dbFileSize)}` : ""}
+                  </p>
+                )}
+                {file && !run && (
+                  <p className="text-xs text-gray-500">
+                    Size: {formatBytes(file.size)}
+                  </p>
+                )}
+              </div>
+
+              {/* Most recent backup status */}
+              <div className={`rounded-lg border p-3 space-y-1 ${latestSuccessfulBackup || backupJustTaken ? "border-gray-200 bg-gray-50" : "border-amber-200 bg-amber-50"}`}>
+                <p className="text-xs font-medium uppercase tracking-wide text-gray-500">Most recent backup of current system</p>
+                {backupJustTaken ? (
+                  <p className="text-sm font-medium text-emerald-700 flex items-center gap-1">
+                    <CheckCircle className="w-4 h-4" /> Fresh backup just taken — current state is saved.
+                  </p>
+                ) : latestSuccessfulBackup ? (
+                  <p className="text-sm text-gray-700">
+                    {formatDate(latestSuccessfulBackup.ranAt)}
+                    {latestSuccessfulBackup.dbFilename ? ` · ${latestSuccessfulBackup.dbFilename.split('/').pop()}` : ""}
+                  </p>
+                ) : (
+                  <p className="text-sm font-medium text-amber-700">No successful backups on record. Take a fresh backup before continuing.</p>
+                )}
+              </div>
+
+              {/* Take Fresh Backup First */}
               <div>
-                <p className="text-gray-700 font-medium mb-1">Type <span className="font-mono text-red-700">RESTORE</span> to confirm:</p>
+                <Button
+                  type="button"
+                  variant="outline"
+                  className="border-emerald-300 text-emerald-700 hover:bg-emerald-50 w-full"
+                  onClick={onTakeBackup}
+                  disabled={backupPending || isPending || backupJustTaken}
+                >
+                  {backupPending ? (
+                    <><Loader2 className="w-4 h-4 mr-2 animate-spin" />Running Backup…</>
+                  ) : backupJustTaken ? (
+                    <><CheckCircle className="w-4 h-4 mr-2" />Backup taken — current state is saved</>
+                  ) : (
+                    <><Play className="w-4 h-4 mr-2" />Take Fresh Backup First (Recommended)</>
+                  )}
+                </Button>
+                <p className="text-xs text-gray-500 mt-1">Saves the current state before restore. Strongly recommended.</p>
+              </div>
+
+              {/* Checkbox confirmation */}
+              <div className="flex items-start gap-3 p-3 rounded-lg border border-gray-200 bg-gray-50">
+                <Checkbox
+                  id="confirm-backup"
+                  checked={confirmed}
+                  onCheckedChange={(v) => setConfirmed(!!v)}
+                  disabled={isPending}
+                  className="mt-0.5"
+                />
+                <label htmlFor="confirm-backup" className="text-sm text-gray-700 cursor-pointer leading-snug">
+                  I confirm I have taken a fresh backup of the current system and understand this will permanently replace all live data.
+                </label>
+              </div>
+
+              {/* Typed phrase */}
+              <div>
+                <p className="text-gray-700 font-medium mb-1">
+                  Type <span className="font-mono text-red-700 bg-red-50 px-1 rounded">EMERGENCY RESTORE</span> to confirm:
+                </p>
                 <Input
                   value={typed}
                   onChange={(e) => setTyped(e.target.value)}
-                  placeholder="RESTORE"
+                  placeholder="EMERGENCY RESTORE"
                   className="font-mono"
                   disabled={isPending}
                 />
               </div>
+
             </div>
           </DialogDescription>
         </DialogHeader>
         <DialogFooter className="gap-2">
-          <Button variant="outline" onClick={handleClose} disabled={isPending}>
+          <Button variant="outline" onClick={onClose} disabled={isPending}>
             Cancel
           </Button>
           <Button
             variant="destructive"
-            disabled={typed !== "RESTORE" || isPending}
-            onClick={handleConfirm}
+            disabled={!canConfirm}
+            onClick={onConfirm}
           >
-            {isPending ? <><Loader2 className="w-4 h-4 mr-2 animate-spin" />Restoring…</> : "Restore Database"}
+            {isPending
+              ? <><Loader2 className="w-4 h-4 mr-2 animate-spin" />Restoring…</>
+              : "Emergency Restore"}
           </Button>
         </DialogFooter>
       </DialogContent>
@@ -117,6 +203,7 @@ export default function BackupSettings() {
   const [downloadingId, setDownloadingId] = useState<any>(null);
   const [restoreModal, setRestoreModal] = useState<any>(null); // { type: 'cloud'|'upload', run?, file? }
   const [restoredSuccessfully, setRestoredSuccessfully] = useState(false);
+  const [backupJustTaken, setBackupJustTaken] = useState(false);
 
   // ── Data Fetching ──────────────────────────────────────────────────────────
 
@@ -140,6 +227,7 @@ export default function BackupSettings() {
     onSuccess: (data) => {
       queryClient.invalidateQueries({ queryKey: ["/api/ops/backup-runs"] });
       if (data.success) {
+        setBackupJustTaken(true);
         toast({ title: "Backup completed", description: "DB dump and object manifest saved successfully." });
       } else {
         toast({ title: "Backup partially failed", description: "Check the run history for details.", variant: "destructive" });
@@ -162,13 +250,13 @@ export default function BackupSettings() {
       if (data.success) {
         setRestoredSuccessfully(true);
       } else {
-        toast({ title: "Restore failed", description: data.error || "An error occurred during restore.", variant: "destructive" });
+        toast({ title: "Emergency restore failed", description: data.error || "An error occurred during restore.", variant: "destructive" });
       }
     },
-    onError: async (err) => {
+    onError: async (err: any) => {
       queryClient.invalidateQueries({ queryKey: ["/api/ops/restore-runs"] });
       setRestoreModal(null);
-      toast({ title: "Restore failed", description: err.message || "An error occurred during restore.", variant: "destructive" });
+      toast({ title: "Emergency restore failed", description: err.message || "An error occurred during restore.", variant: "destructive" });
     },
   });
 
@@ -191,13 +279,13 @@ export default function BackupSettings() {
       if (data.success) {
         setRestoredSuccessfully(true);
       } else {
-        toast({ title: "Restore failed", description: data.error || "An error occurred during restore.", variant: "destructive" });
+        toast({ title: "Emergency restore failed", description: data.error || "An error occurred during restore.", variant: "destructive" });
       }
     },
-    onError: (err) => {
+    onError: (err: any) => {
       queryClient.invalidateQueries({ queryKey: ["/api/ops/restore-runs"] });
       setRestoreModal(null);
-      toast({ title: "Restore failed", description: err.message || "An error occurred during restore.", variant: "destructive" });
+      toast({ title: "Emergency restore failed", description: err.message || "An error occurred during restore.", variant: "destructive" });
     },
   });
 
@@ -229,6 +317,7 @@ export default function BackupSettings() {
   };
 
   const handleRestoreClick = (run: any) => {
+    setBackupJustTaken(false);
     setRestoreModal({
       type: "cloud",
       run,
@@ -240,7 +329,13 @@ export default function BackupSettings() {
     const file = e.target.files?.[0];
     if (!file) return;
     e.target.value = "";
+    setBackupJustTaken(false);
     setRestoreModal({ type: "upload", file, filename: file.name });
+  };
+
+  const handleModalClose = () => {
+    setRestoreModal(null);
+    setBackupJustTaken(false);
   };
 
   const handleRestoreConfirm = () => {
@@ -255,6 +350,7 @@ export default function BackupSettings() {
 
   const runs = (runsData?.runs || []).slice(0, 10);
   const latestRun = runs[0] || null;
+  const latestSuccessfulBackup = runs.find((r: any) => r.success === true) || null;
   const restoreHistory = (restoreRunsData?.runs || []).slice(0, 5);
 
   // ── Render ─────────────────────────────────────────────────────────────────
@@ -268,7 +364,7 @@ export default function BackupSettings() {
             Backup & Recovery
           </CardTitle>
           <CardDescription>
-            Manual database backups and full restore capability. Run a backup, download it offline, or restore the system from any saved backup.
+            Manual database backups for routine use. Emergency restore is a last-resort disaster recovery operation — use it only when the current data must be replaced from a backup.
           </CardDescription>
         </CardHeader>
         <CardContent className="space-y-6">
@@ -278,7 +374,7 @@ export default function BackupSettings() {
             <Alert className="border-emerald-300 bg-emerald-50">
               <CheckCircle className="w-4 h-4 text-emerald-700" />
               <AlertDescription className="text-emerald-800">
-                <strong>Restore completed successfully.</strong> The database has been restored to the selected backup.
+                <strong>Emergency restore completed successfully.</strong> The database has been restored to the selected backup.
                 Please <button className="underline font-medium" onClick={() => window.location.href = "/login"}>log out and log back in</button> to continue working.
               </AlertDescription>
             </Alert>
@@ -343,9 +439,9 @@ export default function BackupSettings() {
                 onClick={() => fileInputRef.current?.click()}
               >
                 <Upload className="w-4 h-4 mr-2" />
-                Upload & Restore
+                Upload & Emergency Restore
               </Button>
-              <p className="text-xs text-gray-500 mt-1">Restore from a downloaded .sql.gz file.</p>
+              <p className="text-xs text-gray-500 mt-1">Last-resort: restore from a downloaded .sql.gz file.</p>
               <input
                 ref={fileInputRef}
                 type="file"
@@ -417,7 +513,7 @@ export default function BackupSettings() {
                                   disabled={isRestoring}
                                   className="h-7 px-2 text-xs border-red-300 text-red-700 hover:bg-red-50"
                                 >
-                                  <RotateCcw className="w-3 h-3 mr-1" />Restore
+                                  <RotateCcw className="w-3 h-3 mr-1" />Emergency Restore
                                 </Button>
                               )}
                             </div>
@@ -437,13 +533,13 @@ export default function BackupSettings() {
           {/* Restore history */}
           <div>
             <h3 className="text-sm font-semibold text-gray-700 mb-3 flex items-center gap-2">
-              <History className="w-4 h-4" /> Recent Restore History
+              <History className="w-4 h-4" /> Recent Emergency Restore History
             </h3>
             {restoreRunsLoading ? (
               <div className="flex items-center gap-2 text-sm text-gray-500"><Loader2 className="w-4 h-4 animate-spin" />Loading…</div>
             ) : restoreHistory.length === 0 ? (
               <div className="border rounded-lg p-4 text-center text-sm text-gray-400">
-                No restores have been performed yet.
+                No emergency restores have been performed yet.
               </div>
             ) : (
               <div className="border rounded-lg overflow-hidden">
@@ -478,13 +574,19 @@ export default function BackupSettings() {
         </CardContent>
       </Card>
 
-      {/* Restore confirmation modal */}
+      {/* Emergency restore confirmation modal */}
       <RestoreConfirmModal
         open={!!restoreModal}
-        onClose={() => setRestoreModal(null)}
+        onClose={handleModalClose}
         onConfirm={handleRestoreConfirm}
         filename={restoreModal?.filename}
         isPending={isRestoring}
+        run={restoreModal?.type === "cloud" ? restoreModal.run : undefined}
+        file={restoreModal?.type === "upload" ? restoreModal.file : undefined}
+        latestSuccessfulBackup={latestSuccessfulBackup}
+        onTakeBackup={() => runBackup.mutate()}
+        backupPending={runBackup.isPending}
+        backupJustTaken={backupJustTaken}
       />
     </>
   );
