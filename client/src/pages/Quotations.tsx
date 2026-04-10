@@ -21,18 +21,51 @@ import QuotationQuickViewModal from "../components/quotations/QuotationQuickView
 
 const STALE_3MIN = 3 * 60 * 1000;
 
+
+interface CustomerEntity {
+  id: number;
+  name?: string;
+  customer_name?: string;
+  is_active?: boolean;
+}
+
+interface BrandEntity {
+  id: number;
+  name?: string;
+  isActive?: boolean;
+}
+
+interface ProductEntity {
+  id: number;
+  name?: string;
+  brandId?: number;
+}
+
+interface FinancialYear {
+  id: number;
+  status: string;
+  startDate: string;
+  endDate: string;
+}
+
+interface DateRange extends Record<string, unknown> {
+  type?: string;
+  startDate?: string;
+  endDate?: string;
+}
+
 export default function Quotations() {
-  const [customers, setCustomers] = useState<any[]>([]);
-  const [products, setProducts] = useState<any[]>([]);
-  const [brands, setBrands] = useState<any[]>([]);
+  const [customers, setCustomers] = useState<CustomerEntity[]>([]);
+  const [products, setProducts] = useState<ProductEntity[]>([]);
+  const [brands, setBrands] = useState<BrandEntity[]>([]);
   const [searchTerm, setSearchTerm] = useState("");
   const [showQuotationForm, setShowQuotationForm] = useState(false);
-  const [editingQuotation, setEditingQuotation] = useState<any>(null);
-  const [selectedStatuses, setSelectedStatuses] = useState<any[]>([]);
-  const [selectedCustomers, setSelectedCustomers] = useState<any[]>([]);
-  const [dateRange, setDateRange] = useState<any>("all");
-  const [financialYears, setFinancialYears] = useState<any[]>([]);
-  const [quickViewQuotationId, setQuickViewQuotationId] = useState<any>(null);
+  const [editingQuotation, setEditingQuotation] = useState<Record<string, unknown> | null>(null);
+  const [selectedStatuses, setSelectedStatuses] = useState<string[]>([]);
+  const [selectedCustomers, setSelectedCustomers] = useState<number[]>([]);
+  const [dateRange, setDateRange] = useState<string | DateRange>("all");
+  const [financialYears, setFinancialYears] = useState<FinancialYear[]>([]);
+  const [quickViewQuotationId, setQuickViewQuotationId] = useState<number | null>(null);
 
   // Pagination state
   const [currentPage, setCurrentPage] = useState(1);
@@ -48,11 +81,11 @@ export default function Quotations() {
           Brand.list().catch(() => []),
           fetch('/api/books', { credentials: 'include' }).then(r => r.ok ? r.json() : []).catch(() => []),
         ]);
-        setCustomers(customersData.filter((c: any) => c.is_active !== false));
-        setProducts(productsData);
-        setBrands(brandsData.filter((b: any) => b.isActive !== false));
+        setCustomers((customersData as CustomerEntity[]).filter((c) => c.is_active !== false));
+        setProducts((productsData || []) as ProductEntity[]);
+        setBrands((brandsData as BrandEntity[]).filter((b) => b.isActive !== false));
         setFinancialYears(booksData);
-      } catch (error: any) {
+      } catch (error: unknown) {
         console.error("Error loading supporting data:", error);
       }
     };
@@ -68,8 +101,8 @@ export default function Quotations() {
   }, [searchTerm]);
 
   const excludeYearsKey = financialYears
-    .filter((y: any) => y.status === 'Closed')
-    .map((cy: any) => `${cy.startDate},${cy.endDate}`)
+    .filter((y: FinancialYear) => y.status === 'Closed')
+    .map((cy: FinancialYear) => `${cy.startDate},${cy.endDate}`)
     .join(';');
 
   const { data: quotationResult, isLoading: loading } = useQuery({
@@ -85,13 +118,13 @@ export default function Quotations() {
       if (selectedStatuses.length) params.set('status', selectedStatuses.join(','));
       if (selectedCustomers.length) params.set('customerId', selectedCustomers.join(','));
       const today = new Date();
-      const toStr = (d: any) => d.toISOString().split('T')[0];
+      const toStr = (d: Date) => d.toISOString().split('T')[0];
       if (dateRange && dateRange !== 'all') {
         if (dateRange === 'today') { const d = toStr(today); params.set('dateFrom', d); params.set('dateTo', d); }
         else if (dateRange === 'week') { const s = new Date(today); s.setDate(today.getDate() - today.getDay()); s.setHours(0,0,0,0); params.set('dateFrom', toStr(s)); }
         else if (dateRange === 'month') params.set('dateFrom', toStr(new Date(today.getFullYear(), today.getMonth(), 1)));
         else if (dateRange === 'quarter') { const q = Math.floor(today.getMonth() / 3); params.set('dateFrom', toStr(new Date(today.getFullYear(), q * 3, 1))); }
-        else if (typeof dateRange === 'object' && dateRange.type === 'custom') { params.set('dateFrom', toStr(new Date(dateRange.startDate))); params.set('dateTo', toStr(new Date(dateRange.endDate))); }
+        else if (typeof dateRange === 'object' && (dateRange as DateRange).type === 'custom') { params.set('dateFrom', toStr(new Date(String((dateRange as DateRange).startDate || '')))); params.set('dateTo', toStr(new Date(String((dateRange as DateRange).endDate || '')))); }
       }
       if (excludeYearsKey) params.set('excludeYears', excludeYearsKey);
       const r = await fetch(`/api/quotations?${params}`, { credentials: 'include' });
@@ -116,7 +149,7 @@ export default function Quotations() {
     setShowQuotationForm(true);
   };
 
-  const handleEditQuotation = (quotation: any) => {
+  const handleEditQuotation = (quotation: Record<string, unknown>) => {
     setEditingQuotation(quotation);
     setShowQuotationForm(true);
   };
@@ -144,16 +177,16 @@ export default function Quotations() {
     if (selectedStatuses.length) params.set('status', selectedStatuses.join(','));
     if (selectedCustomers.length) params.set('customerId', selectedCustomers.join(','));
     const today = new Date();
-    const toStr = (d: any) => d.toISOString().split('T')[0];
+    const toStr = (d: Date) => d.toISOString().split('T')[0];
     if (dateRange && dateRange !== 'all') {
       if (dateRange === 'today') { const d = toStr(today); params.set('dateFrom', d); params.set('dateTo', d); }
       else if (dateRange === 'week') { const s = new Date(today); s.setDate(today.getDate() - today.getDay()); s.setHours(0,0,0,0); params.set('dateFrom', toStr(s)); }
       else if (dateRange === 'month') params.set('dateFrom', toStr(new Date(today.getFullYear(), today.getMonth(), 1)));
       else if (dateRange === 'quarter') { const q = Math.floor(today.getMonth() / 3); params.set('dateFrom', toStr(new Date(today.getFullYear(), q * 3, 1))); }
-      else if (typeof dateRange === 'object' && dateRange.type === 'custom') { params.set('dateFrom', toStr(new Date(dateRange.startDate))); params.set('dateTo', toStr(new Date(dateRange.endDate))); }
+      else if (typeof dateRange === 'object' && (dateRange as DateRange).type === 'custom') { params.set('dateFrom', toStr(new Date(String((dateRange as DateRange).startDate || '')))); params.set('dateTo', toStr(new Date(String((dateRange as DateRange).endDate || '')))); }
     }
-    const closedYears = financialYears.filter((y: any) => y.status === 'Closed');
-    if (closedYears.length > 0) params.set('excludeYears', closedYears.map((cy: any) => `${cy.startDate},${cy.endDate}`).join(';'));
+    const closedYears = financialYears.filter((y: FinancialYear) => y.status === 'Closed');
+    if (closedYears.length > 0) params.set('excludeYears', closedYears.map((cy: FinancialYear) => `${cy.startDate},${cy.endDate}`).join(';'));
     window.open(`/quotations-list-print?${params}`, '_blank');
   };
 
@@ -162,16 +195,16 @@ export default function Quotations() {
     if (debouncedSearch) params.set('search', debouncedSearch);
     if (selectedStatuses.length) params.set('status', selectedStatuses.join(','));
     if (selectedCustomers.length) params.set('customerId', selectedCustomers.join(','));
-    const closedYears = financialYears.filter((y: any) => y.status === 'Closed');
-    if (closedYears.length > 0) params.set('excludeYears', closedYears.map((cy: any) => `${cy.startDate},${cy.endDate}`).join(';'));
+    const closedYears = financialYears.filter((y: FinancialYear) => y.status === 'Closed');
+    if (closedYears.length > 0) params.set('excludeYears', closedYears.map((cy: FinancialYear) => `${cy.startDate},${cy.endDate}`).join(';'));
     const today = new Date();
-    const toStr = (d: any) => d.toISOString().split('T')[0];
+    const toStr = (d: Date) => d.toISOString().split('T')[0];
     if (dateRange && dateRange !== 'all') {
       if (dateRange === 'today') { const d = toStr(today); params.set('dateFrom', d); params.set('dateTo', d); }
       else if (dateRange === 'week') { const s = new Date(today); s.setDate(today.getDate() - today.getDay()); s.setHours(0,0,0,0); params.set('dateFrom', toStr(s)); }
       else if (dateRange === 'month') params.set('dateFrom', toStr(new Date(today.getFullYear(), today.getMonth(), 1)));
       else if (dateRange === 'quarter') { const q = Math.floor(today.getMonth() / 3); params.set('dateFrom', toStr(new Date(today.getFullYear(), q * 3, 1))); }
-      else if (typeof dateRange === 'object' && dateRange.type === 'custom') { params.set('dateFrom', toStr(new Date(dateRange.startDate))); params.set('dateTo', toStr(new Date(dateRange.endDate))); }
+      else if (typeof dateRange === 'object' && (dateRange as DateRange).type === 'custom') { params.set('dateFrom', toStr(new Date(String((dateRange as DateRange).startDate || '')))); params.set('dateTo', toStr(new Date(String((dateRange as DateRange).endDate || '')))); }
     }
     const r = await fetch(`/api/quotations?${params}`, { credentials: 'include' });
     const result = await r.json();
@@ -197,11 +230,11 @@ export default function Quotations() {
             columns={{
               quoteNumber: 'Quotation Number',
               customerName: 'Customer',
-              quoteDate: { label: 'Quotation Date', transform: (date: any) => date ? format(new Date(date), 'dd/MM/yy') : '' },
+              quoteDate: { label: 'Quotation Date', transform: (date: unknown) => date ? format(new Date(String(date)), 'dd/MM/yy') : '' },
               reference: 'Reference',
-              totalAmount: { label: 'Subtotal (AED)', transform: (val: any) => `${val || 0}` },
-              vatAmount: { label: 'VAT (AED)', transform: (val: any) => `${val || 0}` },
-              grandTotal: { label: 'Total (AED)', transform: (val: any) => `${val || 0}` },
+              totalAmount: { label: 'Subtotal (AED)', transform: (val: unknown) => String(val || 0) },
+              vatAmount: { label: 'VAT (AED)', transform: (val: unknown) => String(val || 0) },
+              grandTotal: { label: 'Total (AED)', transform: (val: unknown) => String(val || 0) },
               status: 'Status'
             }}
             isLoading={loading}
@@ -253,7 +286,7 @@ export default function Quotations() {
         currentUser={currentUser}
         onEdit={handleEditQuotation}
         onRefresh={handleRefresh}
-        onQuickView={(id: any) => setQuickViewQuotationId(id)}
+        onQuickView={(id: number) => setQuickViewQuotationId(id)}
       />
 
       {/* Pagination Controls */}
@@ -357,7 +390,7 @@ export default function Quotations() {
         onClose={() => setQuickViewQuotationId(null)}
         canEdit={canEdit}
         canOverride={canOverride}
-        onEdit={(quotation: any) => {
+        onEdit={(quotation: Record<string, unknown>) => {
           setQuickViewQuotationId(null);
           handleEditQuotation(quotation);
         }}

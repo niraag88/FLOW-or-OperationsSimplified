@@ -25,21 +25,57 @@ import { useToast } from '@/hooks/use-toast';
 
 const STALE_3MIN = 3 * 60 * 1000;
 
+
+interface CustomerEntity {
+  id: number;
+  name?: string;
+  customer_name?: string;
+  is_active?: boolean;
+  vatTreatment?: string;
+  type?: string;
+}
+
+interface BrandEntity {
+  id: number;
+  name?: string;
+  isActive?: boolean;
+}
+
+interface ProductEntity {
+  id: number;
+  name?: string;
+  brandId?: number;
+  isActive?: boolean;
+}
+
+interface FinancialYear {
+  id: number;
+  status: string;
+  startDate: string;
+  endDate: string;
+}
+
+interface DateRange extends Record<string, unknown> {
+  type?: string;
+  startDate?: string;
+  endDate?: string;
+}
+
 export default function Invoices() {
-  const [customers, setCustomers] = useState<any[]>([]);
-  const [products, setProducts] = useState<any[]>([]);
-  const [brands, setBrands] = useState<any[]>([]);
+  const [customers, setCustomers] = useState<CustomerEntity[]>([]);
+  const [products, setProducts] = useState<ProductEntity[]>([]);
+  const [brands, setBrands] = useState<BrandEntity[]>([]);
   const [searchTerm, setSearchTerm] = useState("");
   const [showInvoiceForm, setShowInvoiceForm] = useState(false);
-  const [editingInvoice, setEditingInvoice] = useState<any>(null);
-  const [selectedStatuses, setSelectedStatuses] = useState<any[]>([]);
-  const [selectedCustomers, setSelectedCustomers] = useState<any[]>([]);
-  const [dateRange, setDateRange] = useState<any>("all");
+  const [editingInvoice, setEditingInvoice] = useState<Record<string, unknown> | null>(null);
+  const [selectedStatuses, setSelectedStatuses] = useState<string[]>([]);
+  const [selectedCustomers, setSelectedCustomers] = useState<number[]>([]);
+  const [dateRange, setDateRange] = useState<string | DateRange>("all");
   const [paymentStatusFilter, setPaymentStatusFilter] = useState('all');
   const [showCreateFromExistingDialog, setShowCreateFromExistingDialog] = useState(false);
-  const [quickViewInvoiceId, setQuickViewInvoiceId] = useState<any>(null);
-  const [financialYears, setFinancialYears] = useState<any[]>([]);
-  const [sourceQuotationId, setSourceQuotationId] = useState<any>(null);
+  const [quickViewInvoiceId, setQuickViewInvoiceId] = useState<number | null>(null);
+  const [financialYears, setFinancialYears] = useState<FinancialYear[]>([]);
+  const [sourceQuotationId, setSourceQuotationId] = useState<number | null>(null);
 
   // Pagination state
   const [currentPage, setCurrentPage] = useState(1);
@@ -59,11 +95,11 @@ export default function Invoices() {
           Brand.list().catch(() => []),
           fetch('/api/books', { credentials: 'include' }).then(r => r.ok ? r.json() : []).catch(() => []),
         ]);
-        setCustomers(customersData.filter((c: any) => c.is_active !== false));
-        setProducts(productsData);
-        setBrands(brandsData.filter((b: any) => b.isActive !== false));
+        setCustomers((customersData as CustomerEntity[]).filter((c) => c.is_active !== false));
+        setProducts(productsData as ProductEntity[]);
+        setBrands((brandsData as BrandEntity[]).filter((b) => b.isActive !== false));
         setFinancialYears(booksData);
-      } catch (error: any) {
+      } catch (error: unknown) {
         console.error("Error loading supporting data:", error);
       }
     };
@@ -79,8 +115,8 @@ export default function Invoices() {
   }, [searchTerm]);
 
   const excludeYearsKey = financialYears
-    .filter((y: any) => y.status === 'Closed')
-    .map((cy: any) => `${cy.startDate},${cy.endDate}`)
+    .filter((y: FinancialYear) => y.status === 'Closed')
+    .map((cy: FinancialYear) => `${cy.startDate},${cy.endDate}`)
     .join(';');
 
   const { data: invoiceResult, isLoading: loading } = useQuery({
@@ -97,13 +133,13 @@ export default function Invoices() {
       if (selectedCustomers.length) params.set('customerId', selectedCustomers.join(','));
       if (paymentStatusFilter && paymentStatusFilter !== 'all') params.set('paymentStatus', paymentStatusFilter);
       const today = new Date();
-      const toStr = (d: any) => d.toISOString().split('T')[0];
+      const toStr = (d: Date) => d.toISOString().split('T')[0];
       if (dateRange && dateRange !== 'all') {
         if (dateRange === 'today') { const d = toStr(today); params.set('dateFrom', d); params.set('dateTo', d); }
         else if (dateRange === 'week') { const s = new Date(today); s.setDate(today.getDate() - today.getDay()); s.setHours(0,0,0,0); params.set('dateFrom', toStr(s)); }
         else if (dateRange === 'month') params.set('dateFrom', toStr(new Date(today.getFullYear(), today.getMonth(), 1)));
         else if (dateRange === 'quarter') { const q = Math.floor(today.getMonth() / 3); params.set('dateFrom', toStr(new Date(today.getFullYear(), q * 3, 1))); }
-        else if (typeof dateRange === 'object' && dateRange.type === 'custom') { params.set('dateFrom', toStr(new Date(dateRange.startDate))); params.set('dateTo', toStr(new Date(dateRange.endDate))); }
+        else if (typeof dateRange === 'object' && dateRange.type === 'custom') { params.set('dateFrom', toStr(new Date((dateRange as DateRange).startDate!))); params.set('dateTo', toStr(new Date((dateRange as DateRange).endDate!))); }
       }
       if (excludeYearsKey) params.set('excludeYears', excludeYearsKey);
       const r = await fetch(`/api/invoices?${params}`, { credentials: 'include' });
@@ -118,7 +154,7 @@ export default function Invoices() {
 
   // Use preloaded customers for better performance
   const availableCustomers = React.useMemo(() => {
-    return customers.map((customer: any) => ({
+    return customers.map((customer: CustomerEntity) => ({
       ...customer,
       name: customer.name || customer.customer_name // Fallback for reliable display
     }));
@@ -142,7 +178,7 @@ export default function Invoices() {
           const body = await res.json().catch(() => ({}));
           console.warn(`Could not mark quotation #${quotationId} as converted (HTTP ${res.status}):`, body?.error || body);
         }
-      } catch (err: any) {
+      } catch (err: unknown) {
         console.warn(`Could not mark quotation #${quotationId} as converted (network error):`, err);
       }
     }
@@ -153,7 +189,7 @@ export default function Invoices() {
     setShowInvoiceForm(true);
   };
 
-  const handleEditInvoice = async (invoice: any) => {
+  const handleEditInvoice = async (invoice: Record<string, unknown>) => {
     try {
       // Fetch complete invoice data with line items
       const response = await fetch(`/api/invoices/${invoice.id}`);
@@ -164,7 +200,7 @@ export default function Invoices() {
         setEditingInvoice(invoice);
       }
       setShowInvoiceForm(true);
-    } catch (error: any) {
+    } catch (error: unknown) {
       console.error("❌ Error fetching invoice details:", error);
       setEditingInvoice(invoice);
       setShowInvoiceForm(true);
@@ -178,27 +214,29 @@ export default function Invoices() {
   };
 
   // Robust document-to-invoice normalizer function
-  const normalizeDocumentToInvoice = (document: any, documentType: any, dropdownData: any = {}) => {
+  const normalizeDocumentToInvoice = (document: Record<string, unknown>, documentType: string, dropdownData: Record<string, unknown> = {}) => {
     
-    const { availableCustomers = [], availableBrands = [], availableProducts = [] } = dropdownData;
+    const availableCustomers = (dropdownData.availableCustomers || []) as CustomerEntity[];
+    const availableBrands = (dropdownData.availableBrands || []) as BrandEntity[];
+    const availableProducts = (dropdownData.availableProducts || []) as ProductEntity[];
     
     // Helper function to safely get numeric value
-    const safeNumber = (value: any) => {
+    const safeNumber = (value: unknown) => {
       if (value === null || value === undefined || value === '') return 0;
-      const num = parseFloat(value);
+      const num = parseFloat(String(value));
       return isNaN(num) ? 0 : num;
     };
     
     // Helper function to safely get string value
-    const safeString = (value: any, fallback = '') => {
+    const safeString = (value: unknown, fallback = '') => {
       return value !== null && value !== undefined ? String(value) : fallback;
     };
     
     // Helper function to format date
-    const formatDate = (dateValue: any) => {
+    const formatDate = (dateValue: unknown) => {
       if (!dateValue) return '';
       try {
-        return new Date(dateValue).toISOString().split('T')[0];
+        return new Date(String(dateValue)).toISOString().split('T')[0];
       } catch {
         return '';
       }
@@ -208,13 +246,13 @@ export default function Invoices() {
     const rawCustomerId = document.customer_id || document.customerId;
     
     // Validate customer exists in current dropdown options
-    const validCustomer = availableCustomers.find((c: any) => c.id === rawCustomerId);
+    const validCustomer = availableCustomers.find((c: CustomerEntity) => c.id === rawCustomerId);
     if (!validCustomer && rawCustomerId) {
       console.warn(`⚠️ Customer ID ${rawCustomerId} not found in current customers. Available:`, 
-        availableCustomers.map((c: any) => ({ id: c.id, name: c.name || c.customer_name })));
+        availableCustomers.map((c: CustomerEntity) => ({ id: c.id, name: c.name || c.customer_name })));
     }
     
-    const normalizedData: any = {
+    const normalizedData: Record<string, unknown> = {
       // Customer ID - only use if it exists in current dropdown options
       customer_id: validCustomer ? rawCustomerId : null,
       
@@ -261,14 +299,14 @@ export default function Invoices() {
       
       // Handle quotation-specific items - map field names to what InvoiceForm expects
       const quotationItems = document.items || document.lineItems || [];
-      normalizedData.items = quotationItems.map((item: any) => {
+      normalizedData.items = (quotationItems as Record<string, unknown>[]).map((item) => {
         const productId = item.productId || item.product_id;
-        const brandName = item.brandName || item.brand_name;
+        const brandName: string = String(item.brandName || item.brand_name || '');
         
         // Lookup brand_id from brand name
         let brandId = item.brandId || item.brand_id;
         if (!brandId && brandName && availableBrands.length > 0) {
-          const foundBrand = availableBrands.find((b: any) => 
+          const foundBrand = availableBrands.find((b: BrandEntity) => 
             b.name && b.name.toLowerCase() === brandName.toLowerCase()
           );
           if (foundBrand) {
@@ -282,9 +320,9 @@ export default function Invoices() {
           brand_name: brandName,
           product_code: item.productCode || item.product_code || '',
           description: item.description || '',
-          quantity: parseInt(item.quantity) || 0,
-          unit_price: parseFloat(item.unitPrice || item.unit_price) || 0,
-          line_total: parseFloat(item.lineTotal || item.line_total) || 0
+          quantity: parseInt(String(item.quantity)) || 0,
+          unit_price: parseFloat(String(item.unitPrice ?? item.unit_price ?? 0)) || 0,
+          line_total: parseFloat(String(item.lineTotal ?? item.line_total ?? 0)) || 0
         };
       });
       
@@ -294,24 +332,24 @@ export default function Invoices() {
       normalizedData.remarks = `Based on Delivery Order #${doNumber}${notes ? '\n' + notes : ''}`.trim();
       
       // Handle delivery order-specific items - map field names to what InvoiceForm expects
-      const deliveryOrderItems = document.items || document.lineItems || [];
-      normalizedData.items = deliveryOrderItems.map((item: any) => ({
+      const deliveryOrderItems = (document.items || document.lineItems || []) as Record<string, unknown>[];
+      normalizedData.items = (deliveryOrderItems as Record<string, unknown>[]).map((item) => ({
         product_id: item.productId || item.product_id || null,
         brand_id: item.brandId || item.brand_id || null,
         brand_name: item.brandName || item.brand_name || '',
         product_code: item.productCode || item.product_code || '',
         description: item.description || '',
         size: item.size || item.productSize || '',
-        quantity: parseInt(item.quantity) || 0,
-        unit_price: parseFloat(item.unitPrice || item.unit_price) || 0,
-        line_total: parseFloat(item.lineTotal || item.line_total) || 0
+        quantity: parseInt(String(item.quantity)) || 0,
+        unit_price: parseFloat(String(item.unitPrice ?? item.unit_price ?? 0)) || 0,
+        line_total: parseFloat(String(item.lineTotal ?? item.line_total ?? 0)) || 0
       }));
     }
 
     return normalizedData;
   };
 
-  const handleDocumentSelect = async (document: any, documentType: any) => {
+  const handleDocumentSelect = async (document: Record<string, any>, documentType: string = '') => {
     try {
       let fullDocument = document;
       
@@ -322,7 +360,7 @@ export default function Invoices() {
           fullDocument = await response.json();
         }
         // Track source quotation so we can mark it 'converted' after save
-        setSourceQuotationId(document.id);
+        setSourceQuotationId(typeof document.id === 'number' ? document.id : null);
       }
 
       // For delivery orders: only fetch from API if the passed document lacks items
@@ -355,7 +393,7 @@ export default function Invoices() {
       setShowCreateFromExistingDialog(false);
       setShowInvoiceForm(true);
       
-    } catch (error: any) {
+    } catch (error: unknown) {
       console.error("❌ Error processing document selection:", error);
       toast({
         title: "Error",
@@ -372,16 +410,16 @@ export default function Invoices() {
     if (selectedCustomers.length) params.set('customerId', selectedCustomers.join(','));
     if (paymentStatusFilter && paymentStatusFilter !== 'all') params.set('paymentStatus', paymentStatusFilter);
     const today = new Date();
-    const toStr = (d: any) => d.toISOString().split('T')[0];
+    const toStr = (d: Date) => d.toISOString().split('T')[0];
     if (dateRange && dateRange !== 'all') {
       if (dateRange === 'today') { const d = toStr(today); params.set('dateFrom', d); params.set('dateTo', d); }
       else if (dateRange === 'week') { const s = new Date(today); s.setDate(today.getDate() - today.getDay()); s.setHours(0,0,0,0); params.set('dateFrom', toStr(s)); }
       else if (dateRange === 'month') params.set('dateFrom', toStr(new Date(today.getFullYear(), today.getMonth(), 1)));
       else if (dateRange === 'quarter') { const q = Math.floor(today.getMonth() / 3); params.set('dateFrom', toStr(new Date(today.getFullYear(), q * 3, 1))); }
-      else if (typeof dateRange === 'object' && dateRange.type === 'custom') { params.set('dateFrom', toStr(new Date(dateRange.startDate))); params.set('dateTo', toStr(new Date(dateRange.endDate))); }
+      else if (typeof dateRange === 'object' && (dateRange as DateRange).type === 'custom') { params.set('dateFrom', toStr(new Date((dateRange as DateRange).startDate!))); params.set('dateTo', toStr(new Date((dateRange as DateRange).endDate!))); }
     }
-    const closedYears = financialYears.filter((y: any) => y.status === 'Closed');
-    if (closedYears.length > 0) params.set('excludeYears', closedYears.map((cy: any) => `${cy.startDate},${cy.endDate}`).join(';'));
+    const closedYears = financialYears.filter((y: FinancialYear) => y.status === 'Closed');
+    if (closedYears.length > 0) params.set('excludeYears', closedYears.map((cy: FinancialYear) => `${cy.startDate},${cy.endDate}`).join(';'));
     window.open(`/invoices-list-print?${params}`, '_blank');
   };
 
@@ -401,16 +439,16 @@ export default function Invoices() {
     if (selectedStatuses.length) params.set('status', selectedStatuses.join(','));
     if (selectedCustomers.length) params.set('customerId', selectedCustomers.join(','));
     if (paymentStatusFilter && paymentStatusFilter !== 'all') params.set('paymentStatus', paymentStatusFilter);
-    const closedYears = financialYears.filter((y: any) => y.status === 'Closed');
-    if (closedYears.length > 0) params.set('excludeYears', closedYears.map((cy: any) => `${cy.startDate},${cy.endDate}`).join(';'));
+    const closedYears = financialYears.filter((y: FinancialYear) => y.status === 'Closed');
+    if (closedYears.length > 0) params.set('excludeYears', closedYears.map((cy: FinancialYear) => `${cy.startDate},${cy.endDate}`).join(';'));
     const today = new Date();
-    const toStr = (d: any) => d.toISOString().split('T')[0];
+    const toStr = (d: Date) => d.toISOString().split('T')[0];
     if (dateRange && dateRange !== 'all') {
       if (dateRange === 'today') { const d = toStr(today); params.set('dateFrom', d); params.set('dateTo', d); }
       else if (dateRange === 'week') { const s = new Date(today); s.setDate(today.getDate() - today.getDay()); s.setHours(0,0,0,0); params.set('dateFrom', toStr(s)); }
       else if (dateRange === 'month') params.set('dateFrom', toStr(new Date(today.getFullYear(), today.getMonth(), 1)));
       else if (dateRange === 'quarter') { const q = Math.floor(today.getMonth() / 3); params.set('dateFrom', toStr(new Date(today.getFullYear(), q * 3, 1))); }
-      else if (typeof dateRange === 'object' && dateRange.type === 'custom') { params.set('dateFrom', toStr(new Date(dateRange.startDate))); params.set('dateTo', toStr(new Date(dateRange.endDate))); }
+      else if (typeof dateRange === 'object' && (dateRange as DateRange).type === 'custom') { params.set('dateFrom', toStr(new Date((dateRange as DateRange).startDate!))); params.set('dateTo', toStr(new Date((dateRange as DateRange).endDate!))); }
     }
     const r = await fetch(`/api/invoices?${params}`, { credentials: 'include' });
     const result = await r.json();
@@ -436,15 +474,15 @@ export default function Invoices() {
             columns={{
               invoiceNumber: 'Invoice Number',
               customerName: 'Customer',
-              invoiceDate: { label: 'Invoice Date', transform: (date: any) => date ? format(new Date(date), 'dd/MM/yy') : '' },
+              invoiceDate: { label: 'Invoice Date', transform: (date: unknown) => date ? format(new Date(String(date)), 'dd/MM/yy') : '' },
               reference: 'Reference',
-              subtotal: { label: 'Subtotal (AED)', transform: (val: any) => parseFloat(val || 0).toFixed(2) },
-              vatAmount: { label: 'VAT (AED)', transform: (val: any) => parseFloat(val || 0).toFixed(2) },
-              amount: { label: 'Total (AED)', transform: (val: any) => parseFloat(val || 0).toFixed(2) },
-              status: { label: 'Status', transform: (val: any) => val ? val.charAt(0).toUpperCase() + val.slice(1) : '' },
-              paymentStatus: { label: 'Payment Status', transform: (val: any) => val ? val.charAt(0).toUpperCase() + val.slice(1) : 'Outstanding' },
-              paymentReceivedDate: { label: 'Payment Date', transform: (val: any) => val ? format(new Date(val), 'dd/MM/yy') : '' },
-              paymentRemarks: { label: 'Payment Remarks', transform: (val: any) => val || '' }
+              subtotal: { label: 'Subtotal (AED)', transform: (val: unknown) => parseFloat(String(val || 0)).toFixed(2) },
+              vatAmount: { label: 'VAT (AED)', transform: (val: unknown) => parseFloat(String(val || 0)).toFixed(2) },
+              amount: { label: 'Total (AED)', transform: (val: unknown) => parseFloat(String(val || 0)).toFixed(2) },
+              status: { label: 'Status', transform: (val: unknown) => val && typeof val === 'string' ? val.charAt(0).toUpperCase() + val.slice(1) : '' },
+              paymentStatus: { label: 'Payment Status', transform: (val: unknown) => val && typeof val === 'string' ? val.charAt(0).toUpperCase() + val.slice(1) : 'Outstanding' },
+              paymentReceivedDate: { label: 'Payment Date', transform: (val: unknown) => val ? format(new Date(String(val)), 'dd/MM/yy') : '' },
+              paymentRemarks: { label: 'Payment Remarks', transform: (val: unknown) => String(val || '') }
             }}
             isLoading={loading}
             onViewAndPrint={handleViewAndPrint}
@@ -508,7 +546,7 @@ export default function Invoices() {
         currentUser={currentUser}
         onEdit={handleEditInvoice}
         onRefresh={handleRefresh}
-        onQuickView={(id: any) => setQuickViewInvoiceId(id)}
+        onQuickView={(id: number) => setQuickViewInvoiceId(id)}
       />
 
       {/* Pagination Controls */}
@@ -617,7 +655,7 @@ export default function Invoices() {
         onClose={() => setQuickViewInvoiceId(null)}
         canEdit={canEdit}
         canOverride={canOverride}
-        onEdit={(invoice: any) => {
+        onEdit={(invoice: Record<string, unknown>) => {
           setQuickViewInvoiceId(null);
           handleEditInvoice(invoice);
         }}

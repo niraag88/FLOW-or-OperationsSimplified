@@ -56,17 +56,17 @@ export default function GoodsReceiptsTab({
   setShowClosedReceipts
 }: GoodsReceiptsTabProps) {
   const [receivingQuantities, setReceivingQuantities] = useState<Record<string, number>>({});
-  const [processingPO, setProcessingPO] = useState<any>(null);
+  const [processingPOId, setProcessingPOId] = useState<number | null>(null);
   const [showCloseConfirm, setShowCloseConfirm] = useState(false);
-  const [closingPO, setClosingPO] = useState<any>(null);
-  const [selectedPOForReceive, setSelectedPOForReceive] = useState<any>(null);
+  const [closingPO, setClosingPO] = useState<PurchaseOrder | null>(null);
+  const [selectedPOForReceive, setSelectedPOForReceive] = useState<(PurchaseOrder & { items?: Record<string, any>[] }) | null>(null);
   const [receiveQuantities, setReceiveQuantities] = useState<Record<string, number>>({});
   const [receiveNotes, setReceiveNotes] = useState('');
   const [receiveDate, setReceiveDate] = useState(() => new Date().toISOString().slice(0, 10));
   // State is now managed by parent component for context-aware export
   const [showDeleteDialog, setShowDeleteDialog] = useState(false);
-  const [deletingPO, setDeletingPO] = useState<any>(null);
-  const [quickViewPoId, setQuickViewPoId] = useState<any>(null);
+  const [deletingPO, setDeletingPO] = useState<PurchaseOrder | null>(null);
+  const [quickViewPoId, setQuickViewPoId] = useState<number | null>(null);
   // Inline filter state — Open section
   const [openSupplier, setOpenSupplier] = useState('all');
   const [openDateFrom, setOpenDateFrom] = useState('');
@@ -77,15 +77,15 @@ export default function GoodsReceiptsTab({
   const [closedDateTo, setClosedDateTo] = useState('');
   const [closedDelivery, setClosedDelivery] = useState('all');
   // GRN document attachment state
-  const [pendingDocs, setPendingDocs] = useState<any[]>([null, null, null]);
-  const [attachGrnState, setAttachGrnState] = useState<any>(null); // { grnId, slot, receiptNumber }
+  const [pendingDocs, setPendingDocs] = useState<(File | null)[]>([null, null, null]);
+  const [attachGrnState, setAttachGrnState] = useState<{ grnId: number; slot: number; receiptNumber: string } | null>(null); // { grnId, slot, receiptNumber }
   const { toast } = useToast();
 
 
   const ALLOWED_TYPES = ['application/pdf', 'image/jpeg', 'image/jpg', 'image/png'];
   const MAX_DOC_SIZE = 2 * 1024 * 1024;
 
-  const updatePendingDoc = (idx: any, file: any) => {
+  const updatePendingDoc = (idx: number, file: File | null) => {
     setPendingDocs(prev => {
       const arr = [...prev];
       arr[idx] = file;
@@ -93,7 +93,7 @@ export default function GoodsReceiptsTab({
     });
   };
 
-  const handlePendingDocSelect = (idx: any, e: any) => {
+  const handlePendingDocSelect = (idx: number, e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     e.target.value = '';
     if (!file) return;
@@ -108,7 +108,7 @@ export default function GoodsReceiptsTab({
     updatePendingDoc(idx, file);
   };
 
-  const uploadGrnDocToStorage = async (grnId: any, slot: any, file: any) => {
+  const uploadGrnDocToStorage = async (grnId: number, slot: number, file: File) => {
     const extMap = { 'application/pdf': 'pdf', 'image/png': 'png', 'image/jpeg': 'jpg', 'image/jpg': 'jpg' };
     const ext = extMap[file.type as keyof typeof extMap] || 'pdf';
     const storageKey = `goods-receipts/${new Date().getFullYear()}/${grnId}-doc${slot}.${ext}`;
@@ -137,7 +137,8 @@ export default function GoodsReceiptsTab({
     return storageKey;
   };
 
-  const handleGrnAttachSuccess = async (scanKey: any) => {
+  const handleGrnAttachSuccess = async (scanKey?: string) => {
+    if (!scanKey) return;
     if (!attachGrnState) return;
     await fetch(`/api/goods-receipts/${attachGrnState.grnId}/scan-key`, {
       method: 'PATCH',
@@ -149,7 +150,7 @@ export default function GoodsReceiptsTab({
     if (onRefresh) onRefresh();
   };
 
-  const handleRemoveGrnDoc = async (grnId: any, slot: any) => {
+  const handleRemoveGrnDoc = async (grnId: number, slot: number) => {
     try {
       const resp = await fetch(`/api/goods-receipts/${grnId}/scan-key/${slot}`, {
         method: 'DELETE',
@@ -158,23 +159,23 @@ export default function GoodsReceiptsTab({
       if (!resp.ok) throw new Error('Failed to remove');
       toast({ title: 'Document removed' });
       if (onRefresh) onRefresh();
-    } catch (e: any) {
+    } catch (e: unknown) {
       toast({ title: 'Error', description: 'Could not remove the document.', variant: 'destructive' });
     }
   };
 
-  const handleViewGrnDoc = async (scanKey: any) => {
+  const handleViewGrnDoc = async (scanKey: string) => {
     try {
       const res = await fetch(`/api/storage/signed-get?key=${encodeURIComponent(scanKey)}`, { credentials: 'include' });
       const data = await res.json();
       if (!res.ok) throw new Error(data.error || 'Failed to get link');
       window.open(data.url, '_blank');
-    } catch (e: any) {
+    } catch (e: unknown) {
       toast({ title: 'Error', description: 'Could not retrieve the document.', variant: 'destructive' });
     }
   };
 
-  const getStatusColor = (status: any) => {
+  const getStatusColor = (status: string) => {
     switch (status?.toLowerCase()) {
       case 'draft': return 'bg-gray-100 text-gray-800';
       case 'submitted': return 'bg-blue-100 text-blue-800';
@@ -183,27 +184,27 @@ export default function GoodsReceiptsTab({
     }
   };
 
-  const handleQuantityChange = (poId: any, itemIndex: any, quantity: any) => {
+  const handleQuantityChange = (poId: number, itemIndex: number, quantity: number) => {
     setReceivingQuantities((prev) => ({
       ...prev,
-      [`${poId}-${itemIndex}`]: parseInt(quantity) || 0
+      [`${poId}-${itemIndex}`]: Math.floor(quantity) || 0
     }));
   };
 
-  const handleReceiveQuantityChange = (itemId: any, value: any) => {
+  const handleReceiveQuantityChange = (itemId: number, value: number) => {
     setReceiveQuantities((prev) => ({
       ...prev,
-      [itemId]: value === '' ? '' : Math.max(0, parseInt(value) || 0)
+      [itemId]: Math.max(0, Math.floor(value) || 0)
     }));
   };
 
   // These functions now simply return the server-provided data
-  const getLineItemsCount = (po: any) => po.lineItems || 0;
-  const getTotalOrderedQuantity = (po: any) => Number(po.orderedQty) || 0;
-  const getTotalReceivedQuantity = (po: any) => Number(po.receivedQty) || 0;
+  const getLineItemsCount = (po: PurchaseOrder): number => Number((po as Record<string, unknown>).lineItems) || 0;
+  const getTotalOrderedQuantity = (po: PurchaseOrder) => Number((po as Record<string, unknown>).orderedQty) || 0;
+  const getTotalReceivedQuantity = (po: PurchaseOrder) => Number((po as Record<string, unknown>).receivedQty) || 0;
 
   // Handler functions for closed PO actions — delegate to shared utilities in export.jsx
-  const handleViewAndPrint = async (po: any) => {
+  const handleViewAndPrint = async (po: PurchaseOrder) => {
     try {
       await printPOGRNSummary(po.id);
     } catch {
@@ -211,22 +212,22 @@ export default function GoodsReceiptsTab({
     }
   };
 
-  const handleExportToXLSX = async (po: any) => {
+  const handleExportToXLSX = async (po: PurchaseOrder) => {
     try {
       await exportPODetailToXLSX(po.id, po.poNumber);
       toast({ title: "Export successful", description: `${po.poNumber} exported to Excel.` });
-    } catch (error: any) {
+    } catch (error: unknown) {
       console.error('XLSX export error:', error);
       toast({ title: "Export failed", description: "Could not export to Excel. Please try again.", variant: "destructive" });
     }
   };
 
-  const handleDeletePO = (po: any) => {
+  const handleDeletePO = (po: PurchaseOrder) => {
     setDeletingPO(po);
     setShowDeleteDialog(true);
   };
 
-  const handleReopenPO = async (po: any) => {
+  const handleReopenPO = async (po: PurchaseOrder) => {
     try {
       const res = await fetch(`/api/purchase-orders/${po.id}/status`, {
         method: 'PATCH',
@@ -240,8 +241,8 @@ export default function GoodsReceiptsTab({
       }
       toast({ title: 'PO Re-opened', description: `${po.poNumber} has been moved back to Open.` });
       onRefresh();
-    } catch (error: any) {
-      toast({ title: 'Error', description: error.message || 'Could not re-open the purchase order.', variant: 'destructive' });
+    } catch (error: unknown) {
+      toast({ title: 'Error', description: error instanceof Error ? error.message : 'Could not re-open the purchase order.', variant: 'destructive' });
     }
   };
 
@@ -270,18 +271,18 @@ export default function GoodsReceiptsTab({
       if (onRefresh) {
         onRefresh();
       }
-    } catch (error: any) {
+    } catch (error: unknown) {
       console.error('Error deleting purchase order:', error);
       toast({
         title: 'Delete Failed',
-        description: error.message || 'Failed to delete the purchase order. Please try again.',
+        description: error instanceof Error ? error.message : 'Failed to delete the purchase order. Please try again.',
         variant: 'destructive'
       });
     }
   };
 
   // Helper function to render purchase order table (used as fallback; main views use inline HTML tables)
-  const renderPOTable = (pos: any, isClosedSection = false) => (
+  const renderPOTable = (pos: Record<string, any>[], isClosedSection = false) => (
     <Table>
       <TableHeader>
         <TableRow>
@@ -299,23 +300,20 @@ export default function GoodsReceiptsTab({
         </TableRow>
       </TableHeader>
       <TableBody>
-        {pos.map((po: any) => {
-          const ordQty = getTotalOrderedQuantity(po);
-          const recQty = getTotalReceivedQuantity(po);
+        {pos.map((po: Record<string, any>) => {
+          const ordQty = getTotalOrderedQuantity(po as unknown as PurchaseOrder);
+          const recQty = getTotalReceivedQuantity(po as unknown as PurchaseOrder);
           const isPartial = ordQty > 0 && recQty < ordQty;
           return (
           <TableRow key={po.id}>
             <TableCell className="font-medium w-[120px]">{po.poNumber}</TableCell>
             <TableCell className="w-[130px]">{po.brandName || 'Unknown Brand'}</TableCell>
             <TableCell className="w-[100px]">
-              {po.orderDate && !isNaN(new Date(po.orderDate).getTime()) ? 
-                format(new Date(po.orderDate), 'dd/MM/yy') : 
-                '-'
-              }
+              {po.orderDate && !isNaN(new Date(String(po.orderDate)).getTime()) ? format(new Date(String(po.orderDate)), 'dd/MM/yy') : '-'}
             </TableCell>
-            <TableCell className="w-[110px]">{formatCurrency(po.totalAmount || 0, po.currency || 'GBP')}</TableCell>
-            <TableCell className="w-[110px]">{formatCurrency(getAedEquivalent(po), 'AED')}</TableCell>
-            <TableCell className="w-[80px]">{getLineItemsCount(po)}</TableCell>
+            <TableCell className="w-[110px]">{formatCurrency(parseFloat(String(po.totalAmount || 0)) || 0, String(po.currency || 'GBP'))}</TableCell>
+            <TableCell className="w-[110px]">{formatCurrency(getAedEquivalent(po as Record<string, unknown>), 'AED')}</TableCell>
+            <TableCell className="w-[80px]">{getLineItemsCount(po as unknown as PurchaseOrder)}</TableCell>
             <TableCell className="w-[70px]">{ordQty}</TableCell>
             <TableCell className="w-[70px]">{recQty}</TableCell>
             {isClosedSection && (
@@ -358,16 +356,16 @@ export default function GoodsReceiptsTab({
                     </Button>
                   </DropdownMenuTrigger>
                   <DropdownMenuContent align="end">
-                    <DropdownMenuItem onClick={() => handleViewAndPrint(po)}>
+                    <DropdownMenuItem onClick={() => handleViewAndPrint(po as unknown as PurchaseOrder)}>
                       <FileText className="w-4 h-4 mr-2" />
                       View & Print
                     </DropdownMenuItem>
-                    <DropdownMenuItem onClick={() => handleExportToXLSX(po)}>
+                    <DropdownMenuItem onClick={() => handleExportToXLSX(po as unknown as PurchaseOrder)}>
                       <FileSpreadsheet className="w-4 h-4 mr-2" />
                       Export to XLSX
                     </DropdownMenuItem>
                     <DropdownMenuItem 
-                      onClick={() => handleDeletePO(po)}
+                      onClick={() => handleDeletePO(po as unknown as PurchaseOrder)}
                       className="text-red-600"
                     >
                       Delete
@@ -377,11 +375,11 @@ export default function GoodsReceiptsTab({
               ) : (
                 <Button
                   size="sm"
-                  onClick={() => openReceiveDialog(po)}
-                  disabled={!canEdit || processingPO === po.id}
+                  onClick={() => openReceiveDialog(po as unknown as PurchaseOrder)}
+                  disabled={!canEdit || processingPOId === po.id}
                   className="bg-emerald-600 hover:bg-emerald-700"
                 >
-                  {processingPO === po.id ? "Processing..." : "Receive"}
+                  {processingPOId === po.id ? "Processing..." : "Receive"}
                 </Button>
               )}
             </TableCell>
@@ -392,7 +390,7 @@ export default function GoodsReceiptsTab({
     </Table>
   );
 
-  const openReceiveDialog = async (po: any) => {
+  const openReceiveDialog = async (po: PurchaseOrder) => {
     try {
       // Fetch the purchase order items only when opening the dialog
       const response = await fetch(`/api/purchase-orders/${po.id}/items`, { credentials: 'include' });
@@ -402,19 +400,16 @@ export default function GoodsReceiptsTab({
       const items = await response.json();
       
       // Set the selected PO with items
-      setSelectedPOForReceive({
-        ...po,
-        items: items
-      });
+      setSelectedPOForReceive({ ...po, items } as unknown as PurchaseOrder);
       
       // Initialize receive quantities to 0 for all items
-      const initialQuantities: Record<string, any> = {};
-      items.forEach((item: any) => {
-        initialQuantities[item.id] = '';
+      const initialQuantities: Record<string, number> = {};
+      items.forEach((item: Record<string, any>) => {
+        initialQuantities[item.id] = 0;
       });
       setReceiveQuantities(initialQuantities);
       
-    } catch (error: any) {
+    } catch (error: unknown) {
       console.error('Error fetching PO items:', error);
       toast({
         title: "Error",
@@ -428,9 +423,9 @@ export default function GoodsReceiptsTab({
     if (!selectedPOForReceive) return;
 
     try {
-      setProcessingPO(selectedPOForReceive.id);
+      setProcessingPOId(selectedPOForReceive.id);
 
-      const items = selectedPOForReceive.items?.map((item: any) => {
+      const items = (selectedPOForReceive.items as Record<string, any>[] | undefined)?.map((item: Record<string, any>) => {
         const receivedQuantity = receiveQuantities[item.id] || 0;
         return {
           poItemId: item.id,
@@ -441,7 +436,7 @@ export default function GoodsReceiptsTab({
         };
       }) || [];
 
-      if (items.every((item: any) => item.receivedQuantity === 0) && !forceClose) {
+      if (items && items.every((item: Record<string, any>) => item.receivedQuantity === 0) && !forceClose) {
         toast({
           title: "No quantities entered",
           description: "Please enter at least one quantity to receive or use 'Save & Close' to close the PO.",
@@ -472,7 +467,7 @@ export default function GoodsReceiptsTab({
       const result = await response.json();
 
       // Upload any pending documents (non-fatal)
-      const docsSelected = pendingDocs.some((f: any) => f !== null);
+      const docsSelected = pendingDocs.some((f) => f !== null);
       if (docsSelected && result.id) {
         for (let i = 0; i < 3; i++) {
           const file = pendingDocs[i];
@@ -504,7 +499,7 @@ export default function GoodsReceiptsTab({
         onRefresh();
       }
 
-    } catch (error: any) {
+    } catch (error: unknown) {
       console.error('Error creating goods receipt:', error);
       toast({
         title: "Error",
@@ -512,16 +507,16 @@ export default function GoodsReceiptsTab({
         variant: "destructive"
       });
     } finally {
-      setProcessingPO(null);
+      setProcessingPOId(null);
     }
   };
 
 
-  const getReceivedQuantityForItem = (poId: any, productId: any) => {
-    const relatedGRNs = goodsReceipts.filter((grn: any) => (grn.poId ?? grn.purchase_order_id) === poId);
+  const getReceivedQuantityForItem = (poId: number, productId: number) => {
+    const relatedGRNs = goodsReceipts.filter((grn: GoodsReceipt) => (grn.poId ?? (grn as Record<string, unknown>).purchase_order_id) === poId);
     let totalReceived = 0;
-    relatedGRNs.forEach((grn: any) => {
-      grn.items?.forEach((item: any) => {
+    relatedGRNs.forEach((grn: GoodsReceipt) => {
+      (grn as Record<string, any>).items?.forEach((item: Record<string, any>) => {
         if ((item.productId ?? item.product_id) === productId) {
           totalReceived += item.receivedQuantity ?? item.received_quantity ?? 0;
         }
@@ -530,14 +525,14 @@ export default function GoodsReceiptsTab({
     return totalReceived;
   };
 
-  const handleForceCloseClick = (po: any) => {
+  const handleForceCloseClick = (po: PurchaseOrder) => {
     setClosingPO(po);
     setShowCloseConfirm(true);
   };
 
   const handleConfirmForceClose = async () => {
     if (!closingPO || !canEdit) return;
-    setProcessingPO(closingPO.id);
+    setProcessingPOId(closingPO.id);
     try {
       const response = await fetch(`/api/purchase-orders/${closingPO.id}/status`, {
         method: 'PATCH',
@@ -551,11 +546,11 @@ export default function GoodsReceiptsTab({
       }
       toast({ title: "Success", description: `${closingPO.poNumber} has been closed.` });
       onRefresh();
-    } catch (error: any) {
+    } catch (error: unknown) {
       console.error("Error force closing PO:", error);
-      toast({ title: "Error", description: error.message || 'Could not close the Purchase Order.', variant: "destructive" });
+      toast({ title: "Error", description: error instanceof Error ? error.message : 'Could not close the Purchase Order.', variant: "destructive" });
     } finally {
-      setProcessingPO(null);
+      setProcessingPOId(null);
       setShowCloseConfirm(false);
       setClosingPO(null);
     }
@@ -583,20 +578,21 @@ export default function GoodsReceiptsTab({
     );
   }
 
-  const openPOs = purchaseOrders.filter((po: any) => po.status === 'submitted');
-  const closedPOs = purchaseOrders.filter((po: any) => po.status === 'closed');
+  const openPOs = purchaseOrders.filter((po: PurchaseOrder) => po.status === 'submitted');
+  const closedPOs = purchaseOrders.filter((po: PurchaseOrder) => po.status === 'closed');
 
   // Unique supplier/brand lists for dropdowns
   const openSupplierOptions = Array.from(new Set(
-    openPOs.map((po: any) => po.supplierName || po.brandName).filter(Boolean)
+    openPOs.map((po: PurchaseOrder) => (po as Record<string, any>).supplierName || (po as Record<string, any>).brandName).filter(Boolean)
   )).sort();
   const closedSupplierOptions = Array.from(new Set(
-    closedPOs.map((po: any) => po.supplierName || po.brandName).filter(Boolean)
+    closedPOs.map((po: PurchaseOrder) => (po as Record<string, any>).supplierName || (po as Record<string, any>).brandName).filter(Boolean)
   )).sort();
 
-  const filteredOpenPOs = openPOs.filter((po: any) => {
+  const filteredOpenPOs = openPOs.filter((po: PurchaseOrder) => {
+    const poR = po as Record<string, any>;
     if (openSupplier !== 'all') {
-      const name = po.supplierName || po.brandName;
+      const name = poR.supplierName || poR.brandName;
       if (name !== openSupplier) return false;
     }
     if (openDateFrom) {
@@ -608,9 +604,10 @@ export default function GoodsReceiptsTab({
     return true;
   });
 
-  const filteredClosedPOs = closedPOs.filter((po: any) => {
+  const filteredClosedPOs = closedPOs.filter((po: PurchaseOrder) => {
+    const poR = po as Record<string, any>;
     if (closedSupplier !== 'all') {
-      const name = po.supplierName || po.brandName;
+      const name = poR.supplierName || poR.brandName;
       if (name !== closedSupplier) return false;
     }
     if (closedDateFrom) {
@@ -633,61 +630,61 @@ export default function GoodsReceiptsTab({
   const closedFiltersActive = closedSupplier !== 'all' || !!closedDateFrom || !!closedDateTo || closedDelivery !== 'all';
 
   // Shared column transforms
-  const dateTransform = (date: any) => date && !isNaN(new Date(date).getTime()) ? format(new Date(date), 'dd/MM/yy') : '';
-  const totalTransform = (amount: any, row: any) => formatCurrency(amount || 0, row?.currency || 'GBP');
-  const getAedEquivalent = (po: any) => {
-    const amount = parseFloat(po.totalAmount) || 0;
-    const currency = po.currency || 'GBP';
+  const dateTransform = (date: unknown) => date && !isNaN(new Date(String(date)).getTime()) ? format(new Date(String(date)), 'dd/MM/yy') : '';
+  const totalTransform = (amount: unknown, row: Record<string, unknown>) => formatCurrency(Number(amount || 0), String(row?.currency || 'GBP'));
+  const getAedEquivalent = (po: Record<string, unknown>) => {
+    const amount = parseFloat(String(po.totalAmount || 0)) || 0;
+    const currency = String(po.currency || 'GBP');
     if (currency === 'AED') return amount;
-    const rate = parseFloat(po.fxRateToAed) || 4.85;
+    const rate = parseFloat(String(po.fxRateToAed || 0)) || 4.85;
     return amount * rate;
   };
-  const aedTransform = (_: any, row: any) => `AED ${getAedEquivalent(row).toFixed(2)}`;
-  const deliveryTransform = (_: any, row: any) => {
-    const ordQty = getTotalOrderedQuantity(row);
-    const recQty = getTotalReceivedQuantity(row);
+  const aedTransform = (_: unknown, row: Record<string, unknown>) => `AED ${getAedEquivalent(row).toFixed(2)}`;
+  const deliveryTransform = (_: unknown, row: Record<string, unknown>) => {
+    const ordQty = getTotalOrderedQuantity(row as unknown as PurchaseOrder);
+    const recQty = getTotalReceivedQuantity(row as unknown as PurchaseOrder);
     return ordQty > 0 && recQty < ordQty ? 'Short Delivery' : 'Complete';
   };
 
   // Open section export columns (matches on-screen columns)
   const openExportColumns = {
     poNumber: "PO Number",
-    supplierName: { label: "Supplier", transform: (v: any, row: any) => v || row?.brandName || '' },
+    supplierName: { label: "Supplier", transform: (v: unknown, row: Record<string, unknown>) => String(v || row?.brandName || '') },
     orderDate: { label: "Order Date", transform: dateTransform },
     totalAmount: { label: "Total", transform: totalTransform },
     grandTotal: { label: "Total (AED)", transform: aedTransform },
-    lineItems: { label: "Line Items", transform: (_: any, row: any) => getLineItemsCount(row) },
-    orderedQty: { label: "Ordered", transform: (_: any, row: any) => getTotalOrderedQuantity(row) },
-    receivedQty: { label: "Received", transform: (_: any, row: any) => getTotalReceivedQuantity(row) },
-    status: { label: "Status", transform: (s: any) => s?.toUpperCase() || '' },
+    lineItems: { label: "Line Items", transform: (_: unknown, row: Record<string, unknown>) => getLineItemsCount(row as unknown as PurchaseOrder) },
+    orderedQty: { label: "Ordered", transform: (_: unknown, row: Record<string, unknown>) => getTotalOrderedQuantity(row as unknown as PurchaseOrder) },
+    receivedQty: { label: "Received", transform: (_: unknown, row: Record<string, unknown>) => getTotalReceivedQuantity(row as unknown as PurchaseOrder) },
+    status: { label: "Status", transform: (s: unknown) => typeof s === 'string' ? s.toUpperCase() : '' },
   };
 
   // Closed section export columns (matches on-screen columns)
   const closedExportColumns = {
     poNumber: "PO Number",
-    supplierName: { label: "Supplier", transform: (v: any, row: any) => v || row?.brandName || '' },
+    supplierName: { label: "Supplier", transform: (v: unknown, row: Record<string, unknown>) => String(v || row?.brandName || '') },
     orderDate: { label: "Order Date", transform: dateTransform },
     totalAmount: { label: "Total", transform: totalTransform },
     grandTotal: { label: "Total (AED)", transform: aedTransform },
-    lineItems: { label: "Lines", transform: (_: any, row: any) => getLineItemsCount(row) },
-    orderedQty: { label: "Ordered", transform: (_: any, row: any) => getTotalOrderedQuantity(row) },
-    receivedQty: { label: "Received", transform: (_: any, row: any) => getTotalReceivedQuantity(row) },
+    lineItems: { label: "Lines", transform: (_: unknown, row: Record<string, unknown>) => getLineItemsCount(row as unknown as PurchaseOrder) },
+    orderedQty: { label: "Ordered", transform: (_: unknown, row: Record<string, unknown>) => getTotalOrderedQuantity(row as unknown as PurchaseOrder) },
+    receivedQty: { label: "Received", transform: (_: unknown, row: Record<string, unknown>) => getTotalReceivedQuantity(row as unknown as PurchaseOrder) },
     delivery: { label: "Delivery", transform: deliveryTransform },
-    status: { label: "Status", transform: (s: any) => s?.toUpperCase() || '' },
+    status: { label: "Status", transform: (s: unknown) => typeof s === 'string' ? s.toUpperCase() : '' },
   };
 
   // Combined column set for when both sections are visible: superset of open + closed columns
   const combinedExportColumns = {
     poNumber: "PO Number",
-    supplierName: { label: "Supplier", transform: (v: any, row: any) => v || row?.brandName || '' },
+    supplierName: { label: "Supplier", transform: (v: unknown, row: Record<string, unknown>) => String(v || row?.brandName || '') },
     orderDate: { label: "Order Date", transform: dateTransform },
     totalAmount: { label: "Total", transform: totalTransform },
     grandTotal: { label: "Total (AED)", transform: aedTransform },
-    lineItems: { label: "Lines", transform: (_: any, row: any) => getLineItemsCount(row) },
-    orderedQty: { label: "Ordered", transform: (_: any, row: any) => getTotalOrderedQuantity(row) },
-    receivedQty: { label: "Received", transform: (_: any, row: any) => getTotalReceivedQuantity(row) },
-    status: { label: "Status", transform: (s: any) => s?.toUpperCase() || '' },
-    delivery: { label: "Delivery", transform: (_: any, row: any) => row.status === 'closed' ? deliveryTransform(null, row) : '' },
+    lineItems: { label: "Lines", transform: (_: unknown, row: Record<string, unknown>) => getLineItemsCount(row as unknown as PurchaseOrder) },
+    orderedQty: { label: "Ordered", transform: (_: unknown, row: Record<string, unknown>) => getTotalOrderedQuantity(row as unknown as PurchaseOrder) },
+    receivedQty: { label: "Received", transform: (_: unknown, row: Record<string, unknown>) => getTotalReceivedQuantity(row as unknown as PurchaseOrder) },
+    status: { label: "Status", transform: (s: unknown) => typeof s === 'string' ? s.toUpperCase() : '' },
+    delivery: { label: "Delivery", transform: (_: unknown, row: Record<string, unknown>) => row.status === 'closed' ? deliveryTransform(null, row) : '' },
   };
 
   // Context-aware export — wired to filtered lists
@@ -764,7 +761,7 @@ export default function GoodsReceiptsTab({
                     </SelectTrigger>
                     <SelectContent>
                       <SelectItem value="all">All Suppliers</SelectItem>
-                      {openSupplierOptions.map((s: any) => (
+                      {openSupplierOptions.map((s: string) => (
                         <SelectItem key={s} value={s}>{s}</SelectItem>
                       ))}
                     </SelectContent>
@@ -825,7 +822,7 @@ export default function GoodsReceiptsTab({
                         </tr>
                       </thead>
                       <tbody>
-                        {filteredOpenPOs.map((po: any) => (
+                        {(filteredOpenPOs as Record<string, any>[]).map((po: Record<string, any>) => (
                           <tr key={po.id} className="border-b transition-colors hover:bg-muted/50">
                             <td className="p-2 align-middle font-medium" style={{width: '120px'}}>{po.poNumber}</td>
                             <td className="p-2 align-middle" style={{width: '140px'}}>{po.brandName || 'Unknown Brand'}</td>
@@ -835,11 +832,11 @@ export default function GoodsReceiptsTab({
                                 '-'
                               }
                             </td>
-                            <td className="p-2 align-middle" style={{width: '110px'}}>{formatCurrency(po.totalAmount || 0, po.currency || 'GBP')}</td>
-                            <td className="p-2 align-middle" style={{width: '110px'}}>{formatCurrency(getAedEquivalent(po), 'AED')}</td>
-                            <td className="p-2 align-middle" style={{width: '90px'}}>{getLineItemsCount(po)}</td>
-                            <td className="p-2 align-middle" style={{width: '80px'}}>{getTotalOrderedQuantity(po)}</td>
-                            <td className="p-2 align-middle" style={{width: '80px'}}>{getTotalReceivedQuantity(po)}</td>
+                            <td className="p-2 align-middle" style={{width: '110px'}}>{formatCurrency(parseFloat(String(po.totalAmount || 0)) || 0, String(po.currency || 'GBP'))}</td>
+                            <td className="p-2 align-middle" style={{width: '110px'}}>{formatCurrency(getAedEquivalent(po as Record<string, unknown>), 'AED')}</td>
+                            <td className="p-2 align-middle" style={{width: '90px'}}>{getLineItemsCount(po as unknown as PurchaseOrder)}</td>
+                            <td className="p-2 align-middle" style={{width: '80px'}}>{getTotalOrderedQuantity(po as unknown as PurchaseOrder)}</td>
+                            <td className="p-2 align-middle" style={{width: '80px'}}>{getTotalReceivedQuantity(po as unknown as PurchaseOrder)}</td>
                             <td className="p-2 align-middle" style={{width: '90px'}}>
                               <Badge 
                                 variant="outline" 
@@ -851,11 +848,11 @@ export default function GoodsReceiptsTab({
                             <td className="p-2 align-middle" style={{width: '90px'}}>
                               <Button
                                 size="sm"
-                                onClick={() => openReceiveDialog(po)}
-                                disabled={!canEdit || processingPO === po.id}
+                                onClick={() => openReceiveDialog(po as unknown as PurchaseOrder)}
+                                disabled={!canEdit || processingPOId === po.id}
                                 className="bg-emerald-600 hover:bg-emerald-700"
                               >
-                                {processingPO === po.id ? "Processing..." : "Receive"}
+                                {processingPOId === po.id ? "Processing..." : "Receive"}
                               </Button>
                             </td>
                           </tr>
@@ -896,7 +893,7 @@ export default function GoodsReceiptsTab({
                     </SelectTrigger>
                     <SelectContent>
                       <SelectItem value="all">All Suppliers</SelectItem>
-                      {closedSupplierOptions.map((s: any) => (
+                      {closedSupplierOptions.map((s: string) => (
                         <SelectItem key={s} value={s}>{s}</SelectItem>
                       ))}
                     </SelectContent>
@@ -962,10 +959,10 @@ export default function GoodsReceiptsTab({
                       </tr>
                     </thead>
                     <tbody>
-                      {filteredClosedPOs.map((po: any) => {
-                        const poGRNs = (goodsReceipts || []).filter((grn: any) => (grn.poId ?? grn.purchase_order_id) === po.id);
-                        const ordQty = getTotalOrderedQuantity(po);
-                        const recQty = getTotalReceivedQuantity(po);
+                      {(filteredClosedPOs as Record<string, any>[]).map((po: Record<string, any>) => {
+                        const poGRNs = (goodsReceipts || []).filter((grn: GoodsReceipt) => (grn.poId ?? (grn as Record<string, unknown>).purchase_order_id) === po.id);
+                        const ordQty = getTotalOrderedQuantity(po as unknown as PurchaseOrder);
+                        const recQty = getTotalReceivedQuantity(po as unknown as PurchaseOrder);
                         const isPartial = ordQty > 0 && recQty < ordQty;
                         return (
                           <React.Fragment key={po.id}>
@@ -973,7 +970,7 @@ export default function GoodsReceiptsTab({
                               <td className="p-2 align-middle font-medium" style={{width: '130px'}}>
                                 <div className="flex items-center gap-1.5">
                                   <button
-                                    onClick={() => setQuickViewPoId(po.id)}
+                                    onClick={() => setQuickViewPoId(Number(po.id))}
                                     className="text-blue-600 hover:text-blue-800 hover:underline font-medium text-left"
                                   >
                                     {po.poNumber}
@@ -1000,8 +997,8 @@ export default function GoodsReceiptsTab({
                                 }
                               </td>
                               <td className="p-2 align-middle" style={{width: '110px'}}>{formatCurrency(po.totalAmount || 0, po.currency || 'GBP')}</td>
-                              <td className="p-2 align-middle" style={{width: '110px'}}>{formatCurrency(getAedEquivalent(po), 'AED')}</td>
-                              <td className="p-2 align-middle" style={{width: '70px'}}>{getLineItemsCount(po)}</td>
+                              <td className="p-2 align-middle" style={{width: '110px'}}>{formatCurrency(getAedEquivalent(po as Record<string, unknown>), 'AED')}</td>
+                              <td className="p-2 align-middle" style={{width: '70px'}}>{getLineItemsCount(po as unknown as PurchaseOrder)}</td>
                               <td className="p-2 align-middle" style={{width: '70px'}}>{ordQty}</td>
                               <td className="p-2 align-middle" style={{width: '70px'}}>{recQty}</td>
                               <td className="p-2 align-middle" style={{width: '90px'}}>
@@ -1042,26 +1039,26 @@ export default function GoodsReceiptsTab({
                                     </Button>
                                   </DropdownMenuTrigger>
                                   <DropdownMenuContent align="end">
-                                    <DropdownMenuItem onClick={() => setQuickViewPoId(po.id)}>
+                                    <DropdownMenuItem onClick={() => setQuickViewPoId(Number(po.id))}>
                                       <Eye className="w-4 h-4 mr-2" />
                                       View Details
                                     </DropdownMenuItem>
-                                    <DropdownMenuItem onClick={() => handleViewAndPrint(po)}>
+                                    <DropdownMenuItem onClick={() => handleViewAndPrint(po as unknown as PurchaseOrder)}>
                                       <FileText className="w-4 h-4 mr-2" />
                                       View & Print
                                     </DropdownMenuItem>
-                                    <DropdownMenuItem onClick={() => handleExportToXLSX(po)}>
+                                    <DropdownMenuItem onClick={() => handleExportToXLSX(po as unknown as PurchaseOrder)}>
                                       <Download className="w-4 h-4 mr-2" />
                                       Export to XLSX
                                     </DropdownMenuItem>
                                     <DropdownMenuSeparator />
-                                    <DropdownMenuItem onClick={() => handleReopenPO(po)}>
+                                    <DropdownMenuItem onClick={() => handleReopenPO(po as unknown as PurchaseOrder)}>
                                       <RefreshCw className="w-4 h-4 mr-2" />
                                       Re-open PO
                                     </DropdownMenuItem>
                                     <DropdownMenuSeparator />
                                     <DropdownMenuItem 
-                                      onClick={() => handleDeletePO(po)}
+                                      onClick={() => handleDeletePO(po as unknown as PurchaseOrder)}
                                       className="text-red-600 focus:text-red-600"
                                     >
                                       <Trash2 className="w-4 h-4 mr-2" />
@@ -1109,10 +1106,8 @@ export default function GoodsReceiptsTab({
         <DialogContent className="max-w-4xl max-h-[80vh] overflow-y-auto">
           <DialogHeader>
             <DialogTitle>
-              Receive Goods - {selectedPOForReceive?.brandName || 'Unknown Brand'} - {selectedPOForReceive?.poNumber}
-              {selectedPOForReceive?.orderDate && !isNaN(new Date(selectedPOForReceive.orderDate).getTime()) && 
-                ` - ${format(new Date(selectedPOForReceive.orderDate), 'dd/MM/yy')}`
-              }
+              Receive Goods - {(selectedPOForReceive as Record<string, any>)?.brandName || 'Unknown Brand'} - {selectedPOForReceive?.poNumber}
+              {selectedPOForReceive?.orderDate && !isNaN(new Date(selectedPOForReceive.orderDate).getTime()) && ` - ${format(new Date(selectedPOForReceive.orderDate), 'dd/MM/yy')}`}
             </DialogTitle>
             <DialogDescription>
               Enter the quantities received for each product. You can receive partial quantities and continue receiving more later.
@@ -1131,8 +1126,8 @@ export default function GoodsReceiptsTab({
                 </TableRow>
               </TableHeader>
               <TableBody>
-                {selectedPOForReceive?.items?.map((item: any, index: any) => {
-                  const totalReceived = getReceivedQuantityForItem(selectedPOForReceive.id, item.productId);
+                {(selectedPOForReceive?.items as Record<string, any>[] | undefined)?.map((item: Record<string, any>, index: number) => {
+                  const totalReceived = getReceivedQuantityForItem(selectedPOForReceive?.id ?? 0, item.productId);
                   const remaining = item.quantity - totalReceived;
                   
                   return (
@@ -1157,7 +1152,7 @@ export default function GoodsReceiptsTab({
                           max={remaining}
                           placeholder="0"
                           value={receiveQuantities[item.id] || ''}
-                          onChange={(e) => handleReceiveQuantityChange(item.id, e.target.value)}
+                          onChange={(e) => handleReceiveQuantityChange(item.id, parseInt(e.target.value) || 0)}
                           disabled={remaining <= 0}
                           className="w-24"
                         />
@@ -1195,7 +1190,7 @@ export default function GoodsReceiptsTab({
               <Label>Attach Delivery Documents (optional)</Label>
               <p className="text-xs text-gray-500">Up to 3 documents — PDF, JPG, PNG, max 2 MB each. Slot 1 is the supplier invoice for this delivery. Attached automatically after saving.</p>
               <div className="flex gap-2 flex-wrap">
-                {[0, 1, 2].map((idx: any) => {
+                {[0, 1, 2].map((idx: number) => {
                   const slotLabel = idx === 0 ? 'Supplier Invoice' : `Supporting Doc ${idx + 1}`;
                   return (
                     <div key={idx} className="flex-1 min-w-[160px]">
@@ -1239,23 +1234,23 @@ export default function GoodsReceiptsTab({
             
             {/* Dynamic button logic based on whether all quantities match */}
             {(() => {
-              const allItemsFullyReceived = selectedPOForReceive?.items?.every((item: any) => {
-                const totalReceived = getReceivedQuantityForItem(selectedPOForReceive.id, item.productId);
+              const allItemsFullyReceived = (selectedPOForReceive?.items as Record<string, any>[] | undefined)?.every((item: Record<string, any>) => {
+                const totalReceived = getReceivedQuantityForItem(selectedPOForReceive?.id ?? 0, item.productId);
                 const currentReceiving = receiveQuantities[item.id] || 0;
                 return (totalReceived + currentReceiving) >= item.quantity;
               });
 
-              const hasQuantitiesToReceive = selectedPOForReceive?.items?.some((item: any) => receiveQuantities[item.id] > 0);
+              const hasQuantitiesToReceive = (selectedPOForReceive?.items as Record<string, any>[] | undefined)?.some((item: Record<string, any>) => receiveQuantities[item.id] > 0);
 
               if (allItemsFullyReceived && hasQuantitiesToReceive) {
                 // All quantities match - only show "Save & Close"
                 return (
                   <Button 
                     onClick={() => handleSaveReceive(true)}
-                    disabled={processingPO === selectedPOForReceive?.id}
+                    disabled={processingPOId === selectedPOForReceive?.id}
                     className="bg-emerald-600 hover:bg-emerald-700"
                   >
-                    {processingPO === selectedPOForReceive?.id ? "Processing..." : "Save & Close"}
+                    {processingPOId === selectedPOForReceive?.id ? "Processing..." : "Save & Close"}
                   </Button>
                 );
               } else {
@@ -1265,16 +1260,16 @@ export default function GoodsReceiptsTab({
                     <Button 
                       variant="outline"
                       onClick={() => handleSaveReceive(false)}
-                      disabled={processingPO === selectedPOForReceive?.id || !hasQuantitiesToReceive}
+                      disabled={processingPOId === selectedPOForReceive?.id || !hasQuantitiesToReceive}
                     >
-                      {processingPO === selectedPOForReceive?.id ? "Processing..." : "Save"}
+                      {processingPOId === selectedPOForReceive?.id ? "Processing..." : "Save"}
                     </Button>
                     <Button 
                       onClick={() => handleSaveReceive(true)}
-                      disabled={processingPO === selectedPOForReceive?.id}
+                      disabled={processingPOId === selectedPOForReceive?.id}
                       variant="destructive"
                     >
-                      {processingPO === selectedPOForReceive?.id ? "Processing..." : "Save & Close"}
+                      {processingPOId === selectedPOForReceive?.id ? "Processing..." : "Save & Close"}
                     </Button>
                   </>
                 );

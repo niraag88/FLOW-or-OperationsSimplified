@@ -19,21 +19,47 @@ import { format } from "date-fns";
 
 const STALE_3MIN = 3 * 60 * 1000;
 
+
+interface PurchaseOrder {
+  id: number;
+  status?: string;
+  currency?: string;
+  [key: string]: unknown;
+}
+
+interface GoodsReceipt {
+  id: number;
+  poId?: number;
+  po_id?: number;
+  status?: string;
+  grn_number?: string;
+  purchase_order_id?: number;
+  delivery_note_ref?: string;
+  [key: string]: unknown;
+}
+
+interface FinancialYear {
+  id: number;
+  status: string;
+  startDate: string;
+  endDate: string;
+}
+
 export default function PurchaseOrders() {
-  const [allPOs, setAllPOs] = useState<any[]>([]);
-  const [goodsReceipts, setGoodsReceipts] = useState<any[]>([]);
+  const [allPOs, setAllPOs] = useState<PurchaseOrder[]>([]);
+  const [goodsReceipts, setGoodsReceipts] = useState<GoodsReceipt[]>([]);
   const [searchTerm, setSearchTerm] = useState("");
   const [activeTab, setActiveTab] = useState("purchase-orders");
   const [showPOForm, setShowPOForm] = useState(false);
-  const [editingPO, setEditingPO] = useState<any>(null);
-  const [filters, setFilters] = useState<any>({
+  const [editingPO, setEditingPO] = useState<Record<string, unknown> | null>(null);
+  const [filters, setFilters] = useState<Record<string, string>>({
     status: "all",
     supplier: "all",
     dateRange: "all",
     paymentStatus: "all"
   });
-  const [quickViewPoId, setQuickViewPoId] = useState<any>(null);
-  const [financialYears, setFinancialYears] = useState<any[]>([]);
+  const [quickViewPoId, setQuickViewPoId] = useState<number | null>(null);
+  const [financialYears, setFinancialYears] = useState<FinancialYear[]>([]);
   const [financialYearsLoaded, setFinancialYearsLoaded] = useState(false);
   const hasFetchedPOsRef = useRef(false);
 
@@ -58,8 +84,8 @@ export default function PurchaseOrders() {
 
   // Compute the closed-years key for the query cache (stable string)
   const excludeYearsKey = financialYears
-    .filter((y: any) => y.status === 'Closed')
-    .map((cy: any) => `${cy.startDate},${cy.endDate}`)
+    .filter((y: FinancialYear) => y.status === 'Closed')
+    .map((cy: FinancialYear) => `${cy.startDate},${cy.endDate}`)
     .join(';');
 
   const buildPoParams = () => {
@@ -74,14 +100,14 @@ export default function PurchaseOrders() {
     if (filters.supplier && filters.supplier !== 'all') params.set('supplierId', String(filters.supplier));
     if (filters.paymentStatus && filters.paymentStatus !== 'all') params.set('paymentStatus', filters.paymentStatus);
     const today = new Date();
-    const toStr = (d: any) => d.toISOString().split('T')[0];
+    const toStr = (d: Date) => d.toISOString().split('T')[0];
     if (filters.dateRange && filters.dateRange !== 'all') {
       const dr = filters.dateRange;
       if (dr === 'today') { const d = toStr(today); params.set('dateFrom', d); params.set('dateTo', d); }
       else if (dr === 'week') { const s = new Date(today); s.setDate(today.getDate() - today.getDay()); s.setHours(0,0,0,0); params.set('dateFrom', toStr(s)); }
       else if (dr === 'month') params.set('dateFrom', toStr(new Date(today.getFullYear(), today.getMonth(), 1)));
       else if (dr === 'quarter') { const q = Math.floor(today.getMonth() / 3); params.set('dateFrom', toStr(new Date(today.getFullYear(), q * 3, 1))); }
-      else if (typeof dr === 'object' && dr.type === 'custom') { params.set('dateFrom', toStr(new Date(dr.startDate))); params.set('dateTo', toStr(new Date(dr.endDate))); }
+      else if (typeof dr === 'object' && (dr as Record<string, unknown>).type === 'custom') { params.set('dateFrom', toStr(new Date(String((dr as Record<string, string>).startDate || '')))); params.set('dateTo', toStr(new Date(String((dr as Record<string, string>).endDate || '')))); }
     }
     if (excludeYearsKey) params.set('excludeYears', excludeYearsKey);
     return params;
@@ -108,8 +134,9 @@ export default function PurchaseOrders() {
       .then(r => r.json())
       .then(data => {
         const grns = Array.isArray(data) ? data : [];
-        setGoodsReceipts(grns.map((grn: any) => ({
+        setGoodsReceipts((grns as Record<string, any>[]).map((grn): GoodsReceipt => ({
           ...grn,
+          id: grn.id as number,
           grn_number: grn.receiptNumber ?? grn.grn_number,
           purchase_order_id: grn.poId ?? grn.purchase_order_id,
           delivery_note_ref: grn.notes ?? grn.delivery_note_ref,
@@ -162,7 +189,7 @@ export default function PurchaseOrders() {
     setShowPOForm(true);
   };
 
-  const handleEditPO = (po: any) => {
+  const handleEditPO = (po: Record<string, unknown>) => {
     setEditingPO(po);
     setShowPOForm(true);
   };
@@ -189,21 +216,21 @@ export default function PurchaseOrders() {
     if (filters.supplier && filters.supplier !== 'all') params.set('supplierId', String(filters.supplier));
     if (excludeYearsKey) params.set('excludeYears', excludeYearsKey);
     const today = new Date();
-    const toStr = (d: any) => d.toISOString().split('T')[0];
+    const toStr = (d: Date) => d.toISOString().split('T')[0];
     if (filters.dateRange && filters.dateRange !== 'all') {
       const dr = filters.dateRange;
       if (dr === 'today') { const d = toStr(today); params.set('dateFrom', d); params.set('dateTo', d); }
       else if (dr === 'week') { const s = new Date(today); s.setDate(today.getDate() - today.getDay()); s.setHours(0,0,0,0); params.set('dateFrom', toStr(s)); }
       else if (dr === 'month') params.set('dateFrom', toStr(new Date(today.getFullYear(), today.getMonth(), 1)));
       else if (dr === 'quarter') { const q = Math.floor(today.getMonth() / 3); params.set('dateFrom', toStr(new Date(today.getFullYear(), q * 3, 1))); }
-      else if (typeof dr === 'object' && dr.type === 'custom') { params.set('dateFrom', toStr(new Date(dr.startDate))); params.set('dateTo', toStr(new Date(dr.endDate))); }
+      else if (typeof dr === 'object' && (dr as Record<string, unknown>).type === 'custom') { params.set('dateFrom', toStr(new Date(String((dr as Record<string, string>).startDate || '')))); params.set('dateTo', toStr(new Date(String((dr as Record<string, string>).endDate || '')))); }
     }
     const r = await fetch(`/api/purchase-orders?${params}`, { credentials: 'include' });
     const result = await r.json();
     return Array.isArray(result) ? result : (result.data || []);
   };
 
-  const filteredGRNs = goodsReceipts.filter((grn: any) =>
+  const filteredGRNs = goodsReceipts.filter((grn: GoodsReceipt) =>
     grn.grn_number?.toLowerCase().includes(searchTerm.toLowerCase()) ||
     grn.delivery_note_ref?.toLowerCase().includes(searchTerm.toLowerCase())
   );
@@ -213,8 +240,8 @@ export default function PurchaseOrders() {
   const [showClosedReceipts, setShowClosedReceipts] = useState(false);
   
   const getGoodsReceiptsExportData = () => {
-    const openPOs = allPOs.filter((po: any) => po.status === 'submitted');
-    const closedPOs = allPOs.filter((po: any) => po.status === 'closed');
+    const openPOs = allPOs.filter((po: PurchaseOrder) => po.status === 'submitted');
+    const closedPOs = allPOs.filter((po: PurchaseOrder) => po.status === 'closed');
     
     if (showOpenReceipts && !showClosedReceipts) {
       return openPOs;
@@ -231,22 +258,22 @@ export default function PurchaseOrders() {
     brandName: "Brand",
     orderDate: {
       label: "Order Date",
-      transform: (date: any) => date && !isNaN(new Date(date).getTime()) ? format(new Date(date), 'dd/MM/yy') : ''
+      transform: (date: unknown) => date && !isNaN(new Date(String(date)).getTime()) ? format(new Date(String(date)), 'dd/MM/yy') : ''
     },
     totalAmount: {
       label: "Total",
-      transform: (amount: any, row: any) => `${row?.currency || 'GBP'} ${parseFloat(amount || 0).toFixed(2)}`
+      transform: (amount: unknown, row: Record<string, unknown>) => `${row?.currency || 'GBP'} ${parseFloat(String(amount || 0)).toFixed(2)}`
     },
     grandTotal: {
       label: "Total (AED)", 
-      transform: (amount: any) => `AED ${parseFloat(amount || 0).toFixed(2)}`
+      transform: (amount: unknown) => `AED ${parseFloat(String(amount || 0)).toFixed(2)}`
     },
     lineItems: "Line Items",
     orderedQty: "Ordered",
     receivedQty: "Received",
     status: {
       label: "Status",
-      transform: (status: any) => status?.toUpperCase() || ''
+      transform: (status: unknown) => typeof status === 'string' ? status.toUpperCase() : ''
     }
   };
 
@@ -269,19 +296,19 @@ export default function PurchaseOrders() {
             columns={activeTab === 'purchase-orders' ? {
               poNumber: 'PO Number',
               brandName: 'Brand',
-              orderDate: { label: 'Order Date', transform: (date: any) => date ? format(new Date(date), 'dd/MM/yy') : '' },
-              totalAmount: { label: 'Total', transform: (val: any, row: any) => `${row?.currency || 'GBP'} ${parseFloat(val || 0).toFixed(2)}` },
-              grandTotal: { label: 'Total (AED)', transform: (val: any, row: any) => {
-                const amt = parseFloat(row?.totalAmount || 0);
-                const cur = row?.currency || 'GBP';
-                const rate = parseFloat(row?.fxRateToAed || 4.85);
+              orderDate: { label: 'Order Date', transform: (date: unknown) => date ? format(new Date(String(date)), 'dd/MM/yy') : '' },
+              totalAmount: { label: 'Total', transform: (val: unknown, row: Record<string, unknown>) => `${String(row?.currency || 'GBP')} ${parseFloat(String(val || 0)).toFixed(2)}` },
+              grandTotal: { label: 'Total (AED)', transform: (val: unknown, row: Record<string, unknown>) => {
+                const amt = parseFloat(String(row?.totalAmount || 0));
+                const cur = String(row?.currency || 'GBP');
+                const rate = parseFloat(String(row?.fxRateToAed || 4.85));
                 const aed = cur === 'AED' ? amt : amt * rate;
                 return `AED ${aed.toFixed(2)}`;
               }},
-              status: { label: 'Status', transform: (val: any) => val ? val.toUpperCase() : '' },
-              paymentStatus: { label: 'Payment Status', transform: (val: any) => val ? val.charAt(0).toUpperCase() + val.slice(1) : 'Outstanding' },
-              paymentMadeDate: { label: 'Payment Date', transform: (val: any) => val ? format(new Date(val), 'dd/MM/yy') : '' },
-              paymentRemarks: { label: 'Payment Remarks', transform: (val: any) => val || '' }
+              status: { label: 'Status', transform: (val: unknown) => val && typeof val === 'string' ? val.toUpperCase() : '' },
+              paymentStatus: { label: 'Payment Status', transform: (val: unknown) => val && typeof val === 'string' ? val.charAt(0).toUpperCase() + val.slice(1) : 'Outstanding' },
+              paymentMadeDate: { label: 'Payment Date', transform: (val: unknown) => val ? format(new Date(String(val)), 'dd/MM/yy') : '' },
+              paymentRemarks: { label: 'Payment Remarks', transform: (val: unknown) => val || '' }
             } : goodsReceiptsColumns}
             isLoading={loading}
           />
@@ -333,7 +360,7 @@ export default function PurchaseOrders() {
             currentUser={currentUser}
             onEdit={handleEditPO}
             onRefresh={handleRefresh}
-            onQuickView={(id: any) => setQuickViewPoId(id)}
+            onQuickView={(id: number) => setQuickViewPoId(id)}
           />
 
           {/* Pagination Controls for POs */}
@@ -419,8 +446,8 @@ export default function PurchaseOrders() {
 
         <TabsContent value="goods-receipts" className="mt-6">
           <GoodsReceiptsTab 
-            purchaseOrders={allPOs}
-            goodsReceipts={goodsReceipts}
+            purchaseOrders={allPOs as any}
+            goodsReceipts={goodsReceipts as any}
             loading={loading}
             canEdit={canEdit}
             currentUser={currentUser}

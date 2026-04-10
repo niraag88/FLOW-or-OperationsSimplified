@@ -19,18 +19,41 @@ import ExportDropdown from "../components/common/ExportDropdown";
 
 const STALE_3MIN = 3 * 60 * 1000;
 
+
+interface CustomerEntity {
+  id: number;
+  name?: string;
+  customer_name?: string;
+  isActive?: boolean;
+  vatTreatment?: string;
+  type?: string;
+}
+
+interface FinancialYear {
+  id: number;
+  status: string;
+  startDate: string;
+  endDate: string;
+}
+
+interface DateRange extends Record<string, unknown> {
+  type?: string;
+  startDate?: string;
+  endDate?: string;
+}
+
 export default function DeliveryOrders() {
-  const [customers, setCustomers] = useState<any[]>([]);
+  const [customers, setCustomers] = useState<CustomerEntity[]>([]);
   const [searchTerm, setSearchTerm] = useState("");
   const [showDOForm, setShowDOForm] = useState(false);
-  const [editingDO, setEditingDO] = useState<any>(null);
-  const [selectedStatuses, setSelectedStatuses] = useState<any[]>([]);
-  const [selectedCustomers, setSelectedCustomers] = useState<any[]>([]);
-  const [selectedTaxTreatments, setSelectedTaxTreatments] = useState<any[]>([]);
-  const [dateRange, setDateRange] = useState<any>("all");
+  const [editingDO, setEditingDO] = useState<Record<string, unknown> | null>(null);
+  const [selectedStatuses, setSelectedStatuses] = useState<string[]>([]);
+  const [selectedCustomers, setSelectedCustomers] = useState<number[]>([]);
+  const [selectedTaxTreatments, setSelectedTaxTreatments] = useState<string[]>([]);
+  const [dateRange, setDateRange] = useState<string | DateRange>("all");
   const [showCreateFromExistingDialog, setShowCreateFromExistingDialog] = useState(false);
-  const [financialYears, setFinancialYears] = useState<any[]>([]);
-  const [quickViewDoId, setQuickViewDoId] = useState<any>(null);
+  const [financialYears, setFinancialYears] = useState<FinancialYear[]>([]);
+  const [quickViewDoId, setQuickViewDoId] = useState<number | null>(null);
 
   // Pagination state
   const [currentPage, setCurrentPage] = useState(1);
@@ -46,9 +69,9 @@ export default function DeliveryOrders() {
           Customer.list().catch(() => []),
           fetch('/api/books', { credentials: 'include' }).then(r => r.ok ? r.json() : []).catch(() => []),
         ]);
-        setCustomers(customersData.filter((c: any) => c.isActive !== false));
+        setCustomers((customersData as CustomerEntity[]).filter((c) => c.isActive !== false));
         setFinancialYears(booksData);
-      } catch (error: any) {
+      } catch (error: unknown) {
         console.error("Error loading supporting data:", error);
       }
     };
@@ -64,8 +87,8 @@ export default function DeliveryOrders() {
   }, [searchTerm]);
 
   const excludeYearsKey = financialYears
-    .filter((y: any) => y.status === 'Closed')
-    .map((cy: any) => `${cy.startDate},${cy.endDate}`)
+    .filter((y: FinancialYear) => y.status === 'Closed')
+    .map((cy: FinancialYear) => `${cy.startDate},${cy.endDate}`)
     .join(';');
 
   const { data: doResult, isLoading: loading } = useQuery({
@@ -82,13 +105,13 @@ export default function DeliveryOrders() {
       if (selectedCustomers.length) params.set('customerId', selectedCustomers.join(','));
       if (selectedTaxTreatments.length) params.set('taxTreatment', selectedTaxTreatments.join(','));
       const today = new Date();
-      const toStr = (d: any) => d.toISOString().split('T')[0];
+      const toStr = (d: Date) => d.toISOString().split('T')[0];
       if (dateRange && dateRange !== 'all') {
         if (dateRange === 'today') { const d = toStr(today); params.set('dateFrom', d); params.set('dateTo', d); }
         else if (dateRange === 'week') { const s = new Date(today); s.setDate(today.getDate() - today.getDay()); s.setHours(0,0,0,0); params.set('dateFrom', toStr(s)); }
         else if (dateRange === 'month') params.set('dateFrom', toStr(new Date(today.getFullYear(), today.getMonth(), 1)));
         else if (dateRange === 'quarter') { const q = Math.floor(today.getMonth() / 3); params.set('dateFrom', toStr(new Date(today.getFullYear(), q * 3, 1))); }
-        else if (typeof dateRange === 'object' && dateRange.type === 'custom') { params.set('dateFrom', toStr(new Date(dateRange.startDate))); params.set('dateTo', toStr(new Date(dateRange.endDate))); }
+        else if (typeof dateRange === 'object' && (dateRange as DateRange).type === 'custom') { params.set('dateFrom', toStr(new Date(String((dateRange as DateRange).startDate || '')))); params.set('dateTo', toStr(new Date(String((dateRange as DateRange).endDate || '')))); }
       }
       if (excludeYearsKey) params.set('excludeYears', excludeYearsKey);
       const r = await fetch(`/api/delivery-orders?${params}`, { credentials: 'include' });
@@ -103,7 +126,7 @@ export default function DeliveryOrders() {
 
   // Use preloaded customers for better performance
   const availableCustomers = React.useMemo(() => {
-    return customers.map((customer: any) => ({
+    return customers.map((customer: CustomerEntity) => ({
       ...customer,
       name: customer.name || customer.customer_name // Fallback for reliable display
     }));
@@ -118,7 +141,7 @@ export default function DeliveryOrders() {
     setShowDOForm(true);
   };
 
-  const handleEditDO = (doOrder: any) => {
+  const handleEditDO = (doOrder: Record<string, unknown>) => {
     setEditingDO(doOrder);
     setShowDOForm(true);
   };
@@ -128,25 +151,25 @@ export default function DeliveryOrders() {
     setEditingDO(null);
   };
 
-  const handleDocumentSelect = async (document: any, documentType: any) => {
+  const handleDocumentSelect = async (document: Record<string, any>, documentType: string = '') => {
     if (documentType !== 'quotation') return;
 
     // Fetch the full quotation with line items, and the live customer list in parallel
     let fullQuotation = document;
-    let availableCustomers: any[] = [];
+    let availableCustomers: CustomerEntity[] = [];
     try {
       const [quotRes, customersData] = await Promise.all([
         fetch(`/api/quotations/${document.id}`, { credentials: 'include' }),
         Customer.list().catch(() => []),
       ]);
       if (quotRes.ok) fullQuotation = await quotRes.json();
-      availableCustomers = customersData;
+      availableCustomers = (customersData as CustomerEntity[]);
     } catch (_) { /* use list-level data and empty customer list as fallback */ }
 
     // Validate the customer ID against the live customer list (mirrors Invoices.jsx pattern)
     const rawCustomerId = fullQuotation.customerId ?? fullQuotation.customer_id ?? null;
     const validCustomer = rawCustomerId != null
-      ? availableCustomers.find((c: any) => c.id === rawCustomerId)
+      ? availableCustomers.find((c: CustomerEntity) => c.id === rawCustomerId)
       : null;
     if (rawCustomerId != null && !validCustomer) {
       console.warn(`⚠️ DO handleDocumentSelect: Customer ID ${rawCustomerId} not found in customer list.`);
@@ -171,7 +194,7 @@ export default function DeliveryOrders() {
       total_amount: parseFloat(fullQuotation.grandTotal || fullQuotation.total_amount || 0),
       remarks: `Based on Quotation #${fullQuotation.quoteNumber || fullQuotation.quotation_number || ''}\n${fullQuotation.notes || ''}`.trim(),
       show_remarks: false,
-      items: (fullQuotation.items || []).map((item: any) => ({
+      items: ((fullQuotation as Record<string, any>).items || []).map((item: Record<string, any>) => ({
         product_id: item.productId ?? item.product_id ?? null,
         brand_id: item.brandId ?? item.brand_id ?? null,
         brand_name: item.brandName || item.brand_name || '',
@@ -203,16 +226,16 @@ export default function DeliveryOrders() {
     if (selectedStatuses.length) params.set('status', selectedStatuses.join(','));
     if (selectedCustomers.length) params.set('customerId', selectedCustomers.join(','));
     if (selectedTaxTreatments.length) params.set('taxTreatment', selectedTaxTreatments.join(','));
-    const closedYears = financialYears.filter((y: any) => y.status === 'Closed');
-    if (closedYears.length > 0) params.set('excludeYears', closedYears.map((cy: any) => `${cy.startDate},${cy.endDate}`).join(';'));
+    const closedYears = financialYears.filter((y: FinancialYear) => y.status === 'Closed');
+    if (closedYears.length > 0) params.set('excludeYears', closedYears.map((cy: FinancialYear) => `${cy.startDate},${cy.endDate}`).join(';'));
     const today = new Date();
-    const toStr = (d: any) => d.toISOString().split('T')[0];
+    const toStr = (d: Date) => d.toISOString().split('T')[0];
     if (dateRange && dateRange !== 'all') {
       if (dateRange === 'today') { const d = toStr(today); params.set('dateFrom', d); params.set('dateTo', d); }
       else if (dateRange === 'week') { const s = new Date(today); s.setDate(today.getDate() - today.getDay()); s.setHours(0,0,0,0); params.set('dateFrom', toStr(s)); }
       else if (dateRange === 'month') params.set('dateFrom', toStr(new Date(today.getFullYear(), today.getMonth(), 1)));
       else if (dateRange === 'quarter') { const q = Math.floor(today.getMonth() / 3); params.set('dateFrom', toStr(new Date(today.getFullYear(), q * 3, 1))); }
-      else if (typeof dateRange === 'object' && dateRange.type === 'custom') { params.set('dateFrom', toStr(new Date(dateRange.startDate))); params.set('dateTo', toStr(new Date(dateRange.endDate))); }
+      else if (typeof dateRange === 'object' && dateRange.type === 'custom') { params.set('dateFrom', toStr(new Date(String((dateRange as DateRange).startDate || '')))); params.set('dateTo', toStr(new Date(String((dateRange as DateRange).endDate || '')))); }
     }
     const r = await fetch(`/api/delivery-orders?${params}`, { credentials: 'include' });
     const result = await r.json();
@@ -239,12 +262,12 @@ export default function DeliveryOrders() {
             columns={{
               do_number: 'DO Number',
               customer_name: 'Customer',
-              order_date: { label: 'Order Date', transform: (date: any) => date ? format(new Date(date), 'dd/MM/yy') : '' },
+              order_date: { label: 'Order Date', transform: (date: unknown) => date ? format(new Date(String(date)), 'dd/MM/yy') : '' },
               reference: 'Reference',
-              status: { label: 'Status', transform: (val: any) => val?.toLowerCase() === 'submitted' ? 'Submitted' : val ? val.charAt(0).toUpperCase() + val.slice(1) : '' },
-              subtotal: { label: 'Subtotal (AED)', transform: (val: any) => `${val || 0}` },
-              tax_amount: { label: 'VAT (AED)', transform: (val: any) => `${val || 0}` },
-              total_amount: { label: 'Total (AED)', transform: (val: any) => `${val || 0}` }
+              status: { label: 'Status', transform: (val: unknown) => typeof val === 'string' && val.toLowerCase() === 'submitted' ? 'Submitted' : val && typeof val === 'string' ? val.charAt(0).toUpperCase() + val.slice(1) : '' },
+              subtotal: { label: 'Subtotal (AED)', transform: (val: unknown) => String(val || 0) },
+              tax_amount: { label: 'VAT (AED)', transform: (val: unknown) => String(val || 0) },
+              total_amount: { label: 'Total (AED)', transform: (val: unknown) => String(val || 0) }
             }}
             isLoading={loading}
           />
@@ -305,7 +328,7 @@ export default function DeliveryOrders() {
         currentUser={currentUser}
         onEdit={handleEditDO}
         onRefresh={handleRefresh}
-        onQuickView={(id: any) => setQuickViewDoId(id)}
+        onQuickView={(id: number) => setQuickViewDoId(id)}
       />
 
       {/* Pagination Controls */}
@@ -396,7 +419,7 @@ export default function DeliveryOrders() {
         open={!!quickViewDoId}
         onClose={() => setQuickViewDoId(null)}
         canEdit={canEdit}
-        onEdit={(doData: any) => {
+        onEdit={(doData: Record<string, unknown>) => {
           setQuickViewDoId(null);
           handleEditDO(doData);
         }}

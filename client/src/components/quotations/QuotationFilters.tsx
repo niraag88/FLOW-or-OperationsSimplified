@@ -14,9 +14,9 @@ import type { Customer } from "@shared/schema";
 interface QuotationFiltersProps {
   selectedStatuses: string[];
   setSelectedStatuses: React.Dispatch<React.SetStateAction<string[]>>;
-  selectedCustomers: string[];
-  setSelectedCustomers: React.Dispatch<React.SetStateAction<string[]>>;
-  dateRange: string;
+  selectedCustomers: number[];
+  setSelectedCustomers: React.Dispatch<React.SetStateAction<number[]>>;
+  dateRange: string | Record<string, unknown>;
   setDateRange: (range: string | Record<string, any>) => void;
   resetPagination: () => void;
   customers?: Record<string, any>[];
@@ -131,9 +131,9 @@ export default function QuotationFilters({ selectedStatuses, setSelectedStatuses
                       checked={selectedCustomers.includes(customer.id)}
                       onCheckedChange={(checked) => {
                         if (checked) {
-                          setSelectedCustomers((prev: string[]) => [...prev, customer.id]);
+                          setSelectedCustomers((prev: number[]) => [...prev, customer.id]);
                         } else {
-                          setSelectedCustomers((prev: string[]) => prev.filter((id: string) => id !== customer.id));
+                          setSelectedCustomers((prev: number[]) => prev.filter((id: number) => id !== customer.id));
                         }
                         resetPagination();
                       }}
@@ -240,7 +240,7 @@ export default function QuotationFilters({ selectedStatuses, setSelectedStatuses
               />
             </Badge>
           ))}
-          {selectedCustomers.map((customerId: any) => {
+          {selectedCustomers.map((customerId: number) => {
             const customer = customers.find((c: any) => c.id === customerId);
             return (
               <Badge key={customerId} variant="secondary" className="gap-1">
@@ -248,7 +248,7 @@ export default function QuotationFilters({ selectedStatuses, setSelectedStatuses
                 <X 
                   className="h-3 w-3 cursor-pointer" 
                   onClick={() => {
-                    setSelectedCustomers((prev: string[]) => prev.filter((id: string) => id !== customerId));
+                    setSelectedCustomers((prev: number[]) => prev.filter((id: number) => id !== customerId));
                     resetPagination();
                   }}
                 />

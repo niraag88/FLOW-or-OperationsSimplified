@@ -34,7 +34,7 @@ export default function ExportDropdown({
   filename = "export",
   columns = {},
   isLoading = false,
-  onExternalDocumentClick = null,
+  onExternalDocumentClick: _onExternalDocumentClick = null,
   fetchAllData = null,
   totalCount = null,
   onViewAndPrint = null,
@@ -152,9 +152,6 @@ export default function ExportDropdown({
       setIsExporting(false);
     }
   };
-
-  // Suppress unused variable warning for onExternalDocumentClick
-  void onExternalDocumentClick;
 
   const exportCount = totalCount !== null ? totalCount : (data?.length || 0);
   const disabled = isLoading || isExporting;
