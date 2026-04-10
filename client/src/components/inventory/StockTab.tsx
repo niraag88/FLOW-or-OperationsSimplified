@@ -888,7 +888,7 @@ export default function StockTab({ products, loading, onStockSubTabChange, canEd
                     <TableHead>Product Code</TableHead>
                     <TableHead>Product Name</TableHead>
                     <TableHead>Size</TableHead>
-                    <TableHead>Current Stock</TableHead>
+                    <TableHead className="text-right">Current Stock</TableHead>
                     <TableHead>Status</TableHead>
                   </TableRow>
                 </TableHeader>
@@ -1166,9 +1166,9 @@ export default function StockTab({ products, loading, onStockSubTabChange, canEd
                       <TableHead>Product</TableHead>
                       <TableHead>Type</TableHead>
                       <TableHead>Source</TableHead>
-                      <TableHead>Quantity</TableHead>
-                      <TableHead>Previous</TableHead>
-                      <TableHead>New Stock</TableHead>
+                      <TableHead className="text-right">Quantity</TableHead>
+                      <TableHead className="text-right">Previous</TableHead>
+                      <TableHead className="text-right">New Stock</TableHead>
                       <TableHead>Notes</TableHead>
                     </TableRow>
                   </TableHeader>
@@ -1194,11 +1194,11 @@ export default function StockTab({ products, loading, onStockSubTabChange, canEd
                         <TableCell className="text-sm text-gray-600">
                           {formatMovementSource(movement.referenceType, movement.referenceId)}
                         </TableCell>
-                        <TableCell>
+                        <TableCell className="text-right">
                           {formatMovementQuantity(movement.quantity)}
                         </TableCell>
-                        <TableCell>{movement.previousStock}</TableCell>
-                        <TableCell>
+                        <TableCell className="text-right">{movement.previousStock}</TableCell>
+                        <TableCell className="text-right">
                           <Badge variant="outline">{movement.newStock}</Badge>
                         </TableCell>
                         <TableCell className="text-sm text-gray-600">
@@ -1451,7 +1451,7 @@ export default function StockTab({ products, loading, onStockSubTabChange, canEd
                     <TableHead>Product Code</TableHead>
                     <TableHead>Product Name</TableHead>
                     <TableHead>Size</TableHead>
-                    <TableHead>Current Stock</TableHead>
+                    <TableHead className="text-right">Current Stock</TableHead>
                   </TableRow>
                 </TableHeader>
                 <TableBody>

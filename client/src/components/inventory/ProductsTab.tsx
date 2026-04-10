@@ -333,8 +333,8 @@ export default function ProductsTab({
                       <TableHead>Product Code</TableHead>
                       <TableHead>Product Name</TableHead>
                       <TableHead>Size</TableHead>
-                      <TableHead>Cost Price</TableHead>
-                      <TableHead>Sale Price</TableHead>
+                      <TableHead className="text-right">Cost Price</TableHead>
+                      <TableHead className="text-right">Sale Price</TableHead>
                       {(canEdit || canDelete) && <TableHead>Actions</TableHead>}
                     </TableRow>
                   </TableHeader>
@@ -351,8 +351,8 @@ export default function ProductsTab({
                           <div>{product.name}</div>
                         </TableCell>
                         <TableCell>{product.size || '-'}</TableCell>
-                        <TableCell>{formatCurrency(product.costPrice, product.costPriceCurrency || 'GBP')}</TableCell>
-                        <TableCell>AED {parseFloat(product.unitPrice || 0).toFixed(2)}</TableCell>
+                        <TableCell className="text-right">{formatCurrency(product.costPrice, product.costPriceCurrency || 'GBP')}</TableCell>
+                        <TableCell className="text-right">AED {parseFloat(product.unitPrice || 0).toFixed(2)}</TableCell>
                         {(canEdit || canDelete) && (
                           <TableCell>
                             <DropdownMenu>

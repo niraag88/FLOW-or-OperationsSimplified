@@ -516,8 +516,8 @@ export default function PoGrnReport({ purchaseOrders, goodsReceipts, suppliers =
                   <TableHead>PO Number</TableHead>
                   <TableHead>Supplier</TableHead>
                   <TableHead>Order Date</TableHead>
-                  <TableHead>Total (original)</TableHead>
-                  <TableHead>Total (AED)</TableHead>
+                  <TableHead className="text-right">Total (original)</TableHead>
+                  <TableHead className="text-right">Total (AED)</TableHead>
                   <TableHead>Status</TableHead>
                 </TableRow>
               </TableHeader>
@@ -532,8 +532,8 @@ export default function PoGrnReport({ purchaseOrders, goodsReceipts, suppliers =
                       <TableCell className="font-medium">{po.poNumber || po.po_number}</TableCell>
                       <TableCell>{getSupplierName(suppId)}</TableCell>
                       <TableCell>{formatDate(po.orderDate || po.order_date)}</TableCell>
-                      <TableCell>{formatCurrency(originalAmount, currency)}</TableCell>
-                      <TableCell>{formatCurrency(aedAmount, 'AED')}</TableCell>
+                      <TableCell className="text-right">{formatCurrency(originalAmount, currency)}</TableCell>
+                      <TableCell className="text-right">{formatCurrency(aedAmount, 'AED')}</TableCell>
                       <TableCell>
                         <Badge variant="outline" className={
                           po.status === 'closed' ? 'border-green-300 text-green-800 bg-green-50' :
@@ -643,9 +643,9 @@ export default function PoGrnReport({ purchaseOrders, goodsReceipts, suppliers =
                   <TableHead>Supplier</TableHead>
                   <TableHead>Received Date</TableHead>
                   <TableHead>PO Reference</TableHead>
-                  <TableHead>Ordered Qty</TableHead>
-                  <TableHead>Received Qty</TableHead>
-                  <TableHead>PO Value (AED)</TableHead>
+                  <TableHead className="text-right">Ordered Qty</TableHead>
+                  <TableHead className="text-right">Received Qty</TableHead>
+                  <TableHead className="text-right">PO Value (AED)</TableHead>
                   <TableHead>Status</TableHead>
                 </TableRow>
               </TableHeader>
@@ -665,12 +665,12 @@ export default function PoGrnReport({ purchaseOrders, goodsReceipts, suppliers =
                       <TableCell>
                         <Badge variant="outline">{linkedPo?.poNumber || linkedPo?.po_number || '-'}</Badge>
                       </TableCell>
-                      <TableCell>{totalOrdered > 0 ? totalOrdered : '-'}</TableCell>
-                      <TableCell className={isShort ? 'text-amber-600 font-medium' : ''}>
+                      <TableCell className="text-right">{totalOrdered > 0 ? totalOrdered : '-'}</TableCell>
+                      <TableCell className={`text-right${isShort ? ' text-amber-600 font-medium' : ''}`}>
                         {totalReceived > 0 ? totalReceived : '-'}
                         {isShort && <span className="ml-1 text-xs">(short)</span>}
                       </TableCell>
-                      <TableCell>{poAed > 0 ? formatCurrency(poAed, 'AED') : '-'}</TableCell>
+                      <TableCell className="text-right">{poAed > 0 ? formatCurrency(poAed, 'AED') : '-'}</TableCell>
                       <TableCell>
                         <Badge variant="outline" className="border-green-300 text-green-800 bg-green-50">
                           {grn.status?.toUpperCase() || 'CONFIRMED'}

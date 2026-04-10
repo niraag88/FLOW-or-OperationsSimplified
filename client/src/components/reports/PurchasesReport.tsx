@@ -262,8 +262,8 @@ export default function PurchasesReport({ purchaseOrders, suppliers, companySett
               <TableHeader>
                 <TableRow>
                   <TableHead>Month</TableHead>
-                  <TableHead>Orders</TableHead>
-                  <TableHead>Total (AED)</TableHead>
+                  <TableHead className="text-right">Orders</TableHead>
+                  <TableHead className="text-right">Total (AED)</TableHead>
                 </TableRow>
               </TableHeader>
               <TableBody>
@@ -279,8 +279,8 @@ export default function PurchasesReport({ purchaseOrders, suppliers, companySett
                       <TableCell className="font-medium">
                         {format(new Date(month + "-01"), "MMMM yyyy")}
                       </TableCell>
-                      <TableCell>{data.count}</TableCell>
-                      <TableCell className="font-semibold">AED {fmt(data.totalAED)}</TableCell>
+                      <TableCell className="text-right">{data.count}</TableCell>
+                      <TableCell className="text-right font-semibold">AED {fmt(data.totalAED)}</TableCell>
                     </TableRow>
                   ))
                 )}

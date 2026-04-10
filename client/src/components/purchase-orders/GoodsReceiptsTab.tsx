@@ -318,8 +318,8 @@ export default function GoodsReceiptsTab({
           <TableHead className="w-[120px]">PO Number</TableHead>
           <TableHead className="w-[130px]">Brand</TableHead>
           <TableHead className="w-[100px]">Order Date</TableHead>
-          <TableHead className="w-[110px]">Total</TableHead>
-          <TableHead className="w-[110px]">Total (AED)</TableHead>
+          <TableHead className="w-[110px] text-right">Total</TableHead>
+          <TableHead className="w-[110px] text-right">Total (AED)</TableHead>
           <TableHead className="w-[80px]">Lines</TableHead>
           <TableHead className="w-[70px]">Ordered</TableHead>
           <TableHead className="w-[70px]">Received</TableHead>
@@ -340,8 +340,8 @@ export default function GoodsReceiptsTab({
             <TableCell className="w-[100px]">
               {po.orderDate && !isNaN(new Date(String(po.orderDate)).getTime()) ? format(new Date(String(po.orderDate)), 'dd/MM/yy') : '-'}
             </TableCell>
-            <TableCell className="w-[110px]">{formatCurrency(parseFloat(String(po.totalAmount || 0)) || 0, String(po.currency || 'GBP'))}</TableCell>
-            <TableCell className="w-[110px]">{formatCurrency(getAedEquivalent(po), 'AED')}</TableCell>
+            <TableCell className="w-[110px] text-right">{formatCurrency(parseFloat(String(po.totalAmount || 0)) || 0, String(po.currency || 'GBP'))}</TableCell>
+            <TableCell className="w-[110px] text-right">{formatCurrency(getAedEquivalent(po), 'AED')}</TableCell>
             <TableCell className="w-[80px]">{getLineItemsCount(po)}</TableCell>
             <TableCell className="w-[70px]">{ordQty}</TableCell>
             <TableCell className="w-[70px]">{recQty}</TableCell>
@@ -1148,10 +1148,10 @@ export default function GoodsReceiptsTab({
               <TableHeader>
                 <TableRow>
                   <TableHead>Product</TableHead>
-                  <TableHead>Ordered</TableHead>
-                  <TableHead>Already Received</TableHead>
-                  <TableHead>Remaining</TableHead>
-                  <TableHead>Receiving Now</TableHead>
+                  <TableHead className="text-right">Ordered</TableHead>
+                  <TableHead className="text-right">Already Received</TableHead>
+                  <TableHead className="text-right">Remaining</TableHead>
+                  <TableHead className="text-right">Receiving Now</TableHead>
                 </TableRow>
               </TableHeader>
               <TableBody>
@@ -1167,14 +1167,14 @@ export default function GoodsReceiptsTab({
                           <p className="text-sm text-gray-500">{item.productSku} • {item.size}</p>
                         </div>
                       </TableCell>
-                      <TableCell>{item.quantity}</TableCell>
-                      <TableCell>{totalReceived}</TableCell>
-                      <TableCell>
+                      <TableCell className="text-right">{item.quantity}</TableCell>
+                      <TableCell className="text-right">{totalReceived}</TableCell>
+                      <TableCell className="text-right">
                         <Badge variant={remaining > 0 ? "secondary" : "default"}>
                           {remaining}
                         </Badge>
                       </TableCell>
-                      <TableCell>
+                      <TableCell className="text-right">
                         <Input
                           type="number"
                           min="0"
@@ -1183,7 +1183,7 @@ export default function GoodsReceiptsTab({
                           value={receiveQuantities[item.id] || ''}
                           onChange={(e) => handleReceiveQuantityChange(item.id, parseInt(e.target.value) || 0)}
                           disabled={remaining <= 0}
-                          className="w-24"
+                          className="w-24 text-right ml-auto"
                         />
                       </TableCell>
                     </TableRow>

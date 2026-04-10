@@ -301,9 +301,9 @@ export default function SalesAgedInvoicesReport({ invoices, customers, canExport
               <TableHeader>
                 <TableRow>
                   <TableHead>Month</TableHead>
-                  <TableHead>Total Invoiced (AED)</TableHead>
-                  <TableHead>Collected (AED)</TableHead>
-                  <TableHead>Outstanding (AED)</TableHead>
+                  <TableHead className="text-right">Total Invoiced (AED)</TableHead>
+                  <TableHead className="text-right">Collected (AED)</TableHead>
+                  <TableHead className="text-right">Outstanding (AED)</TableHead>
                 </TableRow>
               </TableHeader>
               <TableBody>
@@ -319,9 +319,9 @@ export default function SalesAgedInvoicesReport({ invoices, customers, canExport
                       <TableCell className="font-medium">
                         {format(new Date(month + "-01"), "MMMM yyyy")}
                       </TableCell>
-                      <TableCell>{fmt(data.total)}</TableCell>
-                      <TableCell className="text-green-600">{fmt(data.collected)}</TableCell>
-                      <TableCell className="text-amber-600">
+                      <TableCell className="text-right">{fmt(data.total)}</TableCell>
+                      <TableCell className="text-right text-green-600">{fmt(data.collected)}</TableCell>
+                      <TableCell className="text-right text-amber-600">
                         {fmt(data.total - data.collected)}
                       </TableCell>
                     </TableRow>
@@ -510,18 +510,18 @@ export default function SalesAgedInvoicesReport({ invoices, customers, canExport
               <TableHeader>
                 <TableRow>
                   <TableHead>Bucket</TableHead>
-                  <TableHead>Outstanding (AED)</TableHead>
-                  <TableHead># Invoices</TableHead>
+                  <TableHead className="text-right">Outstanding (AED)</TableHead>
+                  <TableHead className="text-right"># Invoices</TableHead>
                 </TableRow>
               </TableHeader>
               <TableBody>
                 {Object.entries(agingData).map(([bucket, data]) => (
                   <TableRow key={bucket}>
                     <TableCell className="font-medium">{bucket}</TableCell>
-                    <TableCell className="font-semibold text-amber-700">
+                    <TableCell className="text-right font-semibold text-amber-700">
                       AED {fmt(data.total)}
                     </TableCell>
-                    <TableCell>{data.count}</TableCell>
+                    <TableCell className="text-right">{data.count}</TableCell>
                   </TableRow>
                 ))}
               </TableBody>
