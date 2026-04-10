@@ -10,6 +10,36 @@ import { formatDate } from "@/utils/dateUtils";
 import { formatCurrency } from "@/utils/currency";
 import type { DeliveryOrder } from "@shared/schema";
 import { useToast } from "@/hooks/use-toast";
+interface DODetail {
+  id: number;
+  status: string;
+  customer_name?: string;
+  do_number?: string;
+  order_date?: string | Date | null;
+  reference?: string | null;
+  reference_date?: string | Date | null;
+  tax_treatment?: string | null;
+  tax_amount?: number | string | null;
+  total_amount?: number | string | null;
+  scan_key?: string | null;
+  show_remarks?: boolean | null;
+  tax_rate?: number | null;
+  subtotal?: number | string | null;
+  remarks?: string | null;
+  items?: DODetailItem[];
+}
+
+interface DODetailItem {
+  id?: number;
+  brand_name?: string;
+  product_code?: string;
+  product_name?: string;
+  description?: string;
+  size?: string;
+  quantity: number;
+  unit_price?: string | number;
+  line_total?: string | number;
+}
 import { exportDeliveryOrderToXLSX } from "../utils/export";
 
 const STATUS_COLORS = {
@@ -57,7 +87,7 @@ interface DOQuickViewModalProps {
 }
 
 export default function DOQuickViewModal({ doId, open, onClose, canEdit, onEdit }: DOQuickViewModalProps) {
-  const [detail, setDetail] = useState<any>(null);
+  const [detail, setDetail] = useState<DODetail | null>(null);
   const [loading, setLoading] = useState(false);
   const { toast } = useToast();
 
@@ -75,7 +105,7 @@ export default function DOQuickViewModal({ doId, open, onClose, canEdit, onEdit 
       .finally(() => setLoading(false));
   }, [open, doId]);
 
-  const handleViewDoc = async (scanKey: any) => {
+  const handleViewDoc = async (scanKey: string) => {
     try {
       const res = await fetch(`/api/storage/signed-get?key=${encodeURIComponent(scanKey)}`, {
         credentials: "include",
@@ -97,7 +127,7 @@ export default function DOQuickViewModal({ doId, open, onClose, canEdit, onEdit 
     if (!detail) return;
     try {
       await exportDeliveryOrderToXLSX(detail);
-      toast({ title: "Export Successful", description: `Delivery Order ${detail.do_number} exported to Excel.` });
+      toast({ title: "Export Successful", description: `Delivery Order ${detail.do_number ?? detail.id} exported to Excel.` });
     } catch {
       toast({ title: "Export Failed", description: "Failed to export delivery order to Excel.", variant: "destructive" });
     }
@@ -105,18 +135,18 @@ export default function DOQuickViewModal({ doId, open, onClose, canEdit, onEdit 
 
   const handleEdit = () => {
     if (onEdit && detail) {
-      onEdit(detail);
+      onEdit(detail as unknown as DeliveryOrder);
       onClose();
     }
   };
 
-  const isLocked = ['delivered', 'cancelled'].includes(detail?.status);
+  const isLocked = detail?.status ? ['delivered', 'cancelled'].includes(detail.status) : false;
   const canActOnDO = canEdit && !isLocked;
-  const subtotal = detail?.subtotal ?? 0;
-  const vatAmount = detail?.tax_amount ?? 0;
-  const totalAmount = detail?.total_amount ?? 0;
+  const subtotal = parseFloat(String(detail?.subtotal ?? 0)) || 0;
+  const vatAmount = parseFloat(String(detail?.tax_amount ?? 0)) || 0;
+  const totalAmount = parseFloat(String(detail?.total_amount ?? 0)) || 0;
 
-  const getDocFilename = (scanKey: any) => {
+  const getDocFilename = (scanKey: string | null | undefined) => {
     if (!scanKey) return 'Attachment';
     const last = scanKey.split('/').pop() || '';
     const stripped = last.replace(/^\d{10,}-/, '');
@@ -208,7 +238,7 @@ export default function DOQuickViewModal({ doId, open, onClose, canEdit, onEdit 
                       </TableRow>
                     </TableHeader>
                     <TableBody>
-                      {detail.items.map((item: any, idx: any) => (
+                      {detail.items.map((item, idx) => (
                         <TableRow key={item.id || idx}>
                           <TableCell className="text-sm text-gray-600">{item.brand_name || '—'}</TableCell>
                           <TableCell className="text-sm text-gray-600">{item.product_code || '—'}</TableCell>
@@ -216,10 +246,10 @@ export default function DOQuickViewModal({ doId, open, onClose, canEdit, onEdit 
                           <TableCell className="text-sm text-gray-600">{item.size || '—'}</TableCell>
                           <TableCell className="text-right text-sm">{item.quantity}</TableCell>
                           <TableCell className="text-right text-sm">
-                            {parseFloat(item.unit_price || 0).toFixed(2)}
+                            {parseFloat(String(item.unit_price ?? 0)).toFixed(2)}
                           </TableCell>
                           <TableCell className="text-right text-sm font-medium">
-                            {parseFloat(item.line_total || 0).toFixed(2)}
+                            {parseFloat(String(item.line_total ?? 0)).toFixed(2)}
                           </TableCell>
                         </TableRow>
                       ))}

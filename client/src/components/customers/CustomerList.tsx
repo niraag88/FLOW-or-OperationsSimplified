@@ -7,18 +7,27 @@ import { Users, Edit2, Globe, CreditCard } from "lucide-react";
 import { Skeleton } from "@/components/ui/skeleton";
 import type { Customer } from "@shared/schema";
 
+interface CustomerRow extends Customer {
+  contact_person?: string | null;
+  vat_number?: string | null;
+  vat_treatment_default?: string | null;
+  country_code?: string | null;
+  country?: string | null;
+  currency?: string | null;
+}
+
 interface CustomerListProps {
-  customers: Customer[];
+  customers: CustomerRow[];
   loading: boolean;
   canEdit: boolean;
-  onEdit: (customer: Customer) => void;
+  onEdit: (customer: CustomerRow) => void;
   currentUser?: { email: string } | null;
   onRefresh: () => void;
 }
 
 export default function CustomerList({ customers, loading, canEdit, onEdit, currentUser, onRefresh }: CustomerListProps) {
   
-  const getVatTreatmentBadge = (customer: any) => {
+  const getVatTreatmentBadge = (customer: CustomerRow) => {
     const vatTreatment = customer.vat_treatment_default;
     const isUAE = customer.country_code === 'AE';
     
@@ -95,7 +104,7 @@ export default function CustomerList({ customers, loading, canEdit, onEdit, curr
               </TableRow>
             </TableHeader>
             <TableBody>
-              {customers.map((customer: any) => (
+              {customers.map((customer) => (
                 <TableRow key={customer.id} className="hover:bg-gray-50">
                   <TableCell>
                     <div>
@@ -151,7 +160,7 @@ export default function CustomerList({ customers, loading, canEdit, onEdit, curr
 
         {/* Mobile Cards */}
         <div className="lg:hidden space-y-4">
-          {customers.map((customer: any) => (
+          {customers.map((customer) => (
             <Card key={customer.id} className="p-4">
               <div className="flex items-start justify-between mb-3">
                 <div>

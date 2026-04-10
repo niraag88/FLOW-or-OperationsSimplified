@@ -13,12 +13,28 @@ import { formatCurrency } from "@/utils/currency";
 import { format } from "date-fns";
 import type { Product } from "@shared/schema";
 
+
+interface StockMovement {
+  createdAt: string | Date;
+  productSku?: string;
+  productName?: string;
+  movementType?: string;
+  quantity?: number;
+  previousStock?: number;
+  newStock?: number;
+  unitCost?: number | string | null;
+  notes?: string | null;
+}
+
+type ExportFormat = "xlsx" | "pdf";
+type PrintRow = Record<string, string | number>;
+
 interface ExportDropdownProps {
   products: Product[];
   totalProducts: number;
   activeTab: string;
   stockSubTab: string;
-  stockMovements: unknown[];
+  stockMovements: StockMovement[];
   lowStockProducts: Product[];
   outOfStockProducts: Product[];
   searchTerm: string;
@@ -56,14 +72,14 @@ export default function ExportDropdown({
     return Array.isArray(result) ? result : (result.data || []);
   };
 
-  const buildProductRows = (list: any) =>
-    list.map((p: any) => ({
-      Brand: p.brandName || "-",
+  const buildProductRows = (list: Product[]) =>
+    list.map((p) => ({
+      Brand: (p as Record<string, unknown>).brandName as string || "-",
       "Product Code": p.sku || "-",
       "Product Name": p.name || "-",
       Size: p.size || "-",
-      "Cost Price": formatCurrency(p.costPrice, p.costPriceCurrency || "GBP"),
-      "Sale Price (AED)": `AED ${parseFloat(p.unitPrice || 0).toFixed(2)}`,
+      "Cost Price": formatCurrency(parseFloat(String(p.costPrice ?? 0)) || 0, String(p.costPriceCurrency || "GBP")),
+      "Sale Price (AED)": `AED ${parseFloat(String(p.unitPrice ?? 0)).toFixed(2)}`,
       Status: p.isActive ? "Active" : "Inactive",
     }));
 
@@ -82,11 +98,12 @@ export default function ExportDropdown({
     return pw;
   };
 
-  const writePrintContent = (pw: any, subtitle: any, headers: any, rows: any, total: any) => {
+  const writePrintContent = (pw: Window | null, subtitle: string, headers: string[], rows: PrintRow[], total: number) => {
+    if (!pw) return;
     const now = format(new Date(), "dd/MM/yy");
-    const headerCells = headers.map((h: any) => `<th>${h}</th>`).join("");
+    const headerCells = headers.map((h) => `<th>${h}</th>`).join("");
     const bodyRows = rows
-      .map((row: any) => `<tr>${headers.map((h: any) => `<td>${String(row[h] ?? "-")}</td>`).join("")}</tr>`)
+      .map((row) => `<tr>${headers.map((h) => `<td>${String(row[h] ?? "-")}</td>`).join("")}</tr>`)
       .join("");
 
     pw.document.open();
@@ -124,7 +141,7 @@ export default function ExportDropdown({
     pw.document.close();
   };
 
-  const exportProducts = async (exportFmt: any) => {
+  const exportProducts = async (exportFmt: ExportFormat) => {
     // For print: open window immediately in the user-gesture context BEFORE any async work
     const pw = exportFmt === "pdf" ? openPrintWindow() : null;
     if (exportFmt === "pdf" && !pw) return;
@@ -140,7 +157,7 @@ export default function ExportDropdown({
         const headers = ["Brand", "Product Code", "Product Name", "Size", "Cost Price", "Sale Price (AED)", "Status"];
         writePrintContent(pw, "Products", headers, buildProductRows(allProducts), allProducts.length);
       }
-    } catch (err: any) {
+    } catch (err: unknown) {
       console.error("Export error:", err);
       if (pw) pw.close();
       alert("Export failed. Please try again.");
@@ -149,7 +166,7 @@ export default function ExportDropdown({
     }
   };
 
-  const getFxRate = (currency: any) => {
+  const getFxRate = (currency: string | null | undefined) => {
     const c = String(currency || "GBP").toUpperCase();
     if (c === "AED") return 1.0;
     if (c === "USD") return fxRates?.usdToAed ?? 3.6725;
@@ -157,39 +174,39 @@ export default function ExportDropdown({
     return fxRates?.gbpToAed ?? 4.85;
   };
 
-  const formatOrigCost = (costPrice: any, currency: any) => {
-    const cost = parseFloat(costPrice) || 0;
+  const formatOrigCost = (costPrice: string | number | null | undefined, currency: string | null | undefined) => {
+    const cost = parseFloat(String(costPrice ?? 0)) || 0;
     const curr = String(currency || "GBP").toUpperCase();
     return `${curr} ${cost.toFixed(2)}`;
   };
 
-  const formatAedCost = (costPrice: any, currency: any) => {
-    const cost = parseFloat(costPrice) || 0;
+  const formatAedCost = (costPrice: string | number | null | undefined, currency: string | null | undefined) => {
+    const cost = parseFloat(String(costPrice ?? 0)) || 0;
     const rate = getFxRate(currency);
     return `AED ${(cost * rate).toFixed(2)}`;
   };
 
-  const formatOrigStockValue = (stock: any, costPrice: any, currency: any) => {
+  const formatOrigStockValue = (stock: number | null | undefined, costPrice: string | number | null | undefined, currency: string | null | undefined) => {
     const qty = stock || 0;
-    const cost = parseFloat(costPrice) || 0;
+    const cost = parseFloat(String(costPrice ?? 0)) || 0;
     const curr = String(currency || "GBP").toUpperCase();
     return `${curr} ${(qty * cost).toFixed(2)}`;
   };
 
-  const formatAedStockValue = (stock: any, costPrice: any, currency: any) => {
+  const formatAedStockValue = (stock: number | null | undefined, costPrice: string | number | null | undefined, currency: string | null | undefined) => {
     const qty = stock || 0;
-    const cost = parseFloat(costPrice) || 0;
+    const cost = parseFloat(String(costPrice ?? 0)) || 0;
     const rate = getFxRate(currency);
     return `AED ${(qty * cost * rate).toFixed(2)}`;
   };
 
-  const buildCurrentStockRows = (list: any) =>
-    list.map((p: any) => {
+  const buildCurrentStockRows = (list: Product[]) =>
+    list.map((p) => {
       const stock = p.stockQuantity || 0;
       const threshold = lowStockThreshold || 6;
       const status = stock === 0 ? "Out of Stock" : stock <= threshold ? "Low Stock" : "In Stock";
       return {
-        Brand: p.brandName || "-",
+        Brand: (p as Record<string, unknown>).brandName as string || "-",
         "Product Code": p.sku,
         "Product Name": p.name,
         Size: p.size || "-",
@@ -202,7 +219,7 @@ export default function ExportDropdown({
       };
     });
 
-  const exportCurrentStock = async (exportFmt: any) => {
+  const exportCurrentStock = async (exportFmt: ExportFormat) => {
     const pw = exportFmt === "pdf" ? openPrintWindow() : null;
     if (exportFmt === "pdf" && !pw) return;
 
@@ -218,7 +235,7 @@ export default function ExportDropdown({
         const headers = ["Brand", "Product Code", "Product Name", "Size", "Current Stock", "Status", "Cost Price", "Cost Price (AED)", "Stock Value", "Stock Value (AED)"];
         writePrintContent(pw, "Current Stock Levels", headers, rows, allProducts.length);
       }
-    } catch (err: any) {
+    } catch (err: unknown) {
       console.error("Export error:", err);
       if (pw) pw.close();
       alert("Export failed. Please try again.");
@@ -227,20 +244,20 @@ export default function ExportDropdown({
     }
   };
 
-  const buildMovementRows = (list: any) =>
-    list.map((m: any) => ({
-      Date: format(new Date(m.createdAt), "dd/MM/yy"),
-      "Product Code": m.productSku,
-      "Product Name": m.productName,
-      "Movement Type": m.movementType,
-      Quantity: m.quantity,
-      "Previous Stock": m.previousStock,
-      "New Stock": m.newStock,
-      "Unit Cost": m.unitCost || 0,
+  const buildMovementRows = (list: StockMovement[]): PrintRow[] =>
+    list.map((m) => ({
+      Date: format(new Date(String(m.createdAt)), "dd/MM/yy"),
+      "Product Code": m.productSku || "",
+      "Product Name": m.productName || "",
+      "Movement Type": m.movementType || "",
+      Quantity: m.quantity ?? 0,
+      "Previous Stock": m.previousStock ?? 0,
+      "New Stock": m.newStock ?? 0,
+      "Unit Cost": Number(m.unitCost) || 0,
       Notes: m.notes || "",
     }));
 
-  const exportStockMovements = async (exportFmt: any) => {
+  const exportStockMovements = async (exportFmt: ExportFormat) => {
     const pw = exportFmt === "pdf" ? openPrintWindow() : null;
     if (exportFmt === "pdf" && !pw) return;
 
@@ -255,7 +272,7 @@ export default function ExportDropdown({
         const headers = ["Date", "Product Code", "Product Name", "Movement Type", "Quantity", "Previous Stock", "New Stock", "Unit Cost", "Notes"];
         writePrintContent(pw, "Stock Movements", headers, rows, rows.length);
       }
-    } catch (err: any) {
+    } catch (err: unknown) {
       console.error("Export error:", err);
       if (pw) pw.close();
       alert("Export failed. Please try again.");
@@ -264,8 +281,8 @@ export default function ExportDropdown({
     }
   };
 
-  const buildLowStockRows = (list: any) =>
-    list.map((p: any) => ({
+  const buildLowStockRows = (list: Product[]) =>
+    list.map((p) => ({
       "Product Code": p.sku,
       "Product Name": p.name,
       "Current Stock": p.stockQuantity || 0,
@@ -275,7 +292,7 @@ export default function ExportDropdown({
       "Stock Value (AED)": formatAedStockValue(p.stockQuantity, p.costPrice, p.costPriceCurrency),
     }));
 
-  const exportLowStock = async (exportFmt: any) => {
+  const exportLowStock = async (exportFmt: ExportFormat) => {
     const pw = exportFmt === "pdf" ? openPrintWindow() : null;
     if (exportFmt === "pdf" && !pw) return;
 
@@ -290,7 +307,7 @@ export default function ExportDropdown({
         const headers = ["Product Code", "Product Name", "Current Stock", "Cost Price", "Cost Price (AED)", "Stock Value", "Stock Value (AED)"];
         writePrintContent(pw, "Low Stock Alerts", headers, rows, rows.length);
       }
-    } catch (err: any) {
+    } catch (err: unknown) {
       console.error("Export error:", err);
       if (pw) pw.close();
     } finally {
@@ -298,17 +315,17 @@ export default function ExportDropdown({
     }
   };
 
-  const buildOutOfStockRows = (list: any) =>
-    list.map((p: any) => ({
+  const buildOutOfStockRows = (list: Product[]) =>
+    list.map((p) => ({
       "Product Code": p.sku,
       "Product Name": p.name,
-      Brand: p.brandName || "",
+      Brand: (p as Record<string, unknown>).brandName as string || "",
       Size: p.size || "",
       "Current Stock": 0,
       Status: "Out of Stock",
     }));
 
-  const exportOutOfStock = async (exportFmt: any) => {
+  const exportOutOfStock = async (exportFmt: ExportFormat) => {
     const pw = exportFmt === "pdf" ? openPrintWindow() : null;
     if (exportFmt === "pdf" && !pw) return;
 
@@ -323,7 +340,7 @@ export default function ExportDropdown({
         const headers = ["Product Code", "Product Name", "Brand", "Size", "Current Stock", "Status"];
         writePrintContent(pw, "Out of Stock Products", headers, rows, rows.length);
       }
-    } catch (err: any) {
+    } catch (err: unknown) {
       console.error("Export error:", err);
       if (pw) pw.close();
     } finally {
