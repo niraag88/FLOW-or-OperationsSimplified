@@ -74,44 +74,6 @@ class ApiEntity {
   }
 }
 
-class FallbackEntity {
-  name: string;
-
-  constructor(name: string) {
-    this.name = name;
-  }
-
-  async list(_sort?: string): Promise<unknown[]> {
-    console.warn(`${this.name}.list() not implemented yet - returning empty array`);
-    return [];
-  }
-
-  async create(data: EntityData): Promise<unknown> {
-    console.warn(`${this.name}.create() not implemented yet`);
-    return { id: Math.random().toString(36).slice(2), ...data };
-  }
-
-  async update(id: number | string, data: EntityData): Promise<unknown> {
-    console.warn(`${this.name}.update() not implemented yet`);
-    return { id, ...data };
-  }
-
-  async delete(_id: number | string): Promise<unknown> {
-    console.warn(`${this.name}.delete() not implemented yet`);
-    return { success: true };
-  }
-
-  async getById(_id: number | string): Promise<unknown> {
-    console.warn(`${this.name}.getById() not implemented yet`);
-    return null;
-  }
-
-  async filter(_params: Record<string, string>): Promise<unknown[]> {
-    console.warn(`${this.name}.filter() not implemented yet - returning empty array`);
-    return [];
-  }
-}
-
 export const Product = new ApiEntity('products');
 export const Supplier = new ApiEntity('suppliers');
 export const Customer = new ApiEntity('customers');
@@ -122,7 +84,6 @@ export const Quotation = new ApiEntity('quotations');
 export const Invoice = new ApiEntity('invoices');
 export const DeliveryOrder = new ApiEntity('delivery-orders');
 
-export const InventoryLot = new FallbackEntity('InventoryLot');
 export const StockCount = new ApiEntity('stock-counts');
 export const CompanySettings = {
   async list(): Promise<unknown[]> {

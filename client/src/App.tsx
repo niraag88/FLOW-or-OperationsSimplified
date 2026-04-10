@@ -76,7 +76,7 @@ function PagesContent() {
             <Layout currentPageName="Dashboard"><Dashboard /></Layout>
           </ProtectedRoute>
         } />
-        <Route path="/Inventory" element={
+        <Route path="/inventory" element={
           <ProtectedRoute>
             <Layout currentPageName="Inventory"><Inventory /></Layout>
           </ProtectedRoute>
@@ -97,12 +97,12 @@ function PagesContent() {
             <Layout currentPageName="Invoices"><Invoices /></Layout>
           </ProtectedRoute>
         } />
-        <Route path="/Reports" element={
+        <Route path="/reports" element={
           <ProtectedRoute>
             <Layout currentPageName="Reports"><Reports /></Layout>
           </ProtectedRoute>
         } />
-        <Route path="/Settings" element={
+        <Route path="/settings" element={
           <ProtectedRoute>
             <Layout currentPageName="Settings"><Settings /></Layout>
           </ProtectedRoute>
@@ -137,7 +137,7 @@ function PagesContent() {
             <Layout currentPageName="Goods Receipts"><GoodsReceipts /></Layout>
           </ProtectedRoute>
         } />
-        <Route path="/Customers" element={
+        <Route path="/customers" element={
           <ProtectedRoute>
             <Layout currentPageName="Customers"><Customers /></Layout>
           </ProtectedRoute>

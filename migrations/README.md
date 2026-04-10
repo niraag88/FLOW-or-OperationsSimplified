@@ -13,7 +13,7 @@ This folder contains versioned Drizzle SQL migration files.
 4. npm run db:migrate       # applies unapplied migrations to the database
 ```
 
-`db:push` is retained as a script for reference only. Do not use it —
+`db:push` has been removed from `package.json`. Do not add it back —
 it applies changes without generating a file, leaving no audit trail.
 
 ## Baseline

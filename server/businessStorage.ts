@@ -586,7 +586,7 @@ export class BusinessStorage {
     } else {
       // For new company settings, we need the required fields
       const defaultSettings = {
-        companyName: data.companyName || 'My Company',
+        companyName: data.companyName || '',
         ...data,
         updatedAt: new Date()
       };
