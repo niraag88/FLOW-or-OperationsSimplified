@@ -5,49 +5,86 @@ import { createGunzip } from 'zlib';
 
 /**
  * Validates that a readable stream starts with gzip magic bytes (0x1f 0x8b).
- * Reads the first chunk, checks the header, then pushes it back so the stream
- * is still fully readable by the caller.
+ *
+ * Uses paused-mode reading (stream.read / 'readable' events) rather than
+ * attaching a 'data' listener, which would switch the stream to flowing mode
+ * and risk discarding bytes before the gunzip pipe is established.
+ *
+ * After validation, the 2 header bytes are unshifted back to the front of the
+ * stream's internal buffer so the full byte sequence is preserved for the
+ * downstream gunzip → psql pipe.
  *
  * This preflight runs BEFORE any destructive DROP, so a corrupt or wrong file
  * is rejected cleanly without touching the live database.
  *
  * @param {import('stream').Readable} stream
- * @returns {Promise<void>} Resolves if valid gzip, rejects with a descriptive error if not.
+ * @returns {Promise<void>} Resolves if valid gzip, rejects with descriptive error if not.
  */
 async function validateGzipHeader(stream) {
+  // Ensure we are in paused mode. No data is discarded while paused.
+  stream.pause();
+
   return new Promise((resolve, reject) => {
     let settled = false;
 
-    const onData = (chunk) => {
-      if (settled) return;
-      settled = true;
-      stream.removeListener('data', onData);
+    const cleanup = () => {
+      stream.removeListener('readable', tryRead);
       stream.removeListener('error', onError);
+      stream.removeListener('end', onEnd);
+    };
 
-      if (chunk.length < 2 || chunk[0] !== 0x1f || chunk[1] !== 0x8b) {
-        const b0 = chunk[0] !== undefined ? `0x${chunk[0].toString(16).padStart(2, '0')}` : '(empty)';
-        const b1 = chunk[1] !== undefined ? `0x${chunk[1].toString(16).padStart(2, '0')}` : '(empty)';
+    const tryRead = () => {
+      if (settled) return;
+
+      // read(2) pulls exactly 2 bytes from the internal buffer.
+      // Returns null if fewer than 2 bytes are buffered and more data may come.
+      // Returns whatever is buffered if the stream has ended (may be < 2 bytes).
+      const head = stream.read(2);
+      if (head === null) return; // Not enough data yet — wait for next 'readable'
+
+      settled = true;
+      cleanup();
+
+      if (head.length < 2 || head[0] !== 0x1f || head[1] !== 0x8b) {
+        const b0 = head[0] !== undefined ? `0x${head[0].toString(16).padStart(2, '0')}` : '(empty)';
+        const b1 = head[1] !== undefined ? `0x${head[1].toString(16).padStart(2, '0')}` : '(empty)';
         reject(new Error(
-          `Invalid file: not a valid gzip archive. Expected magic bytes 0x1f 0x8b, got ${b0} ${b1}. ` +
+          `Invalid file: not a valid gzip archive. ` +
+          `Expected magic bytes 0x1f 0x8b, got ${b0} ${b1}. ` +
           'The database has not been modified.'
         ));
         return;
       }
 
-      // Push the chunk back so the full stream is still readable downstream.
-      stream.unshift(chunk);
+      // Put the 2 bytes back at the front of the buffer so the full byte
+      // sequence is available to the downstream gunzip → psql pipe.
+      stream.unshift(head);
       resolve();
     };
 
     const onError = (err) => {
       if (settled) return;
       settled = true;
-      stream.removeListener('data', onData);
+      cleanup();
       reject(err);
     };
 
-    stream.once('data', onData);
-    stream.once('error', onError);
+    const onEnd = () => {
+      if (settled) return;
+      settled = true;
+      cleanup();
+      reject(new Error(
+        'Empty file: stream ended before gzip header could be read. ' +
+        'The database has not been modified.'
+      ));
+    };
+
+    stream.on('readable', tryRead);
+    stream.on('error', onError);
+    stream.on('end', onEnd);
+
+    // Attempt an immediate read in case data is already in the internal buffer.
+    tryRead();
   });
 }
 
@@ -55,7 +92,8 @@ async function validateGzipHeader(stream) {
  * Restores the PostgreSQL database from a readable stream of a .sql.gz file.
  *
  * Strategy:
- *   0. Preflight: Validate gzip magic bytes before any destructive work.
+ *   0. Preflight: Validate gzip magic bytes (paused-mode read) before any destructive work.
+ *      A corrupt or wrong file is rejected here — the database is not touched.
  *   1. Drop the public schema (all app tables) and recreate it — clears existing data.
  *   2. Pipe: sqlGzStream → gunzip → psql, loading all SQL statements from the dump.
  *
@@ -72,7 +110,8 @@ async function restoreBackup(sqlGzStream) {
     if (!dbUrl) throw new Error('DATABASE_URL environment variable is not set');
 
     // Step 0: Preflight — validate gzip header before doing any destructive work.
-    // A corrupt, truncated, or wrong file will be rejected here; the DB is untouched.
+    // Uses paused-mode reading; no bytes are discarded. The stream is left with
+    // all original bytes intact and the 2-byte header unshifted back to the front.
     console.log('[restore] Validating gzip header...');
     await validateGzipHeader(sqlGzStream);
     console.log('[restore] Gzip header valid — proceeding with restore.');
@@ -84,7 +123,9 @@ async function restoreBackup(sqlGzStream) {
     await runPsql(dbUrl, ['-v', 'ON_ERROR_STOP=1', '--command', 'DROP SCHEMA IF EXISTS public CASCADE; CREATE SCHEMA public;']);
     console.log('[restore] Public schema cleared.');
 
-    // Step 2: Decompress and pipe SQL into psql
+    // Step 2: Decompress and pipe SQL into psql.
+    // pipe() automatically resumes the stream from paused mode, draining all
+    // buffered bytes (including the unshifted 2-byte header) in order.
     // ON_ERROR_STOP=1: any SQL error causes psql to exit non-zero → restore returns failure.
     console.log('[restore] Starting database restore from dump...');
     const psql = spawn('psql', [dbUrl, '--no-password', '-v', 'ON_ERROR_STOP=1'], {
@@ -94,6 +135,7 @@ async function restoreBackup(sqlGzStream) {
     const gunzip = createGunzip();
 
     // Pipe: sqlGzStream → gunzip → psql.stdin
+    // pipe() resumes the stream; all bytes (including unshifted header) flow through.
     sqlGzStream.pipe(gunzip).pipe(psql.stdin);
 
     let stderr = '';
