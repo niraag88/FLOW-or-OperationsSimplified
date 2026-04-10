@@ -10,7 +10,7 @@
     "check": "tsc",
     "db:generate": "drizzle-kit generate",
     "db:migrate": "drizzle-kit migrate",
-    "create-admin": "node scripts/createAdmin.js"
+    "create-admin": "tsx scripts/createAdmin.js"
   },
   "dependencies": {
     "@hookform/resolvers": "^3.10.0",
