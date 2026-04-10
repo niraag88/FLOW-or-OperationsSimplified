@@ -37,10 +37,22 @@ const getInitialFormData = (invoiceNumber = '') => ({
   total_amount: 0,
   remarks: "",
   show_remarks: false,
-  attachments: [] as any[],
-  items: [] as any[]
+  attachments: [] as string[],
+  items: [] as InvoiceItem[]
 });
 
+
+interface InvoiceItem {
+  brand_id: string | number;
+  brand_name: string;
+  product_id: string | number;
+  product_code: string;
+  description: string;
+  size: string;
+  quantity: number;
+  unit_price: number;
+  line_total: number;
+}
 
 interface InvoiceFormProps {
   open: boolean;
@@ -56,7 +68,7 @@ export default function InvoiceForm({ open, onClose, editingInvoice, currentUser
   const [customers, setCustomers] = useState<any[]>([]);
   const [products, setProducts] = useState<any[]>([]);
   const [brands, setBrands] = useState<any[]>([]);
-  const [selectedCustomer, setSelectedCustomer] = useState<any>(null);
+  const [selectedCustomer, setSelectedCustomer] = useState<Record<string, any> | null>(null);
   const { toast } = useToast();
   const [formData, setFormData] = useState(getInitialFormData());
 
@@ -91,8 +103,8 @@ export default function InvoiceForm({ open, onClose, editingInvoice, currentUser
         const nextNumResp   = settled[3].status === 'fulfilled' ? settled[3].value : null;
         const fullInvResp   = settled[4].status === 'fulfilled' ? settled[4].value : null;
 
-        const filteredCustomers = customersData.filter((c: any) => c.isActive !== false);
-        const filteredBrands    = brandsData.filter((b: any) => b.isActive !== false);
+        const filteredCustomers = (customersData as Record<string, any>[]).filter((c) => c.isActive !== false);
+        const filteredBrands    = (brandsData as Record<string, any>[]).filter((b) => b.isActive !== false);
 
         setCustomers(filteredCustomers);
         setProducts(productsData);
@@ -119,14 +131,14 @@ export default function InvoiceForm({ open, onClose, editingInvoice, currentUser
             attachments: editingInvoice.attachments || [],
           });
         } else {
-          let full: any = null;
+          let full: Record<string, any> | null = null;
           if (fullInvResp && fullInvResp.ok) {
             try { full = await fullInvResp.json(); } catch {}
           }
           if (full) {
             let resolvedCustomerId = full.customer_id;
             if (!resolvedCustomerId && full.customer_name && filteredCustomers.length > 0) {
-              const matched = filteredCustomers.find((c: any) =>
+              const matched = filteredCustomers.find((c) =>
                 c.name?.trim().toLowerCase() === full.customer_name?.trim().toLowerCase()
               );
               if (matched) resolvedCustomerId = (matched as any).id;
@@ -146,7 +158,7 @@ export default function InvoiceForm({ open, onClose, editingInvoice, currentUser
             });
           }
         }
-      } catch (error: any) {
+      } catch (error: unknown) {
         console.error('Error loading invoice form data:', error);
         toast({ title: 'Error', description: 'Failed to load required data.', variant: 'destructive' });
       } finally {
@@ -160,7 +172,7 @@ export default function InvoiceForm({ open, onClose, editingInvoice, currentUser
   useEffect(() => {
     // Effect to update the selected customer object whenever the customer_id in formData changes
     if (formData.customer_id && customers.length > 0) {
-      const customer = customers.find((c: any) => c.id === formData.customer_id);
+      const customer = customers.find((c: Record<string, unknown>) => c.id === formData.customer_id);
       setSelectedCustomer(customer);
     } else if (!formData.customer_id) {
       setSelectedCustomer(null);
@@ -168,15 +180,15 @@ export default function InvoiceForm({ open, onClose, editingInvoice, currentUser
   }, [formData.customer_id, customers]);
 
 
-  const handleInputChange = (field: any, value: any) => {
+  const handleInputChange = (field: string, value: unknown) => {
     setFormData(prev => {
-      let updatedData: any = { ...prev, [field]: value };
+      let updatedData = { ...prev, [field]: value };
 
       // Handle customer change logic
       if (field === 'customer_id') {
-        const customerId = parseInt(value);
-        const customer = customers.find((c: any) => c.id === customerId);
-        updatedData.customer_id = customerId;
+        const customerId = parseInt(String(value));
+        const customer = customers.find((c: Record<string, any>) => c.id === customerId);
+        updatedData.customer_id = String(customerId);
         
         let taxTreatment = "StandardRated";
         let taxRate = 0.05;
@@ -199,7 +211,7 @@ export default function InvoiceForm({ open, onClose, editingInvoice, currentUser
 
   // Calculate totals when items change
   useEffect(() => {
-    const subtotal = formData.items.reduce((sum: any, item: any) => sum + (item.line_total || 0), 0);
+    const subtotal = formData.items.reduce((sum: number, item: InvoiceItem) => sum + (item.line_total || 0), 0);
     const taxAmount = formData.tax_treatment === 'StandardRated' ? subtotal * formData.tax_rate : 0;
     const totalAmount = subtotal + taxAmount;
     
@@ -226,12 +238,12 @@ export default function InvoiceForm({ open, onClose, editingInvoice, currentUser
     setFormData(prev => ({ ...prev, items: [...prev.items, newItem] }));
   };
 
-  const updateItem = (index: any, field: any, value: any) => {
+  const updateItem = (index: number, field: keyof InvoiceItem, value: string | number) => {
     const newItems = [...formData.items];
     
     // Convert string values to numbers for ID fields
     if (field === 'brand_id' || field === 'product_id') {
-      value = parseInt(value);
+      value = parseInt(String(value));
     }
     
     // Check if brand_id is actually changing to prevent clearing during form initialization
@@ -240,7 +252,7 @@ export default function InvoiceForm({ open, onClose, editingInvoice, currentUser
     newItems[index] = { ...newItems[index], [field]: value };
 
     if (isChangingBrand) {
-      const brand = brands.find((b: any) => b.id === value);
+      const brand = brands.find((b: Record<string, any>) => b.id === value);
       newItems[index] = {
         ...newItems[index],
         brand_name: brand?.name || "",
@@ -253,7 +265,7 @@ export default function InvoiceForm({ open, onClose, editingInvoice, currentUser
       };
     } else if (field === 'brand_id') {
       // Just update brand_name without clearing other fields
-      const brand = brands.find((b: any) => b.id === value);
+      const brand = brands.find((b: Record<string, any>) => b.id === value);
       newItems[index] = {
         ...newItems[index],
         brand_name: brand?.name || "",
@@ -261,7 +273,7 @@ export default function InvoiceForm({ open, onClose, editingInvoice, currentUser
     }
 
     if (field === 'product_id' && value) {
-      const product = products.find((p: any) => p.id === value);
+      const product = products.find((p: Record<string, any>) => p.id === value);
       if (product) {
         newItems[index] = {
           ...newItems[index],
@@ -275,27 +287,27 @@ export default function InvoiceForm({ open, onClose, editingInvoice, currentUser
 
     // Recalculate line total
     if (['quantity', 'unit_price'].includes(field) || field === 'product_id') {
-      const quantity = field === 'quantity' ? (parseInt(value) || 0) : (newItems[index].quantity || 0);
-      const unitPrice = field === 'unit_price' ? (parseFloat(value) || 0) : (newItems[index].unit_price || 0);
+      const quantity = field === 'quantity' ? (parseInt(String(value)) || 0) : (newItems[index].quantity || 0);
+      const unitPrice = field === 'unit_price' ? (parseFloat(String(value)) || 0) : (newItems[index].unit_price || 0);
       newItems[index].line_total = quantity * unitPrice;
     }
 
     setFormData(prev => ({ ...prev, items: newItems }));
   };
 
-  const getFilteredProducts = (brandId: any) => {
+  const getFilteredProducts = (brandId: string | number) => {
     if (!brandId) return [];
-    return products.filter((product: any) => Number(product.brand_id ?? product.brandId) === Number(brandId));
+    return products.filter((product: Record<string, unknown>) => Number(product.brand_id ?? product.brandId) === Number(brandId));
   };
 
-  const removeItem = (index: any) => {
+  const removeItem = (index: number) => {
     setFormData(prev => ({ 
       ...prev, 
       items: prev.items.filter((_, i) => i !== index) 
     }));
   };
 
-  const handleSubmit = async (e: any) => {
+  const handleSubmit = async (e: React.FormEvent<HTMLFormElement>) => {
     e.preventDefault();
     
     if (!formData.customer_id || isNaN(Number(formData.customer_id)) || !formData.invoice_number) {
@@ -325,15 +337,15 @@ export default function InvoiceForm({ open, onClose, editingInvoice, currentUser
         remarks: formData.remarks,
         show_remarks: formData.show_remarks,
         attachments: formData.attachments || [],
-        items: formData.items.map((item: any) => ({
+        items: formData.items.map((item: InvoiceItem) => ({
           brand_id: item.brand_id,
           brand_name: item.brand_name,
           product_id: item.product_id,
           product_code: item.product_code,
           description: item.description,
           size: item.size || "",
-          quantity: parseInt(item.quantity) || 0,
-          unit_price: parseFloat(item.unit_price) || 0,
+          quantity: item.quantity || 0,
+          unit_price: item.unit_price || 0,
           line_total: parseFloat((item.line_total || 0).toFixed(2))
         }))
       };
@@ -361,11 +373,11 @@ export default function InvoiceForm({ open, onClose, editingInvoice, currentUser
       
       onSuccess?.();
       onClose();
-    } catch (error: any) {
+    } catch (error: unknown) {
       console.error("Error saving invoice:", error);
       toast({
         title: "Error",
-        description: `Failed to save invoice: ${error.message}`,
+        description: `Failed to save invoice: ${error instanceof Error ? error.message : String(error)}`,
         variant: "destructive",
       });
     } finally {
@@ -408,7 +420,7 @@ export default function InvoiceForm({ open, onClose, editingInvoice, currentUser
                   <SelectValue placeholder="Select customer" />
                 </SelectTrigger>
                 <SelectContent>
-                  {customers.map((c: any) => (
+                  {customers.map((c) => (
                     <SelectItem key={c.id} value={c.id.toString()}>
                       {c.customer_name || c.name}{c.type ? ` (${c.type})` : ''}
                     </SelectItem>
@@ -493,7 +505,7 @@ export default function InvoiceForm({ open, onClose, editingInvoice, currentUser
                             <SelectValue placeholder="Select brand" />
                           </SelectTrigger>
                           <SelectContent>
-                            {brands.map((b: any) => (
+                            {brands.map((b) => (
                               <SelectItem key={b.id} value={b.id.toString()}>{b.name}</SelectItem>
                             ))}
                           </SelectContent>
@@ -511,7 +523,7 @@ export default function InvoiceForm({ open, onClose, editingInvoice, currentUser
                             <SelectValue placeholder="Select product" />
                           </SelectTrigger>
                           <SelectContent>
-                            {getFilteredProducts(item.brand_id).map((p: any) => (
+                            {getFilteredProducts(item.brand_id).map((p) => (
                               <SelectItem key={p.id} value={p.id.toString()}>
                                 <div className="flex flex-col">
                                   <p className="font-medium truncate">{p.name}{p.size ? ` (${p.size})` : ''}</p>

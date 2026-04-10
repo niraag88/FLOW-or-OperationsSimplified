@@ -13,21 +13,76 @@ import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover
 import { Checkbox } from "@/components/ui/checkbox";
 import { format } from "date-fns";
 
+
+interface StockProduct {
+  id: number;
+  sku: string;
+  name: string;
+  description?: string | null;
+  brandName: string;
+  brandId: number;
+  size: string;
+  stockQuantity: number;
+  minStockLevel: number;
+  maxStockLevel: number;
+  unitPrice: string;
+  costPrice: string;
+  costPriceCurrency: string;
+  isActive: boolean;
+}
+
+interface StockMovement {
+  id: number;
+  productId: number;
+  productName: string;
+  productSku: string;
+  brandName: string;
+  movementType: string;
+  referenceId: number;
+  referenceType: string;
+  quantity: number;
+  previousStock: number;
+  newStock: number;
+  unitCost: string;
+  notes: string;
+  createdAt: string;
+}
+
+interface StockData {
+  products: StockProduct[];
+  lowStockProducts: StockProduct[];
+  outOfStockProducts: StockProduct[];
+  stockSummary: {
+    totalItems: number;
+    totalValue: number;
+    lowStockCount: number;
+    outOfStockCount: number;
+  };
+}
+
+interface CompanySettings {
+  lowStockThreshold: number;
+  fxGbpToAed: number;
+  taxNumber?: string;
+  vatNumber?: string;
+  company_trn?: string;
+}
+
 interface StockTabProps {
   products: Product[];
   loading: boolean;
-  onStockSubTabChange: (tab: string, ...args: any[]) => void;
+  onStockSubTabChange: (tab: string, ...args: unknown[]) => void;
   canEdit: boolean;
   currentUser?: { email?: string; role?: string } | null;
   onRefresh: () => void;
 }
 
 export default function StockTab({ products, loading, onStockSubTabChange, canEdit, currentUser, onRefresh }: StockTabProps) {
-  const [stockData, setStockData] = useState<any>(null);
-  const [stockMovements, setStockMovements] = useState<any[]>([]);
+  const [stockData, setStockData] = useState<StockData | null>(null);
+  const [stockMovements, setStockMovements] = useState<StockMovement[]>([]);
   const [loadingStock, setLoadingStock] = useState(true);
   const [loadingMovements, setLoadingMovements] = useState(true);
-  const [companySettings, setCompanySettings] = useState<any>(null);
+  const [companySettings, setCompanySettings] = useState<CompanySettings | null>(null);
   const [activeStockTab, setActiveStockTab] = useState("stock-levels");
   
   // Filter states for each tab
@@ -37,24 +92,24 @@ export default function StockTab({ products, loading, onStockSubTabChange, canEd
   const [outOfStockFilter, setOutOfStockFilter] = useState("");
 
   // Advanced filter states for current stock
-  const [selectedStockBrands, setSelectedStockBrands] = useState<any[]>([]);
-  const [selectedStockSizes, setSelectedStockSizes] = useState<any[]>([]);
-  const [selectedStockStatus, setSelectedStockStatus] = useState<any[]>([]);
+  const [selectedStockBrands, setSelectedStockBrands] = useState<string[]>([]);
+  const [selectedStockSizes, setSelectedStockSizes] = useState<string[]>([]);
+  const [selectedStockStatus, setSelectedStockStatus] = useState<string[]>([]);
   const [stockLevelFilter, setStockLevelFilter] = useState({ min: "", max: "" });
 
   // Advanced filter states for movements
-  const [selectedMovementBrands, setSelectedMovementBrands] = useState<any[]>([]);
-  const [selectedMovementTypes, setSelectedMovementTypes] = useState<any[]>([]);
+  const [selectedMovementBrands, setSelectedMovementBrands] = useState<string[]>([]);
+  const [selectedMovementTypes, setSelectedMovementTypes] = useState<string[]>([]);
   const [movementDateFilter, setMovementDateFilter] = useState({ start: "", end: "" });
 
   // Advanced filter states for low stock  
-  const [selectedLowStockBrands, setSelectedLowStockBrands] = useState<any[]>([]);
-  const [selectedLowStockSizes, setSelectedLowStockSizes] = useState<any[]>([]);
+  const [selectedLowStockBrands, setSelectedLowStockBrands] = useState<string[]>([]);
+  const [selectedLowStockSizes, setSelectedLowStockSizes] = useState<string[]>([]);
   const [lowStockRange, setLowStockRange] = useState({ min: "", max: "" });
 
   // Advanced filter states for out of stock
-  const [selectedOutOfStockBrands, setSelectedOutOfStockBrands] = useState<any[]>([]);
-  const [selectedOutOfStockSizes, setSelectedOutOfStockSizes] = useState<any[]>([]);
+  const [selectedOutOfStockBrands, setSelectedOutOfStockBrands] = useState<string[]>([]);
+  const [selectedOutOfStockSizes, setSelectedOutOfStockSizes] = useState<string[]>([]);
 
   // Pagination states for each tab (independent per-tab)
   const [currentStockPage, setCurrentStockPage] = useState(1);
@@ -84,13 +139,13 @@ export default function StockTab({ products, loading, onStockSubTabChange, canEd
       if (!response.ok) throw new Error('Failed to fetch company settings');
       const data = await response.json();
       setCompanySettings(data);
-    } catch (error: any) {
+    } catch (error: unknown) {
       console.error("Error loading company settings:", error);
       setCompanySettings({ lowStockThreshold: 6, fxGbpToAed: 4.85 });
     }
   };
 
-  const loadStockData = async (threshold: any) => {
+  const loadStockData = async (threshold: number) => {
     setLoadingStock(true);
     try {
       const lowStockThreshold = threshold || companySettings?.lowStockThreshold || 6;
@@ -98,7 +153,7 @@ export default function StockTab({ products, loading, onStockSubTabChange, canEd
       if (!response.ok) throw new Error('Failed to fetch stock analysis');
       const data = await response.json();
       setStockData(data);
-    } catch (error: any) {
+    } catch (error: unknown) {
       console.error("Error loading stock data:", error);
       setStockData(null);
     } finally {
@@ -113,7 +168,7 @@ export default function StockTab({ products, loading, onStockSubTabChange, canEd
       if (!response.ok) throw new Error('Failed to fetch stock movements');
       const data = await response.json();
       setStockMovements(data);
-    } catch (error: any) {
+    } catch (error: unknown) {
       console.error("Error loading stock movements:", error);
       setStockMovements([]);
     } finally {
@@ -138,26 +193,26 @@ export default function StockTab({ products, loading, onStockSubTabChange, canEd
 
   const lowStockProducts = stockData?.lowStockProducts || [];
   const outOfStockProducts = stockData?.outOfStockProducts || [];
-  const allProducts = stockData?.products || products;
+  const allProducts: StockProduct[] = stockData?.products || (products as unknown as StockProduct[]);
 
   // Get unique values for filters from server data
-  const uniqueStockBrands = [...new Set(allProducts.map((p: any) => p.brandName).filter(Boolean))].sort();
-  const uniqueStockSizes = [...new Set(allProducts.map((p: any) => p.size).filter(Boolean))].sort();
-  const uniqueLowStockBrands = [...new Set(lowStockProducts.map((p: any) => p.brandName).filter(Boolean))].sort();
-  const uniqueLowStockSizes = [...new Set(lowStockProducts.map((p: any) => p.size).filter(Boolean))].sort();
-  const uniqueMovementBrands = [...new Set(stockMovements.map((m: any) => m.brandName).filter(Boolean))].sort();
-  const uniqueMovementTypes = [...new Set(stockMovements.map((m: any) => m.movementType).filter(Boolean))].sort();
+  const uniqueStockBrands = [...new Set(allProducts.map((p: StockProduct) => p.brandName).filter(Boolean))].sort() as string[];
+  const uniqueStockSizes = [...new Set(allProducts.map((p: StockProduct) => p.size).filter(Boolean))].sort() as string[];
+  const uniqueLowStockBrands = [...new Set(lowStockProducts.map((p: StockProduct) => p.brandName).filter(Boolean))].sort() as string[];
+  const uniqueLowStockSizes = [...new Set(lowStockProducts.map((p: StockProduct) => p.size).filter(Boolean))].sort() as string[];
+  const uniqueMovementBrands = [...new Set(stockMovements.map((m: StockMovement) => m.brandName).filter(Boolean))].sort() as string[];
+  const uniqueMovementTypes = [...new Set(stockMovements.map((m: StockMovement) => m.movementType).filter(Boolean))].sort() as string[];
 
   // Filter functions
 
   // Advanced filter function for current stock
-  const applyAdvancedStockFilters = (productList: any, searchTerm: any, selectedBrands: any, selectedSizes: any, selectedStatus: any, stockLevelRange: any) => {
+  const applyAdvancedStockFilters = (productList: StockProduct[], searchTerm: string, selectedBrands: string[], selectedSizes: string[], selectedStatus: string[], stockLevelRange: { min: string; max: string }): StockProduct[] => {
     let filtered = productList;
 
     // Text search filter
     if (searchTerm) {
       const term = searchTerm.toLowerCase();
-      filtered = filtered.filter((product: any) => 
+      filtered = filtered.filter((product: StockProduct) => 
         (product.name || '').toLowerCase().includes(term) ||
         (product.sku || '').toLowerCase().includes(term) ||
         (product.brandName || '').toLowerCase().includes(term) ||
@@ -167,19 +222,19 @@ export default function StockTab({ products, loading, onStockSubTabChange, canEd
 
     // Brand filter
     if (selectedBrands.length > 0) {
-      filtered = filtered.filter((product: any) => selectedBrands.includes(product.brandName));
+      filtered = filtered.filter((product: StockProduct) => selectedBrands.includes(product.brandName));
     }
 
     // Size filter
     if (selectedSizes.length > 0) {
-      filtered = filtered.filter((product: any) => selectedSizes.includes(product.size));
+      filtered = filtered.filter((product: StockProduct) => selectedSizes.includes(product.size));
     }
 
     // Stock level filter
     if (stockLevelRange.min !== "" || stockLevelRange.max !== "") {
       const min = stockLevelRange.min !== "" ? parseInt(stockLevelRange.min) : 0;
       const max = stockLevelRange.max !== "" ? parseInt(stockLevelRange.max) : Infinity;
-      filtered = filtered.filter((product: any) => {
+      filtered = filtered.filter((product: StockProduct) => {
         const stock = product.stockQuantity || 0;
         return stock >= min && stock <= max;
       });
@@ -188,13 +243,13 @@ export default function StockTab({ products, loading, onStockSubTabChange, canEd
     // Status filter (in stock, low stock, out of stock)
     if (selectedStatus.length > 0) {
       const lowStockThreshold = companySettings?.lowStockThreshold || 6;
-      filtered = filtered.filter((product: any) => {
+      filtered = filtered.filter((product: StockProduct) => {
         const stock = product.stockQuantity || 0;
         const isInStock = stock > lowStockThreshold;
         const isLowStock = stock > 0 && stock <= lowStockThreshold;
         const isOutOfStock = stock === 0;
 
-        return selectedStatus.some((status: any) => {
+        return selectedStatus.some((status: string) => {
           if (status === 'in-stock' && isInStock) return true;
           if (status === 'low-stock' && isLowStock) return true;
           if (status === 'out-of-stock' && isOutOfStock) return true;
@@ -208,13 +263,13 @@ export default function StockTab({ products, loading, onStockSubTabChange, canEd
 
 
   // Advanced filter function for movements
-  const applyAdvancedMovementFilters = (movementList: any, searchTerm: any, selectedBrands: any, selectedTypes: any, dateRange: any) => {
+  const applyAdvancedMovementFilters = (movementList: StockMovement[], searchTerm: string, selectedBrands: string[], selectedTypes: string[], dateRange: { start: string; end: string }): StockMovement[] => {
     let filtered = movementList;
 
     // Text search filter
     if (searchTerm) {
       const term = searchTerm.toLowerCase();
-      filtered = filtered.filter((movement: any) => 
+      filtered = filtered.filter((movement: StockMovement) => 
         (movement.productName || '').toLowerCase().includes(term) ||
         (movement.productSku || '').toLowerCase().includes(term) ||
         (movement.brandName || '').toLowerCase().includes(term) ||
@@ -225,17 +280,17 @@ export default function StockTab({ products, loading, onStockSubTabChange, canEd
 
     // Brand filter (using actual brandName from API)
     if (selectedBrands.length > 0) {
-      filtered = filtered.filter((movement: any) => selectedBrands.includes(movement.brandName));
+      filtered = filtered.filter((movement: StockMovement) => selectedBrands.includes(movement.brandName));
     }
 
     // Movement type filter
     if (selectedTypes.length > 0) {
-      filtered = filtered.filter((movement: any) => selectedTypes.includes(movement.movementType));
+      filtered = filtered.filter((movement: StockMovement) => selectedTypes.includes(movement.movementType));
     }
 
     // Date range filter — compare by date string (YYYY-MM-DD) to avoid timezone offsets
     if (dateRange.start || dateRange.end) {
-      filtered = filtered.filter((movement: any) => {
+      filtered = filtered.filter((movement: StockMovement) => {
         const movementDateStr = (movement.createdAt || '').slice(0, 10);
         if (dateRange.start && movementDateStr < dateRange.start) return false;
         if (dateRange.end && movementDateStr > dateRange.end) return false;
@@ -280,7 +335,7 @@ export default function StockTab({ products, loading, onStockSubTabChange, canEd
   );
 
   // Pagination logic for each tab
-  const paginateData = (data: any, page: any, perPage: any) => {
+  const paginateData = <T,>(data: T[], page: number, perPage: number) => {
     const startIndex = (page - 1) * perPage;
     const endIndex = startIndex + perPage;
     return {
@@ -299,7 +354,7 @@ export default function StockTab({ products, loading, onStockSubTabChange, canEd
   const paginatedOutOfStock = paginateData(filteredOutOfStockProducts, outOfStockPage, outOfStockPerPage);
 
   // Reset pagination when filters change
-  const resetPagination = (type: any) => {
+  const resetPagination = (type: string) => {
     switch(type) {
       case 'current-stock':
         setCurrentStockPage(1);
@@ -420,7 +475,7 @@ export default function StockTab({ products, loading, onStockSubTabChange, canEd
     }
   }, [activeStockTab, stockMovements, stockData, loadingMovements, movementsFilter, selectedMovementBrands, selectedMovementTypes, movementDateFilter]);
 
-  const getMovementIcon = (type: any) => {
+  const getMovementIcon = (type: string) => {
     switch (type) {
       case 'goods_receipt': return <TrendingUp className="w-4 h-4 text-green-600" />;
       case 'sale': return <TrendingDown className="w-4 h-4 text-red-600" />;
@@ -430,7 +485,7 @@ export default function StockTab({ products, loading, onStockSubTabChange, canEd
     }
   };
 
-  const getMovementTypeLabel = (type: any) => {
+  const getMovementTypeLabel = (type: string) => {
     switch (type) {
       case 'goods_receipt': return 'Stock In';
       case 'sale': return 'Sale';
@@ -440,7 +495,7 @@ export default function StockTab({ products, loading, onStockSubTabChange, canEd
     }
   };
 
-  const formatMovementSource = (referenceType: any, referenceId: any) => {
+  const formatMovementSource = (referenceType: string, referenceId: number) => {
     if (!referenceType || !referenceId) return '-';
     switch (referenceType) {
       case 'goods_receipt': return `GRN #${referenceId}`;
@@ -451,7 +506,7 @@ export default function StockTab({ products, loading, onStockSubTabChange, canEd
     }
   };
 
-  const formatMovementQuantity = (quantity: any) => {
+  const formatMovementQuantity = (quantity: number) => {
     const isPositive = quantity > 0;
     const sign = isPositive ? '+' : '';
     const color = isPositive ? 'text-green-600' : 'text-red-600';
@@ -601,7 +656,7 @@ export default function StockTab({ products, loading, onStockSubTabChange, canEd
                       <div className="space-y-3">
                         <h4 className="font-medium leading-none">Select Brands</h4>
                         <div className="space-y-2 max-h-60 overflow-y-auto">
-                          {uniqueStockBrands.map((brand: any) => (
+                          {uniqueStockBrands.map((brand: string) => (
                             <div key={brand} className="flex items-center space-x-2">
                               <Checkbox
                                 id={`stock-brand-${brand}`}
@@ -610,7 +665,7 @@ export default function StockTab({ products, loading, onStockSubTabChange, canEd
                                   if (checked) {
                                     setSelectedStockBrands(prev => [...prev, brand]);
                                   } else {
-                                    setSelectedStockBrands(prev => prev.filter((b: any) => b !== brand));
+                                    setSelectedStockBrands(prev => prev.filter((b: string) => b !== brand));
                                   }
                                   resetPagination('current-stock');
                                 }}
@@ -640,7 +695,7 @@ export default function StockTab({ products, loading, onStockSubTabChange, canEd
                       <div className="space-y-3">
                         <h4 className="font-medium leading-none">Select Sizes</h4>
                         <div className="space-y-2 max-h-60 overflow-y-auto">
-                          {uniqueStockSizes.map((size: any) => (
+                          {uniqueStockSizes.map((size: string) => (
                             <div key={size} className="flex items-center space-x-2">
                               <Checkbox
                                 id={`stock-size-${size}`}
@@ -649,7 +704,7 @@ export default function StockTab({ products, loading, onStockSubTabChange, canEd
                                   if (checked) {
                                     setSelectedStockSizes(prev => [...prev, size]);
                                   } else {
-                                    setSelectedStockSizes(prev => prev.filter((s: any) => s !== size));
+                                    setSelectedStockSizes(prev => prev.filter((s: string) => s !== size));
                                   }
                                   resetPagination('current-stock');
                                 }}
@@ -683,7 +738,7 @@ export default function StockTab({ products, loading, onStockSubTabChange, canEd
                             { value: 'in-stock', label: 'In Stock' },
                             { value: 'low-stock', label: 'Low Stock' },
                             { value: 'out-of-stock', label: 'Out of Stock' }
-                          ].map((status: any) => (
+                          ].map((status: { value: string; label: string }) => (
                             <div key={status.value} className="flex items-center space-x-2">
                               <Checkbox
                                 id={`stock-status-${status.value}`}
@@ -692,7 +747,7 @@ export default function StockTab({ products, loading, onStockSubTabChange, canEd
                                   if (checked) {
                                     setSelectedStockStatus(prev => [...prev, status.value]);
                                   } else {
-                                    setSelectedStockStatus(prev => prev.filter((s: any) => s !== status.value));
+                                    setSelectedStockStatus(prev => prev.filter((s: string) => s !== status.value));
                                   }
                                   resetPagination('current-stock');
                                 }}
@@ -775,37 +830,37 @@ export default function StockTab({ products, loading, onStockSubTabChange, canEd
                 {(selectedStockBrands.length > 0 || selectedStockSizes.length > 0 || selectedStockStatus.length > 0 || stockLevelFilter.min || stockLevelFilter.max) && (
                   <div className="flex items-center gap-2 flex-wrap">
                     <span className="text-sm text-gray-600">Active filters:</span>
-                    {selectedStockBrands.map((brand: any) => (
+                    {selectedStockBrands.map((brand: string) => (
                       <Badge key={brand} variant="secondary" className="gap-1">
                         Brand: {brand}
                         <X 
                           className="h-3 w-3 cursor-pointer" 
                           onClick={() => {
-                            setSelectedStockBrands(prev => prev.filter((b: any) => b !== brand));
+                            setSelectedStockBrands(prev => prev.filter((b: string) => b !== brand));
                             resetPagination('current-stock');
                           }}
                         />
                       </Badge>
                     ))}
-                    {selectedStockSizes.map((size: any) => (
+                    {selectedStockSizes.map((size: string) => (
                       <Badge key={size} variant="secondary" className="gap-1">
                         Size: {size}
                         <X 
                           className="h-3 w-3 cursor-pointer" 
                           onClick={() => {
-                            setSelectedStockSizes(prev => prev.filter((s: any) => s !== size));
+                            setSelectedStockSizes(prev => prev.filter((s: string) => s !== size));
                             resetPagination('current-stock');
                           }}
                         />
                       </Badge>
                     ))}
-                    {selectedStockStatus.map((status: any) => (
+                    {selectedStockStatus.map((status: string) => (
                       <Badge key={status} variant="secondary" className="gap-1">
                         Status: {status.replace('-', ' ')}
                         <X 
                           className="h-3 w-3 cursor-pointer" 
                           onClick={() => {
-                            setSelectedStockStatus(prev => prev.filter((s: any) => s !== status));
+                            setSelectedStockStatus(prev => prev.filter((s: string) => s !== status));
                             resetPagination('current-stock');
                           }}
                         />
@@ -838,7 +893,7 @@ export default function StockTab({ products, loading, onStockSubTabChange, canEd
                   </TableRow>
                 </TableHeader>
                 <TableBody>
-                  {paginatedCurrentStock.data.map((product: any) => {
+                  {paginatedCurrentStock.data.map((product: StockProduct) => {
                     const stock = product.stockQuantity || 0;
                     const lowStockThreshold = companySettings?.lowStockThreshold || 6;
                     const status = stock === 0 ? 'out' : stock <= lowStockThreshold ? 'low' : 'ok';
@@ -932,7 +987,7 @@ export default function StockTab({ products, loading, onStockSubTabChange, canEd
                       <div className="space-y-3">
                         <h4 className="font-medium leading-none">Select Brands</h4>
                         <div className="space-y-2 max-h-60 overflow-y-auto">
-                          {uniqueMovementBrands.map((brand: any) => (
+                          {uniqueMovementBrands.map((brand: string) => (
                             <div key={brand} className="flex items-center space-x-2">
                               <Checkbox
                                 id={`movement-brand-${brand}`}
@@ -941,7 +996,7 @@ export default function StockTab({ products, loading, onStockSubTabChange, canEd
                                   if (checked) {
                                     setSelectedMovementBrands(prev => [...prev, brand]);
                                   } else {
-                                    setSelectedMovementBrands(prev => prev.filter((b: any) => b !== brand));
+                                    setSelectedMovementBrands(prev => prev.filter((b: string) => b !== brand));
                                   }
                                   resetPagination('movements');
                                 }}
@@ -971,7 +1026,7 @@ export default function StockTab({ products, loading, onStockSubTabChange, canEd
                       <div className="space-y-3">
                         <h4 className="font-medium leading-none">Select Movement Types</h4>
                         <div className="space-y-2">
-                          {uniqueMovementTypes.map((type: any) => (
+                          {uniqueMovementTypes.map((type: string) => (
                             <div key={type} className="flex items-center space-x-2">
                               <Checkbox
                                 id={`movement-type-${type}`}
@@ -980,7 +1035,7 @@ export default function StockTab({ products, loading, onStockSubTabChange, canEd
                                   if (checked) {
                                     setSelectedMovementTypes(prev => [...prev, type]);
                                   } else {
-                                    setSelectedMovementTypes(prev => prev.filter((t: any) => t !== type));
+                                    setSelectedMovementTypes(prev => prev.filter((t: string) => t !== type));
                                   }
                                   resetPagination('movements');
                                 }}
@@ -1057,25 +1112,25 @@ export default function StockTab({ products, loading, onStockSubTabChange, canEd
                 {(selectedMovementBrands.length > 0 || selectedMovementTypes.length > 0 || movementDateFilter.start || movementDateFilter.end) && (
                   <div className="flex items-center gap-2 flex-wrap">
                     <span className="text-sm text-gray-600">Active filters:</span>
-                    {selectedMovementBrands.map((brand: any) => (
+                    {selectedMovementBrands.map((brand: string) => (
                       <Badge key={brand} variant="secondary" className="gap-1">
                         Brand: {brand}
                         <X 
                           className="h-3 w-3 cursor-pointer" 
                           onClick={() => {
-                            setSelectedMovementBrands(prev => prev.filter((b: any) => b !== brand));
+                            setSelectedMovementBrands(prev => prev.filter((b: string) => b !== brand));
                             resetPagination('movements');
                           }}
                         />
                       </Badge>
                     ))}
-                    {selectedMovementTypes.map((type: any) => (
+                    {selectedMovementTypes.map((type: string) => (
                       <Badge key={type} variant="secondary" className="gap-1">
                         Type: {getMovementTypeLabel(type)}
                         <X 
                           className="h-3 w-3 cursor-pointer" 
                           onClick={() => {
-                            setSelectedMovementTypes(prev => prev.filter((t: any) => t !== type));
+                            setSelectedMovementTypes(prev => prev.filter((t: string) => t !== type));
                             resetPagination('movements');
                           }}
                         />
@@ -1118,7 +1173,7 @@ export default function StockTab({ products, loading, onStockSubTabChange, canEd
                     </TableRow>
                   </TableHeader>
                   <TableBody>
-                    {paginatedMovements.data.map((movement: any) => (
+                    {paginatedMovements.data.map((movement: StockMovement) => (
                       <TableRow key={movement.id}>
                         <TableCell className="text-sm">
                           {format(new Date(movement.createdAt), 'dd/MM/yy')}
@@ -1220,7 +1275,7 @@ export default function StockTab({ products, loading, onStockSubTabChange, canEd
                       <div className="space-y-3">
                         <h4 className="font-medium leading-none">Select Brands</h4>
                         <div className="space-y-2 max-h-60 overflow-y-auto">
-                          {uniqueLowStockBrands.map((brand: any) => (
+                          {uniqueLowStockBrands.map((brand: string) => (
                             <div key={brand} className="flex items-center space-x-2">
                               <Checkbox
                                 id={`low-stock-brand-${brand}`}
@@ -1229,7 +1284,7 @@ export default function StockTab({ products, loading, onStockSubTabChange, canEd
                                   if (checked) {
                                     setSelectedLowStockBrands(prev => [...prev, brand]);
                                   } else {
-                                    setSelectedLowStockBrands(prev => prev.filter((b: any) => b !== brand));
+                                    setSelectedLowStockBrands(prev => prev.filter((b: string) => b !== brand));
                                   }
                                   resetPagination('low-stock');
                                 }}
@@ -1259,7 +1314,7 @@ export default function StockTab({ products, loading, onStockSubTabChange, canEd
                       <div className="space-y-3">
                         <h4 className="font-medium leading-none">Select Sizes</h4>
                         <div className="space-y-2 max-h-60 overflow-y-auto">
-                          {uniqueLowStockSizes.map((size: any) => (
+                          {uniqueLowStockSizes.map((size: string) => (
                             <div key={size} className="flex items-center space-x-2">
                               <Checkbox
                                 id={`low-stock-size-${size}`}
@@ -1268,7 +1323,7 @@ export default function StockTab({ products, loading, onStockSubTabChange, canEd
                                   if (checked) {
                                     setSelectedLowStockSizes(prev => [...prev, size]);
                                   } else {
-                                    setSelectedLowStockSizes(prev => prev.filter((s: any) => s !== size));
+                                    setSelectedLowStockSizes(prev => prev.filter((s: string) => s !== size));
                                   }
                                   resetPagination('low-stock');
                                 }}
@@ -1350,25 +1405,25 @@ export default function StockTab({ products, loading, onStockSubTabChange, canEd
                 {(selectedLowStockBrands.length > 0 || selectedLowStockSizes.length > 0 || lowStockRange.min || lowStockRange.max) && (
                   <div className="flex items-center gap-2 flex-wrap">
                     <span className="text-sm text-gray-600">Active filters:</span>
-                    {selectedLowStockBrands.map((brand: any) => (
+                    {selectedLowStockBrands.map((brand: string) => (
                       <Badge key={brand} variant="secondary" className="gap-1">
                         Brand: {brand}
                         <X 
                           className="h-3 w-3 cursor-pointer" 
                           onClick={() => {
-                            setSelectedLowStockBrands(prev => prev.filter((b: any) => b !== brand));
+                            setSelectedLowStockBrands(prev => prev.filter((b: string) => b !== brand));
                             resetPagination('low-stock');
                           }}
                         />
                       </Badge>
                     ))}
-                    {selectedLowStockSizes.map((size: any) => (
+                    {selectedLowStockSizes.map((size: string) => (
                       <Badge key={size} variant="secondary" className="gap-1">
                         Size: {size}
                         <X 
                           className="h-3 w-3 cursor-pointer" 
                           onClick={() => {
-                            setSelectedLowStockSizes(prev => prev.filter((s: any) => s !== size));
+                            setSelectedLowStockSizes(prev => prev.filter((s: string) => s !== size));
                             resetPagination('low-stock');
                           }}
                         />
@@ -1400,7 +1455,7 @@ export default function StockTab({ products, loading, onStockSubTabChange, canEd
                   </TableRow>
                 </TableHeader>
                 <TableBody>
-                  {paginatedLowStock.data.map((product: any) => (
+                  {paginatedLowStock.data.map((product: StockProduct) => (
                     <TableRow key={product.id}>
                       <TableCell>{product.brandName || '-'}</TableCell>
                       <TableCell>{product.sku}</TableCell>
@@ -1479,7 +1534,7 @@ export default function StockTab({ products, loading, onStockSubTabChange, canEd
                       <div className="space-y-3">
                         <h4 className="font-medium leading-none">Select Brands</h4>
                         <div className="space-y-2 max-h-60 overflow-y-auto">
-                          {uniqueStockBrands.map((brand: any) => (
+                          {uniqueStockBrands.map((brand: string) => (
                             <div key={brand} className="flex items-center space-x-2">
                               <Checkbox
                                 id={`out-of-stock-brand-${brand}`}
@@ -1488,7 +1543,7 @@ export default function StockTab({ products, loading, onStockSubTabChange, canEd
                                   if (checked) {
                                     setSelectedOutOfStockBrands(prev => [...prev, brand]);
                                   } else {
-                                    setSelectedOutOfStockBrands(prev => prev.filter((b: any) => b !== brand));
+                                    setSelectedOutOfStockBrands(prev => prev.filter((b: string) => b !== brand));
                                   }
                                   resetPagination('out-of-stock');
                                 }}
@@ -1518,7 +1573,7 @@ export default function StockTab({ products, loading, onStockSubTabChange, canEd
                       <div className="space-y-3">
                         <h4 className="font-medium leading-none">Select Sizes</h4>
                         <div className="space-y-2 max-h-60 overflow-y-auto">
-                          {uniqueStockSizes.map((size: any) => (
+                          {uniqueStockSizes.map((size: string) => (
                             <div key={size} className="flex items-center space-x-2">
                               <Checkbox
                                 id={`out-of-stock-size-${size}`}
@@ -1527,7 +1582,7 @@ export default function StockTab({ products, loading, onStockSubTabChange, canEd
                                   if (checked) {
                                     setSelectedOutOfStockSizes(prev => [...prev, size]);
                                   } else {
-                                    setSelectedOutOfStockSizes(prev => prev.filter((s: any) => s !== size));
+                                    setSelectedOutOfStockSizes(prev => prev.filter((s: string) => s !== size));
                                   }
                                   resetPagination('out-of-stock');
                                 }}
@@ -1565,25 +1620,25 @@ export default function StockTab({ products, loading, onStockSubTabChange, canEd
                 {(selectedOutOfStockBrands.length > 0 || selectedOutOfStockSizes.length > 0) && (
                   <div className="flex items-center gap-2 flex-wrap">
                     <span className="text-sm text-gray-600">Active filters:</span>
-                    {selectedOutOfStockBrands.map((brand: any) => (
+                    {selectedOutOfStockBrands.map((brand: string) => (
                       <Badge key={brand} variant="secondary" className="gap-1">
                         Brand: {brand}
                         <X 
                           className="h-3 w-3 cursor-pointer" 
                           onClick={() => {
-                            setSelectedOutOfStockBrands(prev => prev.filter((b: any) => b !== brand));
+                            setSelectedOutOfStockBrands(prev => prev.filter((b: string) => b !== brand));
                             resetPagination('out-of-stock');
                           }}
                         />
                       </Badge>
                     ))}
-                    {selectedOutOfStockSizes.map((size: any) => (
+                    {selectedOutOfStockSizes.map((size: string) => (
                       <Badge key={size} variant="secondary" className="gap-1">
                         Size: {size}
                         <X 
                           className="h-3 w-3 cursor-pointer" 
                           onClick={() => {
-                            setSelectedOutOfStockSizes(prev => prev.filter((s: any) => s !== size));
+                            setSelectedOutOfStockSizes(prev => prev.filter((s: string) => s !== size));
                             resetPagination('out-of-stock');
                           }}
                         />
@@ -1604,7 +1659,7 @@ export default function StockTab({ products, loading, onStockSubTabChange, canEd
                   </TableRow>
                 </TableHeader>
                 <TableBody>
-                  {paginatedOutOfStock.data.map((product: any) => {
+                  {paginatedOutOfStock.data.map((product: StockProduct) => {
                     return (
                       <TableRow key={product.id}>
                         <TableCell>{product.brandName || '-'}</TableCell>

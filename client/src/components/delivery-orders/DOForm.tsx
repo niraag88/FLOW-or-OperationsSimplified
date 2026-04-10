@@ -432,7 +432,7 @@ export default function DOForm({ open, onClose, editingDO, currentUser, onSucces
                             <SelectValue placeholder="Select brand" />
                           </SelectTrigger>
                           <SelectContent>
-                            {brands.map((b: any) => (
+                            {brands.map((b: Record<string, any>) => (
                               <SelectItem key={b.id} value={b.id.toString()}>{b.name}</SelectItem>
                             ))}
                           </SelectContent>
@@ -450,7 +450,7 @@ export default function DOForm({ open, onClose, editingDO, currentUser, onSucces
                             <SelectValue placeholder="Select product" />
                           </SelectTrigger>
                           <SelectContent>
-                            {getFilteredProducts(item.brand_id).map((p: any) => (
+                            {getFilteredProducts(item.brand_id).map((p: Record<string, any>) => (
                               <SelectItem key={p.id} value={p.id.toString()}>
                                 <div className="flex flex-col">
                                   <p className="font-medium truncate">{p.name}{p.size ? ` (${p.size})` : ''}</p>

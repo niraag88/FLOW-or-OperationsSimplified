@@ -23,6 +23,24 @@ import type { Quotation } from "@shared/schema";
 import { Card } from "@/components/ui/card";
 import { useToast } from "@/hooks/use-toast";
 
+interface QuotationItem {
+  brand_id: string | number;
+  brand_name: string;
+  product_id: string | number;
+  product_code: string;
+  description: string;
+  quantity: number;
+  unit_price: number;
+  line_total: number;
+}
+
+interface QuotationEntity {
+  id?: number;
+  name?: string;
+  isActive?: boolean;
+  [key: string]: unknown;
+}
+
 interface QuotationFormProps {
   open: boolean;
   onClose: () => void;
@@ -30,17 +48,17 @@ interface QuotationFormProps {
   currentUser?: { email?: string; role?: string } | null;
   canOverride?: boolean;
   onSuccess?: () => void;
-  preloadedCustomers?: any[];
-  preloadedProducts?: any[];
-  preloadedBrands?: any[];
+  preloadedCustomers?: Record<string, any>[];
+  preloadedProducts?: Record<string, any>[];
+  preloadedBrands?: Record<string, any>[];
 }
 
 export default function QuotationForm({ open, onClose, editingQuotation, currentUser, canOverride, onSuccess, preloadedCustomers, preloadedProducts, preloadedBrands }: QuotationFormProps) {
   const [loading, setLoading] = useState(false);
-  const [customers, setCustomers] = useState<any[]>([]);
-  const [products, setProducts] = useState<any[]>([]);
-  const [brands, setBrands] = useState<any[]>([]);
-  const [selectedCustomer, setSelectedCustomer] = useState<any>(null);
+  const [customers, setCustomers] = useState<Record<string, any>[]>([]);
+  const [products, setProducts] = useState<Record<string, any>[]>([]);
+  const [brands, setBrands] = useState<Record<string, any>[]>([]);
+  const [selectedCustomer, setSelectedCustomer] = useState<Record<string, any> | null>(null);
   const { toast } = useToast();
 
   const [formData, setFormData] = useState({
@@ -59,8 +77,8 @@ export default function QuotationForm({ open, onClose, editingQuotation, current
     remarks: "",
     show_remarks: false,
     payment_terms: "",
-    attachments: [] as any[],
-    items: [] as any[]
+    attachments: [] as string[],
+    items: [] as QuotationItem[]
   });
 
   useEffect(() => {
@@ -91,15 +109,15 @@ export default function QuotationForm({ open, onClose, editingQuotation, current
         ]);
       }
 
-      setCustomers((customersData ?? []).filter((c: any) => c.is_active !== false));
-      setProducts(productsData ?? []);
-      setBrands((brandsData ?? []).filter((b: any) => b.isActive !== false));
+      setCustomers((customersData as Record<string, any>[] ?? []).filter((c) => c.is_active !== false));
+      setProducts((productsData as Record<string, any>[] ?? []));
+      setBrands((brandsData as Record<string, any>[] ?? []).filter((b) => b.isActive !== false));
 
       if (editingQuotation) {
         
         // 🟢 Use passed editingQuotation data immediately (like POForm does)
-        const customer = (customersData ?? []).find((c: any) => c.id === editingQuotation.customerId);
-        setSelectedCustomer(customer);
+        const customer = (customersData as Record<string, any>[] ?? []).find((c) => c.id === editingQuotation.customerId);
+        setSelectedCustomer(customer ?? null);
         
         // Set basic form data immediately from passed quotation
         const basicFormData = {
@@ -136,10 +154,10 @@ export default function QuotationForm({ open, onClose, editingQuotation, current
           if (itemsResponse.ok || itemsResponse.status === 304) {
             const items = await itemsResponse.json();
             
-            const formattedItems = items.map((item: any) => {
+            const formattedItems = (items as Record<string, any>[]).map((item) => {
               // Look up product details to get brand information
-              const product = (productsData ?? []).find((p: any) => p.id === (item.productId || item.product_id));
-              const brand = (brandsData ?? []).find((b: any) => b.id === product?.brandId);
+              const product = (productsData as Record<string, any>[] ?? []).find((p) => p.id === (item.productId || item.product_id));
+              const brand = (brandsData as Record<string, any>[] ?? []).find((b) => b.id === product?.brandId);
               
               return {
                 product_id: (item.productId || item.product_id || "").toString(),
@@ -161,7 +179,7 @@ export default function QuotationForm({ open, onClose, editingQuotation, current
               items: formattedItems
             }));
           }
-        } catch (error: any) {
+        } catch (error: unknown) {
           console.error("Error fetching quotation details:", error);
           toast({
             title: "Error",
@@ -189,7 +207,7 @@ export default function QuotationForm({ open, onClose, editingQuotation, current
               quotation_date: new Date().toISOString().split('T')[0]
             }));
           }
-        } catch (error: any) {
+        } catch (error: unknown) {
           console.error('Error fetching next quotation number:', error);
           // Fallback to manual number
           setFormData(prev => ({ 
@@ -199,7 +217,7 @@ export default function QuotationForm({ open, onClose, editingQuotation, current
           }));
         }
       }
-    } catch (error: any) {
+    } catch (error: unknown) {
       console.error("Error loading data:", error);
       toast({
         title: "Error",
@@ -212,7 +230,7 @@ export default function QuotationForm({ open, onClose, editingQuotation, current
     }
   };
 
-  const handleInputChange = (field: any, value: any) => {
+  const handleInputChange = (field: string, value: unknown) => {
     setFormData(prev => {
       const newState = {
         ...prev,
@@ -221,10 +239,10 @@ export default function QuotationForm({ open, onClose, editingQuotation, current
 
       // Specific logic for customer_id
       if (field === 'customer_id') {
-        const customerId = parseInt(value);
-        const customer = customers.find((c: any) => c.id === customerId);
-        setSelectedCustomer(customer);
-        newState.customer_id = customerId as any;
+        const customerId = parseInt(String(value));
+        const customer = customers.find((c) => c.id === customerId);
+        setSelectedCustomer(customer ?? null);
+        newState.customer_id = String(customerId);
         
         let taxTreatment = "StandardRated";
         let taxRate = 0.05;
@@ -249,7 +267,7 @@ export default function QuotationForm({ open, onClose, editingQuotation, current
 
   // Calculate totals when items change
   useEffect(() => {
-    const subtotal = formData.items.reduce((sum: any, item: any) => sum + (item.line_total || 0), 0);
+    const subtotal = formData.items.reduce((sum: number, item: QuotationItem) => sum + (item.line_total || 0), 0);
     const taxAmount = formData.tax_treatment === 'StandardRated' ? subtotal * formData.tax_rate : 0;
     const totalAmount = subtotal + taxAmount;
     
@@ -275,19 +293,19 @@ export default function QuotationForm({ open, onClose, editingQuotation, current
     setFormData(prev => ({ ...prev, items: [...prev.items, newItem] }));
   };
 
-  const updateItem = (index: any, field: any, value: any) => {
+  const updateItem = (index: number, field: keyof QuotationItem, value: string | number) => {
     const newItems = [...formData.items];
     
     // Convert string values to numbers for ID fields
     if (field === 'brand_id' || field === 'product_id') {
-      value = parseInt(value);
+      value = parseInt(String(value));
     }
     
     newItems[index] = { ...newItems[index], [field]: value };
 
     // Handle brand selection - reset product fields
     if (field === 'brand_id') {
-      const brand = brands.find((b: any) => b.id === value);
+      const brand = brands.find((b) => b.id === value);
       newItems[index] = {
         ...newItems[index],
         brand_name: brand?.name || "",
@@ -301,7 +319,7 @@ export default function QuotationForm({ open, onClose, editingQuotation, current
 
     // Auto-populate product details when product is selected
     if (field === 'product_id' && value) {
-      const product = products.find((p: any) => p.id === value);
+      const product = products.find((p) => p.id === value);
       if (product) {
         newItems[index] = {
           ...newItems[index],
@@ -314,29 +332,29 @@ export default function QuotationForm({ open, onClose, editingQuotation, current
 
     // Recalculate line total when quantity or unit price changes
     if (['quantity', 'unit_price'].includes(field) || field === 'product_id') {
-      const quantity = field === 'quantity' ? (parseInt(value) || 0) : (newItems[index].quantity || 0);
-      const unitPrice = field === 'unit_price' ? (parseFloat(value) || 0) : (newItems[index].unit_price || 0);
+      const quantity = field === 'quantity' ? (parseInt(String(value)) || 0) : (newItems[index].quantity || 0);
+      const unitPrice = field === 'unit_price' ? (parseFloat(String(value)) || 0) : (newItems[index].unit_price || 0);
       newItems[index].line_total = quantity * unitPrice;
     }
 
     setFormData(prev => ({ ...prev, items: newItems }));
   };
 
-  const getFilteredProducts = (brandId: any) => {
+  const getFilteredProducts = (brandId: string | number) => {
     if (!brandId) return [];
     // Convert brandId to number for comparison since product.brandId is a number
-    const numericBrandId = parseInt(brandId);
-    return products.filter((product: any) => product.brandId === numericBrandId);
+    const numericBrandId = parseInt(String(brandId));
+    return products.filter((product) => product.brandId === numericBrandId);
   };
 
-  const removeItem = (index: any) => {
+  const removeItem = (index: number) => {
     setFormData(prev => ({ 
       ...prev, 
       items: prev.items.filter((_, i) => i !== index) 
     }));
   };
 
-  const handleSubmit = async (e: any) => {
+  const handleSubmit = async (e: React.FormEvent<HTMLFormElement>) => {
     e.preventDefault();
     
     if (!formData.customer_id || !formData.quotation_number) {
@@ -374,14 +392,14 @@ export default function QuotationForm({ open, onClose, editingQuotation, current
         tax_treatment: formData.tax_treatment,
         tax_rate: formData.tax_rate,
         attachments: formData.attachments || [],
-        items: formData.items.map((item: any) => ({
+        items: formData.items.map((item: QuotationItem) => ({
           brand_id: item.brand_id,
           brand_name: item.brand_name,
           product_id: item.product_id,
           product_code: item.product_code,
           description: item.description,
-          quantity: parseInt(item.quantity) || 0,
-          unit_price: parseFloat(item.unit_price) || 0,
+          quantity: item.quantity || 0,
+          unit_price: item.unit_price || 0,
           line_total: parseFloat((item.line_total || 0).toFixed(2))
         }))
       };
@@ -407,11 +425,11 @@ export default function QuotationForm({ open, onClose, editingQuotation, current
       
       onSuccess?.();
       onClose();
-    } catch (error: any) {
+    } catch (error: unknown) {
       console.error("Error saving quotation:", error);
       toast({
         title: "Error",
-        description: `Failed to save quotation: ${error.message}`,
+        description: `Failed to save quotation: ${error instanceof Error ? error.message : String(error)}`,
         variant: "destructive",
       });
     } finally {
@@ -452,7 +470,7 @@ export default function QuotationForm({ open, onClose, editingQuotation, current
                   <SelectValue placeholder="Select customer" />
                 </SelectTrigger>
                 <SelectContent>
-                  {customers.map((c: any) => (
+                  {customers.map((c) => (
                     <SelectItem key={c.id} value={c.id.toString()}>
                       {c.name} ({c.vatTreatment})
                     </SelectItem>
@@ -565,7 +583,7 @@ export default function QuotationForm({ open, onClose, editingQuotation, current
                               <SelectValue placeholder="Select brand" />
                             </SelectTrigger>
                             <SelectContent>
-                              {brands.map((b: any) => (
+                              {brands.map((b) => (
                                 <SelectItem key={b.id} value={b.id.toString()}>{b.name}</SelectItem>
                               ))}
                             </SelectContent>
@@ -581,7 +599,7 @@ export default function QuotationForm({ open, onClose, editingQuotation, current
                               <SelectValue placeholder={item.brand_id ? "Select product" : "Select brand first"} />
                             </SelectTrigger>
                             <SelectContent>
-                              {getFilteredProducts(item.brand_id).map((p: any) => (
+                              {getFilteredProducts(item.brand_id).map((p) => (
                                 <SelectItem key={p.id} value={p.id.toString()}>
                                   {p.name} - {p.sku} - {p.size || 'N/A'}
                                 </SelectItem>

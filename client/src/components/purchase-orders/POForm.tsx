@@ -31,6 +31,17 @@ import { useToast } from "@/hooks/use-toast";
 import { queryClient } from "@/lib/queryClient";
 import { format } from "date-fns";
 
+interface POItem {
+  productId: string | number;
+  productSku: string;
+  productName: string;
+  size: string;
+  quantity: number;
+  unitPrice: number;
+  lineTotal: number;
+  receivedQuantity?: number;
+}
+
 interface POFormProps {
   open: boolean;
   onClose: () => void;
@@ -62,7 +73,7 @@ export default function POForm({ open, onClose, editingPO, currentUser, onSucces
     currency: "GBP",
     fxRateToAed: "4.8500",
     totalAmount: "0.00",
-    items: [] as any[]
+    items: [] as POItem[]
   });
 
   useEffect(() => {
@@ -77,7 +88,7 @@ export default function POForm({ open, onClose, editingPO, currentUser, onSucces
     }
   }, [open, editingPO?.id]);
 
-  const loadGrnDocs = async (poId: any) => {
+  const loadGrnDocs = async (poId: number) => {
     setLoadingGrnDocs(true);
     try {
       const res = await fetch(`/api/goods-receipts?poId=${poId}`, { credentials: 'include' });
@@ -85,20 +96,20 @@ export default function POForm({ open, onClose, editingPO, currentUser, onSucces
         const data = await res.json();
         setGrnDocs(data);
       }
-    } catch (e: any) {
+    } catch (e: unknown) {
       // silently ignore
     } finally {
       setLoadingGrnDocs(false);
     }
   };
 
-  const handleViewDoc = async (scanKey: any) => {
+  const handleViewDoc = async (scanKey: string) => {
     try {
       const res = await fetch(`/api/storage/signed-get?key=${encodeURIComponent(scanKey)}`, { credentials: 'include' });
       const data = await res.json();
       if (!res.ok) throw new Error(data.error || 'Failed to get link');
       window.open(data.url, '_blank');
-    } catch (e: any) {
+    } catch (e: unknown) {
       toast({ title: 'Error', description: 'Could not retrieve the document.', variant: 'destructive' });
     }
   };
@@ -121,7 +132,7 @@ export default function POForm({ open, onClose, editingPO, currentUser, onSucces
       setPoScanKey(null);
       queryClient.invalidateQueries({ queryKey: ['/api/purchase-orders'] });
       toast({ title: 'Document Removed', description: 'The document has been removed from this purchase order.' });
-    } catch (e: any) {
+    } catch (e: unknown) {
       toast({ title: 'Error', description: 'Could not remove the document. Please try again.', variant: 'destructive' });
     }
   };
@@ -140,7 +151,7 @@ export default function POForm({ open, onClose, editingPO, currentUser, onSucces
       const settingsResponse = settled[2].status === 'fulfilled' ? settled[2].value : null;
       const nextNumberResponse = settled[3].status === 'fulfilled' ? settled[3].value : null;
 
-      const filteredBrands = (brandsData || []).filter((b: any) => b.isActive !== false).sort((a: any, b: any) => (a.name || '').localeCompare(b.name || ''));
+      const filteredBrands = (brandsData as Record<string, any>[] || []).filter((b) => b.isActive !== false).sort((a, b) => (String(a.name || '')).localeCompare(String(b.name || '')));
       setBrands(filteredBrands);
       setProducts(productsData || []);
 
@@ -174,11 +185,11 @@ export default function POForm({ open, onClose, editingPO, currentUser, onSucces
           currency: "GBP",
           fxRateToAed: defaultRate.toFixed(4),
           totalAmount: "0.00",
-          items: [] as any[]
+          items: [] as POItem[]
         });
         setCurrencyExplicitlySet(false);
       }
-    } catch (error: any) {
+    } catch (error: unknown) {
       console.error("Error loading PO form data:", error);
     }
   };
@@ -197,7 +208,7 @@ export default function POForm({ open, onClose, editingPO, currentUser, onSucces
         currency: editingPO.currency || "GBP",
         fxRateToAed: editingPO.fxRateToAed || (settings ? getRateToAed(editingPO.currency || 'GBP', settings).toFixed(4) : "4.8500"),
         totalAmount: editingPO.totalAmount || "0.00",
-        items: [] as any[]
+        items: [] as POItem[]
       };
       
       setFormData(formDataToSet);
@@ -209,7 +220,7 @@ export default function POForm({ open, onClose, editingPO, currentUser, onSucces
         const response = await fetch(`/api/purchase-orders/${editingPO.id}/items`, { credentials: 'include' });
         if (response.ok) {
           const items = await response.json();
-          const formattedItems = items.map((item: any) => ({
+          const formattedItems = (items as Record<string, any>[]).map((item) => ({
             id: item.id,
             productId: item.productId?.toString() || "",
             productSku: item.productSku || "",
@@ -218,7 +229,7 @@ export default function POForm({ open, onClose, editingPO, currentUser, onSucces
             quantity: item.quantity || 0,
             receivedQuantity: item.receivedQuantity ?? 0,
             unitPrice: parseFloat(item.unitPrice) || 0,
-            lineTotal: parseFloat(item.lineTotal) || 0
+            lineTotal: item.lineTotal || 0
           }));
           
           setFormData(prev => ({
@@ -227,17 +238,17 @@ export default function POForm({ open, onClose, editingPO, currentUser, onSucces
           }));
         }
       }
-    } catch (error: any) {
+    } catch (error: unknown) {
       console.error("Error loading editing data:", error);
     }
   };
 
 
-  const handleInputChange = (field: any, value: any) => {
+  const handleInputChange = (field: string, value: unknown) => {
     setFormData(prev => ({ ...prev, [field]: value }));
   };
 
-  const handleCurrencyChange = (currency: any) => {
+  const handleCurrencyChange = (currency: string) => {
     const rate = companySettings ? getRateToAed(currency, companySettings) : 4.85;
     setCurrencyExplicitlySet(true);
     setFormData(prev => ({
@@ -263,12 +274,12 @@ export default function POForm({ open, onClose, editingPO, currentUser, onSucces
     }));
   };
 
-  const updateItem = (index: any, field: any, value: any) => {
+  const updateItem = (index: number, field: keyof POItem, value: string | number) => {
     const newItems = [...formData.items];
     newItems[index] = { ...newItems[index], [field]: value };
     
     if (field === 'productId' && value) {
-      const product = products.find((p: any) => p.id === parseInt(value));
+      const product = products.find((p: Record<string, any>) => p.id === parseInt(String(value)));
       if (product) {
         newItems[index].productSku = product.sku;
         newItems[index].productName = product.name;
@@ -279,7 +290,7 @@ export default function POForm({ open, onClose, editingPO, currentUser, onSucces
         // Auto-set PO currency from product's costPriceCurrency when first product is selected on a new PO
         // Only if user has NOT explicitly changed the currency themselves, and no other product is already selected
         const productCurrency = product.costPriceCurrency || 'GBP';
-        const selectedProductCount = newItems.filter((i: any) => i.productId).length;
+        const selectedProductCount = newItems.filter((i: POItem) => i.productId).length;
         const isFirstProductSelected = !editingPO && !currencyExplicitlySet && selectedProductCount <= 1;
         if (isFirstProductSelected) {
           const rate = companySettings ? getRateToAed(productCurrency, companySettings) : 4.85;
@@ -289,7 +300,7 @@ export default function POForm({ open, onClose, editingPO, currentUser, onSucces
             fxRateToAed: rate.toFixed(4),
             items: newItems
           }));
-          const total = newItems.reduce((sum: any, item: any) => sum + (item.lineTotal || 0), 0);
+          const total = newItems.reduce((sum: number, item: POItem) => sum + (item.lineTotal || 0), 0);
           setFormData(prev => ({ ...prev, totalAmount: total.toFixed(2) }));
           return;
         }
@@ -302,19 +313,19 @@ export default function POForm({ open, onClose, editingPO, currentUser, onSucces
     
     setFormData(prev => ({ ...prev, items: newItems }));
     
-    const total = newItems.reduce((sum: any, item: any) => sum + (item.lineTotal || 0), 0);
+    const total = newItems.reduce((sum: number, item: POItem) => sum + (item.lineTotal || 0), 0);
     setFormData(prev => ({ ...prev, totalAmount: total.toFixed(2) }));
   };
 
-  const removeItem = (index: any) => {
+  const removeItem = (index: number) => {
     const newItems = formData.items.filter((_, i) => i !== index);
     setFormData(prev => ({ ...prev, items: newItems }));
     
-    const total = newItems.reduce((sum: any, item: any) => sum + (item.lineTotal || 0), 0);
+    const total = newItems.reduce((sum: number, item: POItem) => sum + (item.lineTotal || 0), 0);
     setFormData(prev => ({ ...prev, totalAmount: total.toFixed(2) }));
   };
 
-  const handleSubmit = async (e: any) => {
+  const handleSubmit = async (e: React.FormEvent<HTMLFormElement>) => {
     e.preventDefault();
     setLoading(true);
 
@@ -333,14 +344,14 @@ export default function POForm({ open, onClose, editingPO, currentUser, onSucces
         fxRateToAed: formData.fxRateToAed,
         totalAmount: formData.totalAmount,
         grandTotal: formData.currency === 'AED' ? formData.totalAmount : totalAed,
-        items: formData.items.map((item: any) => ({
-          productId: parseInt(item.productId),
+        items: formData.items.map((item: POItem) => ({
+          productId: parseInt(String(item.productId)),
           productSku: item.productSku,
           productName: item.productName,
           size: item.size || null,
-          quantity: parseInt(item.quantity),
-          unitPrice: parseFloat(item.unitPrice),
-          lineTotal: parseFloat(item.lineTotal)
+          quantity: item.quantity,
+          unitPrice: item.unitPrice,
+          lineTotal: item.lineTotal
         }))
       };
 
@@ -353,11 +364,11 @@ export default function POForm({ open, onClose, editingPO, currentUser, onSucces
       onSuccess?.();
       onClose();
       resetForm();
-    } catch (error: any) {
+    } catch (error: unknown) {
       console.error("Error saving purchase order:", error);
       toast({
         title: "Save Failed",
-        description: error?.message || "Could not save the purchase order. Please try again.",
+        description: error instanceof Error ? error.message : "Could not save the purchase order. Please try again.",
         variant: "destructive",
       });
     } finally {
@@ -377,14 +388,14 @@ export default function POForm({ open, onClose, editingPO, currentUser, onSucces
       currency: "GBP",
       fxRateToAed: "4.8500",
       totalAmount: "0.00",
-      items: [] as any[]
+      items: [] as POItem[]
     });
   };
 
   const getFilteredProducts = () => {
     if (!formData.brandId) return [];
     const brandId = parseInt(formData.brandId);
-    return products.filter((p: any) => p.isActive !== false && p.brandId === brandId);
+    return products.filter((p: Record<string, any>) => p.isActive !== false && p.brandId === brandId);
   };
 
   const canEdit = !editingPO || editingPO.status !== 'closed';
@@ -439,7 +450,7 @@ export default function POForm({ open, onClose, editingPO, currentUser, onSucces
                   <SelectValue placeholder="Select brand" />
                 </SelectTrigger>
                 <SelectContent>
-                  {brands.map((brand: any) => (
+                  {brands.map((brand: Record<string, any>) => (
                     <SelectItem key={brand.id} value={brand.id.toString()}>
                       {brand.name}
                     </SelectItem>
@@ -509,8 +520,8 @@ export default function POForm({ open, onClose, editingPO, currentUser, onSucces
                   <SelectValue />
                 </SelectTrigger>
                 <SelectContent>
-                  {SUPPORTED_CURRENCIES.map((c: any) => (
-                    <SelectItem key={c} value={c}>{c}</SelectItem>
+                  {SUPPORTED_CURRENCIES.map((c: string) => (
+                    <SelectItem key={String(c)} value={String(c)}>{String(c)}</SelectItem>
                   ))}
                 </SelectContent>
               </Select>
@@ -574,7 +585,7 @@ export default function POForm({ open, onClose, editingPO, currentUser, onSucces
                       <TableRow key={index}>
                         <TableCell>
                           <Select
-                            value={item.productId}
+                            value={String(item.productId)}
                             onValueChange={(value) => updateItem(index, 'productId', value)}
                             disabled={!canEdit}
                           >
@@ -582,7 +593,7 @@ export default function POForm({ open, onClose, editingPO, currentUser, onSucces
                               <SelectValue placeholder="Select product" />
                             </SelectTrigger>
                             <SelectContent>
-                              {getFilteredProducts().map((product: any) => (
+                              {getFilteredProducts().map((product: Record<string, any>) => (
                                 <SelectItem key={product.id} value={product.id.toString()}>
                                   {product.name}{product.size ? ` - ${product.size}` : ''}
                                 </SelectItem>
@@ -714,7 +725,7 @@ export default function POForm({ open, onClose, editingPO, currentUser, onSucces
                   )}
                 </div>
               </div>
-              {formData.items.some((i: any) => (i.receivedQuantity ?? 0) > 0) && (
+              {formData.items.some((i: POItem) => (i.receivedQuantity ?? 0) > 0) && (
                 <div className="text-xs text-gray-600 border-t pt-2">
                   <div className="grid grid-cols-4 gap-1 font-medium text-gray-500 mb-1">
                     <span>Product</span>
@@ -723,7 +734,7 @@ export default function POForm({ open, onClose, editingPO, currentUser, onSucces
                     <span className="text-right">Payable</span>
                   </div>
                   {formData.items.map((item, i) => {
-                    const payable = (item.receivedQuantity ?? 0) * (parseFloat(item.unitPrice) || 0);
+                    const payable = (item.receivedQuantity ?? 0) * (item.unitPrice || 0);
                     const isItemShort = (item.receivedQuantity ?? 0) < item.quantity;
                     return (
                       <div key={i} className="grid grid-cols-4 gap-1 py-0.5">
@@ -763,8 +774,8 @@ export default function POForm({ open, onClose, editingPO, currentUser, onSucces
                     {loadingGrnDocs ? (
                       <p className="text-xs text-gray-500">Loading documents...</p>
                     ) : (() => {
-                      const grnInvoices = grnDocs.filter((grn: any) => grn.scanKey1);
-                      const supportingDocs = grnDocs.flatMap((grn: any) =>
+                      const grnInvoices = (grnDocs as Record<string, any>[]).filter((grn) => grn.scanKey1);
+                      const supportingDocs = (grnDocs as Record<string, any>[]).flatMap((grn) =>
                         [
                           grn.scanKey2 && { key: grn.scanKey2, grn, slot: 2 },
                           grn.scanKey3 && { key: grn.scanKey3, grn, slot: 3 },
@@ -772,7 +783,7 @@ export default function POForm({ open, onClose, editingPO, currentUser, onSucces
                       );
                       const hasAnyDoc = grnInvoices.length > 0 || poScanKey || supportingDocs.length > 0;
 
-                      const extractFilename = (key: any) => {
+                      const extractFilename = (key: string) => {
                         if (!key) return '';
                         const last = key.split('/').pop() || key;
                         return last.replace(/^\d{10,}-/, '');
@@ -784,7 +795,7 @@ export default function POForm({ open, onClose, editingPO, currentUser, onSucces
                           {grnInvoices.length > 0 && (
                             <div className="space-y-1.5">
                               <p className="text-xs font-medium text-gray-600">Per-Delivery Invoices</p>
-                              {grnInvoices.map((grn: any) => (
+                              {(grnInvoices as Record<string, any>[]).map((grn) => (
                                 <div key={grn.id} className="flex items-center gap-3 bg-white border border-blue-100 rounded px-3 py-2">
                                   <FileText className="w-4 h-4 text-green-600 flex-shrink-0" />
                                   <div className="flex-1 min-w-0">
