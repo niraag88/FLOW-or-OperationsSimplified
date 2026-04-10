@@ -446,7 +446,7 @@ export default function BackupSettings() {
               <input
                 ref={fileInputRef}
                 type="file"
-                accept=".sql.gz,.gz"
+                accept=".sql.gz"
                 className="hidden"
                 onChange={handleFileSelected}
               />

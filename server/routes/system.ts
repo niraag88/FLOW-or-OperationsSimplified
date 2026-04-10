@@ -833,7 +833,7 @@ export function registerSystemRoutes(app: Express) {
 
     // @ts-ignore
     const Busboy = (await import('busboy')).default;
-    const bb = Busboy({ headers: req.headers, limits: { files: 1 } });
+    const bb = Busboy({ headers: req.headers, limits: { files: 1, fileSize: 500 * 1024 * 1024 } });
 
     let fileHandled = false;
 
@@ -843,10 +843,15 @@ export function registerSystemRoutes(app: Express) {
       fileHandled = true;
 
       const { filename } = info;
-      if (!filename.endsWith('.sql.gz') && !filename.endsWith('.gz')) {
+      if (!filename.endsWith('.sql.gz')) {
         fileStream.resume();
         return res.status(400).json({ error: 'File must be a .sql.gz gzip-compressed PostgreSQL dump' });
       }
+
+      fileStream.on('limit', () => {
+        fileStream.resume();
+        if (!res.headersSent) res.status(413).json({ error: 'File too large. Maximum size is 500 MB.' });
+      });
 
       // Pass the stream directly to restoreBackup — no in-memory buffering
       runRestore({
