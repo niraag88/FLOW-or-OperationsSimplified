@@ -42,7 +42,7 @@ PostgreSQL is the chosen database, managed by Drizzle ORM. Schema definitions ar
 
 ### Migration Infrastructure (Task #89)
 - **Versioned migrations adopted**: `migrations/0000_baseline.sql` created from full current schema. `drizzle.__drizzle_migrations` table seeded — baseline marked applied, live data untouched.
-- **Scripts**: `npm run db:generate` (create migration file), `npm run db:migrate` (apply pending migrations). **`db:push` hangs in this project — do not use it.**
+- **Scripts**: `npm run db:generate` (create migration file), `npm run db:migrate` (apply pending migrations). **`db:push` has been removed from package.json — it hung in this project and was a risk on a live system. Do not add it back.**
 - **Post-merge automation**: `scripts/post-merge.sh` runs `npm install && npm run db:migrate` on every task merge.
 - **Workflow for schema changes**: Edit `shared/schema.ts` → `npm run db:generate` → commit the SQL file → `npm run db:migrate`.
 
@@ -114,7 +114,11 @@ The project follows a monorepo layout with separate directories for client, serv
 - **Express.js**: Web application framework.
 - **connect-pg-simple**: PostgreSQL session store.
 - **nanoid**: Unique ID generation.
+- **busboy**: Multipart form parser — used by restore-upload endpoint. Direct dependency (Task #229).
 - **tsx**: TypeScript execution for development.
+
+## Admin Setup
+- `npm run create-admin` — runs `scripts/createAdmin.js` to create the initial admin user. Uses `ADMIN_USERNAME`/`ADMIN_PASSWORD` env vars if set, otherwise prompts interactively.
 
 ## Platform Integration
 - **Base44 SDK**: Business operations platform (shimmed for demo mode).
