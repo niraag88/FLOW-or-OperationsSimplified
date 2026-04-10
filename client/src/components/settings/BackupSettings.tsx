@@ -348,9 +348,10 @@ export default function BackupSettings() {
 
   const isRestoring = restoreFromCloud.isPending || restoreFromUpload.isPending;
 
-  const runs = (runsData?.runs || []).slice(0, 10);
+  const allRuns: any[] = runsData?.runs || [];
+  const runs = allRuns.slice(0, 10);
   const latestRun = runs[0] || null;
-  const latestSuccessfulBackup = runs.find((r: any) => r.success === true) || null;
+  const latestSuccessfulBackup = allRuns.find((r: any) => r.success === true) || null;
   const restoreHistory = (restoreRunsData?.runs || []).slice(0, 5);
 
   // ── Render ─────────────────────────────────────────────────────────────────
