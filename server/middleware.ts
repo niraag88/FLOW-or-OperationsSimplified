@@ -187,7 +187,6 @@ export const validatePdfMagicBytes = (fileBuffer: Buffer) => {
   if (magicBytes !== '%PDF') {
     return { valid: false, error: 'Invalid file format. Only real PDF files are allowed.' };
   }
-  console.log('Validated real PDF');
   return { valid: true };
 };
 
