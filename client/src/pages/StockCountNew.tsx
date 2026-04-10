@@ -98,7 +98,7 @@ export default function StockCountNew() {
       });
 
       // Navigate back to inventory
-      navigate('/Inventory');
+      navigate('/inventory');
       
     } catch (error: any) {
       console.error("Error creating stock count:", error);
@@ -113,7 +113,7 @@ export default function StockCountNew() {
   };
 
   const handleCancel = () => {
-    navigate('/Inventory');
+    navigate('/inventory');
   };
 
   const filteredProducts = products.filter((product: any) =>
