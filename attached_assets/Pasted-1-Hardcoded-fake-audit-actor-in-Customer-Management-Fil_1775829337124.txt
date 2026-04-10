@@ -1,0 +1,137 @@
+1. Hardcoded fake audit actor in Customer Management
+
+File: client/src/components/settings/CustomerManagement.jsx
+
+This still logs customer actions as:
+
+admin@example.com
+
+That means your audit trail will be wrong for:
+
+create
+update
+status change
+
+This is the clearest thing I would still fix.
+
+2. Mock notifications are still in the live layout
+
+File: client/src/pages/Layout.jsx
+
+You still have:
+
+getMockNotifications = () => []
+comment saying “Use mock notifications for now”
+
+That means the notification area is still placeholder behavior.
+
+My recommendation:
+
+either wire it to real audit/activity data
+or remove/hide the bell for now
+
+Do not leave “fake finished” UI in a business app.
+
+3. Fallback entity code with fake success still exists
+
+File: client/src/api/entities.js
+
+You still have:
+
+FallbackEntity
+Math.random() fake ID generation
+InventoryLot using that fallback path
+
+This is dangerous because if that code is ever hit, it can look like something worked when it did not.
+
+Even if it is currently unused, I would still fix it by either:
+
+deleting it
+or making it throw a hard error instead of pretending success
+4. Dev-only Print Sandbox still exists with hardcoded test company data
+
+File: client/src/pages/PrintSandboxPage.jsx
+
+It still contains:
+
+Supernature Trading LLC
+hardcoded email/details
+“Development Tool”
+
+I checked the ZIP and it does not appear to be routed in App.tsx, so this is not an active production problem.
+But I would still either:
+
+remove it
+move it to a dev-only folder
+or clearly mark it as non-production and keep it out of delivered code
+5. Company logo upload is still not aligned with the architecture
+
+Files:
+
+client/src/components/settings/CompanySettings.jsx
+client/src/api/integrations.js
+
+This is subtle but important.
+
+Your schema/comments suggest logo is an object storage key, but the actual upload flow still uses FileReader and stores a data URL/base64 string through UploadFile.
+
+So:
+
+it works
+but it is not architecturally clean
+and it is not using the same storage strategy as the rest of the app
+
+For a tiny logo, this is acceptable.
+For a robust business app, I would eventually make logo upload use the same proper storage flow as documents.
+
+6. Default company name still falls back to "My Company"
+
+File: server/businessStorage.ts
+
+This is not a bug, but it is still a weak fallback for a business system.
+
+It is much better than hardcoding someone else’s name, but I would still prefer one of these:
+
+blank value until settings are completed
+forced setup on first run
+export/print blocked until real company settings exist
+
+This is not urgent, but it is still worth tightening.
+
+Lower-priority cleanup only
+
+These are not things I would block on, but I would clean them eventually:
+
+7. Route casing is still inconsistent
+
+File: client/src/App.tsx
+
+You still mix:
+
+lowercase routes like /purchase-orders, /delivery-orders, /invoices
+uppercase routes like /Inventory, /Reports, /Settings, /Customers
+
+Not dangerous, just untidy.
+
+8. Migrations README is slightly outdated
+
+File: migrations/README.md
+
+It says db:push is “retained as a script for reference only,” but in the ZIP it is actually removed from package.json.
+
+Tiny issue, but worth correcting so docs match reality.
+
+9. Memory upload storage is still in use
+
+File: server/middleware.ts
+
+You still use:
+
+multer.memoryStorage()
+
+For your current usage, I think this is acceptable.
+I would not force you to change it right now unless:
+
+file sizes increase
+users upload concurrently more often
+you add more media-heavy workflows
