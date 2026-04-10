@@ -11,6 +11,7 @@ import { formatCurrency } from "@/utils/currency";
 import type { DeliveryOrder } from "@shared/schema";
 import { useToast } from "@/hooks/use-toast";
 interface DODetail {
+  [key: string]: unknown;
   id: number;
   status: string;
   customer_name?: string;
@@ -83,7 +84,7 @@ interface DOQuickViewModalProps {
   open: boolean;
   onClose: () => void;
   canEdit: boolean;
-  onEdit: (doOrder: DeliveryOrder) => void;
+  onEdit: (doOrder: Record<string, unknown>) => void;
 }
 
 export default function DOQuickViewModal({ doId, open, onClose, canEdit, onEdit }: DOQuickViewModalProps) {
@@ -135,7 +136,7 @@ export default function DOQuickViewModal({ doId, open, onClose, canEdit, onEdit 
 
   const handleEdit = () => {
     if (onEdit && detail) {
-      onEdit(detail as unknown as DeliveryOrder);
+      onEdit(detail);
       onClose();
     }
   };

@@ -69,7 +69,7 @@ interface CompanySettings {
 }
 
 interface StockTabProps {
-  products: Product[];
+  products: StockProduct[];
   loading: boolean;
   onStockSubTabChange: (tab: string, ...args: unknown[]) => void;
   canEdit: boolean;
@@ -193,7 +193,7 @@ export default function StockTab({ products, loading, onStockSubTabChange, canEd
 
   const lowStockProducts = stockData?.lowStockProducts || [];
   const outOfStockProducts = stockData?.outOfStockProducts || [];
-  const allProducts: StockProduct[] = stockData?.products || (products as unknown as StockProduct[]);
+  const allProducts: StockProduct[] = stockData?.products || products;
 
   // Get unique values for filters from server data
   const uniqueStockBrands = [...new Set(allProducts.map((p: StockProduct) => p.brandName).filter(Boolean))].sort() as string[];

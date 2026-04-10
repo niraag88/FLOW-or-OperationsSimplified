@@ -38,6 +38,7 @@ interface POItem {
   productName?: string;
   productSku?: string;
   brandName?: string;
+  size?: string | null;
 }
 
 interface PORow extends PurchaseOrder {
@@ -228,11 +229,11 @@ export default function GoodsReceiptsTab({
 
   // These functions now simply return the server-provided data
   const getLineItemsCount = (po: POStats): number => Number(po.lineItems) || 0;
-  const getTotalOrderedQuantity = (po: PurchaseOrder) => Number((po as Record<string, unknown>).orderedQty) || 0;
-  const getTotalReceivedQuantity = (po: PurchaseOrder) => Number((po as Record<string, unknown>).receivedQty) || 0;
+  const getTotalOrderedQuantity = (po: POStats): number => Number(po.orderedQty) || 0;
+  const getTotalReceivedQuantity = (po: POStats): number => Number(po.receivedQty) || 0;
 
   // Handler functions for closed PO actions — delegate to shared utilities in export.jsx
-  const handleViewAndPrint = async (po: PurchaseOrder) => {
+  const handleViewAndPrint = async (po: PORow) => {
     try {
       await printPOGRNSummary(po.id);
     } catch {
@@ -250,7 +251,7 @@ export default function GoodsReceiptsTab({
     }
   };
 
-  const handleDeletePO = (po: PurchaseOrder) => {
+  const handleDeletePO = (po: PORow) => {
     setDeletingPO(po);
     setShowDeleteDialog(true);
   };
@@ -418,7 +419,7 @@ export default function GoodsReceiptsTab({
     </Table>
   );
 
-  const openReceiveDialog = async (po: PurchaseOrder) => {
+  const openReceiveDialog = async (po: PORow) => {
     try {
       // Fetch the purchase order items only when opening the dialog
       const response = await fetch(`/api/purchase-orders/${po.id}/items`, { credentials: 'include' });
@@ -553,7 +554,7 @@ export default function GoodsReceiptsTab({
     return totalReceived;
   };
 
-  const handleForceCloseClick = (po: PurchaseOrder) => {
+  const handleForceCloseClick = (po: PORow) => {
     setClosingPO(po);
     setShowCloseConfirm(true);
   };
@@ -606,15 +607,15 @@ export default function GoodsReceiptsTab({
     );
   }
 
-  const openPOs = purchaseOrders.filter((po: PurchaseOrder) => po.status === 'submitted');
-  const closedPOs = purchaseOrders.filter((po: PurchaseOrder) => po.status === 'closed');
+  const openPOs: PORow[] = purchaseOrders.filter(po => po.status === 'submitted');
+  const closedPOs: PORow[] = purchaseOrders.filter(po => po.status === 'closed');
 
   // Unique supplier/brand lists for dropdowns
   const openSupplierOptions = Array.from(new Set(
-    openPOs.map((po: PurchaseOrder) => (po as Record<string, any>).supplierName || (po as Record<string, any>).brandName).filter(Boolean)
+    openPOs.map(po => po.supplierName || po.brandName).filter(Boolean)
   )).sort();
   const closedSupplierOptions = Array.from(new Set(
-    closedPOs.map((po: PurchaseOrder) => (po as Record<string, any>).supplierName || (po as Record<string, any>).brandName).filter(Boolean)
+    closedPOs.map(po => po.supplierName || po.brandName).filter(Boolean)
   )).sort();
 
   const filteredOpenPOs = openPOs.filter((po: PORow) => {
@@ -789,7 +790,7 @@ export default function GoodsReceiptsTab({
                     </SelectTrigger>
                     <SelectContent>
                       <SelectItem value="all">All Suppliers</SelectItem>
-                      {openSupplierOptions.map((s: string) => (
+                      {(openSupplierOptions as string[]).map((s) => (
                         <SelectItem key={s} value={s}>{s}</SelectItem>
                       ))}
                     </SelectContent>
@@ -921,7 +922,7 @@ export default function GoodsReceiptsTab({
                     </SelectTrigger>
                     <SelectContent>
                       <SelectItem value="all">All Suppliers</SelectItem>
-                      {closedSupplierOptions.map((s: string) => (
+                      {(closedSupplierOptions as string[]).map((s) => (
                         <SelectItem key={s} value={s}>{s}</SelectItem>
                       ))}
                     </SelectContent>
@@ -1155,8 +1156,8 @@ export default function GoodsReceiptsTab({
               </TableHeader>
               <TableBody>
                 {selectedPOForReceive?.items?.map((item: POItem, index: number) => {
-                  const totalReceived = getReceivedQuantityForItem(selectedPOForReceive?.id ?? 0, item.productId);
-                  const remaining = item.quantity - totalReceived;
+                  const totalReceived = getReceivedQuantityForItem(selectedPOForReceive?.id ?? 0, item.productId ?? 0);
+                  const remaining = (item.quantity ?? 0) - totalReceived;
                   
                   return (
                     <TableRow key={index}>
@@ -1263,9 +1264,9 @@ export default function GoodsReceiptsTab({
             {/* Dynamic button logic based on whether all quantities match */}
             {(() => {
               const allItemsFullyReceived = selectedPOForReceive?.items?.every((item: POItem) => {
-                const totalReceived = getReceivedQuantityForItem(selectedPOForReceive?.id ?? 0, item.productId);
+                const totalReceived = getReceivedQuantityForItem(selectedPOForReceive?.id ?? 0, item.productId ?? 0);
                 const currentReceiving = receiveQuantities[item.id] || 0;
-                return (totalReceived + currentReceiving) >= item.quantity;
+                return (totalReceived + currentReceiving) >= (item.quantity ?? 0);
               });
 
               const hasQuantitiesToReceive = selectedPOForReceive?.items?.some((item: POItem) => receiveQuantities[item.id] > 0);
