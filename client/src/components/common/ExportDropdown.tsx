@@ -34,7 +34,7 @@ export default function ExportDropdown({
 }) {
   const [isExporting, setIsExporting] = useState(false);
 
-  const getExportData = (sourceData) => {
+  const getExportData = (sourceData: any) => {
     const src = sourceData || data;
     if (!src || src.length === 0) return [];
     return src.map((item: any) => {
@@ -63,7 +63,7 @@ export default function ExportDropdown({
     return pw;
   };
 
-  const writePrintContent = (pw, subtitle, headers, rows, total) => {
+  const writePrintContent = (pw: any, subtitle: any, headers: any, rows: any, total: any) => {
     const now = format(new Date(), 'dd/MM/yy HH:mm');
     const headerCells = headers.map((h: any) => `<th>${h}</th>`).join('');
     const bodyRows = rows

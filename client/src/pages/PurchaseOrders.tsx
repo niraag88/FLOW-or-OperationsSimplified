@@ -74,7 +74,7 @@ export default function PurchaseOrders() {
     if (filters.supplier && filters.supplier !== 'all') params.set('supplierId', String(filters.supplier));
     if (filters.paymentStatus && filters.paymentStatus !== 'all') params.set('paymentStatus', filters.paymentStatus);
     const today = new Date();
-    const toStr = (d) => d.toISOString().split('T')[0];
+    const toStr = (d: any) => d.toISOString().split('T')[0];
     if (filters.dateRange && filters.dateRange !== 'all') {
       const dr = filters.dateRange;
       if (dr === 'today') { const d = toStr(today); params.set('dateFrom', d); params.set('dateTo', d); }
@@ -162,7 +162,7 @@ export default function PurchaseOrders() {
     setShowPOForm(true);
   };
 
-  const handleEditPO = (po) => {
+  const handleEditPO = (po: any) => {
     setEditingPO(po);
     setShowPOForm(true);
   };
@@ -189,7 +189,7 @@ export default function PurchaseOrders() {
     if (filters.supplier && filters.supplier !== 'all') params.set('supplierId', String(filters.supplier));
     if (excludeYearsKey) params.set('excludeYears', excludeYearsKey);
     const today = new Date();
-    const toStr = (d) => d.toISOString().split('T')[0];
+    const toStr = (d: any) => d.toISOString().split('T')[0];
     if (filters.dateRange && filters.dateRange !== 'all') {
       const dr = filters.dateRange;
       if (dr === 'today') { const d = toStr(today); params.set('dateFrom', d); params.set('dateTo', d); }
@@ -231,22 +231,22 @@ export default function PurchaseOrders() {
     brandName: "Brand",
     orderDate: {
       label: "Order Date",
-      transform: (date) => date && !isNaN(new Date(date).getTime()) ? format(new Date(date), 'dd/MM/yy') : ''
+      transform: (date: any) => date && !isNaN(new Date(date).getTime()) ? format(new Date(date), 'dd/MM/yy') : ''
     },
     totalAmount: {
       label: "Total",
-      transform: (amount, row) => `${row?.currency || 'GBP'} ${parseFloat(amount || 0).toFixed(2)}`
+      transform: (amount: any, row: any) => `${row?.currency || 'GBP'} ${parseFloat(amount || 0).toFixed(2)}`
     },
     grandTotal: {
       label: "Total (AED)", 
-      transform: (amount) => `AED ${parseFloat(amount || 0).toFixed(2)}`
+      transform: (amount: any) => `AED ${parseFloat(amount || 0).toFixed(2)}`
     },
     lineItems: "Line Items",
     orderedQty: "Ordered",
     receivedQty: "Received",
     status: {
       label: "Status",
-      transform: (status) => status?.toUpperCase() || ''
+      transform: (status: any) => status?.toUpperCase() || ''
     }
   };
 
@@ -269,19 +269,19 @@ export default function PurchaseOrders() {
             columns={activeTab === 'purchase-orders' ? {
               poNumber: 'PO Number',
               brandName: 'Brand',
-              orderDate: { label: 'Order Date', transform: (date) => date ? format(new Date(date), 'dd/MM/yy') : '' },
-              totalAmount: { label: 'Total', transform: (val, row) => `${row?.currency || 'GBP'} ${parseFloat(val || 0).toFixed(2)}` },
-              grandTotal: { label: 'Total (AED)', transform: (val, row) => {
+              orderDate: { label: 'Order Date', transform: (date: any) => date ? format(new Date(date), 'dd/MM/yy') : '' },
+              totalAmount: { label: 'Total', transform: (val: any, row: any) => `${row?.currency || 'GBP'} ${parseFloat(val || 0).toFixed(2)}` },
+              grandTotal: { label: 'Total (AED)', transform: (val: any, row: any) => {
                 const amt = parseFloat(row?.totalAmount || 0);
                 const cur = row?.currency || 'GBP';
                 const rate = parseFloat(row?.fxRateToAed || 4.85);
                 const aed = cur === 'AED' ? amt : amt * rate;
                 return `AED ${aed.toFixed(2)}`;
               }},
-              status: { label: 'Status', transform: (val) => val ? val.toUpperCase() : '' },
-              paymentStatus: { label: 'Payment Status', transform: (val) => val ? val.charAt(0).toUpperCase() + val.slice(1) : 'Outstanding' },
-              paymentMadeDate: { label: 'Payment Date', transform: (val) => val ? format(new Date(val), 'dd/MM/yy') : '' },
-              paymentRemarks: { label: 'Payment Remarks', transform: (val) => val || '' }
+              status: { label: 'Status', transform: (val: any) => val ? val.toUpperCase() : '' },
+              paymentStatus: { label: 'Payment Status', transform: (val: any) => val ? val.charAt(0).toUpperCase() + val.slice(1) : 'Outstanding' },
+              paymentMadeDate: { label: 'Payment Date', transform: (val: any) => val ? format(new Date(val), 'dd/MM/yy') : '' },
+              paymentRemarks: { label: 'Payment Remarks', transform: (val: any) => val || '' }
             } : goodsReceiptsColumns}
             isLoading={loading}
           />
@@ -333,7 +333,7 @@ export default function PurchaseOrders() {
             currentUser={currentUser}
             onEdit={handleEditPO}
             onRefresh={handleRefresh}
-            onQuickView={(id) => setQuickViewPoId(id)}
+            onQuickView={(id: any) => setQuickViewPoId(id)}
           />
 
           {/* Pagination Controls for POs */}

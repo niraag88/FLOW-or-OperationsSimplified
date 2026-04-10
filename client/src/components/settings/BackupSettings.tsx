@@ -11,25 +11,25 @@ import { apiRequest } from "@/lib/queryClient";
 import { format } from "date-fns";
 import { useState, useRef, useEffect } from "react";
 
-function formatBytes(bytes) {
+function formatBytes(bytes: any) {
   if (!bytes) return "—";
   if (bytes < 1024) return `${bytes} B`;
   if (bytes < 1024 * 1024) return `${(bytes / 1024).toFixed(1)} KB`;
   return `${(bytes / (1024 * 1024)).toFixed(1)} MB`;
 }
 
-function formatDate(ts) {
+function formatDate(ts: any) {
   if (!ts) return "Never";
   try { return format(new Date(ts), "dd/MM/yy HH:mm"); } catch { return "—"; }
 }
 
-function formatDuration(ms) {
+function formatDuration(ms: any) {
   if (!ms) return "—";
   if (ms < 1000) return `${ms}ms`;
   return `${(ms / 1000).toFixed(1)}s`;
 }
 
-function StatusBadge({ success }) {
+function StatusBadge({ success }: any) {
   if (success === null || success === undefined) return null;
   return success
     ? <Badge className="bg-emerald-100 text-emerald-800 border-emerald-200"><CheckCircle className="w-3 h-3 mr-1 inline" />OK</Badge>
@@ -40,7 +40,7 @@ function StatusBadge({ success }) {
  * Confirmation modal for destructive restore actions.
  * Requires the user to type "RESTORE" before the confirm button activates.
  */
-function RestoreConfirmModal({ open, onClose, onConfirm, filename, isPending }) {
+function RestoreConfirmModal({ open, onClose, onConfirm, filename, isPending }: any) {
   const [typed, setTyped] = useState("");
 
   // Reset typed confirmation whenever the modal closes (any path: cancel, success, error, programmatic)
@@ -203,7 +203,7 @@ export default function BackupSettings() {
 
   // ── Handlers ───────────────────────────────────────────────────────────────
 
-  const handleDownload = async (run) => {
+  const handleDownload = async (run: any) => {
     setDownloadingId(run.id);
     try {
       const res = await fetch(`/api/ops/backup-runs/${run.id}/download`, { credentials: "include" });
@@ -228,7 +228,7 @@ export default function BackupSettings() {
     }
   };
 
-  const handleRestoreClick = (run) => {
+  const handleRestoreClick = (run: any) => {
     setRestoreModal({
       type: "cloud",
       run,
@@ -236,7 +236,7 @@ export default function BackupSettings() {
     });
   };
 
-  const handleFileSelected = (e) => {
+  const handleFileSelected = (e: any) => {
     const file = e.target.files?.[0];
     if (!file) return;
     e.target.value = "";
@@ -381,7 +381,7 @@ export default function BackupSettings() {
                     </tr>
                   </thead>
                   <tbody className="divide-y">
-                    {runs.map((run) => (
+                    {runs.map((run: any) => (
                       <tr key={run.id} className="hover:bg-gray-50">
                         <td className="px-3 py-2 whitespace-nowrap text-gray-700">{formatDate(run.ranAt)}</td>
                         <td className="px-3 py-2"><StatusBadge success={run.success} /></td>
@@ -458,7 +458,7 @@ export default function BackupSettings() {
                     </tr>
                   </thead>
                   <tbody className="divide-y">
-                    {restoreHistory.map((r) => (
+                    {restoreHistory.map((r: any) => (
                       <tr key={r.id} className="hover:bg-gray-50">
                         <td className="px-3 py-2 whitespace-nowrap text-gray-700">{formatDate(r.restoredAt)}</td>
                         <td className="px-3 py-2"><StatusBadge success={r.success} /></td>

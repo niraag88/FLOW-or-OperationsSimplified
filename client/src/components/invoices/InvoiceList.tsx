@@ -11,13 +11,13 @@ import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover
 import InvoiceActionsDropdown from "./InvoiceActionsDropdown";
 import MarkPaidDialog from "./MarkPaidDialog";
 
-export default function InvoiceList({ invoices, totalCount, loading, canEdit, canOverride, currentUser, onEdit, onRefresh, onQuickView }) {
+export default function InvoiceList({ invoices, totalCount, loading, canEdit, canOverride, currentUser, onEdit, onRefresh, onQuickView }: any) {
   const [showEditPaymentDialog, setShowEditPaymentDialog] = useState(false);
   const [editPaymentInvoice, setEditPaymentInvoice] = useState<any>(null);
 
-  const getCustomerName = (invoice) => invoice.customer_name || invoice.customerName || 'Unknown Customer';
+  const getCustomerName = (invoice: any) => invoice.customer_name || invoice.customerName || 'Unknown Customer';
 
-  const formatDate = (dateString) => {
+  const formatDate = (dateString: any) => {
     if (!dateString) return '-';
     try {
       const date = new Date(dateString);
@@ -28,7 +28,7 @@ export default function InvoiceList({ invoices, totalCount, loading, canEdit, ca
     }
   };
 
-  const formatShortDate = (dateString) => {
+  const formatShortDate = (dateString: any) => {
     if (!dateString) return '-';
     try {
       const date = new Date(dateString);
@@ -39,7 +39,7 @@ export default function InvoiceList({ invoices, totalCount, loading, canEdit, ca
     }
   };
 
-  const getStatusColor = (status) => {
+  const getStatusColor = (status: any) => {
     switch (status?.toLowerCase()) {
       case 'draft': return 'bg-gray-100 text-gray-800';
       case 'submitted':
@@ -50,7 +50,7 @@ export default function InvoiceList({ invoices, totalCount, loading, canEdit, ca
     }
   };
 
-  const formatCurrency = (amount, currency = 'AED') => {
+  const formatCurrency = (amount: any, currency = 'AED') => {
     const formatter = new Intl.NumberFormat('en-US', {
       style: 'decimal',
       minimumFractionDigits: 2,
@@ -59,13 +59,13 @@ export default function InvoiceList({ invoices, totalCount, loading, canEdit, ca
     return `${currency} ${formatter.format(amount || 0)}`;
   };
 
-  const canPerformActions = (invoice) => {
+  const canPerformActions = (invoice: any) => {
     if (!canEdit) return false;
     if (canOverride) return true;
     return ['draft', 'submitted'].includes(invoice.status);
   };
 
-  const handleEditPayment = (invoice) => {
+  const handleEditPayment = (invoice: any) => {
     setEditPaymentInvoice(invoice);
     setShowEditPaymentDialog(true);
   };
@@ -125,7 +125,7 @@ export default function InvoiceList({ invoices, totalCount, loading, canEdit, ca
                 </TableRow>
               </TableHeader>
               <TableBody>
-                {invoices.map((invoice) => {
+                {invoices.map((invoice: any) => {
                   const isCancelled = invoice.status === 'cancelled';
                   const ps = invoice.paymentStatus || invoice.payment_status || 'outstanding';
                   const paidDate = invoice.paymentReceivedDate || invoice.payment_received_date;

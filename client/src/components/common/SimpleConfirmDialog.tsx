@@ -19,7 +19,7 @@ export default function SimpleConfirmDialog({
   confirmText = "Yes, Confirm",
   cancelText = "No, Cancel",
   confirmVariant = "default"
-}) {
+}: any) {
   return (
     <AlertDialog open={open} onOpenChange={onClose}>
       <AlertDialogContent>

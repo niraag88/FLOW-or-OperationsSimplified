@@ -1,7 +1,7 @@
 export default function SignatureSection({
   leftSignatureLabel,
   rightSignatureLabel
-}) {
+}: any) {
   return (
     <section className="mt-auto pt-8 border-t print-signature">
       <div className="grid grid-cols-2 gap-8">

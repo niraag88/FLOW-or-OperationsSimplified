@@ -1,7 +1,7 @@
 import React from 'react';
 import PrintStyles from './PrintStyles';
 
-export default function PrintPage({ children, className = "", style = {} }) {
+export default function PrintPage({ children, className = "", style = {} }: any) {
   const defaultStyle: React.CSSProperties = {
     width: '100%',
     maxWidth: '210mm',

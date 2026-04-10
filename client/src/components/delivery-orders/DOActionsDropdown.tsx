@@ -16,7 +16,7 @@ import SimpleConfirmDialog from "../common/SimpleConfirmDialog";
 import { DeliveryOrder } from "@/api/entities";
 import UploadFileDialog from "../common/UploadFileDialog";
 
-export default function DOActionsDropdown({ doOrder, canEdit, onEdit, onRefresh, currentUser }) {
+export default function DOActionsDropdown({ doOrder, canEdit, onEdit, onRefresh, currentUser }: any) {
   const { toast } = useToast();
   const [showDeleteDialog, setShowDeleteDialog] = useState(false);
   const [showUploadDialog, setShowUploadDialog] = useState(false);
@@ -67,7 +67,7 @@ export default function DOActionsDropdown({ doOrder, canEdit, onEdit, onRefresh,
     }
   };
 
-  const handleUploadSuccess = async (storageKey) => {
+  const handleUploadSuccess = async (storageKey: any) => {
     try {
       const res = await fetch(`/api/delivery-orders/${doOrder.id}/scan-key`, {
         method: 'PATCH',

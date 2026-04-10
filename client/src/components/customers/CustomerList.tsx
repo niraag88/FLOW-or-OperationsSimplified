@@ -8,7 +8,7 @@ import { Skeleton } from "@/components/ui/skeleton";
 
 export default function CustomerList({ customers, loading, canEdit, onEdit, currentUser, onRefresh }: any) {
   
-  const getVatTreatmentBadge = (customer) => {
+  const getVatTreatmentBadge = (customer: any) => {
     const vatTreatment = customer.vat_treatment_default;
     const isUAE = customer.country_code === 'AE';
     
@@ -85,7 +85,7 @@ export default function CustomerList({ customers, loading, canEdit, onEdit, curr
               </TableRow>
             </TableHeader>
             <TableBody>
-              {customers.map((customer) => (
+              {customers.map((customer: any) => (
                 <TableRow key={customer.id} className="hover:bg-gray-50">
                   <TableCell>
                     <div>
@@ -141,7 +141,7 @@ export default function CustomerList({ customers, loading, canEdit, onEdit, curr
 
         {/* Mobile Cards */}
         <div className="lg:hidden space-y-4">
-          {customers.map((customer) => (
+          {customers.map((customer: any) => (
             <Card key={customer.id} className="p-4">
               <div className="flex items-start justify-between mb-3">
                 <div>

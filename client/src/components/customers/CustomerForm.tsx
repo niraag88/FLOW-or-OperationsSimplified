@@ -46,7 +46,7 @@ const COUNTRIES = [
   { code: 'KR', name: 'South Korea' }
 ].sort((a: any, b: any) => a.name.localeCompare(b.name));
 
-export default function CustomerForm({ open, onClose, editingCustomer, currentUser, onSuccess }) {
+export default function CustomerForm({ open, onClose, editingCustomer, currentUser, onSuccess }: any) {
   const [loading, setLoading] = useState(false);
   const [formData, setFormData] = useState({
     name: "",
@@ -92,7 +92,7 @@ export default function CustomerForm({ open, onClose, editingCustomer, currentUs
     }
   }, [editingCustomer, open]);
 
-  const handleCountryChange = (countryCode) => {
+  const handleCountryChange = (countryCode: any) => {
     const country = COUNTRIES.find((c: any) => c.code === countryCode);
     setFormData(prev => ({
       ...prev,
@@ -117,7 +117,7 @@ export default function CustomerForm({ open, onClose, editingCustomer, currentUs
     }
   };
 
-  const handleSubmit = async (e) => {
+  const handleSubmit = async (e: any) => {
     e.preventDefault();
     setLoading(true);
 

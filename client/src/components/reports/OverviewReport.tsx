@@ -7,10 +7,10 @@ import {
 import { format } from "date-fns";
 import { getRateToAed } from "@/utils/currency";
 
-const fmt = (v) =>
+const fmt = (v: any) =>
   new Intl.NumberFormat("en-US", { minimumFractionDigits: 2, maximumFractionDigits: 2 }).format(v);
 
-function KpiTile({ icon: Icon, iconBg, label, value, sub, valueColor }) {
+function KpiTile({ icon: Icon, iconBg, label, value, sub, valueColor }: any) {
   return (
     <Card className="p-5">
       <div className="flex items-start gap-4">
@@ -27,8 +27,8 @@ function KpiTile({ icon: Icon, iconBg, label, value, sub, valueColor }) {
   );
 }
 
-export default function OverviewReport({ invoices, purchaseOrders, companySettings }) {
-  const getFxRate = (po) => {
+export default function OverviewReport({ invoices, purchaseOrders, companySettings }: any) {
+  const getFxRate = (po: any) => {
     const stored = parseFloat(po.fxRateToAed || po.fx_rate_to_aed);
     if (!isNaN(stored) && stored > 0) return stored;
     return getRateToAed(po.currency || "GBP", companySettings);
@@ -36,22 +36,22 @@ export default function OverviewReport({ invoices, purchaseOrders, companySettin
 
   const kpis = useMemo(() => {
     const activeInvoices = invoices.filter(
-      (inv) => !["cancelled", "draft"].includes((inv.status || "").toLowerCase())
+      (inv: any) => !["cancelled", "draft"].includes((inv.status || "").toLowerCase())
     );
 
     const totalRevenue = activeInvoices.reduce(
-      (sum, inv) => sum + Number(inv.total_amount || inv.totalAmount || inv.amount || 0),
+      (sum: any, inv: any) => sum + Number(inv.total_amount || inv.totalAmount || inv.amount || 0),
       0
     );
 
     const totalOutstanding = activeInvoices
-      .filter((inv) => {
+      .filter((inv: any) => {
         const ps = (inv.paymentStatus || inv.payment_status || "outstanding").toLowerCase();
         const st = (inv.status || "").toLowerCase();
         return ps !== "paid" && st !== "delivered";
       })
       .reduce(
-        (sum, inv) => sum + Number(inv.total_amount || inv.totalAmount || inv.amount || 0),
+        (sum: any, inv: any) => sum + Number(inv.total_amount || inv.totalAmount || inv.amount || 0),
         0
       );
 
@@ -72,8 +72,8 @@ export default function OverviewReport({ invoices, purchaseOrders, companySettin
   const chartData = useMemo(() => {
     const salesMap: Record<string, any> = {};
     invoices
-      .filter((inv) => !["cancelled", "draft"].includes((inv.status || "").toLowerCase()))
-      .forEach((inv) => {
+      .filter((inv: any) => !["cancelled", "draft"].includes((inv.status || "").toLowerCase()))
+      .forEach((inv: any) => {
         const dateVal = inv.invoice_date || inv.invoiceDate;
         if (!dateVal) return;
         const d = new Date(dateVal);
@@ -83,7 +83,7 @@ export default function OverviewReport({ invoices, purchaseOrders, companySettin
       });
 
     const purchasesMap: Record<string, any> = {};
-    purchaseOrders.forEach((po) => {
+    purchaseOrders.forEach((po: any) => {
       const dateVal = po.orderDate || po.order_date;
       if (!dateVal) return;
       const d = new Date(dateVal);

@@ -104,7 +104,7 @@ const navigationItems: any[] = [
   },
 ];
 
-const getIconForEntityType = (type) => {
+const getIconForEntityType = (type: any) => {
   switch (type) {
     case 'Product': return <Package className="w-4 h-4 text-gray-500" />;
     case 'PurchaseOrder': return <ShoppingCart className="w-4 h-4 text-gray-500" />;
@@ -120,7 +120,7 @@ const getIconForEntityType = (type) => {
 
 const getMockNotifications = () => [];
 
-const getNotificationDetails = (log) => {
+const getNotificationDetails = (log: any) => {
     let title = 'New Activity';
     const doc = log.changes?.created_po || log.changes?.updated_po || log.changes?.created_document || log.changes?.document_data;
 
@@ -159,7 +159,7 @@ const getNotificationDetails = (log) => {
     return { title, subtitle, icon: getIconForEntityType(log.entity_type) };
 };
 
-const getTimeAgo = (date) => {
+const getTimeAgo = (date: any) => {
   const now = new Date();
   const diffInMinutes = Math.floor((now.getTime() - (date as Date).getTime()) / (1000 * 60));
   
@@ -173,7 +173,7 @@ const getTimeAgo = (date) => {
   return `${diffInDays}d ago`;
 };
 
-export default function Layout({ children, currentPageName = "" }) {
+export default function Layout({ children, currentPageName = "" }: any) {
   const location = useLocation();
   const { user, logout } = useAuth();
   const [mobileMenuOpen, setMobileMenuOpen] = React.useState(false);
@@ -199,7 +199,7 @@ export default function Layout({ children, currentPageName = "" }) {
     return <>{children}</>;
   }
 
-  const isActiveItem = (item) => {
+  const isActiveItem = (item: any) => {
     if (item.type === "single") {
       return location.pathname.startsWith(item.url);
     } else if (item.type === "dropdown") {
@@ -294,7 +294,7 @@ export default function Layout({ children, currentPageName = "" }) {
                       <DropdownMenuContent align="start" className="w-48">
                         {item.items
                           .filter((subItem: any) => !subItem.adminOnly || currentUser?.role === 'Admin')
-                          .map((subItem) => (
+                          .map((subItem: any) => (
                           <DropdownMenuItem key={subItem.title} asChild>
                             <Link
                               to={subItem.url}
@@ -411,7 +411,7 @@ export default function Layout({ children, currentPageName = "" }) {
                       </div>
                       {item.items
                         .filter((subItem: any) => !subItem.adminOnly || currentUser?.role === 'Admin')
-                        .map((subItem) => {
+                        .map((subItem: any) => {
                         const isActive = location.pathname.startsWith(subItem.url);
                         return (
                           <Link

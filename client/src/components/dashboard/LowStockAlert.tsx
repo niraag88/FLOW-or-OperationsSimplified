@@ -5,7 +5,7 @@ import { Link } from 'react-router-dom';
 import { createPageUrl } from '@/utils';
 import { isLowStock } from '@/utils/stockUtils';
 
-export default function LowStockAlert({ products, lowStockThreshold = 6 }) {
+export default function LowStockAlert({ products, lowStockThreshold = 6 }: any) {
   const threshold = parseInt(String(lowStockThreshold)) || 6;
   const allLowStock = (products || []).filter((p: any) => isLowStock(p.stockQuantity, threshold));
 

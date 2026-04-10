@@ -8,7 +8,7 @@ export default function PrintHeader({
   companyPhone,
   companyEmail,
   companyTrn
-}) {
+}: any) {
   return (
     <header className="flex justify-between items-start mb-10 border-b-2 border-gray-300 pb-6">
       <div>

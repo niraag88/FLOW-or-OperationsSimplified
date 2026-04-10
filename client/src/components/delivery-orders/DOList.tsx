@@ -8,12 +8,12 @@ import { Skeleton } from "@/components/ui/skeleton";
 import { format, isValid, parseISO } from "date-fns";
 import DOActionsDropdown from "./DOActionsDropdown";
 
-export default function DOList({ deliveryOrders, totalCount, loading, canEdit, currentUser, onEdit, onRefresh, onQuickView }) {
-  const getCustomerName = (doOrder) => {
+export default function DOList({ deliveryOrders, totalCount, loading, canEdit, currentUser, onEdit, onRefresh, onQuickView }: any) {
+  const getCustomerName = (doOrder: any) => {
     return doOrder.customer_name || doOrder.customerName || 'Unknown Customer';
   };
   
-  const formatDate = (dateString) => {
+  const formatDate = (dateString: any) => {
     if (!dateString) return '-';
     try {
       const date = typeof dateString === 'string' ? parseISO(dateString) : new Date(dateString);
@@ -23,7 +23,7 @@ export default function DOList({ deliveryOrders, totalCount, loading, canEdit, c
     }
   };
 
-  const getStatusColor = (status) => {
+  const getStatusColor = (status: any) => {
     switch (status?.toLowerCase()) {
       case 'draft': return 'bg-gray-100 text-gray-800';
       case 'submitted': return 'bg-blue-100 text-blue-800';
@@ -32,13 +32,13 @@ export default function DOList({ deliveryOrders, totalCount, loading, canEdit, c
     }
   };
 
-  const getStatusLabel = (status) => {
+  const getStatusLabel = (status: any) => {
     if (!status) return '';
     if (status.toLowerCase() === 'submitted') return 'SUBMITTED';
     return status.replace(/_/g, ' ').toUpperCase();
   };
 
-  const formatCurrency = (amount, currency = 'AED') => {
+  const formatCurrency = (amount: any, currency = 'AED') => {
     const formatter = new Intl.NumberFormat('en-US', {
       style: 'decimal',
       minimumFractionDigits: 2,
@@ -100,7 +100,7 @@ export default function DOList({ deliveryOrders, totalCount, loading, canEdit, c
               </TableRow>
             </TableHeader>
             <TableBody>
-              {deliveryOrders.map((doOrder) => (
+              {deliveryOrders.map((doOrder: any) => (
                 <TableRow key={doOrder.id} className="hover:bg-gray-50">
                   <TableCell className="font-medium">
                     <span className="flex items-center gap-1">

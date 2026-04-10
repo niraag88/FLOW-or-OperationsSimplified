@@ -7,8 +7,8 @@ import TotalsSummary from './shared/TotalsSummary';
 import NotesSection from './shared/NotesSection';
 import SignatureSection from './shared/SignatureSection';
 
-export default function QuotationTemplate({ data, customer, settings }) {
-  const formatDate = (dateString) => {
+export default function QuotationTemplate({ data, customer, settings }: any) {
+  const formatDate = (dateString: any) => {
     if (!dateString) return '';
     try {
       const date = typeof dateString === 'string' ? parseISO(dateString) : new Date(dateString);

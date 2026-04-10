@@ -19,7 +19,7 @@ import { exportToXLSX } from "../utils/export";
 
 const LOW_STOCK_THRESHOLD = 6;
 
-const escapeHtml = (str) => {
+const escapeHtml = (str: any) => {
   if (str == null) return '-';
   return String(str)
     .replace(/&/g, '&amp;')
@@ -29,13 +29,13 @@ const escapeHtml = (str) => {
     .replace(/'/g, '&#39;');
 };
 
-const getStatus = (qty) => {
+const getStatus = (qty: any) => {
   if (qty === 0) return 'Out of Stock';
   if (qty <= LOW_STOCK_THRESHOLD) return 'Low Stock';
   return 'In Stock';
 };
 
-export default function StockOnHandReport({ products }) {
+export default function StockOnHandReport({ products }: any) {
   const [searchTerm, setSearchTerm] = useState("");
   const [selectedBrand, setSelectedBrand] = useState<any>("all");
   const [selectedStatus, setSelectedStatus] = useState<any>("all");

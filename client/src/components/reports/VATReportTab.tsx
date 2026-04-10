@@ -29,11 +29,11 @@ import { format, startOfMonth, endOfMonth, subMonths, isValid, parseISO } from "
 import { useToast } from "@/hooks/use-toast";
 import { exportToXLSX } from "../utils/export";
 
-const fmt = (value) => new Intl.NumberFormat('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 }).format(value);
+const fmt = (value: any) => new Intl.NumberFormat('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 }).format(value);
 
 const DEFAULT_STATUSES = ['submitted', 'delivered', 'paid'];
 
-const vatLabel = (t) => {
+const vatLabel = (t: any) => {
   if (t === 'StandardRated') return 'Standard Rated';
   if (t === 'ZeroRated')    return 'Zero Rated';
   if (t === 'Exempt')       return 'Exempt';
@@ -41,7 +41,7 @@ const vatLabel = (t) => {
   return t || 'Standard Rated';
 };
 
-export default function VATReportTab({ invoices, customers, books, companySettings, currentUser, loading }) {
+export default function VATReportTab({ invoices, customers, books, companySettings, currentUser, loading }: any) {
   const allStatuses = useMemo(() => {
     const set = new Set(invoices.map((i: any) => i.status).filter(Boolean));
     ['draft', 'submitted', 'delivered', 'paid', 'cancelled'].forEach((s: any) => set.add(s));
@@ -90,12 +90,12 @@ export default function VATReportTab({ invoices, customers, books, companySettin
     localStorage.setItem('vat-report-filters-v2', JSON.stringify(filters));
   }, [filters]);
 
-  const getCustomerName = (customerId) => {
+  const getCustomerName = (customerId: any) => {
     const customer = customers.find((c: any) => c.id === customerId || c.id === Number(customerId));
     return customer?.name || customer?.customer_name || 'Unknown Customer';
   };
 
-  const isClosedPeriod = (invoiceDate) => {
+  const isClosedPeriod = (invoiceDate: any) => {
     const d = new Date(invoiceDate);
     return (books || []).some((book: any) =>
       book.status === 'Closed' &&
@@ -148,9 +148,9 @@ export default function VATReportTab({ invoices, customers, books, companySettin
     return acc;
   }, { subtotal: 0, tax: 0, total: 0 });
 
-  const handleQuickDateRange = (months) => {
+  const handleQuickDateRange = (months: any) => {
     const date = subMonths(new Date(), months);
-    setFilters(prev => ({
+    setFilters((prev: any) => ({
       ...prev,
       dateFrom: format(startOfMonth(date), 'yyyy-MM-dd'),
       dateTo: format(endOfMonth(date), 'yyyy-MM-dd')
@@ -158,8 +158,8 @@ export default function VATReportTab({ invoices, customers, books, companySettin
     setCurrentPage(1);
   };
 
-  const handleStatusToggle = (status) => {
-    setFilters(prev => ({
+  const handleStatusToggle = (status: any) => {
+    setFilters((prev: any) => ({
       ...prev,
       statuses: prev.statuses.includes(status)
         ? prev.statuses.filter((s: any) => s !== status)
@@ -168,7 +168,7 @@ export default function VATReportTab({ invoices, customers, books, companySettin
     setCurrentPage(1);
   };
 
-  const formatDate = (dateString) => {
+  const formatDate = (dateString: any) => {
     if (!dateString) return '-';
     try {
       const date = typeof dateString === 'string' ? parseISO(dateString) : new Date(dateString);
@@ -178,7 +178,7 @@ export default function VATReportTab({ invoices, customers, books, companySettin
     }
   };
 
-  const formatDateForSelect = (dateString) => {
+  const formatDateForSelect = (dateString: any) => {
     if (!dateString) return '-';
     try {
       const date = typeof dateString === 'string' ? parseISO(dateString) : new Date(dateString);
@@ -264,7 +264,7 @@ export default function VATReportTab({ invoices, customers, books, companySettin
     setTimeout(() => URL.revokeObjectURL(url), 60000);
   };
 
-  const handleCopyInvoiceLink = (invoice) => {
+  const handleCopyInvoiceLink = (invoice: any) => {
     const url = `${window.location.origin}/invoices/${invoice.id}`;
     navigator.clipboard.writeText(url);
     toast({ title: "Link copied", description: "Invoice link copied to clipboard" });
@@ -309,7 +309,7 @@ export default function VATReportTab({ invoices, customers, books, companySettin
               <Input
                 type="date"
                 value={filters.dateFrom}
-                onChange={(e) => { setFilters(prev => ({ ...prev, dateFrom: e.target.value })); setCurrentPage(1); }}
+                onChange={(e) => { setFilters((prev: any) => ({ ...prev, dateFrom: e.target.value })); setCurrentPage(1); }}
               />
             </div>
             <div className="space-y-2">
@@ -317,7 +317,7 @@ export default function VATReportTab({ invoices, customers, books, companySettin
               <Input
                 type="date"
                 value={filters.dateTo}
-                onChange={(e) => { setFilters(prev => ({ ...prev, dateTo: e.target.value })); setCurrentPage(1); }}
+                onChange={(e) => { setFilters((prev: any) => ({ ...prev, dateTo: e.target.value })); setCurrentPage(1); }}
               />
             </div>
             <div className="space-y-2">
@@ -437,7 +437,7 @@ export default function VATReportTab({ invoices, customers, books, companySettin
                       No invoices found for the selected filters
                     </TableCell>
                   </TableRow>
-                ) : paginatedInvoices.map((invoice) => {
+                ) : paginatedInvoices.map((invoice: any) => {
                   const invDate = invoice.invoice_date || invoice.invoiceDate;
                   const invNum = invoice.invoice_number || invoice.invoiceNumber;
                   const custId = invoice.customer_id ?? invoice.customerId;

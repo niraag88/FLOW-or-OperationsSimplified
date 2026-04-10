@@ -19,7 +19,7 @@ export default function ConfirmDialog({
   cancelText = "Cancel", 
   onConfirm,
   variant = "default"
-}) {
+}: any) {
   const getButtonClass = () => {
     switch (variant) {
       case "destructive":

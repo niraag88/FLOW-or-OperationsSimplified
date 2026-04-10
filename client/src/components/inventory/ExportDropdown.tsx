@@ -25,7 +25,7 @@ export default function ExportDropdown({
   selectedSizes,
   lowStockThreshold,
   fxRates,
-}) {
+}: any) {
   const [isExporting, setIsExporting] = useState(false);
 
   // Fetch ALL matching products from the server (respects active filters, ignores pagination)
@@ -40,8 +40,8 @@ export default function ExportDropdown({
     return Array.isArray(result) ? result : (result.data || []);
   };
 
-  const buildProductRows = (list) =>
-    list.map((p) => ({
+  const buildProductRows = (list: any) =>
+    list.map((p: any) => ({
       Brand: p.brandName || "-",
       "Product Code": p.sku || "-",
       "Product Name": p.name || "-",
@@ -66,11 +66,11 @@ export default function ExportDropdown({
     return pw;
   };
 
-  const writePrintContent = (pw, subtitle, headers, rows, total) => {
+  const writePrintContent = (pw: any, subtitle: any, headers: any, rows: any, total: any) => {
     const now = format(new Date(), "dd/MM/yy");
-    const headerCells = headers.map((h) => `<th>${h}</th>`).join("");
+    const headerCells = headers.map((h: any) => `<th>${h}</th>`).join("");
     const bodyRows = rows
-      .map((row) => `<tr>${headers.map((h) => `<td>${String(row[h] ?? "-")}</td>`).join("")}</tr>`)
+      .map((row: any) => `<tr>${headers.map((h: any) => `<td>${String(row[h] ?? "-")}</td>`).join("")}</tr>`)
       .join("");
 
     pw.document.open();
@@ -108,7 +108,7 @@ export default function ExportDropdown({
     pw.document.close();
   };
 
-  const exportProducts = async (exportFmt) => {
+  const exportProducts = async (exportFmt: any) => {
     // For print: open window immediately in the user-gesture context BEFORE any async work
     const pw = exportFmt === "pdf" ? openPrintWindow() : null;
     if (exportFmt === "pdf" && !pw) return;
@@ -133,7 +133,7 @@ export default function ExportDropdown({
     }
   };
 
-  const getFxRate = (currency) => {
+  const getFxRate = (currency: any) => {
     const c = String(currency || "GBP").toUpperCase();
     if (c === "AED") return 1.0;
     if (c === "USD") return fxRates?.usdToAed ?? 3.6725;
@@ -141,34 +141,34 @@ export default function ExportDropdown({
     return fxRates?.gbpToAed ?? 4.85;
   };
 
-  const formatOrigCost = (costPrice, currency) => {
+  const formatOrigCost = (costPrice: any, currency: any) => {
     const cost = parseFloat(costPrice) || 0;
     const curr = String(currency || "GBP").toUpperCase();
     return `${curr} ${cost.toFixed(2)}`;
   };
 
-  const formatAedCost = (costPrice, currency) => {
+  const formatAedCost = (costPrice: any, currency: any) => {
     const cost = parseFloat(costPrice) || 0;
     const rate = getFxRate(currency);
     return `AED ${(cost * rate).toFixed(2)}`;
   };
 
-  const formatOrigStockValue = (stock, costPrice, currency) => {
+  const formatOrigStockValue = (stock: any, costPrice: any, currency: any) => {
     const qty = stock || 0;
     const cost = parseFloat(costPrice) || 0;
     const curr = String(currency || "GBP").toUpperCase();
     return `${curr} ${(qty * cost).toFixed(2)}`;
   };
 
-  const formatAedStockValue = (stock, costPrice, currency) => {
+  const formatAedStockValue = (stock: any, costPrice: any, currency: any) => {
     const qty = stock || 0;
     const cost = parseFloat(costPrice) || 0;
     const rate = getFxRate(currency);
     return `AED ${(qty * cost * rate).toFixed(2)}`;
   };
 
-  const buildCurrentStockRows = (list) =>
-    list.map((p) => {
+  const buildCurrentStockRows = (list: any) =>
+    list.map((p: any) => {
       const stock = p.stockQuantity || 0;
       const threshold = lowStockThreshold || 6;
       const status = stock === 0 ? "Out of Stock" : stock <= threshold ? "Low Stock" : "In Stock";
@@ -186,7 +186,7 @@ export default function ExportDropdown({
       };
     });
 
-  const exportCurrentStock = async (exportFmt) => {
+  const exportCurrentStock = async (exportFmt: any) => {
     const pw = exportFmt === "pdf" ? openPrintWindow() : null;
     if (exportFmt === "pdf" && !pw) return;
 
@@ -211,8 +211,8 @@ export default function ExportDropdown({
     }
   };
 
-  const buildMovementRows = (list) =>
-    list.map((m) => ({
+  const buildMovementRows = (list: any) =>
+    list.map((m: any) => ({
       Date: format(new Date(m.createdAt), "dd/MM/yy"),
       "Product Code": m.productSku,
       "Product Name": m.productName,
@@ -224,7 +224,7 @@ export default function ExportDropdown({
       Notes: m.notes || "",
     }));
 
-  const exportStockMovements = async (exportFmt) => {
+  const exportStockMovements = async (exportFmt: any) => {
     const pw = exportFmt === "pdf" ? openPrintWindow() : null;
     if (exportFmt === "pdf" && !pw) return;
 
@@ -248,8 +248,8 @@ export default function ExportDropdown({
     }
   };
 
-  const buildLowStockRows = (list) =>
-    list.map((p) => ({
+  const buildLowStockRows = (list: any) =>
+    list.map((p: any) => ({
       "Product Code": p.sku,
       "Product Name": p.name,
       "Current Stock": p.stockQuantity || 0,
@@ -259,7 +259,7 @@ export default function ExportDropdown({
       "Stock Value (AED)": formatAedStockValue(p.stockQuantity, p.costPrice, p.costPriceCurrency),
     }));
 
-  const exportLowStock = async (exportFmt) => {
+  const exportLowStock = async (exportFmt: any) => {
     const pw = exportFmt === "pdf" ? openPrintWindow() : null;
     if (exportFmt === "pdf" && !pw) return;
 
@@ -282,8 +282,8 @@ export default function ExportDropdown({
     }
   };
 
-  const buildOutOfStockRows = (list) =>
-    list.map((p) => ({
+  const buildOutOfStockRows = (list: any) =>
+    list.map((p: any) => ({
       "Product Code": p.sku,
       "Product Name": p.name,
       Brand: p.brandName || "",
@@ -292,7 +292,7 @@ export default function ExportDropdown({
       Status: "Out of Stock",
     }));
 
-  const exportOutOfStock = async (exportFmt) => {
+  const exportOutOfStock = async (exportFmt: any) => {
     const pw = exportFmt === "pdf" ? openPrintWindow() : null;
     if (exportFmt === "pdf" && !pw) return;
 

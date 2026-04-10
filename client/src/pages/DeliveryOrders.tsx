@@ -82,7 +82,7 @@ export default function DeliveryOrders() {
       if (selectedCustomers.length) params.set('customerId', selectedCustomers.join(','));
       if (selectedTaxTreatments.length) params.set('taxTreatment', selectedTaxTreatments.join(','));
       const today = new Date();
-      const toStr = (d) => d.toISOString().split('T')[0];
+      const toStr = (d: any) => d.toISOString().split('T')[0];
       if (dateRange && dateRange !== 'all') {
         if (dateRange === 'today') { const d = toStr(today); params.set('dateFrom', d); params.set('dateTo', d); }
         else if (dateRange === 'week') { const s = new Date(today); s.setDate(today.getDate() - today.getDay()); s.setHours(0,0,0,0); params.set('dateFrom', toStr(s)); }
@@ -118,7 +118,7 @@ export default function DeliveryOrders() {
     setShowDOForm(true);
   };
 
-  const handleEditDO = (doOrder) => {
+  const handleEditDO = (doOrder: any) => {
     setEditingDO(doOrder);
     setShowDOForm(true);
   };
@@ -128,7 +128,7 @@ export default function DeliveryOrders() {
     setEditingDO(null);
   };
 
-  const handleDocumentSelect = async (document, documentType) => {
+  const handleDocumentSelect = async (document: any, documentType: any) => {
     if (documentType !== 'quotation') return;
 
     // Fetch the full quotation with line items, and the live customer list in parallel
@@ -206,7 +206,7 @@ export default function DeliveryOrders() {
     const closedYears = financialYears.filter((y: any) => y.status === 'Closed');
     if (closedYears.length > 0) params.set('excludeYears', closedYears.map((cy: any) => `${cy.startDate},${cy.endDate}`).join(';'));
     const today = new Date();
-    const toStr = (d) => d.toISOString().split('T')[0];
+    const toStr = (d: any) => d.toISOString().split('T')[0];
     if (dateRange && dateRange !== 'all') {
       if (dateRange === 'today') { const d = toStr(today); params.set('dateFrom', d); params.set('dateTo', d); }
       else if (dateRange === 'week') { const s = new Date(today); s.setDate(today.getDate() - today.getDay()); s.setHours(0,0,0,0); params.set('dateFrom', toStr(s)); }
@@ -239,12 +239,12 @@ export default function DeliveryOrders() {
             columns={{
               do_number: 'DO Number',
               customer_name: 'Customer',
-              order_date: { label: 'Order Date', transform: (date) => date ? format(new Date(date), 'dd/MM/yy') : '' },
+              order_date: { label: 'Order Date', transform: (date: any) => date ? format(new Date(date), 'dd/MM/yy') : '' },
               reference: 'Reference',
-              status: { label: 'Status', transform: (val) => val?.toLowerCase() === 'submitted' ? 'Submitted' : val ? val.charAt(0).toUpperCase() + val.slice(1) : '' },
-              subtotal: { label: 'Subtotal (AED)', transform: (val) => `${val || 0}` },
-              tax_amount: { label: 'VAT (AED)', transform: (val) => `${val || 0}` },
-              total_amount: { label: 'Total (AED)', transform: (val) => `${val || 0}` }
+              status: { label: 'Status', transform: (val: any) => val?.toLowerCase() === 'submitted' ? 'Submitted' : val ? val.charAt(0).toUpperCase() + val.slice(1) : '' },
+              subtotal: { label: 'Subtotal (AED)', transform: (val: any) => `${val || 0}` },
+              tax_amount: { label: 'VAT (AED)', transform: (val: any) => `${val || 0}` },
+              total_amount: { label: 'Total (AED)', transform: (val: any) => `${val || 0}` }
             }}
             isLoading={loading}
           />
@@ -305,7 +305,7 @@ export default function DeliveryOrders() {
         currentUser={currentUser}
         onEdit={handleEditDO}
         onRefresh={handleRefresh}
-        onQuickView={(id) => setQuickViewDoId(id)}
+        onQuickView={(id: any) => setQuickViewDoId(id)}
       />
 
       {/* Pagination Controls */}
@@ -396,7 +396,7 @@ export default function DeliveryOrders() {
         open={!!quickViewDoId}
         onClose={() => setQuickViewDoId(null)}
         canEdit={canEdit}
-        onEdit={(doData) => {
+        onEdit={(doData: any) => {
           setQuickViewDoId(null);
           handleEditDO(doData);
         }}

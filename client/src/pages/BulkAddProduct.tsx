@@ -34,7 +34,7 @@ const HEADERS = [
 const SKU_REGEX = /^[A-Za-z0-9]{1,50}$/;
 const STALE_3MIN = 3 * 60 * 1000;
 
-function parseSheet(workbook) {
+function parseSheet(workbook: any) {
   const sheetName = workbook.SheetNames.find((n: any) => n === 'Products') || workbook.SheetNames.find((n: any) => !n.startsWith('_')) || workbook.SheetNames[0];
   const sheet = workbook.Sheets[sheetName];
   const raw = XLSX.utils.sheet_to_json(sheet, { header: 1, defval: "" });
@@ -59,9 +59,9 @@ function parseSheet(workbook) {
   return rows;
 }
 
-function validateRows(rows, brandsSet) {
+function validateRows(rows: any, brandsSet: any) {
   const seenCodes = new Set();
-  return rows.map((row) => {
+  return rows.map((row: any) => {
     const errors: any[] = [];
 
     if (!row.brandName) errors.push("Brand name is required");
@@ -137,7 +137,7 @@ export default function BulkAddProduct() {
   }, [toast]);
 
   const processFile = useCallback(
-    (file) => {
+    (file: any) => {
       if (!file) return;
       setFileName(file.name);
       setResult(null);
@@ -163,26 +163,26 @@ export default function BulkAddProduct() {
     [brandsSet, toast]
   );
 
-  const handleFileChange = (e) => {
+  const handleFileChange = (e: any) => {
     processFile(e.target.files?.[0]);
     e.target.value = "";
   };
 
-  const handleDrop = (e) => {
+  const handleDrop = (e: any) => {
     e.preventDefault();
     setIsDragging(false);
     const file = e.dataTransfer.files?.[0];
     if (file) processFile(file);
   };
 
-  const validRows = parsedRows?.filter((r) => r.valid) || [];
-  const invalidRows = parsedRows?.filter((r) => !r.valid) || [];
+  const validRows = parsedRows?.filter((r: any) => r.valid) || [];
+  const invalidRows = parsedRows?.filter((r: any) => !r.valid) || [];
 
   const handleImport = async () => {
     if (validRows.length === 0) return;
     setImporting(true);
     try {
-      const payload = validRows.map((r) => ({
+      const payload = validRows.map((r: any) => ({
         brandName: r.brandName,
         productCode: r.productCode,
         productName: r.productName,
@@ -298,7 +298,7 @@ export default function BulkAddProduct() {
               <>
                 <span className="text-amber-700 ml-2">{result.failed} row{result.failed !== 1 ? "s" : ""} had errors.</span>
                 <ul className="mt-2 space-y-1">
-                  {result.errors.map((e, idx) => (
+                  {result.errors.map((e: any, idx: any) => (
                     <li key={idx} className="text-xs text-red-600">
                       Row {e.row} ({e.sku || "no code"}): {e.message}
                     </li>
@@ -364,7 +364,7 @@ export default function BulkAddProduct() {
                 </tr>
               </thead>
               <tbody className="divide-y">
-                {parsedRows.map((row, idx) => (
+                {parsedRows.map((row: any, idx: any) => (
                   <tr
                     key={idx}
                     className={row.valid ? "bg-green-50/40" : "bg-red-50/60"}
@@ -380,7 +380,7 @@ export default function BulkAddProduct() {
                           </TooltipTrigger>
                           <TooltipContent side="right" className="max-w-xs">
                             <ul className="space-y-1">
-                              {row.errors.map((err, ei) => (
+                              {row.errors.map((err: any, ei: any) => (
                                 <li key={ei} className="text-xs">• {err}</li>
                               ))}
                             </ul>

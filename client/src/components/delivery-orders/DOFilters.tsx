@@ -10,7 +10,7 @@ import { Badge } from "@/components/ui/badge";
 import { format } from "date-fns";
 import { cn } from "@/lib/utils";
 
-export default function DOFilters({ selectedStatuses, setSelectedStatuses, selectedCustomers, setSelectedCustomers, selectedTaxTreatments, setSelectedTaxTreatments, dateRange, setDateRange, resetPagination, customers = [] as any[] }) {
+export default function DOFilters({ selectedStatuses, setSelectedStatuses, selectedCustomers, setSelectedCustomers, selectedTaxTreatments, setSelectedTaxTreatments, dateRange, setDateRange, resetPagination, customers = [] as any[] }: any) {
   const [dateRangeOpen, setDateRangeOpen] = useState(false);
   const [customStartDate, setCustomStartDate] = useState<any>(null);
   const [customEndDate, setCustomEndDate] = useState<any>(null);
@@ -39,7 +39,7 @@ export default function DOFilters({ selectedStatuses, setSelectedStatuses, selec
     { value: 'ZeroRated', label: 'Zero Rated (0%)' },
   ];
 
-  const handleDateRangeChange = (value) => {
+  const handleDateRangeChange = (value: any) => {
     if (value !== 'custom') {
       setCustomStartDate(null);
       setCustomEndDate(null);
@@ -91,9 +91,9 @@ export default function DOFilters({ selectedStatuses, setSelectedStatuses, selec
                       checked={selectedStatuses.includes(value)}
                       onCheckedChange={(checked) => {
                         if (checked) {
-                          setSelectedStatuses(prev => [...prev, value]);
+                          setSelectedStatuses((prev: any) => [...prev, value]);
                         } else {
-                          setSelectedStatuses(prev => prev.filter((s: any) => s !== value));
+                          setSelectedStatuses((prev: any) => prev.filter((s: any) => s !== value));
                         }
                         resetPagination();
                       }}
@@ -130,9 +130,9 @@ export default function DOFilters({ selectedStatuses, setSelectedStatuses, selec
                       checked={selectedCustomers.includes(customer.id)}
                       onCheckedChange={(checked) => {
                         if (checked) {
-                          setSelectedCustomers(prev => [...prev, customer.id]);
+                          setSelectedCustomers((prev: any) => [...prev, customer.id]);
                         } else {
-                          setSelectedCustomers(prev => prev.filter((id: any) => id !== customer.id));
+                          setSelectedCustomers((prev: any) => prev.filter((id: any) => id !== customer.id));
                         }
                         resetPagination();
                       }}
@@ -169,9 +169,9 @@ export default function DOFilters({ selectedStatuses, setSelectedStatuses, selec
                       checked={selectedTaxTreatments.includes(value)}
                       onCheckedChange={(checked) => {
                         if (checked) {
-                          setSelectedTaxTreatments(prev => [...prev, value]);
+                          setSelectedTaxTreatments((prev: any) => [...prev, value]);
                         } else {
-                          setSelectedTaxTreatments(prev => prev.filter((t: any) => t !== value));
+                          setSelectedTaxTreatments((prev: any) => prev.filter((t: any) => t !== value));
                         }
                         resetPagination();
                       }}
@@ -275,7 +275,7 @@ export default function DOFilters({ selectedStatuses, setSelectedStatuses, selec
                 <X 
                   className="h-3 w-3 cursor-pointer" 
                   onClick={() => {
-                    setSelectedStatuses(prev => prev.filter((s: any) => s !== status));
+                    setSelectedStatuses((prev: any) => prev.filter((s: any) => s !== status));
                     resetPagination();
                   }}
                 />
@@ -290,7 +290,7 @@ export default function DOFilters({ selectedStatuses, setSelectedStatuses, selec
                 <X 
                   className="h-3 w-3 cursor-pointer" 
                   onClick={() => {
-                    setSelectedCustomers(prev => prev.filter((id: any) => id !== customerId));
+                    setSelectedCustomers((prev: any) => prev.filter((id: any) => id !== customerId));
                     resetPagination();
                   }}
                 />
@@ -305,7 +305,7 @@ export default function DOFilters({ selectedStatuses, setSelectedStatuses, selec
                 <X 
                   className="h-3 w-3 cursor-pointer" 
                   onClick={() => {
-                    setSelectedTaxTreatments(prev => prev.filter((t: any) => t !== treatment));
+                    setSelectedTaxTreatments((prev: any) => prev.filter((t: any) => t !== treatment));
                     resetPagination();
                   }}
                 />

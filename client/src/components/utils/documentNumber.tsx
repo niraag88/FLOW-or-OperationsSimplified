@@ -1,6 +1,6 @@
 import { CompanySettings } from "@/api/entities";
 
-export const generateDocumentNumber = async (type) => {
+export const generateDocumentNumber = async (type: any) => {
   try {
     const settingsList = await CompanySettings.list();
     let settings: any = settingsList[0];

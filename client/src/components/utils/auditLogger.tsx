@@ -1,7 +1,7 @@
 
 import { AuditLog } from "@/api/entities";
 
-export const logAuditAction = async (entityType, entityId, action, userEmail, changes = {}, metadata = {}) => {
+export const logAuditAction = async (entityType: any, entityId: any, action: any, userEmail: any, changes = {}, metadata = {}) => {
   try {
     await AuditLog.create({
       entity_type: entityType,
@@ -17,7 +17,7 @@ export const logAuditAction = async (entityType, entityId, action, userEmail, ch
   }
 };
 
-export const logStatusChange = async (entityType, entityId, userEmail, oldStatus, newStatus, additionalChanges = {}) => {
+export const logStatusChange = async (entityType: any, entityId: any, userEmail: any, oldStatus: any, newStatus: any, additionalChanges = {}) => {
   const changes = {
     status: {
       from: oldStatus,
@@ -29,7 +29,7 @@ export const logStatusChange = async (entityType, entityId, userEmail, oldStatus
   await logAuditAction(entityType, entityId, 'status_change', userEmail, changes);
 };
 
-export const logQuantityChange = async (entityType, entityId, userEmail, productId, oldQty, newQty, reason) => {
+export const logQuantityChange = async (entityType: any, entityId: any, userEmail: any, productId: any, oldQty: any, newQty: any, reason: any) => {
   const changes = {
     product_id: productId,
     quantity: {

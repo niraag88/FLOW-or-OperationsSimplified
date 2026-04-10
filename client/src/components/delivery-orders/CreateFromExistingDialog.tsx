@@ -14,7 +14,7 @@ import { Customer } from '@/api/entities';
 import { Quotation } from '@/api/entities';
 import { useToast } from '@/hooks/use-toast';
 
-export default function CreateFromExistingDialog({ open, onClose, onDocumentSelected }) {
+export default function CreateFromExistingDialog({ open, onClose, onDocumentSelected }: any) {
   const [loading, setLoading] = useState(false);
   const [submittedQuotations, setSubmittedQuotations] = useState<any[]>([]);
   const [selectedQuotationId, setSelectedQuotationId] = useState('');

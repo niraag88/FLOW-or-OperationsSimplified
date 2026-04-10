@@ -3,12 +3,12 @@ import jsPDF from 'jspdf';
 import autoTable from 'jspdf-autotable';
 import { format } from 'date-fns';
 
-const fmtShort = (dateStr) => {
+const fmtShort = (dateStr: any) => {
   if (!dateStr) return '';
   try { return format(new Date(dateStr), 'dd/MM/yy'); } catch { return ''; }
 };
 
-export const exportToCsv = (data, filename) => {
+export const exportToCsv = (data: any, filename: any) => {
   if (!data || data.length === 0) {
     console.error("No data to export.");
     return;
@@ -43,7 +43,7 @@ export const exportToCsv = (data, filename) => {
   }
 };
 
-export const exportToXLSX = (data, filename, sheetName = 'Sheet1') => {
+export const exportToXLSX = (data: any, filename: any, sheetName = 'Sheet1') => {
   if (!data || data.length === 0) {
     console.error("No data to export.");
     return;
@@ -60,7 +60,7 @@ export const exportToXLSX = (data, filename, sheetName = 'Sheet1') => {
   XLSX.writeFile(workbook, `${filename}.xlsx`);
 };
 
-export const exportToPDF = (data, filename, title = 'Export', columns = null) => {
+export const exportToPDF = (data: any, filename: any, title = 'Export', columns = null) => {
   if (!data || data.length === 0) {
     console.error("No data to export.");
     return;
@@ -118,7 +118,7 @@ export const exportToPDF = (data, filename, title = 'Export', columns = null) =>
   }
 };
 
-export const exportQuotationToXLSX = async (quotation) => {
+export const exportQuotationToXLSX = async (quotation: any) => {
   if (!quotation) {
     console.error("No quotation data to export.");
     return;
@@ -337,7 +337,7 @@ export const exportQuotationToXLSX = async (quotation) => {
   }
 };
 
-export const exportInvoiceToXLSX = async (invoice) => {
+export const exportInvoiceToXLSX = async (invoice: any) => {
   if (!invoice) {
     console.error("No invoice data to export.");
     return;
@@ -428,7 +428,7 @@ export const exportInvoiceToXLSX = async (invoice) => {
   }
 };
 
-export const exportDeliveryOrderToXLSX = async (deliveryOrder) => {
+export const exportDeliveryOrderToXLSX = async (deliveryOrder: any) => {
   if (!deliveryOrder) {
     console.error("No delivery order data to export.");
     return;
@@ -521,7 +521,7 @@ export const exportDeliveryOrderToXLSX = async (deliveryOrder) => {
   }
 };
 
-export const exportPurchaseOrderToPDF = async (purchaseOrder) => {
+export const exportPurchaseOrderToPDF = async (purchaseOrder: any) => {
   try {
     // Get company settings dynamically
     let companyInfo = {
@@ -693,7 +693,7 @@ export const exportPurchaseOrderToPDF = async (purchaseOrder) => {
         4: { cellWidth: 22, halign: 'right' }, // Unit Price
         5: { cellWidth: 22, halign: 'right' }  // Line Total
       },
-      drawHorizontalLine: (lineIndex, startX, endX, startY, endY, doc) => {
+      drawHorizontalLine: (lineIndex: any, startX: any, endX: any, startY: any, endY: any, doc: any) => {
         // Draw top border, header separator, and bottom border only
         return lineIndex === 0 || lineIndex === 1 || lineIndex === tableData.length + 1;
       },
@@ -744,15 +744,15 @@ export const exportPurchaseOrderToPDF = async (purchaseOrder) => {
 // ─── Shared PO GRN Summary utilities ─────────────────────────────────────────
 // Used by both GoodsReceiptsTab and POActionsDropdown to avoid duplication.
 
-export const printPOGRNSummary = async (poId) => {
+export const printPOGRNSummary = async (poId: any) => {
   const res = await fetch(`/api/purchase-orders/${poId}/detail`, { credentials: 'include' });
   if (!res.ok) throw new Error('Failed to load PO detail');
   const d = await res.json();
   const currency = d.currency || 'GBP';
-  const fmt = (n) => `${currency} ${parseFloat(n || 0).toFixed(2)}`;
-  const fmtDate = (s) => fmtShort(s) || '—';
+  const fmt = (n: any) => `${currency} ${parseFloat(n || 0).toFixed(2)}`;
+  const fmtDate = (s: any) => fmtShort(s) || '—';
 
-  const productCell = (name, size, sku) =>
+  const productCell = (name: any, size: any, sku: any) =>
     `${name || '—'}${size ? `<br/><span class="size-text">${size}</span>` : ''}${sku ? `<br/><span class="sku">${sku}</span>` : ''}`;
 
   const orderedRows = (d.items || []).map((item: any) => `
@@ -921,7 +921,7 @@ export const printPOGRNSummary = async (poId) => {
   printWindow?.document.close();
 };
 
-export const exportPODetailToXLSX = async (poId, poNumber) => {
+export const exportPODetailToXLSX = async (poId: any, poNumber: any) => {
   const res = await fetch(`/api/purchase-orders/${poId}/detail`, { credentials: 'include' });
   if (!res.ok) throw new Error('Failed to load PO detail');
   const d = await res.json();
@@ -932,8 +932,8 @@ export const exportPODetailToXLSX = async (poId, poNumber) => {
     company = companyRes.ok ? await companyRes.json() : null;
   }
   const currency = d.currency || 'GBP';
-  const fmtDate = (s) => fmtShort(s);
-  const fmtNum = (n) => parseFloat(n || 0).toFixed(2);
+  const fmtDate = (s: any) => fmtShort(s);
+  const fmtNum = (n: any) => parseFloat(n || 0).toFixed(2);
 
   const rows: any[] = [];
 
@@ -976,10 +976,10 @@ export const exportPODetailToXLSX = async (poId, poNumber) => {
 
     for (const grn of d.grns.filter((g: any) => g.items && g.items.length > 0)) {
       const grnShort = grn.items.some(
-        i => (parseInt(i.receivedQuantity) || 0) < (parseInt(i.orderedQuantity) || 0)
+        (i: any) => (parseInt(i.receivedQuantity) || 0) < (parseInt(i.orderedQuantity) || 0)
       );
       const grnTotal = grn.items.reduce(
-        (s, i) => s + (parseFloat(i.receivedQuantity) || 0) * (parseFloat(i.unitPrice) || 0), 0
+        (s: any, i: any) => s + (parseFloat(i.receivedQuantity) || 0) * (parseFloat(i.unitPrice) || 0), 0
       );
       rows.push([]);
       rows.push([
@@ -1031,9 +1031,9 @@ export const exportPODetailToXLSX = async (poId, poNumber) => {
 
 /* ── Statement of Account XLSX export ──────────────────────────────────── */
 
-export const exportStatementToXLSX = ({ type, entity, companySettings, records, dateFrom, dateTo, statusFilter }) => {
-  const fmtAmt = (v) => new Intl.NumberFormat("en-US", { minimumFractionDigits: 2, maximumFractionDigits: 2 }).format(v || 0);
-  const fmtD   = (val) => {
+export const exportStatementToXLSX = ({ type, entity, companySettings, records, dateFrom, dateTo, statusFilter }: any) => {
+  const fmtAmt = (v: any) => new Intl.NumberFormat("en-US", { minimumFractionDigits: 2, maximumFractionDigits: 2 }).format(v || 0);
+  const fmtD   = (val: any) => {
     if (!val) return "—";
     try {
       const d = new Date(val);
@@ -1057,13 +1057,13 @@ export const exportStatementToXLSX = ({ type, entity, companySettings, records, 
   const today       = format(new Date(), "dd/MM/yy");
 
   const totalAed = records.reduce((s: any, r: any) => s + (r._aed || 0), 0);
-  const paidAed  = records.filter((r) => r._paymentStatus === "paid").reduce((s: any, r: any) => s + (r._aed || 0), 0);
-  const outAed   = records.filter((r) => r._paymentStatus !== "paid").reduce((s: any, r: any) => s + (r._aed || 0), 0);
-  const origCurrency = records.find((r) => r._currency && r._currency !== "AED")?._currency || null;
+  const paidAed  = records.filter((r: any) => r._paymentStatus === "paid").reduce((s: any, r: any) => s + (r._aed || 0), 0);
+  const outAed   = records.filter((r: any) => r._paymentStatus !== "paid").reduce((s: any, r: any) => s + (r._aed || 0), 0);
+  const origCurrency = records.find((r: any) => r._currency && r._currency !== "AED")?._currency || null;
   const showDual = Boolean(origCurrency);
   const totalOrig = showDual ? records.reduce((s: any, r: any) => s + (r._origAmount || r._aed || 0), 0) : 0;
-  const paidOrig  = showDual ? records.filter((r) => r._paymentStatus === "paid").reduce((s: any, r: any) => s + (r._origAmount || r._aed || 0), 0) : 0;
-  const outOrig   = showDual ? records.filter((r) => r._paymentStatus !== "paid").reduce((s: any, r: any) => s + (r._origAmount || r._aed || 0), 0) : 0;
+  const paidOrig  = showDual ? records.filter((r: any) => r._paymentStatus === "paid").reduce((s: any, r: any) => s + (r._origAmount || r._aed || 0), 0) : 0;
+  const outOrig   = showDual ? records.filter((r: any) => r._paymentStatus !== "paid").reduce((s: any, r: any) => s + (r._origAmount || r._aed || 0), 0) : 0;
 
   const rows: any[] = [];
 
@@ -1075,8 +1075,8 @@ export const exportStatementToXLSX = ({ type, entity, companySettings, records, 
   rows.push([fromLabel, "", "", "", "", toLabel]);
   rows.push([companySettings?.companyName || "", "", "", "", "", entityName]);
 
-  const companyAddressLines = (companySettings?.address || "").split("\n").map((l) => l.trim()).filter(Boolean);
-  const entityAddressLines  = entityAddress.split("\n").map((l) => l.trim()).filter(Boolean);
+  const companyAddressLines = (companySettings?.address || "").split("\n").map((l: any) => l.trim()).filter(Boolean);
+  const entityAddressLines  = entityAddress.split("\n").map((l: any) => l.trim()).filter(Boolean);
 
   const maxLines = Math.max(companyAddressLines.length, entityAddressLines.length);
   for (let i = 0; i < maxLines; i++) {
@@ -1111,7 +1111,7 @@ export const exportStatementToXLSX = ({ type, entity, companySettings, records, 
 
   if (type === "invoices") {
     rows.push(["#", "Invoice #", "Date", "Subtotal (AED)", "VAT (AED)", "Total (AED)", "Status", "Received"]);
-    records.forEach((r, i) => {
+    records.forEach((r: any, i: any) => {
       rows.push([
         i + 1,
         r._ref,
@@ -1125,7 +1125,7 @@ export const exportStatementToXLSX = ({ type, entity, companySettings, records, 
     });
   } else {
     rows.push(["#", "PO #", "Date", "Amount", "Amount (AED)", "Status", "Payment Date"]);
-    records.forEach((r, i) => {
+    records.forEach((r: any, i: any) => {
       rows.push([
         i + 1,
         r._ref,
@@ -1141,7 +1141,7 @@ export const exportStatementToXLSX = ({ type, entity, companySettings, records, 
   rows.push([]);
 
   const colCount = type === "invoices" ? 8 : 7;
-  const pad = (n) => Array(n).fill("");
+  const pad = (n: any) => Array(n).fill("");
 
   if (showDual) {
     rows.push([...pad(colCount - 3), "Outstanding:", `${origCurrency} ${fmtAmt(outOrig)}`, `AED ${fmtAmt(outAed)}`]);

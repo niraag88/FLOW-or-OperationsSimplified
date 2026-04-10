@@ -12,7 +12,7 @@ import { useToast } from "@/hooks/use-toast";
 import { Customer } from "@/api/entities";
 import SimpleConfirmDialog from "../common/SimpleConfirmDialog";
 
-export default function CustomerActionsDropdown({ customer, onEdit, onRefresh }) {
+export default function CustomerActionsDropdown({ customer, onEdit, onRefresh }: any) {
   const { toast } = useToast();
   const [showDeleteDialog, setShowDeleteDialog] = useState(false);
 

@@ -1,7 +1,7 @@
 import React, { useEffect } from 'react';
 import { format } from 'date-fns';
 
-export default function ProductsPrintView({ products, onClose }) {
+export default function ProductsPrintView({ products, onClose }: any) {
   useEffect(() => {
     // Trigger print dialog when component mounts
     const timer = setTimeout(() => {
@@ -48,7 +48,7 @@ export default function ProductsPrintView({ products, onClose }) {
         </thead>
         <tbody>
           {products && products.length > 0 ? (
-            products.map((product) => (
+            products.map((product: any) => (
               <tr key={product.id}>
                 <td>{product.brandName || '-'}</td>
                 <td>{product.sku}</td>

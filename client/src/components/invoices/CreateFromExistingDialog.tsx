@@ -20,7 +20,7 @@ import { Quotation } from '@/api/entities';
 import { DeliveryOrder } from '@/api/entities';
 import { useToast } from '@/hooks/use-toast';
 
-export default function CreateFromExistingDialog({ open, onClose, onDocumentSelected }) {
+export default function CreateFromExistingDialog({ open, onClose, onDocumentSelected }: any) {
   const [loading, setLoading] = useState(false);
   const [activeTab, setActiveTab] = useState('quotation');
   const [enrichedQuotations, setEnrichedQuotations] = useState<any[]>([]);
@@ -133,7 +133,7 @@ export default function CreateFromExistingDialog({ open, onClose, onDocumentSele
     }
   };
 
-  const handleDoItemQtyChange = (idx, value) => {
+  const handleDoItemQtyChange = (idx: any, value: any) => {
     setDoItems(prev => prev.map((item, i) => {
       if (i !== idx) return item;
       const parsed = parseInt(value, 10);

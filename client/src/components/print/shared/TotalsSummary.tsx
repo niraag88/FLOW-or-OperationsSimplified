@@ -5,7 +5,7 @@ export default function TotalsSummary({
   currency = 'AED',
   showTax = false,
   taxLabel = 'Tax'
-}) {
+}: any) {
   return (
     <section className="flex justify-end mb-8">
       <div className="w-full md:w-1/2">

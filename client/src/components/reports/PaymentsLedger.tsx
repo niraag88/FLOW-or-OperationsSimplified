@@ -10,9 +10,9 @@ import { ChevronDown, ChevronRight, CreditCard, TrendingUp, TrendingDown, Search
 import ExportDropdown from "../common/ExportDropdown";
 import { getRateToAed } from "@/utils/currency";
 
-const fmt = (v) => new Intl.NumberFormat("en-US", { minimumFractionDigits: 2, maximumFractionDigits: 2 }).format(v);
+const fmt = (v: any) => new Intl.NumberFormat("en-US", { minimumFractionDigits: 2, maximumFractionDigits: 2 }).format(v);
 
-function fmtDate(val) {
+function fmtDate(val: any) {
   if (!val) return "—";
   try {
     const d = new Date(val);
@@ -23,14 +23,14 @@ function fmtDate(val) {
   }
 }
 
-function PaymentStatusBadge({ status }) {
+function PaymentStatusBadge({ status }: any) {
   if (status === "paid") {
     return <Badge className="bg-green-100 text-green-800 border-green-300 font-medium text-xs">Paid</Badge>;
   }
   return <Badge className="bg-amber-100 text-amber-800 border-amber-300 font-medium text-xs">Outstanding</Badge>;
 }
 
-function SummaryTiles({ records, label }) {
+function SummaryTiles({ records, label }: any) {
   const totals = useMemo(() => {
     const byCurrency: Record<string, any> = {};
     let totalAed = 0;
@@ -39,7 +39,7 @@ function SummaryTiles({ records, label }) {
     let outstandingCount = 0;
     let outstandingAed = 0;
 
-    records.forEach((r) => {
+    records.forEach((r: any) => {
       const amt = r._aed;
       const cur = r._currency || "AED";
       const origAmt = r._origAmount;
@@ -111,7 +111,7 @@ function SummaryTiles({ records, label }) {
   );
 }
 
-function CollapsibleSection({ title, icon: Icon, iconColor, children, defaultOpen = false }) {
+function CollapsibleSection({ title, icon: Icon, iconColor, children, defaultOpen = false }: any) {
   const [open, setOpen] = useState(defaultOpen);
 
   return (
@@ -141,7 +141,7 @@ function CollapsibleSection({ title, icon: Icon, iconColor, children, defaultOpe
   );
 }
 
-function LedgerFilters({ paymentFilter, setPaymentFilter, dateFrom, setDateFrom, dateTo, setDateTo, search, setSearch, searchPlaceholder }) {
+function LedgerFilters({ paymentFilter, setPaymentFilter, dateFrom, setDateFrom, dateTo, setDateTo, search, setSearch, searchPlaceholder }: any) {
   return (
     <div className="flex flex-wrap gap-3 flex-1">
       <Select value={paymentFilter} onValueChange={setPaymentFilter}>
@@ -198,14 +198,14 @@ function LedgerFilters({ paymentFilter, setPaymentFilter, dateFrom, setDateFrom,
   );
 }
 
-function SalesPaymentsSection({ invoices, companySettings, canExport }) {
+function SalesPaymentsSection({ invoices, companySettings, canExport }: any) {
   const [paymentFilter, setPaymentFilter] = useState<any>("all");
   const [dateFrom, setDateFrom] = useState("");
   const [dateTo, setDateTo] = useState("");
   const [search, setSearch] = useState("");
 
   const enriched = useMemo(() => {
-    return invoices.map((inv) => {
+    return invoices.map((inv: any) => {
       const origAmount = parseFloat(inv.total_amount || inv.totalAmount || inv.amount || 0);
       const currency = (inv.currency || "AED").toUpperCase();
       const rate = getRateToAed(currency, companySettings);
@@ -229,7 +229,7 @@ function SalesPaymentsSection({ invoices, companySettings, canExport }) {
   const filtered = useMemo(() => {
     const fromTs = dateFrom ? new Date(dateFrom).getTime() : null;
     const toTs = dateTo ? new Date(dateTo + "T23:59:59").getTime() : null;
-    return enriched.filter((r) => {
+    return enriched.filter((r: any) => {
       if (paymentFilter !== "all" && r._paymentStatus !== paymentFilter) return false;
       if (r._date && (fromTs || toTs)) {
         const ts = new Date(r._date).getTime();
@@ -246,7 +246,7 @@ function SalesPaymentsSection({ invoices, companySettings, canExport }) {
     });
   }, [enriched, paymentFilter, dateFrom, dateTo, search]);
 
-  const exportData = filtered.map((r) => ({
+  const exportData = filtered.map((r: any) => ({
     invoice_number: r._ref,
     customer: r._customer,
     invoice_date: fmtDate(r._date),
@@ -308,7 +308,7 @@ function SalesPaymentsSection({ invoices, companySettings, canExport }) {
                 </TableCell>
               </TableRow>
             ) : (
-              filtered.map((r) => (
+              filtered.map((r: any) => (
                 <TableRow key={r.id} className="hover:bg-gray-50">
                   <TableCell className="font-medium text-blue-700">{r._ref}</TableCell>
                   <TableCell>{r._customer}</TableCell>
@@ -328,25 +328,25 @@ function SalesPaymentsSection({ invoices, companySettings, canExport }) {
   );
 }
 
-function PurchasesPaymentsSection({ purchaseOrders, suppliers, companySettings, canExport }) {
+function PurchasesPaymentsSection({ purchaseOrders, suppliers, companySettings, canExport }: any) {
   const [paymentFilter, setPaymentFilter] = useState<any>("all");
   const [dateFrom, setDateFrom] = useState("");
   const [dateTo, setDateTo] = useState("");
   const [search, setSearch] = useState("");
 
-  const getSupplierName = (supplierId) => {
-    const s = (suppliers || []).find((s) => s.id === supplierId || s.id === Number(supplierId));
+  const getSupplierName = (supplierId: any) => {
+    const s = (suppliers || []).find((s: any) => s.id === supplierId || s.id === Number(supplierId));
     return s?.name || "";
   };
 
-  const getFxRate = (po) => {
+  const getFxRate = (po: any) => {
     const stored = parseFloat(po.fxRateToAed || po.fx_rate_to_aed);
     if (!isNaN(stored) && stored > 0) return stored;
     return getRateToAed(po.currency || "GBP", companySettings);
   };
 
   const enriched = useMemo(() => {
-    return purchaseOrders.map((po) => {
+    return purchaseOrders.map((po: any) => {
       const origAmt = parseFloat(po.totalAmount || po.total_amount || 0);
       const currency = po.currency || "GBP";
       const rate = getFxRate(po);
@@ -371,7 +371,7 @@ function PurchasesPaymentsSection({ purchaseOrders, suppliers, companySettings, 
   const filtered = useMemo(() => {
     const fromTs = dateFrom ? new Date(dateFrom).getTime() : null;
     const toTs = dateTo ? new Date(dateTo + "T23:59:59").getTime() : null;
-    return enriched.filter((r) => {
+    return enriched.filter((r: any) => {
       if (paymentFilter !== "all" && r._paymentStatus !== paymentFilter) return false;
       if (r._date && (fromTs || toTs)) {
         const ts = new Date(r._date).getTime();
@@ -388,7 +388,7 @@ function PurchasesPaymentsSection({ purchaseOrders, suppliers, companySettings, 
     });
   }, [enriched, paymentFilter, dateFrom, dateTo, search]);
 
-  const exportData = filtered.map((r) => ({
+  const exportData = filtered.map((r: any) => ({
     po_number: r._ref,
     supplier: r._supplier,
     order_date: fmtDate(r._date),
@@ -456,7 +456,7 @@ function PurchasesPaymentsSection({ purchaseOrders, suppliers, companySettings, 
                 </TableCell>
               </TableRow>
             ) : (
-              filtered.map((r) => (
+              filtered.map((r: any) => (
                 <TableRow key={r.id} className="hover:bg-gray-50">
                   <TableCell className="font-medium text-purple-700">{r._ref}</TableCell>
                   <TableCell>{r._supplier}</TableCell>
@@ -480,7 +480,7 @@ function PurchasesPaymentsSection({ purchaseOrders, suppliers, companySettings, 
   );
 }
 
-export default function PaymentsLedger({ invoices, purchaseOrders, suppliers, companySettings, canExport }) {
+export default function PaymentsLedger({ invoices, purchaseOrders, suppliers, companySettings, canExport }: any) {
   return (
     <div className="space-y-4">
       <CollapsibleSection

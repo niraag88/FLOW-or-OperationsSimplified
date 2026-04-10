@@ -9,7 +9,7 @@ import { Brand } from "@/api/entities"; // Changed from Supplier
 import { format } from "date-fns";
 import { cn } from "@/lib/utils";
 
-export default function POFilters({ filters, onFiltersChange, onFilterChange }) {
+export default function POFilters({ filters, onFiltersChange, onFilterChange }: any) {
   const [brands, setBrands] = useState<any[]>([]); // Changed from suppliers
   const [dateRangeOpen, setDateRangeOpen] = useState(false);
   const [customStartDate, setCustomStartDate] = useState<any>(null);
@@ -28,8 +28,8 @@ export default function POFilters({ filters, onFiltersChange, onFilterChange }) 
     }
   };
 
-  const handleFilterChange = (field, value) => {
-    onFiltersChange(prev => ({
+  const handleFilterChange = (field: any, value: any) => {
+    onFiltersChange((prev: any) => ({
       ...prev,
       [field]: value
     }));
@@ -50,7 +50,7 @@ export default function POFilters({ filters, onFiltersChange, onFilterChange }) 
 
   const hasActiveFilters = filters.status !== "all" || filters.supplier !== "all" || filters.dateRange !== "all" || (filters.paymentStatus && filters.paymentStatus !== "all");
 
-  const handleDateRangeChange = (value) => {
+  const handleDateRangeChange = (value: any) => {
     if (value !== 'custom') {
       // Reset custom dates when switching to preset ranges
       setCustomStartDate(null);

@@ -20,7 +20,7 @@ export default function QuotationActionsDropdown({ quotation, canEdit, canCreate
   const { toast } = useToast();
   const [showDeleteDialog, setShowDeleteDialog] = useState(false);
 
-  const formatDate = (dateString) => {
+  const formatDate = (dateString: any) => {
     if (!dateString) return '';
     try {
       const date = typeof dateString === 'string' ? parseISO(dateString) : new Date(dateString);
@@ -30,7 +30,7 @@ export default function QuotationActionsDropdown({ quotation, canEdit, canCreate
     }
   };
 
-  const formatDateForExport = (dateString) => {
+  const formatDateForExport = (dateString: any) => {
     if (!dateString) return '';
     try {
       const date = typeof dateString === 'string' ? parseISO(dateString) : new Date(dateString);

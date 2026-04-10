@@ -75,7 +75,7 @@ export default function CompanySettingsComponent() {
     }
   };
 
-  const validateTRN = (trn) => {
+  const validateTRN = (trn: any) => {
     if (!trn) return true; // TRN is optional, valid if empty
     
     // UAE TRN format: 15 digits, typically starts with 1
@@ -83,7 +83,7 @@ export default function CompanySettingsComponent() {
     return trnRegex.test(trn);
   };
 
-  const handleInputChange = (field, value) => {
+  const handleInputChange = (field: any, value: any) => {
     setSettings(prev => ({
       ...prev,
       [field]: value
@@ -99,7 +99,7 @@ export default function CompanySettingsComponent() {
     }
   };
 
-  const handleLogoUpload = async (event) => {
+  const handleLogoUpload = async (event: any) => {
     const file = event.target.files[0];
     if (!file) return;
 

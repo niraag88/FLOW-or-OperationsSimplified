@@ -22,7 +22,7 @@ const STATUS_COLORS = {
   rejected: "bg-red-100 text-red-800",
 };
 
-function Section({ title, children }) {
+function Section({ title, children }: any) {
   return (
     <div>
       <h3 className="text-sm font-semibold text-gray-500 uppercase tracking-wide mb-3">{title}</h3>
@@ -33,7 +33,7 @@ function Section({ title, children }) {
 
 const NON_EDITABLE_STATUSES = ['accepted', 'rejected', 'invoiced', 'converted'];
 
-export default function QuotationQuickViewModal({ quotationId, open, onClose, canEdit, canOverride, onEdit }) {
+export default function QuotationQuickViewModal({ quotationId, open, onClose, canEdit, canOverride, onEdit }: any) {
   const [detail, setDetail] = useState<any>(null);
   const [loading, setLoading] = useState(false);
   const { toast } = useToast();
@@ -97,7 +97,7 @@ export default function QuotationQuickViewModal({ quotationId, open, onClose, ca
               <>
                 <span className="font-bold text-lg">{detail?.quoteNumber || '—'}</span>
                 {detail?.status && (
-                  <Badge className={`${STATUS_COLORS[detail.status] || STATUS_COLORS.draft} border text-xs`}>
+                  <Badge className={`${STATUS_COLORS[detail.status as keyof typeof STATUS_COLORS] || STATUS_COLORS.draft} border text-xs`}>
                     {detail.status.toUpperCase()}
                   </Badge>
                 )}
@@ -166,7 +166,7 @@ export default function QuotationQuickViewModal({ quotationId, open, onClose, ca
                       </TableRow>
                     </TableHeader>
                     <TableBody>
-                      {detail.items.map((item, idx) => (
+                      {detail.items.map((item: any, idx: any) => (
                         <TableRow key={item.id || idx}>
                           <TableCell className="text-sm text-gray-600">{item.brandName || '—'}</TableCell>
                           <TableCell className="text-sm text-gray-600">{item.productCode || '—'}</TableCell>

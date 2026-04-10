@@ -11,10 +11,10 @@ import {
 } from "recharts";
 import { getRateToAed } from "@/utils/currency";
 
-const fmt = (value) =>
+const fmt = (value: any) =>
   new Intl.NumberFormat("en-US", { minimumFractionDigits: 2, maximumFractionDigits: 2 }).format(value);
 
-function getPeriodBounds(period, customFrom, customTo) {
+function getPeriodBounds(period: any, customFrom: any, customTo: any) {
   const now = new Date();
   if (period === "this_month") return { from: startOfMonth(now), to: endOfMonth(now) };
   if (period === "last_3") return { from: startOfMonth(subMonths(now, 2)), to: endOfMonth(now) };
@@ -41,26 +41,26 @@ function SummaryTile({ label, value, sub = null, color }: any) {
   );
 }
 
-export default function PurchasesReport({ purchaseOrders, suppliers, companySettings, canExport }) {
+export default function PurchasesReport({ purchaseOrders, suppliers, companySettings, canExport }: any) {
   const [period, setPeriod] = useState<any>("all");
   const [customFrom, setCustomFrom] = useState("");
   const [customTo, setCustomTo] = useState("");
 
-  const getSupplierName = (supplierId) => {
+  const getSupplierName = (supplierId: any) => {
     const supplier = (suppliers || []).find(
-      (s) => s.id === supplierId || s.id === Number(supplierId)
+      (s: any) => s.id === supplierId || s.id === Number(supplierId)
     );
     return supplier?.name || "Unknown Supplier";
   };
 
-  const getFxRate = (po) => {
+  const getFxRate = (po: any) => {
     const storedRate = parseFloat(po.fxRateToAed || po.fx_rate_to_aed);
     if (!isNaN(storedRate) && storedRate > 0) return storedRate;
     const currency = po.currency || "GBP";
     return getRateToAed(currency, companySettings);
   };
 
-  const getAedAmount = (po) => {
+  const getAedAmount = (po: any) => {
     const amount = Number(po.totalAmount || po.total_amount || 0);
     const currency = po.currency || "GBP";
     return currency === "AED" ? amount : amount * getFxRate(po);
@@ -69,7 +69,7 @@ export default function PurchasesReport({ purchaseOrders, suppliers, companySett
   const filteredPOs = useMemo(() => {
     const bounds = getPeriodBounds(period, customFrom, customTo);
     if (!bounds) return purchaseOrders;
-    return purchaseOrders.filter((po) => {
+    return purchaseOrders.filter((po: any) => {
       const d = new Date(po.orderDate || po.order_date);
       return d >= bounds.from && d <= bounds.to;
     });
@@ -79,7 +79,7 @@ export default function PurchasesReport({ purchaseOrders, suppliers, companySett
     let totalAED = 0;
     let outstandingAED = 0;
     let paidAED = 0;
-    filteredPOs.forEach((po) => {
+    filteredPOs.forEach((po: any) => {
       const aed = getAedAmount(po);
       totalAED += aed;
       const ps = (po.paymentStatus || po.payment_status || "outstanding").toLowerCase();
@@ -91,7 +91,7 @@ export default function PurchasesReport({ purchaseOrders, suppliers, companySett
 
   const purchasesByMonth = useMemo(() => {
     const purchases: Record<string, any> = {};
-    filteredPOs.forEach((po) => {
+    filteredPOs.forEach((po: any) => {
       const dateValue = po.orderDate || po.order_date;
       if (!dateValue) return;
       const d = new Date(dateValue);
@@ -114,7 +114,7 @@ export default function PurchasesReport({ purchaseOrders, suppliers, companySett
 
   const topSuppliers = useMemo(() => {
     const supplierTotals: Record<string, any> = {};
-    filteredPOs.forEach((po) => {
+    filteredPOs.forEach((po: any) => {
       const suppId = po.supplierId || po.supplier_id;
       const name = getSupplierName(suppId);
       const aed = getAedAmount(po);
@@ -129,7 +129,7 @@ export default function PurchasesReport({ purchaseOrders, suppliers, companySett
 
   const currencyBreakdown = useMemo(() => {
     const byCurrency: Record<string, any> = {};
-    filteredPOs.forEach((po) => {
+    filteredPOs.forEach((po: any) => {
       const cur = po.currency || "GBP";
       const aed = getAedAmount(po);
       if (!byCurrency[cur]) byCurrency[cur] = 0;
@@ -365,7 +365,7 @@ export default function PurchasesReport({ purchaseOrders, suppliers, companySett
                     INR: "bg-orange-500",
                     AED: "bg-purple-500",
                   };
-                  const barColor = COLORS[currency] || "bg-gray-400";
+                  const barColor = COLORS[currency as keyof typeof COLORS] || "bg-gray-400";
                   return (
                     <div key={currency}>
                       <div className="flex justify-between mb-1">

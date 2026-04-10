@@ -30,7 +30,7 @@ import { useToast } from "@/hooks/use-toast";
 import { queryClient } from "@/lib/queryClient";
 import { format } from "date-fns";
 
-export default function POForm({ open, onClose, editingPO, currentUser, onSuccess }) {
+export default function POForm({ open, onClose, editingPO, currentUser, onSuccess }: any) {
   const [loading, setLoading] = useState(false);
   const [brands, setBrands] = useState<any[]>([]);
   const [products, setProducts] = useState<any[]>([]);
@@ -68,7 +68,7 @@ export default function POForm({ open, onClose, editingPO, currentUser, onSucces
     }
   }, [open, editingPO?.id]);
 
-  const loadGrnDocs = async (poId) => {
+  const loadGrnDocs = async (poId: any) => {
     setLoadingGrnDocs(true);
     try {
       const res = await fetch(`/api/goods-receipts?poId=${poId}`, { credentials: 'include' });
@@ -83,7 +83,7 @@ export default function POForm({ open, onClose, editingPO, currentUser, onSucces
     }
   };
 
-  const handleViewDoc = async (scanKey) => {
+  const handleViewDoc = async (scanKey: any) => {
     try {
       const res = await fetch(`/api/storage/signed-get?key=${encodeURIComponent(scanKey)}`, { credentials: 'include' });
       const data = await res.json();
@@ -224,11 +224,11 @@ export default function POForm({ open, onClose, editingPO, currentUser, onSucces
   };
 
 
-  const handleInputChange = (field, value) => {
+  const handleInputChange = (field: any, value: any) => {
     setFormData(prev => ({ ...prev, [field]: value }));
   };
 
-  const handleCurrencyChange = (currency) => {
+  const handleCurrencyChange = (currency: any) => {
     const rate = companySettings ? getRateToAed(currency, companySettings) : 4.85;
     setCurrencyExplicitlySet(true);
     setFormData(prev => ({
@@ -254,7 +254,7 @@ export default function POForm({ open, onClose, editingPO, currentUser, onSucces
     }));
   };
 
-  const updateItem = (index, field, value) => {
+  const updateItem = (index: any, field: any, value: any) => {
     const newItems = [...formData.items];
     newItems[index] = { ...newItems[index], [field]: value };
     
@@ -297,7 +297,7 @@ export default function POForm({ open, onClose, editingPO, currentUser, onSucces
     setFormData(prev => ({ ...prev, totalAmount: total.toFixed(2) }));
   };
 
-  const removeItem = (index) => {
+  const removeItem = (index: any) => {
     const newItems = formData.items.filter((_, i) => i !== index);
     setFormData(prev => ({ ...prev, items: newItems }));
     
@@ -305,7 +305,7 @@ export default function POForm({ open, onClose, editingPO, currentUser, onSucces
     setFormData(prev => ({ ...prev, totalAmount: total.toFixed(2) }));
   };
 
-  const handleSubmit = async (e) => {
+  const handleSubmit = async (e: any) => {
     e.preventDefault();
     setLoading(true);
 
@@ -763,7 +763,7 @@ export default function POForm({ open, onClose, editingPO, currentUser, onSucces
                       );
                       const hasAnyDoc = grnInvoices.length > 0 || poScanKey || supportingDocs.length > 0;
 
-                      const extractFilename = (key) => {
+                      const extractFilename = (key: any) => {
                         if (!key) return '';
                         const last = key.split('/').pop() || key;
                         return last.replace(/^\d{10,}-/, '');

@@ -7,8 +7,8 @@ import TotalsSummary from './shared/TotalsSummary';
 import NotesSection from './shared/NotesSection';
 import SignatureSection from './shared/SignatureSection';
 
-export default function POTemplate({ data, brand, settings }) {
-  const formatDate = (dateString) => {
+export default function POTemplate({ data, brand, settings }: any) {
+  const formatDate = (dateString: any) => {
     if (!dateString) return '';
     try {
       const date = typeof dateString === 'string' ? parseISO(dateString) : new Date(dateString);

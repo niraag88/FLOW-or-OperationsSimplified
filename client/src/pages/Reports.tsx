@@ -22,9 +22,9 @@ import PaymentsLedger from "../components/reports/PaymentsLedger";
 import StatementsTab from "../components/reports/StatementsTab";
 import StockOnHandReport from "../components/reports/StockOnHandReport";
 
-function normalizeTaxTreatment(raw) {
+function normalizeTaxTreatment(raw: any) {
   if (!raw) return 'StandardRated';
-  const map = {
+  const map: Record<string, string> = {
     standard: 'StandardRated',
     standardrated: 'StandardRated',
     zero_rated: 'ZeroRated',
@@ -36,7 +36,7 @@ function normalizeTaxTreatment(raw) {
   return map[raw.toLowerCase().replace(/-/g, '_')] || raw;
 }
 
-function normalizeInvoice(inv) {
+function normalizeInvoice(inv: any) {
   const amount = parseFloat(inv.amount || inv.total_amount || 0);
   const vatAmount = parseFloat(inv.vatAmount || inv.tax_amount || 0);
   const subtotal = amount - vatAmount;

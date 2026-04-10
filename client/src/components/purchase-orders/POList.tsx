@@ -13,13 +13,13 @@ import MarkPOPaidDialog from "./MarkPOPaidDialog";
 import POActionsDropdown from "./POActionsDropdown";
 import { formatCurrency } from "@/utils/currency";
 
-export default function POList({ purchaseOrders, totalCount, loading, canEdit, currentUser, onEdit, onRefresh, onQuickView }) {
+export default function POList({ purchaseOrders, totalCount, loading, canEdit, currentUser, onEdit, onRefresh, onQuickView }: any) {
   const [showEditPaymentDialog, setShowEditPaymentDialog] = useState(false);
   const [editPaymentPO, setEditPaymentPO] = useState<any>(null);
 
-  const getBrandName = (po) => po.brandName || po.supplierName || '';
+  const getBrandName = (po: any) => po.brandName || po.supplierName || '';
 
-  const getStatusColor = (status) => {
+  const getStatusColor = (status: any) => {
     switch (status?.toLowerCase()) {
       case 'draft': return 'bg-gray-100 text-gray-800';
       case 'submitted': return 'bg-blue-100 text-blue-800';
@@ -28,7 +28,7 @@ export default function POList({ purchaseOrders, totalCount, loading, canEdit, c
     }
   };
 
-  const getAedEquivalent = (po) => {
+  const getAedEquivalent = (po: any) => {
     const amount = parseFloat(po.totalAmount) || 0;
     const currency = po.currency || 'GBP';
     if (currency === 'AED') return amount;
@@ -36,19 +36,19 @@ export default function POList({ purchaseOrders, totalCount, loading, canEdit, c
     return amount * rate;
   };
 
-  const isShortDelivered = (po) => {
+  const isShortDelivered = (po: any) => {
     if (po.status !== 'closed') return false;
     const ordered = Number(po.orderedQty) || 0;
     const received = Number(po.receivedQty) || 0;
     return ordered > 0 && received < ordered;
   };
 
-  const handleEditPayment = (po) => {
+  const handleEditPayment = (po: any) => {
     setEditPaymentPO(po);
     setShowEditPaymentDialog(true);
   };
 
-  const formatPaymentDate = (dateVal) => {
+  const formatPaymentDate = (dateVal: any) => {
     if (!dateVal) return null;
     try {
       return format(new Date(dateVal), 'dd/MM/yy');
@@ -110,7 +110,7 @@ export default function POList({ purchaseOrders, totalCount, loading, canEdit, c
                 </TableRow>
               </TableHeader>
               <TableBody>
-                {purchaseOrders.map((po) => {
+                {purchaseOrders.map((po: any) => {
                   const currency = po.currency || 'GBP';
                   const aedTotal = getAedEquivalent(po);
                   const ps = po.paymentStatus || po.payment_status || 'outstanding';

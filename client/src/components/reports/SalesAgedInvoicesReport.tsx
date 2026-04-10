@@ -12,16 +12,16 @@ import {
 
 const EXCLUDED_STATUSES = new Set(["cancelled"]);
 
-const fmt = (value) =>
+const fmt = (value: any) =>
   new Intl.NumberFormat("en-US", { minimumFractionDigits: 2, maximumFractionDigits: 2 }).format(value);
 
-function isLocalCustomer(customer) {
+function isLocalCustomer(customer: any) {
   if (!customer) return true;
   const vat = (customer.vatTreatment || '').toLowerCase();
   return vat !== 'international';
 }
 
-function getPeriodBounds(period, customFrom, customTo) {
+function getPeriodBounds(period: any, customFrom: any, customTo: any) {
   const now = new Date();
   if (period === "this_month") return { from: startOfMonth(now), to: endOfMonth(now) };
   if (period === "last_3") return { from: startOfMonth(subMonths(now, 2)), to: endOfMonth(now) };
@@ -38,7 +38,7 @@ function getPeriodBounds(period, customFrom, customTo) {
   return null;
 }
 
-function SummaryTile({ label, value, color }) {
+function SummaryTile({ label, value, color }: any) {
   return (
     <Card className="p-4">
       <p className="text-sm text-gray-500">{label}</p>
@@ -47,26 +47,26 @@ function SummaryTile({ label, value, color }) {
   );
 }
 
-export default function SalesAgedInvoicesReport({ invoices, customers, canExport }) {
+export default function SalesAgedInvoicesReport({ invoices, customers, canExport }: any) {
   const [period, setPeriod] = useState<any>("all");
   const [customFrom, setCustomFrom] = useState("");
   const [customTo, setCustomTo] = useState("");
 
   const activeInvoices = useMemo(
-    () => invoices.filter((inv) => !EXCLUDED_STATUSES.has(inv.status)),
+    () => invoices.filter((inv: any) => !EXCLUDED_STATUSES.has(inv.status)),
     [invoices]
   );
 
   const filteredInvoices = useMemo(() => {
     const bounds = getPeriodBounds(period, customFrom, customTo);
     if (!bounds) return activeInvoices;
-    return activeInvoices.filter((inv) => {
+    return activeInvoices.filter((inv: any) => {
       const d = new Date(inv.invoice_date || inv.invoiceDate);
       return d >= bounds.from && d <= bounds.to;
     });
   }, [activeInvoices, period, customFrom, customTo]);
 
-  const isSettled = (inv) => {
+  const isSettled = (inv: any) => {
     const ps = (inv.paymentStatus || inv.payment_status || "").toLowerCase();
     const st = (inv.status || "").toLowerCase();
     return ps === "paid" || st === "delivered";
@@ -74,20 +74,20 @@ export default function SalesAgedInvoicesReport({ invoices, customers, canExport
 
   const summary = useMemo(() => {
     const totalInvoiced = filteredInvoices.reduce(
-      (sum, inv) => sum + Number(inv.total_amount || inv.totalAmount || inv.amount || 0),
+      (sum: any, inv: any) => sum + Number(inv.total_amount || inv.totalAmount || inv.amount || 0),
       0
     );
     const totalCollected = filteredInvoices
       .filter(isSettled)
       .reduce(
-        (sum, inv) => sum + Number(inv.total_amount || inv.totalAmount || inv.amount || 0),
+        (sum: any, inv: any) => sum + Number(inv.total_amount || inv.totalAmount || inv.amount || 0),
         0
       );
     return { totalInvoiced, totalCollected, outstanding: totalInvoiced - totalCollected };
   }, [filteredInvoices]);
 
   const agingData = useMemo(() => {
-    const buckets = {
+    const buckets: Record<string, { total: number; count: number }> = {
       current: { total: 0, count: 0 },
       "0-30": { total: 0, count: 0 },
       "31-60": { total: 0, count: 0 },
@@ -96,8 +96,8 @@ export default function SalesAgedInvoicesReport({ invoices, customers, canExport
     };
     const today = new Date();
     filteredInvoices
-      .filter((inv) => !isSettled(inv))
-      .forEach((inv) => {
+      .filter((inv: any) => !isSettled(inv))
+      .forEach((inv: any) => {
         const totalAmount = Number(inv.total_amount || inv.totalAmount || inv.amount || 0);
         if (totalAmount <= 0) return;
         const dateValue = inv.invoice_date || inv.invoiceDate;
@@ -118,7 +118,7 @@ export default function SalesAgedInvoicesReport({ invoices, customers, canExport
 
   const salesByMonth = useMemo(() => {
     const sales: Record<string, any> = {};
-    filteredInvoices.forEach((inv) => {
+    filteredInvoices.forEach((inv: any) => {
       const dateValue = inv.invoice_date || inv.invoiceDate;
       if (!dateValue) return;
       const month = format(new Date(dateValue), "yyyy-MM");
@@ -141,11 +141,11 @@ export default function SalesAgedInvoicesReport({ invoices, customers, canExport
 
   const topCustomers = useMemo(() => {
     const customerTotals: Record<string, any> = {};
-    filteredInvoices.forEach((inv) => {
+    filteredInvoices.forEach((inv: any) => {
       const name =
         inv.customer_name ||
         inv.customerName ||
-        customers.find((c) => c.id === (inv.customer_id ?? inv.customerId))?.name ||
+        customers.find((c: any) => c.id === (inv.customer_id ?? inv.customerId))?.name ||
         "Unknown";
       const total = Number(inv.total_amount || inv.totalAmount || inv.amount || 0);
       if (!customerTotals[name]) customerTotals[name] = 0;
@@ -158,10 +158,10 @@ export default function SalesAgedInvoicesReport({ invoices, customers, canExport
   }, [filteredInvoices, customers]);
 
   const regionSplit = useMemo(() => {
-    const customerMap = new Map(customers.map((c) => [c.id, c]));
+    const customerMap = new Map(customers.map((c: any) => [c.id, c]));
     let local = 0;
     let international = 0;
-    filteredInvoices.forEach((inv) => {
+    filteredInvoices.forEach((inv: any) => {
       const total = Number(inv.total_amount || inv.totalAmount || inv.amount || 0);
       const custId = inv.customer_id ?? inv.customerId;
       const customer = customerMap.get(custId);

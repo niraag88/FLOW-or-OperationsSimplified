@@ -41,7 +41,7 @@ const getInitialFormData = (invoiceNumber = '') => ({
 });
 
 
-export default function InvoiceForm({ open, onClose, editingInvoice, currentUser, canOverride, onSuccess }) {
+export default function InvoiceForm({ open, onClose, editingInvoice, currentUser, canOverride, onSuccess }: any) {
   const [loading, setLoading] = useState(false);
   const [customers, setCustomers] = useState<any[]>([]);
   const [products, setProducts] = useState<any[]>([]);
@@ -158,7 +158,7 @@ export default function InvoiceForm({ open, onClose, editingInvoice, currentUser
   }, [formData.customer_id, customers]);
 
 
-  const handleInputChange = (field, value) => {
+  const handleInputChange = (field: any, value: any) => {
     setFormData(prev => {
       let updatedData: any = { ...prev, [field]: value };
 
@@ -216,7 +216,7 @@ export default function InvoiceForm({ open, onClose, editingInvoice, currentUser
     setFormData(prev => ({ ...prev, items: [...prev.items, newItem] }));
   };
 
-  const updateItem = (index, field, value) => {
+  const updateItem = (index: any, field: any, value: any) => {
     const newItems = [...formData.items];
     
     // Convert string values to numbers for ID fields
@@ -273,19 +273,19 @@ export default function InvoiceForm({ open, onClose, editingInvoice, currentUser
     setFormData(prev => ({ ...prev, items: newItems }));
   };
 
-  const getFilteredProducts = (brandId) => {
+  const getFilteredProducts = (brandId: any) => {
     if (!brandId) return [];
     return products.filter((product: any) => Number(product.brand_id ?? product.brandId) === Number(brandId));
   };
 
-  const removeItem = (index) => {
+  const removeItem = (index: any) => {
     setFormData(prev => ({ 
       ...prev, 
       items: prev.items.filter((_, i) => i !== index) 
     }));
   };
 
-  const handleSubmit = async (e) => {
+  const handleSubmit = async (e: any) => {
     e.preventDefault();
     
     if (!formData.customer_id || isNaN(Number(formData.customer_id)) || !formData.invoice_number) {

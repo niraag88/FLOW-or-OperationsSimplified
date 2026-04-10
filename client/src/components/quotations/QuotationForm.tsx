@@ -22,7 +22,7 @@ import { Brand } from "@/api/entities";
 import { Card } from "@/components/ui/card";
 import { useToast } from "@/hooks/use-toast";
 
-export default function QuotationForm({ open, onClose, editingQuotation, currentUser, canOverride, onSuccess, preloadedCustomers, preloadedProducts, preloadedBrands }) {
+export default function QuotationForm({ open, onClose, editingQuotation, currentUser, canOverride, onSuccess, preloadedCustomers, preloadedProducts, preloadedBrands }: any) {
   const [loading, setLoading] = useState(false);
   const [customers, setCustomers] = useState<any[]>([]);
   const [products, setProducts] = useState<any[]>([]);
@@ -199,7 +199,7 @@ export default function QuotationForm({ open, onClose, editingQuotation, current
     }
   };
 
-  const handleInputChange = (field, value) => {
+  const handleInputChange = (field: any, value: any) => {
     setFormData(prev => {
       const newState = {
         ...prev,
@@ -262,7 +262,7 @@ export default function QuotationForm({ open, onClose, editingQuotation, current
     setFormData(prev => ({ ...prev, items: [...prev.items, newItem] }));
   };
 
-  const updateItem = (index, field, value) => {
+  const updateItem = (index: any, field: any, value: any) => {
     const newItems = [...formData.items];
     
     // Convert string values to numbers for ID fields
@@ -309,21 +309,21 @@ export default function QuotationForm({ open, onClose, editingQuotation, current
     setFormData(prev => ({ ...prev, items: newItems }));
   };
 
-  const getFilteredProducts = (brandId) => {
+  const getFilteredProducts = (brandId: any) => {
     if (!brandId) return [];
     // Convert brandId to number for comparison since product.brandId is a number
     const numericBrandId = parseInt(brandId);
     return products.filter((product: any) => product.brandId === numericBrandId);
   };
 
-  const removeItem = (index) => {
+  const removeItem = (index: any) => {
     setFormData(prev => ({ 
       ...prev, 
       items: prev.items.filter((_, i) => i !== index) 
     }));
   };
 
-  const handleSubmit = async (e) => {
+  const handleSubmit = async (e: any) => {
     e.preventDefault();
     
     if (!formData.customer_id || !formData.quotation_number) {

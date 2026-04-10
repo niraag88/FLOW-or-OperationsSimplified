@@ -21,7 +21,7 @@ export default function POPrintView() {
     loadPrintData(poId);
   }, []);
 
-  const loadPrintData = async (poId) => {
+  const loadPrintData = async (poId: any) => {
     try {
       const poResponse = await fetch(`/api/export/po?poId=${poId}`);
       const poResult = await poResponse.json();
@@ -48,7 +48,7 @@ export default function POPrintView() {
     }
   };
 
-  const formatDate = (dateString) => {
+  const formatDate = (dateString: any) => {
     if (!dateString) return '';
     try {
       const date = new Date(dateString);
@@ -56,7 +56,7 @@ export default function POPrintView() {
     } catch { return ''; }
   };
 
-  const formatAmount = (amount, currency) => {
+  const formatAmount = (amount: any, currency: any) => {
     const num = parseFloat(amount) || 0;
     return `${currency} ${num.toFixed(2)}`;
   };
@@ -162,7 +162,7 @@ export default function POPrintView() {
               </tr>
             </thead>
             <tbody>
-              {poData.items?.map((item, index) => (
+              {poData.items?.map((item: any, index: any) => (
                 <tr key={index}>
                   <td className="col-code">{item.product_code}</td>
                   <td className="col-description">{item.description}</td>

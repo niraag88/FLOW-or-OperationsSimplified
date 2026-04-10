@@ -15,7 +15,7 @@ import { useToast } from "@/hooks/use-toast";
 import { formatCurrency } from "@/utils/currency";
 import { computeReconciliation } from "@/utils/poReconciliation";
 
-export default function MarkPOPaidDialog({ open, onClose, po, onSuccess }) {
+export default function MarkPOPaidDialog({ open, onClose, po, onSuccess }: any) {
   const { toast } = useToast();
   const [loading, setLoading] = useState(false);
   const [paymentMadeDate, setPaymentMadeDate] = useState("");
@@ -41,7 +41,7 @@ export default function MarkPOPaidDialog({ open, onClose, po, onSuccess }) {
     }
   }, [open, po]);
 
-  const fetchPOItems = async (poId) => {
+  const fetchPOItems = async (poId: any) => {
     try {
       const res = await fetch(`/api/purchase-orders/${poId}/items`, { credentials: 'include' });
       if (!res.ok) { setPoItems([]); return; }
@@ -52,7 +52,7 @@ export default function MarkPOPaidDialog({ open, onClose, po, onSuccess }) {
     }
   };
 
-  const handleSubmit = async (e) => {
+  const handleSubmit = async (e: any) => {
     e.preventDefault();
     if (!po) return;
     setLoading(true);

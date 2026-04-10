@@ -99,7 +99,7 @@ export default function InvoiceActionsDropdown({ invoice, canEdit, canOverride, 
     }
   };
 
-  const handleUploadSuccess = async (storageKey) => {
+  const handleUploadSuccess = async (storageKey: any) => {
     try {
       const res = await fetch(`/api/invoices/${invoice.id}/scan-key`, {
         method: 'PATCH',

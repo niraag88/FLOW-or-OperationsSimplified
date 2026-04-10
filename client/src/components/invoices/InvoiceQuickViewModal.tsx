@@ -24,7 +24,7 @@ const PAYMENT_COLORS = {
   outstanding: "bg-amber-100 text-amber-800 border-amber-200",
 };
 
-function Section({ title, children }) {
+function Section({ title, children }: any) {
   return (
     <div>
       <h3 className="text-sm font-semibold text-gray-500 uppercase tracking-wide mb-3">{title}</h3>
@@ -33,7 +33,7 @@ function Section({ title, children }) {
   );
 }
 
-function DocLink({ label, scanKey, onView }) {
+function DocLink({ label, scanKey, onView }: any) {
   return (
     <button
       onClick={() => onView(scanKey)}
@@ -46,7 +46,7 @@ function DocLink({ label, scanKey, onView }) {
   );
 }
 
-export default function InvoiceQuickViewModal({ invoiceId, open, onClose, canEdit, canOverride, onEdit }) {
+export default function InvoiceQuickViewModal({ invoiceId, open, onClose, canEdit, canOverride, onEdit }: any) {
   const [detail, setDetail] = useState<any>(null);
   const [loading, setLoading] = useState(false);
   const { toast } = useToast();
@@ -65,7 +65,7 @@ export default function InvoiceQuickViewModal({ invoiceId, open, onClose, canEdi
       .finally(() => setLoading(false));
   }, [open, invoiceId]);
 
-  const handleViewDoc = async (scanKey) => {
+  const handleViewDoc = async (scanKey: any) => {
     try {
       const res = await fetch(`/api/storage/signed-get?key=${encodeURIComponent(scanKey)}`, {
         credentials: "include",
@@ -107,7 +107,7 @@ export default function InvoiceQuickViewModal({ invoiceId, open, onClose, canEdi
   const vatAmount = detail?.tax_amount ?? 0;
   const totalAmount = detail?.total_amount ?? 0;
 
-  const getDocFilename = (scanKey) => {
+  const getDocFilename = (scanKey: any) => {
     if (!scanKey) return 'Attachment';
     const last = scanKey.split('/').pop() || '';
     const stripped = last.replace(/^\d{10,}-/, '');
@@ -125,12 +125,12 @@ export default function InvoiceQuickViewModal({ invoiceId, open, onClose, canEdi
               <>
                 <span className="font-bold text-lg">{detail?.invoice_number || '—'}</span>
                 {detail?.status && (
-                  <Badge className={`${STATUS_COLORS[detail.status] || STATUS_COLORS.draft} border text-xs`}>
+                  <Badge className={`${STATUS_COLORS[detail.status as keyof typeof STATUS_COLORS] || STATUS_COLORS.draft} border text-xs`}>
                     {detail.status.toUpperCase()}
                   </Badge>
                 )}
                 {!isCancelled && (
-                  <Badge className={`${PAYMENT_COLORS[ps] || PAYMENT_COLORS.outstanding} border text-xs`}>
+                  <Badge className={`${PAYMENT_COLORS[ps as keyof typeof PAYMENT_COLORS] || PAYMENT_COLORS.outstanding} border text-xs`}>
                     {ps.toUpperCase()}
                   </Badge>
                 )}
@@ -205,7 +205,7 @@ export default function InvoiceQuickViewModal({ invoiceId, open, onClose, canEdi
                       </TableRow>
                     </TableHeader>
                     <TableBody>
-                      {detail.items.map((item, idx) => (
+                      {detail.items.map((item: any, idx: any) => (
                         <TableRow key={item.id || idx}>
                           <TableCell className="text-sm text-gray-600">{item.brand_name || '—'}</TableCell>
                           <TableCell className="text-sm text-gray-600">{item.product_code || '—'}</TableCell>

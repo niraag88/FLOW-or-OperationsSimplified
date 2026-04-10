@@ -40,11 +40,11 @@ export default function StockCountNew() {
     loadProducts();
   }, [toast]);
 
-  const handleQuantityChange = (productId, value) => {
+  const handleQuantityChange = (productId: any, value: any) => {
     const numQuantity = parseInt(value) || 0;
     const limitedQuantity = Math.min(Math.max(0, numQuantity), 9999);
     
-    setQuantities(prev => ({
+    setQuantities((prev: any) => ({
       ...prev,
       [productId]: limitedQuantity
     }));

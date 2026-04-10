@@ -97,7 +97,7 @@ export default function Invoices() {
       if (selectedCustomers.length) params.set('customerId', selectedCustomers.join(','));
       if (paymentStatusFilter && paymentStatusFilter !== 'all') params.set('paymentStatus', paymentStatusFilter);
       const today = new Date();
-      const toStr = (d) => d.toISOString().split('T')[0];
+      const toStr = (d: any) => d.toISOString().split('T')[0];
       if (dateRange && dateRange !== 'all') {
         if (dateRange === 'today') { const d = toStr(today); params.set('dateFrom', d); params.set('dateTo', d); }
         else if (dateRange === 'week') { const s = new Date(today); s.setDate(today.getDate() - today.getDay()); s.setHours(0,0,0,0); params.set('dateFrom', toStr(s)); }
@@ -153,7 +153,7 @@ export default function Invoices() {
     setShowInvoiceForm(true);
   };
 
-  const handleEditInvoice = async (invoice) => {
+  const handleEditInvoice = async (invoice: any) => {
     try {
       // Fetch complete invoice data with line items
       const response = await fetch(`/api/invoices/${invoice.id}`);
@@ -178,24 +178,24 @@ export default function Invoices() {
   };
 
   // Robust document-to-invoice normalizer function
-  const normalizeDocumentToInvoice = (document, documentType, dropdownData: any = {}) => {
+  const normalizeDocumentToInvoice = (document: any, documentType: any, dropdownData: any = {}) => {
     
     const { availableCustomers = [], availableBrands = [], availableProducts = [] } = dropdownData;
     
     // Helper function to safely get numeric value
-    const safeNumber = (value) => {
+    const safeNumber = (value: any) => {
       if (value === null || value === undefined || value === '') return 0;
       const num = parseFloat(value);
       return isNaN(num) ? 0 : num;
     };
     
     // Helper function to safely get string value
-    const safeString = (value, fallback = '') => {
+    const safeString = (value: any, fallback = '') => {
       return value !== null && value !== undefined ? String(value) : fallback;
     };
     
     // Helper function to format date
-    const formatDate = (dateValue) => {
+    const formatDate = (dateValue: any) => {
       if (!dateValue) return '';
       try {
         return new Date(dateValue).toISOString().split('T')[0];
@@ -311,7 +311,7 @@ export default function Invoices() {
     return normalizedData;
   };
 
-  const handleDocumentSelect = async (document, documentType) => {
+  const handleDocumentSelect = async (document: any, documentType: any) => {
     try {
       let fullDocument = document;
       
@@ -372,7 +372,7 @@ export default function Invoices() {
     if (selectedCustomers.length) params.set('customerId', selectedCustomers.join(','));
     if (paymentStatusFilter && paymentStatusFilter !== 'all') params.set('paymentStatus', paymentStatusFilter);
     const today = new Date();
-    const toStr = (d) => d.toISOString().split('T')[0];
+    const toStr = (d: any) => d.toISOString().split('T')[0];
     if (dateRange && dateRange !== 'all') {
       if (dateRange === 'today') { const d = toStr(today); params.set('dateFrom', d); params.set('dateTo', d); }
       else if (dateRange === 'week') { const s = new Date(today); s.setDate(today.getDate() - today.getDay()); s.setHours(0,0,0,0); params.set('dateFrom', toStr(s)); }
@@ -404,7 +404,7 @@ export default function Invoices() {
     const closedYears = financialYears.filter((y: any) => y.status === 'Closed');
     if (closedYears.length > 0) params.set('excludeYears', closedYears.map((cy: any) => `${cy.startDate},${cy.endDate}`).join(';'));
     const today = new Date();
-    const toStr = (d) => d.toISOString().split('T')[0];
+    const toStr = (d: any) => d.toISOString().split('T')[0];
     if (dateRange && dateRange !== 'all') {
       if (dateRange === 'today') { const d = toStr(today); params.set('dateFrom', d); params.set('dateTo', d); }
       else if (dateRange === 'week') { const s = new Date(today); s.setDate(today.getDate() - today.getDay()); s.setHours(0,0,0,0); params.set('dateFrom', toStr(s)); }
@@ -436,15 +436,15 @@ export default function Invoices() {
             columns={{
               invoiceNumber: 'Invoice Number',
               customerName: 'Customer',
-              invoiceDate: { label: 'Invoice Date', transform: (date) => date ? format(new Date(date), 'dd/MM/yy') : '' },
+              invoiceDate: { label: 'Invoice Date', transform: (date: any) => date ? format(new Date(date), 'dd/MM/yy') : '' },
               reference: 'Reference',
-              subtotal: { label: 'Subtotal (AED)', transform: (val) => parseFloat(val || 0).toFixed(2) },
-              vatAmount: { label: 'VAT (AED)', transform: (val) => parseFloat(val || 0).toFixed(2) },
-              amount: { label: 'Total (AED)', transform: (val) => parseFloat(val || 0).toFixed(2) },
-              status: { label: 'Status', transform: (val) => val ? val.charAt(0).toUpperCase() + val.slice(1) : '' },
-              paymentStatus: { label: 'Payment Status', transform: (val) => val ? val.charAt(0).toUpperCase() + val.slice(1) : 'Outstanding' },
-              paymentReceivedDate: { label: 'Payment Date', transform: (val) => val ? format(new Date(val), 'dd/MM/yy') : '' },
-              paymentRemarks: { label: 'Payment Remarks', transform: (val) => val || '' }
+              subtotal: { label: 'Subtotal (AED)', transform: (val: any) => parseFloat(val || 0).toFixed(2) },
+              vatAmount: { label: 'VAT (AED)', transform: (val: any) => parseFloat(val || 0).toFixed(2) },
+              amount: { label: 'Total (AED)', transform: (val: any) => parseFloat(val || 0).toFixed(2) },
+              status: { label: 'Status', transform: (val: any) => val ? val.charAt(0).toUpperCase() + val.slice(1) : '' },
+              paymentStatus: { label: 'Payment Status', transform: (val: any) => val ? val.charAt(0).toUpperCase() + val.slice(1) : 'Outstanding' },
+              paymentReceivedDate: { label: 'Payment Date', transform: (val: any) => val ? format(new Date(val), 'dd/MM/yy') : '' },
+              paymentRemarks: { label: 'Payment Remarks', transform: (val: any) => val || '' }
             }}
             isLoading={loading}
             onViewAndPrint={handleViewAndPrint}
@@ -508,7 +508,7 @@ export default function Invoices() {
         currentUser={currentUser}
         onEdit={handleEditInvoice}
         onRefresh={handleRefresh}
-        onQuickView={(id) => setQuickViewInvoiceId(id)}
+        onQuickView={(id: any) => setQuickViewInvoiceId(id)}
       />
 
       {/* Pagination Controls */}
@@ -617,7 +617,7 @@ export default function Invoices() {
         onClose={() => setQuickViewInvoiceId(null)}
         canEdit={canEdit}
         canOverride={canOverride}
-        onEdit={(invoice) => {
+        onEdit={(invoice: any) => {
           setQuickViewInvoiceId(null);
           handleEditInvoice(invoice);
         }}

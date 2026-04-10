@@ -70,7 +70,7 @@ export default function CustomerManagement() {
     setShowForm(false);
   };
 
-  const handleSubmit = async (e) => {
+  const handleSubmit = async (e: any) => {
     e.preventDefault();
     setLoading(true);
 
@@ -112,14 +112,14 @@ export default function CustomerManagement() {
     }
   };
 
-  const handleEdit = (customer) => {
+  const handleEdit = (customer: any) => {
     setFormData(customer);
     setEditingCustomer(customer);
     setShowForm(true);
   };
   
 
-  const handleToggleActive = async (customer) => {
+  const handleToggleActive = async (customer: any) => {
     try {
       await Customer.update(customer.id, { ...customer, isActive: !customer.isActive });
       await logAuditAction("Customer", customer.id, "status_change", "admin@example.com", { 

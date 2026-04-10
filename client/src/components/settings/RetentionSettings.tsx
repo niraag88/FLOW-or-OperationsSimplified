@@ -13,7 +13,7 @@ const initialSettings = {
   lifecycle_cold_storage_after_days: 30,
 };
 
-export default function RetentionSettings({ currentUser }) {
+export default function RetentionSettings({ currentUser }: any) {
   const [settings, setSettings] = useState(initialSettings);
   const [loading, setLoading] = useState(false);
   const { toast } = useToast();
@@ -37,7 +37,7 @@ export default function RetentionSettings({ currentUser }) {
     }
   };
 
-  const handleInputChange = (field, value) => {
+  const handleInputChange = (field: any, value: any) => {
     setSettings(prev => ({ ...prev, [field]: parseInt(value) || 0 }));
   };
 

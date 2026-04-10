@@ -10,7 +10,7 @@ import { Badge } from "@/components/ui/badge";
 import { format } from "date-fns";
 import { cn } from "@/lib/utils";
 
-export default function QuotationFilters({ selectedStatuses, setSelectedStatuses, selectedCustomers, setSelectedCustomers, dateRange, setDateRange, resetPagination, customers = [] as any[] }) {
+export default function QuotationFilters({ selectedStatuses, setSelectedStatuses, selectedCustomers, setSelectedCustomers, dateRange, setDateRange, resetPagination, customers = [] as any[] }: any) {
   const [dateRangeOpen, setDateRangeOpen] = useState(false);
   const [customStartDate, setCustomStartDate] = useState<any>(null);
   const [customEndDate, setCustomEndDate] = useState<any>(null);
@@ -28,7 +28,7 @@ export default function QuotationFilters({ selectedStatuses, setSelectedStatuses
 
   const uniqueStatuses = ['draft', 'submitted'];
 
-  const handleDateRangeChange = (value) => {
+  const handleDateRangeChange = (value: any) => {
     if (value !== 'custom') {
       setCustomStartDate(null);
       setCustomEndDate(null);
@@ -80,9 +80,9 @@ export default function QuotationFilters({ selectedStatuses, setSelectedStatuses
                       checked={selectedStatuses.includes(status)}
                       onCheckedChange={(checked) => {
                         if (checked) {
-                          setSelectedStatuses(prev => [...prev, status]);
+                          setSelectedStatuses((prev: any) => [...prev, status]);
                         } else {
-                          setSelectedStatuses(prev => prev.filter((s: any) => s !== status));
+                          setSelectedStatuses((prev: any) => prev.filter((s: any) => s !== status));
                         }
                         resetPagination();
                       }}
@@ -119,9 +119,9 @@ export default function QuotationFilters({ selectedStatuses, setSelectedStatuses
                       checked={selectedCustomers.includes(customer.id)}
                       onCheckedChange={(checked) => {
                         if (checked) {
-                          setSelectedCustomers(prev => [...prev, customer.id]);
+                          setSelectedCustomers((prev: any) => [...prev, customer.id]);
                         } else {
-                          setSelectedCustomers(prev => prev.filter((id: any) => id !== customer.id));
+                          setSelectedCustomers((prev: any) => prev.filter((id: any) => id !== customer.id));
                         }
                         resetPagination();
                       }}
@@ -223,7 +223,7 @@ export default function QuotationFilters({ selectedStatuses, setSelectedStatuses
               <X 
                 className="h-3 w-3 cursor-pointer" 
                 onClick={() => {
-                  setSelectedStatuses(prev => prev.filter((s: any) => s !== status));
+                  setSelectedStatuses((prev: any) => prev.filter((s: any) => s !== status));
                   resetPagination();
                 }}
               />
@@ -237,7 +237,7 @@ export default function QuotationFilters({ selectedStatuses, setSelectedStatuses
                 <X 
                   className="h-3 w-3 cursor-pointer" 
                   onClick={() => {
-                    setSelectedCustomers(prev => prev.filter((id: any) => id !== customerId));
+                    setSelectedCustomers((prev: any) => prev.filter((id: any) => id !== customerId));
                     resetPagination();
                   }}
                 />

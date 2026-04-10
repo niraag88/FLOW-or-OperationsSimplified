@@ -38,7 +38,7 @@ export default function Print() {
     const loadDocument = async () => {
       try {
         setLoading(true);
-        let doc;
+        let doc: any;
         let related: any = {};
 
         switch (type) {

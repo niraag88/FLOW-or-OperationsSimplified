@@ -115,7 +115,7 @@ export default function PrintSandboxPage() {
     setZoom([85]);
   };
 
-  const handleSyncScroll = (e) => {
+  const handleSyncScroll = (e: any) => {
     if (!syncScroll) return;
     
     const scrollTop = e.target.scrollTop;

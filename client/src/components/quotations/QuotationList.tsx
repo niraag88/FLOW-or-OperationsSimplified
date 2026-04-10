@@ -8,12 +8,12 @@ import { Skeleton } from "@/components/ui/skeleton";
 import { format, isValid, parseISO } from "date-fns";
 import QuotationActionsDropdown from "./QuotationActionsDropdown";
 
-export default function QuotationList({ quotations, totalCount, loading, canEdit, canCreate, canOverride, currentUser, onEdit, onRefresh, onQuickView }) {
-  const getCustomerName = (quotation) => {
+export default function QuotationList({ quotations, totalCount, loading, canEdit, canCreate, canOverride, currentUser, onEdit, onRefresh, onQuickView }: any) {
+  const getCustomerName = (quotation: any) => {
     return quotation.customerName || quotation.customer_name || 'Unknown Customer';
   };
 
-  const formatDate = (dateString) => {
+  const formatDate = (dateString: any) => {
     if (!dateString) return '-';
     try {
       const date = typeof dateString === 'string' ? parseISO(dateString) : new Date(dateString);
@@ -23,7 +23,7 @@ export default function QuotationList({ quotations, totalCount, loading, canEdit
     }
   };
 
-  const getStatusColor = (status) => {
+  const getStatusColor = (status: any) => {
     switch (status?.toLowerCase()) {
       case 'draft': return 'bg-gray-100 text-gray-800';
       case 'sent': case 'submitted': return 'bg-blue-100 text-blue-800';
@@ -35,7 +35,7 @@ export default function QuotationList({ quotations, totalCount, loading, canEdit
     }
   };
 
-  const formatCurrency = (amount, currency = 'AED') => {
+  const formatCurrency = (amount: any, currency = 'AED') => {
     const formatter = new Intl.NumberFormat('en-US', {
       style: 'decimal',
       minimumFractionDigits: 2,
@@ -44,13 +44,13 @@ export default function QuotationList({ quotations, totalCount, loading, canEdit
     return `${currency} ${formatter.format(amount || 0)}`;
   };
 
-  const canPerformActions = (quotation) => {
+  const canPerformActions = (quotation: any) => {
     if (!canCreate) return false;
     if (canOverride) return true;
     return !['accepted', 'rejected', 'invoiced', 'converted'].includes(quotation.status);
   };
 
-  const canEditActions = (quotation) => {
+  const canEditActions = (quotation: any) => {
     if (!canEdit) return false;
     if (canOverride) return true;
     return !['accepted', 'rejected', 'invoiced', 'converted'].includes(quotation.status);
@@ -110,7 +110,7 @@ export default function QuotationList({ quotations, totalCount, loading, canEdit
                 </TableRow>
               </TableHeader>
               <TableBody>
-                {quotations.map((quotation) => (
+                {quotations.map((quotation: any) => (
                   <TableRow key={quotation.id} className="hover:bg-gray-50">
                     <TableCell className="font-medium">
                       <button

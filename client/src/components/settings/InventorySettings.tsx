@@ -64,15 +64,15 @@ export default function InventorySettings() {
     loadProducts();
   }, []);
 
-  const handleSettingsChange = (field, value) => {
+  const handleSettingsChange = (field: any, value: any) => {
     setSettings(prev => ({
       ...prev,
       [field]: value
     }));
   };
 
-  const handleStockChange = (productId, field, value) => {
-    setInitialStockData(prev => ({
+  const handleStockChange = (productId: any, field: any, value: any) => {
+    setInitialStockData((prev: any) => ({
       ...prev,
       [productId]: {
         ...prev[productId],

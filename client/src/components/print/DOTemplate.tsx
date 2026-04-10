@@ -1,8 +1,8 @@
 import React from 'react';
 import { format, isValid, parseISO } from 'date-fns';
 
-export default function DOTemplate({ data, customer, settings }) {
-  const formatDate = (dateString) => {
+export default function DOTemplate({ data, customer, settings }: any) {
+  const formatDate = (dateString: any) => {
     if (!dateString) return '';
     try {
       const date = typeof dateString === 'string' ? parseISO(dateString) : new Date(dateString);
@@ -129,7 +129,7 @@ export default function DOTemplate({ data, customer, settings }) {
           </thead>
           <tbody>
             {data.items && data.items.length > 0 ? (
-              data.items.map((item, index) => (
+              data.items.map((item: any, index: any) => (
                 <tr key={index} className="border-b border-gray-200">
                   <td className="py-3 px-4 border-r border-gray-200 font-medium">{item.product_code || '-'}</td>
                   <td className="py-3 px-4 border-r border-gray-200">{item.brand_name || '-'}</td>

@@ -13,7 +13,7 @@ import { cn } from "@/lib/utils";
 import ExportDropdown from "../common/ExportDropdown";
 import { getRateToAed } from "@/utils/currency";
 
-export default function PoGrnReport({ purchaseOrders, goodsReceipts, suppliers = [] as any[], companySettings, canExport }) {
+export default function PoGrnReport({ purchaseOrders, goodsReceipts, suppliers = [] as any[], companySettings, canExport }: any) {
   // PO section filter state
   const [poSelectedStatuses, setPoSelectedStatuses] = useState<any[]>([]);
   const [poSelectedSuppliers, setPoSelectedSuppliers] = useState<any[]>([]);
@@ -34,12 +34,12 @@ export default function PoGrnReport({ purchaseOrders, goodsReceipts, suppliers =
   const [grnItemsPerPage, setGrnItemsPerPage] = useState(20);
 
   // Shared utilities
-  const getSupplierName = (supplierId) => {
+  const getSupplierName = (supplierId: any) => {
     const supplier = suppliers.find((s: any) => s.id === supplierId || s.id === Number(supplierId));
     return supplier?.name || 'Unknown Supplier';
   };
 
-  const formatCurrency = (amount, currency) => {
+  const formatCurrency = (amount: any, currency: any) => {
     const formatter = new Intl.NumberFormat('en-US', {
       minimumFractionDigits: 2,
       maximumFractionDigits: 2,
@@ -48,21 +48,21 @@ export default function PoGrnReport({ purchaseOrders, goodsReceipts, suppliers =
     return `${currency} ${formatter.format(numericAmount)}`;
   };
 
-  const getFxRate = (po) => {
+  const getFxRate = (po: any) => {
     const storedRate = parseFloat(po.fxRateToAed || po.fx_rate_to_aed);
     if (!isNaN(storedRate) && storedRate > 0) return storedRate;
     const currency = po.currency || 'GBP';
     return getRateToAed(currency, companySettings);
   };
 
-  const calculateAEDAmount = (po) => {
+  const calculateAEDAmount = (po: any) => {
     const numericAmount = parseFloat(po.totalAmount || po.total_amount || 0);
     const currency = po.currency || 'GBP';
     if (currency === 'AED') return numericAmount;
     return numericAmount * getFxRate(po);
   };
 
-  const formatDate = (dateString) => {
+  const formatDate = (dateString: any) => {
     if (!dateString) return '-';
     try {
       const date = new Date(dateString);
@@ -75,7 +75,7 @@ export default function PoGrnReport({ purchaseOrders, goodsReceipts, suppliers =
   const sortedSuppliers = [...suppliers].sort((a: any, b: any) => (a.name || '').localeCompare(b.name || ''));
 
   // Generic date filter — accepts the dateRange value as a parameter
-  const applyDateFilter = (po, dateRange) => {
+  const applyDateFilter = (po: any, dateRange: any) => {
     if (dateRange === "all") return true;
     const dateValue = po.orderDate || po.order_date;
     if (!dateValue) return false;
@@ -106,7 +106,7 @@ export default function PoGrnReport({ purchaseOrders, goodsReceipts, suppliers =
   };
 
   // GRN-specific date filter using receivedDate
-  const applyGrnDateFilter = (grn, dateRange) => {
+  const applyGrnDateFilter = (grn: any, dateRange: any) => {
     if (dateRange === "all") return true;
     const dateValue = grn.receivedDate || grn.received_date;
     if (!dateValue) return false;
@@ -147,7 +147,7 @@ export default function PoGrnReport({ purchaseOrders, goodsReceipts, suppliers =
   };
   const hasPoFilters = poSelectedStatuses.length > 0 || poSelectedSuppliers.length > 0 || poDateRange !== "all";
 
-  const handlePoDateRangeChange = (value) => {
+  const handlePoDateRangeChange = (value: any) => {
     if (value !== 'custom') setPoCustomRange({ from: null, to: null });
     setPoDateRange(value);
     setCurrentPage(1);
@@ -176,7 +176,7 @@ export default function PoGrnReport({ purchaseOrders, goodsReceipts, suppliers =
   };
   const hasGrnFilters = grnSelectedSuppliers.length > 0 || grnDateRange !== "all";
 
-  const handleGrnDateRangeChange = (value) => {
+  const handleGrnDateRangeChange = (value: any) => {
     if (value !== 'custom') setGrnCustomRange({ from: null, to: null });
     setGrnDateRange(value);
     setGrnCurrentPage(1);
@@ -278,7 +278,7 @@ export default function PoGrnReport({ purchaseOrders, goodsReceipts, suppliers =
   ];
 
   // Reusable supplier filter popover content
-  const SupplierFilterPopover = ({ selected, setSelected, onReset, idPrefix }) => (
+  const SupplierFilterPopover = ({ selected, setSelected, onReset, idPrefix }: any) => (
     <Popover>
       <PopoverTrigger asChild>
         <Button variant="outline" className="justify-between w-48">
@@ -296,7 +296,7 @@ export default function PoGrnReport({ purchaseOrders, goodsReceipts, suppliers =
                   id={`${idPrefix}-supplier-${supplier.id}`}
                   checked={selected.includes(supplier.id)}
                   onCheckedChange={(checked) => {
-                    setSelected(prev => checked ? [...prev, supplier.id] : prev.filter((id: any) => id !== supplier.id));
+                    setSelected((prev: any) => checked ? [...prev, supplier.id] : prev.filter((id: any) => id !== supplier.id));
                     onReset();
                   }}
                 />
@@ -312,7 +312,7 @@ export default function PoGrnReport({ purchaseOrders, goodsReceipts, suppliers =
   );
 
   // Reusable date range filter
-  const DateRangeFilter = ({ dateRange, onDateRangeChange, dateRangeOpen, setDateRangeOpen, customRange, pendingRange, setPendingRange, applyCustomRange, formatRange }) => (
+  const DateRangeFilter = ({ dateRange, onDateRangeChange, dateRangeOpen, setDateRangeOpen, customRange, pendingRange, setPendingRange, applyCustomRange, formatRange }: any) => (
     <>
       <Select value={typeof dateRange === 'object' ? 'custom' : dateRange} onValueChange={onDateRangeChange}>
         <SelectTrigger className="w-32">
@@ -514,7 +514,7 @@ export default function PoGrnReport({ purchaseOrders, goodsReceipts, suppliers =
                 </TableRow>
               </TableHeader>
               <TableBody>
-                {paginatedPOs.map((po) => {
+                {paginatedPOs.map((po: any) => {
                   const suppId = po.supplierId || po.supplier_id;
                   const currency = po.currency || 'GBP';
                   const originalAmount = Number(po.totalAmount || po.total_amount || 0);
@@ -642,7 +642,7 @@ export default function PoGrnReport({ purchaseOrders, goodsReceipts, suppliers =
                 </TableRow>
               </TableHeader>
               <TableBody>
-                {paginatedGRNs.map((grn) => {
+                {paginatedGRNs.map((grn: any) => {
                   const linkedPo = purchaseOrders.find((p: any) => p.id === (grn.poId || grn.po_id));
                   const suppId = grn.supplierId || grn.supplier_id || linkedPo?.supplierId || linkedPo?.supplier_id;
                   const poAed = linkedPo ? calculateAEDAmount(linkedPo) : 0;

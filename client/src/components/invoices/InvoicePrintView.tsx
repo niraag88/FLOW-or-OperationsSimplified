@@ -49,7 +49,7 @@ export default function InvoicePrintView() {
 
   // Remove auto-print behavior to match quotations - let user choose when to print
 
-  const formatDate = (dateString) => {
+  const formatDate = (dateString: any) => {
     if (!dateString) return '';
     try {
       const date = new Date(dateString);
@@ -57,7 +57,7 @@ export default function InvoicePrintView() {
     } catch { return ''; }
   };
 
-  const formatCurrency = (amount, currency = 'AED') => {
+  const formatCurrency = (amount: any, currency = 'AED') => {
     const num = parseFloat(amount) || 0;
     return `${currency} ${num.toFixed(2)}`;
   };
@@ -181,7 +181,7 @@ export default function InvoicePrintView() {
               </tr>
             </thead>
             <tbody>
-              {invoice.items && invoice.items.map((item, index) => (
+              {invoice.items && invoice.items.map((item: any, index: any) => (
                 <tr key={index}>
                   <td className="text-center">{item.product_code || '-'}</td>
                   <td>{item.description}</td>

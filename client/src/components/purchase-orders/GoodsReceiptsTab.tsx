@@ -40,7 +40,7 @@ export default function GoodsReceiptsTab({
   setShowOpenReceipts,
   showClosedReceipts,
   setShowClosedReceipts
-}) {
+}: any) {
   const [receivingQuantities, setReceivingQuantities] = useState<any>({});
   const [processingPO, setProcessingPO] = useState<any>(null);
   const [showCloseConfirm, setShowCloseConfirm] = useState(false);
@@ -71,7 +71,7 @@ export default function GoodsReceiptsTab({
   const ALLOWED_TYPES = ['application/pdf', 'image/jpeg', 'image/jpg', 'image/png'];
   const MAX_DOC_SIZE = 2 * 1024 * 1024;
 
-  const updatePendingDoc = (idx, file) => {
+  const updatePendingDoc = (idx: any, file: any) => {
     setPendingDocs(prev => {
       const arr = [...prev];
       arr[idx] = file;
@@ -79,7 +79,7 @@ export default function GoodsReceiptsTab({
     });
   };
 
-  const handlePendingDocSelect = (idx, e) => {
+  const handlePendingDocSelect = (idx: any, e: any) => {
     const file = e.target.files?.[0];
     e.target.value = '';
     if (!file) return;
@@ -94,9 +94,9 @@ export default function GoodsReceiptsTab({
     updatePendingDoc(idx, file);
   };
 
-  const uploadGrnDocToStorage = async (grnId, slot, file) => {
+  const uploadGrnDocToStorage = async (grnId: any, slot: any, file: any) => {
     const extMap = { 'application/pdf': 'pdf', 'image/png': 'png', 'image/jpeg': 'jpg', 'image/jpg': 'jpg' };
-    const ext = extMap[file.type] || 'pdf';
+    const ext = extMap[file.type as keyof typeof extMap] || 'pdf';
     const storageKey = `goods-receipts/${new Date().getFullYear()}/${grnId}-doc${slot}.${ext}`;
     const formData = new FormData();
     formData.append('file', file);
@@ -123,7 +123,7 @@ export default function GoodsReceiptsTab({
     return storageKey;
   };
 
-  const handleGrnAttachSuccess = async (scanKey) => {
+  const handleGrnAttachSuccess = async (scanKey: any) => {
     if (!attachGrnState) return;
     await fetch(`/api/goods-receipts/${attachGrnState.grnId}/scan-key`, {
       method: 'PATCH',
@@ -135,7 +135,7 @@ export default function GoodsReceiptsTab({
     if (onRefresh) onRefresh();
   };
 
-  const handleRemoveGrnDoc = async (grnId, slot) => {
+  const handleRemoveGrnDoc = async (grnId: any, slot: any) => {
     try {
       const resp = await fetch(`/api/goods-receipts/${grnId}/scan-key/${slot}`, {
         method: 'DELETE',
@@ -149,7 +149,7 @@ export default function GoodsReceiptsTab({
     }
   };
 
-  const handleViewGrnDoc = async (scanKey) => {
+  const handleViewGrnDoc = async (scanKey: any) => {
     try {
       const res = await fetch(`/api/storage/signed-get?key=${encodeURIComponent(scanKey)}`, { credentials: 'include' });
       const data = await res.json();
@@ -160,7 +160,7 @@ export default function GoodsReceiptsTab({
     }
   };
 
-  const getStatusColor = (status) => {
+  const getStatusColor = (status: any) => {
     switch (status?.toLowerCase()) {
       case 'draft': return 'bg-gray-100 text-gray-800';
       case 'submitted': return 'bg-blue-100 text-blue-800';
@@ -169,27 +169,27 @@ export default function GoodsReceiptsTab({
     }
   };
 
-  const handleQuantityChange = (poId, itemIndex, quantity) => {
-    setReceivingQuantities(prev => ({
+  const handleQuantityChange = (poId: any, itemIndex: any, quantity: any) => {
+    setReceivingQuantities((prev: any) => ({
       ...prev,
       [`${poId}-${itemIndex}`]: parseInt(quantity) || 0
     }));
   };
 
-  const handleReceiveQuantityChange = (itemId, value) => {
-    setReceiveQuantities(prev => ({
+  const handleReceiveQuantityChange = (itemId: any, value: any) => {
+    setReceiveQuantities((prev: any) => ({
       ...prev,
       [itemId]: value === '' ? '' : Math.max(0, parseInt(value) || 0)
     }));
   };
 
   // These functions now simply return the server-provided data
-  const getLineItemsCount = (po) => po.lineItems || 0;
-  const getTotalOrderedQuantity = (po) => Number(po.orderedQty) || 0;
-  const getTotalReceivedQuantity = (po) => Number(po.receivedQty) || 0;
+  const getLineItemsCount = (po: any) => po.lineItems || 0;
+  const getTotalOrderedQuantity = (po: any) => Number(po.orderedQty) || 0;
+  const getTotalReceivedQuantity = (po: any) => Number(po.receivedQty) || 0;
 
   // Handler functions for closed PO actions — delegate to shared utilities in export.jsx
-  const handleViewAndPrint = async (po) => {
+  const handleViewAndPrint = async (po: any) => {
     try {
       await printPOGRNSummary(po.id);
     } catch {
@@ -197,7 +197,7 @@ export default function GoodsReceiptsTab({
     }
   };
 
-  const handleExportToXLSX = async (po) => {
+  const handleExportToXLSX = async (po: any) => {
     try {
       await exportPODetailToXLSX(po.id, po.poNumber);
       toast({ title: "Export successful", description: `${po.poNumber} exported to Excel.` });
@@ -207,12 +207,12 @@ export default function GoodsReceiptsTab({
     }
   };
 
-  const handleDeletePO = (po) => {
+  const handleDeletePO = (po: any) => {
     setDeletingPO(po);
     setShowDeleteDialog(true);
   };
 
-  const handleReopenPO = async (po) => {
+  const handleReopenPO = async (po: any) => {
     try {
       const res = await fetch(`/api/purchase-orders/${po.id}/status`, {
         method: 'PATCH',
@@ -267,7 +267,7 @@ export default function GoodsReceiptsTab({
   };
 
   // Helper function to render purchase order table (used as fallback; main views use inline HTML tables)
-  const renderPOTable = (pos, isClosedSection = false) => (
+  const renderPOTable = (pos: any, isClosedSection = false) => (
     <Table>
       <TableHeader>
         <TableRow>
@@ -285,7 +285,7 @@ export default function GoodsReceiptsTab({
         </TableRow>
       </TableHeader>
       <TableBody>
-        {pos.map((po) => {
+        {pos.map((po: any) => {
           const ordQty = getTotalOrderedQuantity(po);
           const recQty = getTotalReceivedQuantity(po);
           const isPartial = ordQty > 0 && recQty < ordQty;
@@ -378,7 +378,7 @@ export default function GoodsReceiptsTab({
     </Table>
   );
 
-  const openReceiveDialog = async (po) => {
+  const openReceiveDialog = async (po: any) => {
     try {
       // Fetch the purchase order items only when opening the dialog
       const response = await fetch(`/api/purchase-orders/${po.id}/items`, { credentials: 'include' });
@@ -427,7 +427,7 @@ export default function GoodsReceiptsTab({
         };
       }) || [];
 
-      if (items.every(item => item.receivedQuantity === 0) && !forceClose) {
+      if (items.every((item: any) => item.receivedQuantity === 0) && !forceClose) {
         toast({
           title: "No quantities entered",
           description: "Please enter at least one quantity to receive or use 'Save & Close' to close the PO.",
@@ -503,7 +503,7 @@ export default function GoodsReceiptsTab({
   };
 
 
-  const getReceivedQuantityForItem = (poId, productId) => {
+  const getReceivedQuantityForItem = (poId: any, productId: any) => {
     const relatedGRNs = goodsReceipts.filter((grn: any) => (grn.poId ?? grn.purchase_order_id) === poId);
     let totalReceived = 0;
     relatedGRNs.forEach((grn: any) => {
@@ -516,7 +516,7 @@ export default function GoodsReceiptsTab({
     return totalReceived;
   };
 
-  const handleForceCloseClick = (po) => {
+  const handleForceCloseClick = (po: any) => {
     setClosingPO(po);
     setShowCloseConfirm(true);
   };
@@ -619,17 +619,17 @@ export default function GoodsReceiptsTab({
   const closedFiltersActive = closedSupplier !== 'all' || !!closedDateFrom || !!closedDateTo || closedDelivery !== 'all';
 
   // Shared column transforms
-  const dateTransform = (date) => date && !isNaN(new Date(date).getTime()) ? format(new Date(date), 'dd/MM/yy') : '';
-  const totalTransform = (amount, row) => formatCurrency(amount || 0, row?.currency || 'GBP');
-  const getAedEquivalent = (po) => {
+  const dateTransform = (date: any) => date && !isNaN(new Date(date).getTime()) ? format(new Date(date), 'dd/MM/yy') : '';
+  const totalTransform = (amount: any, row: any) => formatCurrency(amount || 0, row?.currency || 'GBP');
+  const getAedEquivalent = (po: any) => {
     const amount = parseFloat(po.totalAmount) || 0;
     const currency = po.currency || 'GBP';
     if (currency === 'AED') return amount;
     const rate = parseFloat(po.fxRateToAed) || 4.85;
     return amount * rate;
   };
-  const aedTransform = (_, row) => `AED ${getAedEquivalent(row).toFixed(2)}`;
-  const deliveryTransform = (_, row) => {
+  const aedTransform = (_: any, row: any) => `AED ${getAedEquivalent(row).toFixed(2)}`;
+  const deliveryTransform = (_: any, row: any) => {
     const ordQty = getTotalOrderedQuantity(row);
     const recQty = getTotalReceivedQuantity(row);
     return ordQty > 0 && recQty < ordQty ? 'Short Delivery' : 'Complete';
@@ -638,42 +638,42 @@ export default function GoodsReceiptsTab({
   // Open section export columns (matches on-screen columns)
   const openExportColumns = {
     poNumber: "PO Number",
-    supplierName: { label: "Supplier", transform: (v, row) => v || row?.brandName || '' },
+    supplierName: { label: "Supplier", transform: (v: any, row: any) => v || row?.brandName || '' },
     orderDate: { label: "Order Date", transform: dateTransform },
     totalAmount: { label: "Total", transform: totalTransform },
     grandTotal: { label: "Total (AED)", transform: aedTransform },
-    lineItems: { label: "Line Items", transform: (_, row) => getLineItemsCount(row) },
-    orderedQty: { label: "Ordered", transform: (_, row) => getTotalOrderedQuantity(row) },
-    receivedQty: { label: "Received", transform: (_, row) => getTotalReceivedQuantity(row) },
-    status: { label: "Status", transform: (s) => s?.toUpperCase() || '' },
+    lineItems: { label: "Line Items", transform: (_: any, row: any) => getLineItemsCount(row) },
+    orderedQty: { label: "Ordered", transform: (_: any, row: any) => getTotalOrderedQuantity(row) },
+    receivedQty: { label: "Received", transform: (_: any, row: any) => getTotalReceivedQuantity(row) },
+    status: { label: "Status", transform: (s: any) => s?.toUpperCase() || '' },
   };
 
   // Closed section export columns (matches on-screen columns)
   const closedExportColumns = {
     poNumber: "PO Number",
-    supplierName: { label: "Supplier", transform: (v, row) => v || row?.brandName || '' },
+    supplierName: { label: "Supplier", transform: (v: any, row: any) => v || row?.brandName || '' },
     orderDate: { label: "Order Date", transform: dateTransform },
     totalAmount: { label: "Total", transform: totalTransform },
     grandTotal: { label: "Total (AED)", transform: aedTransform },
-    lineItems: { label: "Lines", transform: (_, row) => getLineItemsCount(row) },
-    orderedQty: { label: "Ordered", transform: (_, row) => getTotalOrderedQuantity(row) },
-    receivedQty: { label: "Received", transform: (_, row) => getTotalReceivedQuantity(row) },
+    lineItems: { label: "Lines", transform: (_: any, row: any) => getLineItemsCount(row) },
+    orderedQty: { label: "Ordered", transform: (_: any, row: any) => getTotalOrderedQuantity(row) },
+    receivedQty: { label: "Received", transform: (_: any, row: any) => getTotalReceivedQuantity(row) },
     delivery: { label: "Delivery", transform: deliveryTransform },
-    status: { label: "Status", transform: (s) => s?.toUpperCase() || '' },
+    status: { label: "Status", transform: (s: any) => s?.toUpperCase() || '' },
   };
 
   // Combined column set for when both sections are visible: superset of open + closed columns
   const combinedExportColumns = {
     poNumber: "PO Number",
-    supplierName: { label: "Supplier", transform: (v, row) => v || row?.brandName || '' },
+    supplierName: { label: "Supplier", transform: (v: any, row: any) => v || row?.brandName || '' },
     orderDate: { label: "Order Date", transform: dateTransform },
     totalAmount: { label: "Total", transform: totalTransform },
     grandTotal: { label: "Total (AED)", transform: aedTransform },
-    lineItems: { label: "Lines", transform: (_, row) => getLineItemsCount(row) },
-    orderedQty: { label: "Ordered", transform: (_, row) => getTotalOrderedQuantity(row) },
-    receivedQty: { label: "Received", transform: (_, row) => getTotalReceivedQuantity(row) },
-    status: { label: "Status", transform: (s) => s?.toUpperCase() || '' },
-    delivery: { label: "Delivery", transform: (_, row) => row.status === 'closed' ? deliveryTransform(null, row) : '' },
+    lineItems: { label: "Lines", transform: (_: any, row: any) => getLineItemsCount(row) },
+    orderedQty: { label: "Ordered", transform: (_: any, row: any) => getTotalOrderedQuantity(row) },
+    receivedQty: { label: "Received", transform: (_: any, row: any) => getTotalReceivedQuantity(row) },
+    status: { label: "Status", transform: (s: any) => s?.toUpperCase() || '' },
+    delivery: { label: "Delivery", transform: (_: any, row: any) => row.status === 'closed' ? deliveryTransform(null, row) : '' },
   };
 
   // Context-aware export — wired to filtered lists
@@ -811,7 +811,7 @@ export default function GoodsReceiptsTab({
                         </tr>
                       </thead>
                       <tbody>
-                        {filteredOpenPOs.map((po) => (
+                        {filteredOpenPOs.map((po: any) => (
                           <tr key={po.id} className="border-b transition-colors hover:bg-muted/50">
                             <td className="p-2 align-middle font-medium" style={{width: '120px'}}>{po.poNumber}</td>
                             <td className="p-2 align-middle" style={{width: '140px'}}>{po.brandName || 'Unknown Brand'}</td>
@@ -948,7 +948,7 @@ export default function GoodsReceiptsTab({
                       </tr>
                     </thead>
                     <tbody>
-                      {filteredClosedPOs.map((po) => {
+                      {filteredClosedPOs.map((po: any) => {
                         const poGRNs = (goodsReceipts || []).filter((grn: any) => (grn.poId ?? grn.purchase_order_id) === po.id);
                         const ordQty = getTotalOrderedQuantity(po);
                         const recQty = getTotalReceivedQuantity(po);
@@ -1117,7 +1117,7 @@ export default function GoodsReceiptsTab({
                 </TableRow>
               </TableHeader>
               <TableBody>
-                {selectedPOForReceive?.items?.map((item, index) => {
+                {selectedPOForReceive?.items?.map((item: any, index: any) => {
                   const totalReceived = getReceivedQuantityForItem(selectedPOForReceive.id, item.productId);
                   const remaining = item.quantity - totalReceived;
                   
@@ -1225,7 +1225,7 @@ export default function GoodsReceiptsTab({
             
             {/* Dynamic button logic based on whether all quantities match */}
             {(() => {
-              const allItemsFullyReceived = selectedPOForReceive?.items?.every(item => {
+              const allItemsFullyReceived = selectedPOForReceive?.items?.every((item: any) => {
                 const totalReceived = getReceivedQuantityForItem(selectedPOForReceive.id, item.productId);
                 const currentReceiving = receiveQuantities[item.id] || 0;
                 return (totalReceived + currentReceiving) >= item.quantity;

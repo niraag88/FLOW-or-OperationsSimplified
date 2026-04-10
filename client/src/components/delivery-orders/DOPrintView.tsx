@@ -42,7 +42,7 @@ export default function DOPrintView() {
 
   // No auto-print — let the user choose when to print (matches Invoice & Quotation behaviour)
 
-  const formatDate = (dateString) => {
+  const formatDate = (dateString: any) => {
     if (!dateString) return '';
     try {
       const date = new Date(dateString);
@@ -50,7 +50,7 @@ export default function DOPrintView() {
     } catch { return ''; }
   };
 
-  const formatCurrency = (amount, currency = 'AED') => {
+  const formatCurrency = (amount: any, currency = 'AED') => {
     const num = parseFloat(amount) || 0;
     return `${currency} ${num.toFixed(2)}`;
   };
@@ -172,7 +172,7 @@ export default function DOPrintView() {
               </tr>
             </thead>
             <tbody>
-              {deliveryOrder.items && deliveryOrder.items.map((item, index) => (
+              {deliveryOrder.items && deliveryOrder.items.map((item: any, index: any) => (
                 <tr key={index}>
                   <td className="text-center">{item.product_code || '-'}</td>
                   <td>{item.description || item.product_name || '-'}</td>

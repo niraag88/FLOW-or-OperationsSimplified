@@ -30,14 +30,14 @@ export default function QuotationsListPrintView() {
       });
   }, []);
 
-  const fmtDate = (d) => {
+  const fmtDate = (d: any) => {
     if (!d) return '';
     try { return format(new Date(d), 'dd/MM/yy'); } catch { return ''; }
   };
 
-  const fmtNum = (v) => (parseFloat(v) || 0).toFixed(2);
+  const fmtNum = (v: any) => (parseFloat(v) || 0).toFixed(2);
 
-  const statusLabel = (s) => {
+  const statusLabel = (s: any) => {
     if (!s) return '';
     return s.charAt(0).toUpperCase() + s.slice(1);
   };
@@ -128,7 +128,7 @@ export default function QuotationsListPrintView() {
                   </td>
                 </tr>
               ) : (
-                quotations.map((q, i) => (
+                quotations.map((q: any, i: any) => (
                   <tr key={q.id}>
                     <td style={{ textAlign: 'center' }}>{i + 1}</td>
                     <td>{q.quoteNumber}</td>

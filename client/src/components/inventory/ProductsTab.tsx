@@ -40,19 +40,19 @@ export default function ProductsTab({
   totalPages,
   startIndex,
   endIndex
-}) {
+}: any) {
   const navigate = useNavigate();
 
   // State variables for SimpleConfirmDialog
   const [dialogOpen, setDialogOpen] = useState(false);
   const [productToDelete, setProductToDelete] = useState<any>(null);
 
-  const handleDeleteClick = (product) => {
+  const handleDeleteClick = (product: any) => {
     setProductToDelete(product);
     setDialogOpen(true);
   };
 
-  const handleModifyClick = (product) => {
+  const handleModifyClick = (product: any) => {
     navigate(`/products/edit/${product.id}`);
   };
 
@@ -182,9 +182,9 @@ export default function ProductsTab({
                             checked={selectedBrands.includes(brand)}
                             onCheckedChange={(checked) => {
                               if (checked) {
-                                setSelectedBrands(prev => [...prev, brand]);
+                                setSelectedBrands((prev: any) => [...prev, brand]);
                               } else {
-                                setSelectedBrands(prev => prev.filter((b: any) => b !== brand));
+                                setSelectedBrands((prev: any) => prev.filter((b: any) => b !== brand));
                               }
                               resetPagination();
                             }}
@@ -221,9 +221,9 @@ export default function ProductsTab({
                             checked={selectedSizes.includes(size)}
                             onCheckedChange={(checked) => {
                               if (checked) {
-                                setSelectedSizes(prev => [...prev, size]);
+                                setSelectedSizes((prev: any) => [...prev, size]);
                               } else {
-                                setSelectedSizes(prev => prev.filter((s: any) => s !== size));
+                                setSelectedSizes((prev: any) => prev.filter((s: any) => s !== size));
                               }
                               resetPagination();
                             }}
@@ -267,7 +267,7 @@ export default function ProductsTab({
                     <X 
                       className="h-3 w-3 cursor-pointer" 
                       onClick={() => {
-                        setSelectedBrands(prev => prev.filter((b: any) => b !== brand));
+                        setSelectedBrands((prev: any) => prev.filter((b: any) => b !== brand));
                         resetPagination();
                       }}
                     />
@@ -279,7 +279,7 @@ export default function ProductsTab({
                     <X 
                       className="h-3 w-3 cursor-pointer" 
                       onClick={() => {
-                        setSelectedSizes(prev => prev.filter((s: any) => s !== size));
+                        setSelectedSizes((prev: any) => prev.filter((s: any) => s !== size));
                         resetPagination();
                       }}
                     />
@@ -312,7 +312,7 @@ export default function ProductsTab({
                     </TableRow>
                   </TableHeader>
                   <TableBody>
-                    {paginatedProducts.map((product) => (
+                    {paginatedProducts.map((product: any) => (
                       <TableRow
                         key={product.id}
                         className="hover:bg-gray-50 transition-colors duration-200"
@@ -399,7 +399,7 @@ export default function ProductsTab({
                         <Button
                           variant="outline"
                           
-                          onClick={() => setCurrentPage(prev => Math.max(1, prev - 1))}
+                          onClick={() => setCurrentPage((prev: any) => Math.max(1, prev - 1))}
                           disabled={currentPage === 1}
                         >
                           Previous
@@ -435,7 +435,7 @@ export default function ProductsTab({
                         <Button
                           variant="outline"
                           
-                          onClick={() => setCurrentPage(prev => Math.min(totalPages, prev + 1))}
+                          onClick={() => setCurrentPage((prev: any) => Math.min(totalPages, prev + 1))}
                           disabled={currentPage === totalPages}
                         >
                           Next

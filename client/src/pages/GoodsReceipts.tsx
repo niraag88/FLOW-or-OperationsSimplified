@@ -57,7 +57,7 @@ export default function GoodsReceipts() {
     po.status === 'submitted'
   );
 
-  const handlePOSelection = async (poId) => {
+  const handlePOSelection = async (poId: any) => {
     try {
       const response = await fetch(`/api/purchase-orders/${poId}/items`, { credentials: 'include' });
       if (!response.ok) throw new Error('Failed to fetch PO items');
@@ -81,7 +81,7 @@ export default function GoodsReceipts() {
     }
   };
 
-  const handleQuantityChange = (itemId, quantity) => {
+  const handleQuantityChange = (itemId: any, quantity: any) => {
     const numQuantity = Math.max(0, parseInt(quantity) || 0);
     setReceivingItems(prev =>
       prev.map((item: any) =>
@@ -305,7 +305,7 @@ export default function GoodsReceipts() {
                 </TableRow>
               </TableHeader>
               <TableBody>
-                {goodsReceipts.map((receipt) => (
+                {goodsReceipts.map((receipt: any) => (
                   <TableRow key={receipt.id}>
                     <TableCell className="font-mono font-medium">
                       {receipt.receiptNumber}

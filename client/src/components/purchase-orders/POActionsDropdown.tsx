@@ -15,7 +15,7 @@ import SimpleConfirmDialog from "../common/SimpleConfirmDialog";
 import MarkPOPaidDialog from "./MarkPOPaidDialog";
 import UploadFileDialog from "../common/UploadFileDialog";
 
-export default function POActionsDropdown({ po, canEdit, onEdit, onRefresh, currentUser }) {
+export default function POActionsDropdown({ po, canEdit, onEdit, onRefresh, currentUser }: any) {
   const { toast } = useToast();
   const [showDeleteDialog, setShowDeleteDialog] = useState(false);
   const [showMarkPaidDialog, setShowMarkPaidDialog] = useState(false);
@@ -86,7 +86,7 @@ export default function POActionsDropdown({ po, canEdit, onEdit, onRefresh, curr
     }
   };
 
-  const handleUploadSuccess = async (storageKey) => {
+  const handleUploadSuccess = async (storageKey: any) => {
     try {
       const res = await fetch(`/api/purchase-orders/${po.id}/scan-key`, {
         method: 'PATCH',

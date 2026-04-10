@@ -1,4 +1,4 @@
-export const getDerivedInvoiceStatus = (invoice) => {
+export const getDerivedInvoiceStatus = (invoice: any) => {
   if (invoice.status === 'draft') {
     return 'draft';
   }

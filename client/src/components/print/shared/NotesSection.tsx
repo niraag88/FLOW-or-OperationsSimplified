@@ -1,7 +1,7 @@
 export default function NotesSection({ 
   title = "Notes", 
   content 
-}) {
+}: any) {
   if (!content) return null;
   
   return (

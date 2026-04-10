@@ -17,11 +17,11 @@ import { exportStatementToXLSX } from "../utils/export";
 
 /* ── formatting helpers ─────────────────────────────────────────────────── */
 
-function fmt(v) {
+function fmt(v: any) {
   return new Intl.NumberFormat("en-US", { minimumFractionDigits: 2, maximumFractionDigits: 2 }).format(v || 0);
 }
 
-function fmtDate(val, full = false) {
+function fmtDate(val: any, full = false) {
   if (!val) return "—";
   try {
     const d = new Date(val);
@@ -34,18 +34,18 @@ function fmtDate(val, full = false) {
 
 /* ── small shared components ────────────────────────────────────────────── */
 
-function StatusBadge({ status }) {
+function StatusBadge({ status }: any) {
   if (status === "paid")
     return <Badge className="bg-green-100 text-green-800 border-green-300 text-xs font-medium">Paid</Badge>;
   return <Badge className="bg-amber-100 text-amber-800 border-amber-300 text-xs font-medium">Outstanding</Badge>;
 }
 
-function SummaryTiles({ records }) {
+function SummaryTiles({ records }: any) {
   const totals = useMemo(() => {
     let totalAed = 0, paidCount = 0, paidAed = 0, outCount = 0, outAed = 0;
     let totalOrig = 0, paidOrig = 0, outOrig = 0;
-    let origCurrency = null;
-    records.forEach((r) => {
+    let origCurrency: string | null = null;
+    records.forEach((r: any) => {
       totalAed  += r._aed || 0;
       totalOrig += r._origAmount || r._aed || 0;
       if (!origCurrency && r._currency && r._currency !== "AED") origCurrency = r._currency;
@@ -83,7 +83,7 @@ function SummaryTiles({ records }) {
   );
 }
 
-function CollapsibleSection({ title, icon: Icon, iconColor, children }) {
+function CollapsibleSection({ title, icon: Icon, iconColor, children }: any) {
   const [open, setOpen] = useState(false);
   return (
     <Card className="border-0 shadow-lg overflow-hidden">
@@ -106,9 +106,9 @@ function CollapsibleSection({ title, icon: Icon, iconColor, children }) {
 
 /* ── searchable combobox ────────────────────────────────────────────────── */
 
-function EntityCombobox({ items, value, onValueChange, placeholder = "Select…", allLabel = "All" }) {
+function EntityCombobox({ items, value, onValueChange, placeholder = "Select…", allLabel = "All" }: any) {
   const [popOpen, setPopOpen] = useState(false);
-  const selected = items.find((i) => String(i.id) === value) || null;
+  const selected = items.find((i: any) => String(i.id) === value) || null;
   return (
     <Popover open={popOpen} onOpenChange={setPopOpen}>
       <PopoverTrigger asChild>
@@ -135,7 +135,7 @@ function EntityCombobox({ items, value, onValueChange, placeholder = "Select…"
                 <Check className={`mr-2 h-4 w-4 ${!value ? "opacity-100" : "opacity-0"}`} />
                 {allLabel}
               </CommandItem>
-              {items.map((item) => (
+              {items.map((item: any) => (
                 <CommandItem
                   key={item.id}
                   value={item.name}
@@ -155,7 +155,7 @@ function EntityCombobox({ items, value, onValueChange, placeholder = "Select…"
 
 /* ── HTML escape helper for print window ────────────────────────────────── */
 
-function esc(s) {
+function esc(s: any) {
   return String(s == null ? "" : s)
     .replace(/&/g, "&amp;")
     .replace(/</g, "&lt;")
@@ -165,16 +165,16 @@ function esc(s) {
 
 /* ── buildStatementHtml — plain HTML string for window.open print ────────── */
 
-function buildStatementHtml({ type, entity, companySettings, records, dateFrom, dateTo, statusFilter }) {
+function buildStatementHtml({ type, entity, companySettings, records, dateFrom, dateTo, statusFilter }: any) {
   const totalAed = records.reduce((s: any, r: any) => s + (r._aed || 0), 0);
-  const paidAed  = records.filter((r) => r._paymentStatus === "paid").reduce((s: any, r: any) => s + (r._aed || 0), 0);
-  const outAed   = records.filter((r) => r._paymentStatus !== "paid").reduce((s: any, r: any) => s + (r._aed || 0), 0);
+  const paidAed  = records.filter((r: any) => r._paymentStatus === "paid").reduce((s: any, r: any) => s + (r._aed || 0), 0);
+  const outAed   = records.filter((r: any) => r._paymentStatus !== "paid").reduce((s: any, r: any) => s + (r._aed || 0), 0);
 
-  const origCurrency = records.find((r) => r._currency && r._currency !== "AED")?._currency || null;
+  const origCurrency = records.find((r: any) => r._currency && r._currency !== "AED")?._currency || null;
   const showDual = Boolean(origCurrency);
   const totalOrig = showDual ? records.reduce((s: any, r: any) => s + (r._origAmount || r._aed || 0), 0) : 0;
-  const paidOrig  = showDual ? records.filter((r) => r._paymentStatus === "paid").reduce((s: any, r: any) => s + (r._origAmount || r._aed || 0), 0) : 0;
-  const outOrig   = showDual ? records.filter((r) => r._paymentStatus !== "paid").reduce((s: any, r: any) => s + (r._origAmount || r._aed || 0), 0) : 0;
+  const paidOrig  = showDual ? records.filter((r: any) => r._paymentStatus === "paid").reduce((s: any, r: any) => s + (r._origAmount || r._aed || 0), 0) : 0;
+  const outOrig   = showDual ? records.filter((r: any) => r._paymentStatus !== "paid").reduce((s: any, r: any) => s + (r._origAmount || r._aed || 0), 0) : 0;
 
   const entityName    = entity?.name || "—";
   const entityAddress = type === "invoices" ? (entity?.billingAddress || entity?.address || "") : (entity?.description || "");
@@ -207,7 +207,7 @@ function buildStatementHtml({ type, entity, companySettings, records, dateFrom, 
 
   const dataRows = records.length === 0
     ? `<tr><td colspan="${type === "invoices" ? 8 : 7}" style="text-align:center;padding:16px;color:#9ca3af">No records</td></tr>`
-    : records.map((r, i) => {
+    : records.map((r: any, i: any) => {
         const statusBg    = r._paymentStatus === "paid" ? "#dcfce7" : "#fef3c7";
         const statusColor = r._paymentStatus === "paid" ? "#166534" : "#92400e";
         const statusText  = r._paymentStatus === "paid" ? "Paid" : "Outstanding";
@@ -336,16 +336,16 @@ function buildStatementHtml({ type, entity, companySettings, records, dateFrom, 
 
 /* ── statement layout (shared between modal preview and print portal) ───── */
 
-function StatementLayout({ type, entity, companySettings, records, dateFrom, dateTo, statusFilter }) {
+function StatementLayout({ type, entity, companySettings, records, dateFrom, dateTo, statusFilter }: any) {
   const totalAed = records.reduce((s: any, r: any) => s + (r._aed || 0), 0);
-  const paidAed  = records.filter((r) => r._paymentStatus === "paid").reduce((s: any, r: any) => s + (r._aed || 0), 0);
-  const outAed   = records.filter((r) => r._paymentStatus !== "paid").reduce((s: any, r: any) => s + (r._aed || 0), 0);
+  const paidAed  = records.filter((r: any) => r._paymentStatus === "paid").reduce((s: any, r: any) => s + (r._aed || 0), 0);
+  const outAed   = records.filter((r: any) => r._paymentStatus !== "paid").reduce((s: any, r: any) => s + (r._aed || 0), 0);
 
-  const origCurrency = records.find((r) => r._currency && r._currency !== "AED")?._currency || null;
+  const origCurrency = records.find((r: any) => r._currency && r._currency !== "AED")?._currency || null;
   const showDual = Boolean(origCurrency);
   const totalOrig = showDual ? records.reduce((s: any, r: any) => s + (r._origAmount || r._aed || 0), 0) : 0;
-  const paidOrig  = showDual ? records.filter((r) => r._paymentStatus === "paid").reduce((s: any, r: any) => s + (r._origAmount || r._aed || 0), 0) : 0;
-  const outOrig   = showDual ? records.filter((r) => r._paymentStatus !== "paid").reduce((s: any, r: any) => s + (r._origAmount || r._aed || 0), 0) : 0;
+  const paidOrig  = showDual ? records.filter((r: any) => r._paymentStatus === "paid").reduce((s: any, r: any) => s + (r._origAmount || r._aed || 0), 0) : 0;
+  const outOrig   = showDual ? records.filter((r: any) => r._paymentStatus !== "paid").reduce((s: any, r: any) => s + (r._origAmount || r._aed || 0), 0) : 0;
 
   const entityName    = entity?.name || "—";
   const entityAddress = type === "invoices" ? (entity?.billingAddress || entity?.address || "") : (entity?.description || "");
@@ -433,7 +433,7 @@ function StatementLayout({ type, entity, companySettings, records, dateFrom, dat
             <tbody>
               {records.length === 0 ? (
                 <tr><td colSpan={type === "invoices" ? 8 : 7} className="text-center py-6 text-gray-400">No records</td></tr>
-              ) : records.map((r, i) => (
+              ) : records.map((r: any, i: any) => (
                 <tr key={r.id || i} className="border-b border-gray-100">
                   <td className="text-center p-2 text-gray-500">{i + 1}</td>
                   {type === "invoices" ? (
@@ -498,7 +498,7 @@ function StatementLayout({ type, entity, companySettings, records, dateFrom, dat
 
 /* ── statement preview modal ────────────────────────────────────────────── */
 
-function StatementPreviewModal({ open, onClose, type, entity, companySettings, records, dateFrom, dateTo, statusFilter }) {
+function StatementPreviewModal({ open, onClose, type, entity, companySettings, records, dateFrom, dateTo, statusFilter }: any) {
   const handlePrint = useCallback(() => {
     const html = buildStatementHtml({ type, entity, companySettings, records, dateFrom, dateTo, statusFilter });
     const blob = new Blob([html], { type: "text/html" });
@@ -549,7 +549,7 @@ function StatementPreviewModal({ open, onClose, type, entity, companySettings, r
 
 /* ── Invoices section ───────────────────────────────────────────────────── */
 
-function InvoicesSection({ invoices, customers, companySettings }) {
+function InvoicesSection({ invoices, customers, companySettings }: any) {
   const [selectedCustomerId, setSelectedCustomerId] = useState("");
   const [statusFilter, setStatusFilter] = useState<any>("all");
   const [dateFrom, setDateFrom] = useState("");
@@ -558,20 +558,20 @@ function InvoicesSection({ invoices, customers, companySettings }) {
 
   const eligibleCustomers = useMemo(() => {
     const ids = new Set(
-      invoices.map((inv) => inv.customer_id ?? inv.customerId).filter(Boolean).map(String)
+      invoices.map((inv: any) => inv.customer_id ?? inv.customerId).filter(Boolean).map(String)
     );
     return (customers || [])
-      .filter((c) => ids.has(String(c.id)))
+      .filter((c: any) => ids.has(String(c.id)))
       .sort((a: any, b: any) => (a.name || "").localeCompare(b.name || ""));
   }, [invoices, customers]);
 
   const selectedCustomer = useMemo(
-    () => eligibleCustomers.find((c) => String(c.id) === selectedCustomerId) || null,
+    () => eligibleCustomers.find((c: any) => String(c.id) === selectedCustomerId) || null,
     [eligibleCustomers, selectedCustomerId]
   );
 
   const enriched = useMemo(() => {
-    return invoices.map((inv) => {
+    return invoices.map((inv: any) => {
       const origAmount = parseFloat(inv.total_amount || inv.totalAmount || inv.amount || 0);
       const subtotal = parseFloat(inv.subtotal || 0);
       const vat = parseFloat(inv.tax_amount || inv.vatAmount || 0);
@@ -596,7 +596,7 @@ function InvoicesSection({ invoices, customers, companySettings }) {
     if (!selectedCustomerId) return [];
     const fromTs = dateFrom ? new Date(dateFrom).getTime() : null;
     const toTs = dateTo ? new Date(dateTo + "T23:59:59").getTime() : null;
-    return enriched.filter((r) => {
+    return enriched.filter((r: any) => {
       if (r._customerId !== selectedCustomerId) return false;
       if (statusFilter !== "all" && r._paymentStatus !== statusFilter) return false;
       if (r._date && (fromTs || toTs)) {
@@ -610,14 +610,14 @@ function InvoicesSection({ invoices, customers, companySettings }) {
     });
   }, [enriched, selectedCustomerId, statusFilter, dateFrom, dateTo]);
 
-  const handleCustomerChange = (val) => {
+  const handleCustomerChange = (val: any) => {
     setSelectedCustomerId(val);
     setStatusFilter("all");
     setDateFrom("");
     setDateTo("");
   };
 
-  const exportData = filtered.map((r) => ({
+  const exportData = filtered.map((r: any) => ({
     invoice_number: r._ref,
     customer: r._customer,
     invoice_date: fmtDate(r._date),
@@ -735,7 +735,7 @@ function InvoicesSection({ invoices, customers, companySettings }) {
                 </TableCell>
               </TableRow>
             ) : (
-              filtered.map((r) => (
+              filtered.map((r: any) => (
                 <TableRow key={r.id} className="hover:bg-gray-50">
                   <TableCell className="font-medium text-blue-700">{r._ref}</TableCell>
                   <TableCell>{r._customer}</TableCell>
@@ -771,7 +771,7 @@ function InvoicesSection({ invoices, customers, companySettings }) {
 
 /* ── Purchase Orders section ────────────────────────────────────────────── */
 
-function PurchaseOrdersSection({ purchaseOrders, companySettings }) {
+function PurchaseOrdersSection({ purchaseOrders, companySettings }: any) {
   const [selectedBrandId, setSelectedBrandId] = useState("");
   const [statusFilter, setStatusFilter] = useState<any>("all");
   const [dateFrom, setDateFrom] = useState("");
@@ -785,7 +785,7 @@ function PurchaseOrdersSection({ purchaseOrders, companySettings }) {
 
   const eligibleBrands = useMemo(() => {
     const brandMap = new Map();
-    purchaseOrders.forEach((po) => {
+    purchaseOrders.forEach((po: any) => {
       const id = po.brandId || po.brand_id;
       const name = po.brandName || po.brand_name;
       if (id && name) brandMap.set(String(id), { id: String(id), name });
@@ -801,7 +801,7 @@ function PurchaseOrdersSection({ purchaseOrders, companySettings }) {
   }, [eligibleBrands, selectedBrandId, allBrands]);
 
   const enriched = useMemo(() => {
-    return purchaseOrders.map((po) => {
+    return purchaseOrders.map((po: any) => {
       const origAmt = parseFloat(po.totalAmount || po.total_amount || 0);
       const currency = po.currency || "AED";
       const storedRate = parseFloat(po.fxRateToAed || po.fx_rate_to_aed);
@@ -828,7 +828,7 @@ function PurchaseOrdersSection({ purchaseOrders, companySettings }) {
     if (!selectedBrandId) return [];
     const fromTs = dateFrom ? new Date(dateFrom).getTime() : null;
     const toTs = dateTo ? new Date(dateTo + "T23:59:59").getTime() : null;
-    return enriched.filter((r) => {
+    return enriched.filter((r: any) => {
       if (r._brandId !== selectedBrandId) return false;
       if (statusFilter !== "all" && r._paymentStatus !== statusFilter) return false;
       if (r._date && (fromTs || toTs)) {
@@ -842,14 +842,14 @@ function PurchaseOrdersSection({ purchaseOrders, companySettings }) {
     });
   }, [enriched, selectedBrandId, statusFilter, dateFrom, dateTo]);
 
-  const handleBrandChange = (val) => {
+  const handleBrandChange = (val: any) => {
     setSelectedBrandId(val);
     setStatusFilter("all");
     setDateFrom("");
     setDateTo("");
   };
 
-  const exportData = filtered.map((r) => ({
+  const exportData = filtered.map((r: any) => ({
     po_number: r._ref,
     brand: r._brand,
     order_date: fmtDate(r._date),
@@ -967,7 +967,7 @@ function PurchaseOrdersSection({ purchaseOrders, companySettings }) {
                 </TableCell>
               </TableRow>
             ) : (
-              filtered.map((r) => (
+              filtered.map((r: any) => (
                 <TableRow key={r.id} className="hover:bg-gray-50">
                   <TableCell className="font-medium text-purple-700">{r._ref}</TableCell>
                   <TableCell>{r._brand}</TableCell>

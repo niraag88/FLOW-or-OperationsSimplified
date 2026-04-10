@@ -1,8 +1,8 @@
 import React from 'react';
 import { format } from 'date-fns';
 
-export default function StockCountTemplate({ data, settings }) {
-  const formatDate = (dateString) => {
+export default function StockCountTemplate({ data, settings }: any) {
+  const formatDate = (dateString: any) => {
     if (!dateString) return '';
     return format(new Date(dateString), 'dd/MM/yy');
   };
@@ -90,7 +90,7 @@ export default function StockCountTemplate({ data, settings }) {
               </tr>
             </thead>
             <tbody>
-              {data.items.map((item, index) => (
+              {data.items.map((item: any, index: any) => (
                 <tr key={index} className="hover:bg-gray-50">
                   <td className="border border-gray-300 px-4 py-2">
                     {item.product_code || item.productCode}

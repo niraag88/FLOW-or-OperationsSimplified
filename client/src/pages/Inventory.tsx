@@ -93,7 +93,7 @@ export default function Inventory() {
     queryClient.invalidateQueries({ queryKey: ['/api/dashboard'] });
   };
 
-  const handleStockSubTabChange = (subTab, stockMovements, lowStockProducts, outOfStockProducts) => {
+  const handleStockSubTabChange = (subTab: any, stockMovements: any, lowStockProducts: any, outOfStockProducts: any) => {
     setStockSubTab(subTab);
     setStockSubTabData({ stockMovements, lowStockProducts, outOfStockProducts });
   };

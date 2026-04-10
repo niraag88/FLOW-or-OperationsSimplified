@@ -21,7 +21,7 @@ import { Lock, Unlock, AlertTriangle, PlusCircle, Download } from 'lucide-react'
 import { format, getYear, isValid, parseISO } from 'date-fns';
 import { useToast } from "@/hooks/use-toast";
 
-export default function BookClosingManager({ currentUser }) {
+export default function BookClosingManager({ currentUser }: any) {
   const [books, setBooks] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
   const [newYear, setNewYear] = useState<any>(getYear(new Date()));
@@ -31,7 +31,7 @@ export default function BookClosingManager({ currentUser }) {
   const [exportingId, setExportingId] = useState<any>(null);
   const { toast } = useToast();
 
-  const formatDate = (dateString) => {
+  const formatDate = (dateString: any) => {
     if (!dateString) return '-';
     try {
       const date = typeof dateString === 'string' ? parseISO(dateString) : new Date(dateString);
@@ -60,7 +60,7 @@ export default function BookClosingManager({ currentUser }) {
     }
   };
 
-  const handleAddNewYear = async (e) => {
+  const handleAddNewYear = async (e: any) => {
     e.preventDefault();
     const year = parseInt(newYear);
     if (isNaN(year) || year < 2000 || year > 2100) {
@@ -89,7 +89,7 @@ export default function BookClosingManager({ currentUser }) {
     }
   };
 
-  const validateYearEnd = async (book) => {
+  const validateYearEnd = async (book: any) => {
     const errors: any[] = [];
     const startDate = new Date(book.startDate);
     const endDate = new Date(book.endDate);
@@ -102,7 +102,7 @@ export default function BookClosingManager({ currentUser }) {
         fetch('/api/delivery-orders').then(r => r.json()).catch(() => []),
       ]);
 
-      const inRange = (dateVal) => {
+      const inRange = (dateVal: any) => {
         if (!dateVal) return false;
         const d = new Date(dateVal);
         return d >= startDate && d <= endDate;
@@ -137,7 +137,7 @@ export default function BookClosingManager({ currentUser }) {
     return errors.length === 0;
   };
 
-  const doCloseYear = async (book) => {
+  const doCloseYear = async (book: any) => {
     setShowValidationError(false);
     setPendingCloseBook(null);
     try {
@@ -155,7 +155,7 @@ export default function BookClosingManager({ currentUser }) {
     }
   };
 
-  const handleCloseYear = async (book) => {
+  const handleCloseYear = async (book: any) => {
     const ok = await validateYearEnd(book);
     if (!ok) {
       setPendingCloseBook(book);
@@ -165,7 +165,7 @@ export default function BookClosingManager({ currentUser }) {
     doCloseYear(book);
   };
 
-  const handleReopenYear = async (book) => {
+  const handleReopenYear = async (book: any) => {
     try {
       const res = await fetch(`/api/books/${book.id}`, {
         method: 'PUT',
@@ -181,7 +181,7 @@ export default function BookClosingManager({ currentUser }) {
     }
   };
 
-  const handleExportYear = async (book) => {
+  const handleExportYear = async (book: any) => {
     setExportingId(book.id);
     try {
       const res = await fetch(`/api/books/${book.id}/export`);
@@ -202,7 +202,7 @@ export default function BookClosingManager({ currentUser }) {
     }
   };
 
-  const getStatusBadge = (status) => {
+  const getStatusBadge = (status: any) => {
     return status === 'Closed'
       ? <Badge variant="destructive" className="bg-red-100 text-red-800"><Lock className="w-3 h-3 mr-1" />Closed</Badge>
       : <Badge variant="secondary" className="bg-green-100 text-green-800"><Unlock className="w-3 h-3 mr-1" />Open</Badge>;

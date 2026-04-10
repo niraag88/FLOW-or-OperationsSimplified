@@ -59,7 +59,7 @@ export default function BrandManagement() {
     }
   };
 
-  const handleSubmit = async (e) => {
+  const handleSubmit = async (e: any) => {
     e.preventDefault();
     
     if (!formData.name.trim()) {
@@ -111,7 +111,7 @@ export default function BrandManagement() {
     }
   };
 
-  const handleEdit = (brand) => {
+  const handleEdit = (brand: any) => {
     setEditingBrand(brand);
     setFormData({
       name: brand.name || "",
@@ -125,7 +125,7 @@ export default function BrandManagement() {
     setShowForm(true);
   };
 
-  const handleToggleActive = async (brand) => {
+  const handleToggleActive = async (brand: any) => {
     try {
       await Brand.update(brand.id, {
         name: brand.name,
@@ -142,7 +142,7 @@ export default function BrandManagement() {
     }
   };
 
-  const handleDeleteClick = (brand) => {
+  const handleDeleteClick = (brand: any) => {
     setBrandToDelete(brand);
     setDialogOpen(true);
   };
@@ -178,7 +178,7 @@ export default function BrandManagement() {
     setFormData(initialFormData);
   };
 
-  const handleInputChange = (field, value) => {
+  const handleInputChange = (field: any, value: any) => {
     setFormData(prev => ({ ...prev, [field]: value }));
   };
 

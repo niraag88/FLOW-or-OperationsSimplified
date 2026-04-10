@@ -58,7 +58,7 @@ export default function RecycleBinComponent() {
     }
   };
 
-  const handleSelectItem = (itemId, checked) => {
+  const handleSelectItem = (itemId: any, checked: any) => {
     const newSelected = new Set(selectedItems);
     if (checked) {
       newSelected.add(itemId);
@@ -68,7 +68,7 @@ export default function RecycleBinComponent() {
     setSelectedItems(newSelected);
   };
 
-  const handleSelectAll = (checked) => {
+  const handleSelectAll = (checked: any) => {
     if (checked) {
       const allIds = filteredItems.map((item: any) => item.id);
       setSelectedItems(new Set(allIds));
@@ -456,7 +456,7 @@ export default function RecycleBinComponent() {
 }
 
 // Helper functions moved outside the component as per outline
-const getDocumentIcon = (type) => {
+const getDocumentIcon = (type: any) => {
   switch (type) {
     case 'PurchaseOrder': return <ShoppingCart className="w-4 h-4" />;
     case 'Invoice': return <FileText className="w-4 h-4" />;
@@ -466,7 +466,7 @@ const getDocumentIcon = (type) => {
   }
 };
 
-const getDocumentColor = (type) => {
+const getDocumentColor = (type: any) => {
   switch (type) {
     case 'PurchaseOrder': return 'bg-emerald-100 text-emerald-800';
     case 'Invoice': return 'bg-purple-100 text-purple-800';

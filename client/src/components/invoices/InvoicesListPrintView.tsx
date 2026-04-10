@@ -30,14 +30,14 @@ export default function InvoicesListPrintView() {
       });
   }, []);
 
-  const fmtDate = (d) => {
+  const fmtDate = (d: any) => {
     if (!d) return '';
     try { return format(new Date(d), 'dd/MM/yy'); } catch { return ''; }
   };
 
-  const fmtNum = (v) => (parseFloat(v) || 0).toFixed(2);
+  const fmtNum = (v: any) => (parseFloat(v) || 0).toFixed(2);
 
-  const statusLabel = (s) => {
+  const statusLabel = (s: any) => {
     if (!s) return '';
     return s.charAt(0).toUpperCase() + s.slice(1);
   };
@@ -130,7 +130,7 @@ export default function InvoicesListPrintView() {
                   </td>
                 </tr>
               ) : (
-                invoices.map((inv, i) => (
+                invoices.map((inv: any, i: any) => (
                   <tr key={inv.id}>
                     <td style={{ textAlign: 'center' }}>{i + 1}</td>
                     <td>{inv.invoiceNumber}</td>

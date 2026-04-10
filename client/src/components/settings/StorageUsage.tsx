@@ -18,7 +18,7 @@ import { useToast } from '@/hooks/use-toast';
 
 const QUOTA_BYTES = 10 * 1024 * 1024 * 1024; // 10 GiB
 
-function formatBytes(bytes) {
+function formatBytes(bytes: any) {
   if (bytes == null || isNaN(bytes)) return '—';
   if (bytes >= 1024 * 1024 * 1024) return `${(bytes / (1024 * 1024 * 1024)).toFixed(2)} GB`;
   if (bytes >= 1024 * 1024) return `${(bytes / (1024 * 1024)).toFixed(1)} MB`;

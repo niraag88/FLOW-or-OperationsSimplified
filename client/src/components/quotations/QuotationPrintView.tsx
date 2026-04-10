@@ -51,7 +51,7 @@ export default function QuotationPrintView() {
     loadData();
   }, [navigate, routeId]);
 
-  const formatDate = (dateString) => {
+  const formatDate = (dateString: any) => {
     if (!dateString) return '';
     try {
       const date = new Date(dateString);
@@ -59,7 +59,7 @@ export default function QuotationPrintView() {
     } catch { return ''; }
   };
 
-  const formatCurrency = (amount, currency = 'AED') => {
+  const formatCurrency = (amount: any, currency = 'AED') => {
     const num = parseFloat(amount) || 0;
     return `${currency} ${num.toFixed(2)}`;
   };
@@ -193,7 +193,7 @@ export default function QuotationPrintView() {
               </tr>
             </thead>
             <tbody>
-              {quotation.items?.map((item, index) => (
+              {quotation.items?.map((item: any, index: any) => (
                 <tr key={index}>
                   <td className="col-code">{item.product_code}</td>
                   <td className="col-description">{item.description}</td>

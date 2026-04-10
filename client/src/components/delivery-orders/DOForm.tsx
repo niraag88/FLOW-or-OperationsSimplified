@@ -20,9 +20,9 @@ import { Customer } from "@/api/entities";
 import { Brand } from "@/api/entities";
 import { Card } from "@/components/ui/card";
 
-const toNum = (v) => parseFloat(v) || 0;
+const toNum = (v: any) => parseFloat(v) || 0;
 
-const normalizeDoData = (data) => ({
+const normalizeDoData = (data: any) => ({
   ...data,
   subtotal: toNum(data.subtotal),
   tax_amount: toNum(data.tax_amount),
@@ -48,7 +48,7 @@ const getInitialDOFormData = () => ({
   items: [] as any[]
 });
 
-export default function DOForm({ open, onClose, editingDO, currentUser, onSuccess }) {
+export default function DOForm({ open, onClose, editingDO, currentUser, onSuccess }: any) {
   const [loading, setLoading] = useState(false);
   const [customers, setCustomers] = useState<any[]>([]);
   const [products, setProducts] = useState<any[]>([]);
@@ -146,7 +146,7 @@ export default function DOForm({ open, onClose, editingDO, currentUser, onSucces
     }
   };
 
-  const handleInputChange = (field, value) => {
+  const handleInputChange = (field: any, value: any) => {
     setFormData(prev => {
       let newState = { ...prev, [field]: value };
 
@@ -203,7 +203,7 @@ export default function DOForm({ open, onClose, editingDO, currentUser, onSucces
     setFormData(prev => ({ ...prev, items: [...prev.items, newItem] }));
   };
 
-  const updateItem = (index, field, value) => {
+  const updateItem = (index: any, field: any, value: any) => {
     const newItems = [...formData.items];
     
     // Convert string values to numbers for ID fields
@@ -249,19 +249,19 @@ export default function DOForm({ open, onClose, editingDO, currentUser, onSucces
     setFormData(prev => ({ ...prev, items: newItems }));
   };
 
-  const getFilteredProducts = (brandId) => {
+  const getFilteredProducts = (brandId: any) => {
     if (!brandId) return [];
     return products.filter((product: any) => String(product.brandId) === String(brandId));
   };
 
-  const removeItem = (index) => {
+  const removeItem = (index: any) => {
     setFormData(prev => ({ 
       ...prev, 
       items: prev.items.filter((_, i) => i !== index) 
     }));
   };
 
-  const handleSubmit = async (e) => {
+  const handleSubmit = async (e: any) => {
     e.preventDefault();
     if (!formData.customer_id || !formData.do_number) return;
 

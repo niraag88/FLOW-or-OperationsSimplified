@@ -20,7 +20,7 @@ const getMonthBounds = (monthOffset = 0) => {
   return { start, end };
 };
 
-const countInMonth = (items, monthOffset) => {
+const countInMonth = (items: any, monthOffset: any) => {
   const { start, end } = getMonthBounds(monthOffset);
   return items.filter((item: any) => {
     const d = new Date(item.createdAt || item.created_at);
@@ -28,7 +28,7 @@ const countInMonth = (items, monthOffset) => {
   }).length;
 };
 
-const computeChange = (items) => {
+const computeChange = (items: any) => {
   const thisMonth = countInMonth(items, 0);
   const lastMonth = countInMonth(items, -1);
   const diff = thisMonth - lastMonth;
@@ -45,7 +45,7 @@ const computeChange = (items) => {
   return { label: "No change", type: "neutral" };
 };
 
-export default function DashboardStats({ data }) {
+export default function DashboardStats({ data }: any) {
   const stats = [
     {
       title: "Products",

@@ -188,19 +188,19 @@ export default function EditProduct() {
     }
   };
 
-  const handleInputChange = (field, value) => {
+  const handleInputChange = (field: any, value: any) => {
     let processedValue = value;
     if (field === 'product_code') {
       processedValue = value.toUpperCase().replace(/[^A-Z0-9]/g, '');
     }
     setFormData(prev => ({ ...prev, [field]: processedValue }));
     if (errors[field]) {
-      setErrors(prev => ({ ...prev, [field]: null }));
+      setErrors((prev: any) => ({ ...prev, [field]: null }));
     }
   };
   
   useEffect(() => {
-    const handleKeyDown = (event) => {
+    const handleKeyDown = (event: any) => {
       if (event.key === 'Escape') {
         navigate(createPageUrl('Inventory'));
       } else if (event.key === 'Enter' && (event.metaKey || event.ctrlKey)) {

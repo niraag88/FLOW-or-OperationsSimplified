@@ -80,7 +80,7 @@ export default function StockTab({ products, loading, onStockSubTabChange, canEd
     }
   };
 
-  const loadStockData = async (threshold) => {
+  const loadStockData = async (threshold: any) => {
     setLoadingStock(true);
     try {
       const lowStockThreshold = threshold || companySettings?.lowStockThreshold || 6;
@@ -141,7 +141,7 @@ export default function StockTab({ products, loading, onStockSubTabChange, canEd
   // Filter functions
 
   // Advanced filter function for current stock
-  const applyAdvancedStockFilters = (productList, searchTerm, selectedBrands, selectedSizes, selectedStatus, stockLevelRange) => {
+  const applyAdvancedStockFilters = (productList: any, searchTerm: any, selectedBrands: any, selectedSizes: any, selectedStatus: any, stockLevelRange: any) => {
     let filtered = productList;
 
     // Text search filter
@@ -198,7 +198,7 @@ export default function StockTab({ products, loading, onStockSubTabChange, canEd
 
 
   // Advanced filter function for movements
-  const applyAdvancedMovementFilters = (movementList, searchTerm, selectedBrands, selectedTypes, dateRange) => {
+  const applyAdvancedMovementFilters = (movementList: any, searchTerm: any, selectedBrands: any, selectedTypes: any, dateRange: any) => {
     let filtered = movementList;
 
     // Text search filter
@@ -270,7 +270,7 @@ export default function StockTab({ products, loading, onStockSubTabChange, canEd
   );
 
   // Pagination logic for each tab
-  const paginateData = (data, page, perPage) => {
+  const paginateData = (data: any, page: any, perPage: any) => {
     const startIndex = (page - 1) * perPage;
     const endIndex = startIndex + perPage;
     return {
@@ -289,7 +289,7 @@ export default function StockTab({ products, loading, onStockSubTabChange, canEd
   const paginatedOutOfStock = paginateData(filteredOutOfStockProducts, outOfStockPage, outOfStockPerPage);
 
   // Reset pagination when filters change
-  const resetPagination = (type) => {
+  const resetPagination = (type: any) => {
     switch(type) {
       case 'current-stock':
         setCurrentStockPage(1);
@@ -307,7 +307,7 @@ export default function StockTab({ products, loading, onStockSubTabChange, canEd
   };
 
   // Reusable pagination controls component
-  const PaginationControls = ({ paginationData, currentPage, setPage, perPage, setPerPage, type, itemName }) => {
+  const PaginationControls = ({ paginationData, currentPage, setPage, perPage, setPerPage, type, itemName }: any) => {
     if (paginationData.totalItems === 0) return null;
 
     return (
@@ -347,7 +347,7 @@ export default function StockTab({ products, loading, onStockSubTabChange, canEd
               <Button
                 variant="outline"
                 
-                onClick={() => setPage(prev => Math.max(1, prev - 1))}
+                onClick={() => setPage((prev: any) => Math.max(1, prev - 1))}
                 disabled={currentPage === 1}
               >
                 Previous
@@ -383,7 +383,7 @@ export default function StockTab({ products, loading, onStockSubTabChange, canEd
               <Button
                 variant="outline"
                 
-                onClick={() => setPage(prev => Math.min(paginationData.totalPages, prev + 1))}
+                onClick={() => setPage((prev: any) => Math.min(paginationData.totalPages, prev + 1))}
                 disabled={currentPage === paginationData.totalPages}
               >
                 Next
@@ -402,7 +402,7 @@ export default function StockTab({ products, loading, onStockSubTabChange, canEd
     }
   }, [activeStockTab, stockMovements, stockData, loadingMovements, movementsFilter, selectedMovementBrands, selectedMovementTypes, movementDateFilter]);
 
-  const getMovementIcon = (type) => {
+  const getMovementIcon = (type: any) => {
     switch (type) {
       case 'goods_receipt': return <TrendingUp className="w-4 h-4 text-green-600" />;
       case 'sale': return <TrendingDown className="w-4 h-4 text-red-600" />;
@@ -412,7 +412,7 @@ export default function StockTab({ products, loading, onStockSubTabChange, canEd
     }
   };
 
-  const getMovementTypeLabel = (type) => {
+  const getMovementTypeLabel = (type: any) => {
     switch (type) {
       case 'goods_receipt': return 'Stock In';
       case 'sale': return 'Sale';
@@ -422,7 +422,7 @@ export default function StockTab({ products, loading, onStockSubTabChange, canEd
     }
   };
 
-  const formatMovementSource = (referenceType, referenceId) => {
+  const formatMovementSource = (referenceType: any, referenceId: any) => {
     if (!referenceType || !referenceId) return '-';
     switch (referenceType) {
       case 'goods_receipt': return `GRN #${referenceId}`;
@@ -433,7 +433,7 @@ export default function StockTab({ products, loading, onStockSubTabChange, canEd
     }
   };
 
-  const formatMovementQuantity = (quantity) => {
+  const formatMovementQuantity = (quantity: any) => {
     const isPositive = quantity > 0;
     const sign = isPositive ? '+' : '';
     const color = isPositive ? 'text-green-600' : 'text-red-600';
@@ -820,7 +820,7 @@ export default function StockTab({ products, loading, onStockSubTabChange, canEd
                   </TableRow>
                 </TableHeader>
                 <TableBody>
-                  {paginatedCurrentStock.data.map((product) => {
+                  {paginatedCurrentStock.data.map((product: any) => {
                     const stock = product.stockQuantity || 0;
                     const lowStockThreshold = companySettings?.lowStockThreshold || 6;
                     const status = stock === 0 ? 'out' : stock <= lowStockThreshold ? 'low' : 'ok';
@@ -1100,7 +1100,7 @@ export default function StockTab({ products, loading, onStockSubTabChange, canEd
                     </TableRow>
                   </TableHeader>
                   <TableBody>
-                    {paginatedMovements.data.map((movement) => (
+                    {paginatedMovements.data.map((movement: any) => (
                       <TableRow key={movement.id}>
                         <TableCell className="text-sm">
                           {format(new Date(movement.createdAt), 'dd/MM/yy')}
@@ -1382,7 +1382,7 @@ export default function StockTab({ products, loading, onStockSubTabChange, canEd
                   </TableRow>
                 </TableHeader>
                 <TableBody>
-                  {paginatedLowStock.data.map((product) => (
+                  {paginatedLowStock.data.map((product: any) => (
                     <TableRow key={product.id}>
                       <TableCell>{product.brandName || '-'}</TableCell>
                       <TableCell>{product.sku}</TableCell>
@@ -1586,7 +1586,7 @@ export default function StockTab({ products, loading, onStockSubTabChange, canEd
                   </TableRow>
                 </TableHeader>
                 <TableBody>
-                  {paginatedOutOfStock.data.map((product) => {
+                  {paginatedOutOfStock.data.map((product: any) => {
                     return (
                       <TableRow key={product.id}>
                         <TableCell>{product.brandName || '-'}</TableCell>

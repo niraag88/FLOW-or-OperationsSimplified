@@ -51,7 +51,7 @@ export default function Customers() {
     setShowCustomerForm(true);
   };
 
-  const handleEditCustomer = (customer) => {
+  const handleEditCustomer = (customer: any) => {
     setEditingCustomer(customer);
     setShowCustomerForm(true);
   };

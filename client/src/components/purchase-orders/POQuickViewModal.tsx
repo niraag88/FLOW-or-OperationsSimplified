@@ -26,7 +26,7 @@ const PAYMENT_COLORS = {
   outstanding: "bg-amber-100 text-amber-800 border-amber-200",
 };
 
-function Section({ title, children }) {
+function Section({ title, children }: any) {
   return (
     <div>
       <h3 className="text-sm font-semibold text-gray-500 uppercase tracking-wide mb-3">{title}</h3>
@@ -35,7 +35,7 @@ function Section({ title, children }) {
   );
 }
 
-function DocLink({ label, scanKey, onView }) {
+function DocLink({ label, scanKey, onView }: any) {
   return (
     <button
       onClick={() => onView(scanKey)}
@@ -48,7 +48,7 @@ function DocLink({ label, scanKey, onView }) {
   );
 }
 
-export default function POQuickViewModal({ poId, open, onClose }) {
+export default function POQuickViewModal({ poId, open, onClose }: any) {
   const [detail, setDetail] = useState<any>(null);
   const [loading, setLoading] = useState(false);
   const [confirmDeleteOpen, setConfirmDeleteOpen] = useState(false);
@@ -65,7 +65,7 @@ export default function POQuickViewModal({ poId, open, onClose }) {
       .finally(() => setLoading(false));
   }, [open, poId]);
 
-  const handleViewDoc = async (scanKey) => {
+  const handleViewDoc = async (scanKey: any) => {
     try {
       const res = await fetch(`/api/storage/signed-get?key=${encodeURIComponent(scanKey)}`, {
         credentials: "include",
@@ -90,7 +90,7 @@ export default function POQuickViewModal({ poId, open, onClose }) {
         credentials: 'include',
       });
       if (!res.ok) throw new Error('Failed to remove document');
-      setDetail(prev => prev ? { ...prev, supplierScanKey: null } : prev);
+      setDetail((prev: any) => prev ? { ...prev, supplierScanKey: null } : prev);
       queryClient.invalidateQueries({ queryKey: ['/api/purchase-orders'] });
       toast({ title: 'Document Removed', description: 'The document has been removed from the purchase order.' });
     } catch {
@@ -132,12 +132,12 @@ export default function POQuickViewModal({ poId, open, onClose }) {
               <>
                 <span className="font-bold text-lg">{detail?.poNumber}</span>
                 {detail?.status && (
-                  <Badge className={`${STATUS_COLORS[detail.status] || STATUS_COLORS.draft} border text-xs`}>
+                  <Badge className={`${STATUS_COLORS[detail.status as keyof typeof STATUS_COLORS] || STATUS_COLORS.draft} border text-xs`}>
                     {detail.status.toUpperCase()}
                   </Badge>
                 )}
                 {detail?.paymentStatus && (
-                  <Badge className={`${PAYMENT_COLORS[detail.paymentStatus] || PAYMENT_COLORS.outstanding} border text-xs`}>
+                  <Badge className={`${PAYMENT_COLORS[detail.paymentStatus as keyof typeof PAYMENT_COLORS] || PAYMENT_COLORS.outstanding} border text-xs`}>
                     {detail.paymentStatus.toUpperCase()}
                   </Badge>
                 )}
@@ -201,7 +201,7 @@ export default function POQuickViewModal({ poId, open, onClose }) {
                       </TableRow>
                     </TableHeader>
                     <TableBody>
-                      {detail.items.map((item) => (
+                      {detail.items.map((item: any) => (
                         <TableRow key={item.id}>
                           <TableCell>
                             <div className="font-medium text-sm">{item.productName || "—"}</div>
@@ -249,7 +249,7 @@ export default function POQuickViewModal({ poId, open, onClose }) {
                         </TableRow>
                       </TableHeader>
                       <TableBody>
-                        {detail.items.map((item) => {
+                        {detail.items.map((item: any) => {
                           const receivedQty = parseFloat(item.receivedQuantity) || 0;
                           const orderedQty = parseFloat(item.quantity) || 0;
                           const isShort = orderedQty > 0 && receivedQty < orderedQty;
@@ -295,12 +295,12 @@ export default function POQuickViewModal({ poId, open, onClose }) {
                 <Separator />
                 <Section title="Goods Receipts">
                   <div className="space-y-3">
-                    {detail.grns.filter((g: any) => g.items && g.items.length > 0).map((grn) => {
+                    {detail.grns.filter((g: any) => g.items && g.items.length > 0).map((grn: any) => {
                       const grnShort = grn.items.some(
-                        i => (parseFloat(i.receivedQuantity) || 0) < (parseFloat(i.orderedQuantity) || 0)
+                        (i: any) => (parseFloat(i.receivedQuantity) || 0) < (parseFloat(i.orderedQuantity) || 0)
                       );
                       const grnTotal = grn.items.reduce(
-                        (s, i) => s + (parseFloat(i.receivedQuantity) || 0) * (parseFloat(i.unitPrice) || 0), 0
+                        (s: any, i: any) => s + (parseFloat(i.receivedQuantity) || 0) * (parseFloat(i.unitPrice) || 0), 0
                       );
                       return (
                         <div key={grn.id} className="rounded-md border overflow-hidden">
@@ -327,7 +327,7 @@ export default function POQuickViewModal({ poId, open, onClose }) {
                               </TableRow>
                             </TableHeader>
                             <TableBody>
-                              {grn.items.map((item, idx) => {
+                              {grn.items.map((item: any, idx: any) => {
                                 const recQty = parseFloat(item.receivedQuantity) || 0;
                                 const ordQty = parseFloat(item.orderedQuantity) || 0;
                                 const price = parseFloat(item.unitPrice) || 0;
@@ -412,7 +412,7 @@ export default function POQuickViewModal({ poId, open, onClose }) {
                   {/* GRN reference list */}
                   {detail.grns.length > 0 && (
                     <div className="mt-3 space-y-1">
-                      {detail.grns.map((grn) => (
+                      {detail.grns.map((grn: any) => (
                         <div key={grn.id} className="flex items-center gap-2 text-xs text-gray-500">
                           <Package className="w-3 h-3" />
                           <span>

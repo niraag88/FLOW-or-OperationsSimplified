@@ -85,7 +85,7 @@ export default function Quotations() {
       if (selectedStatuses.length) params.set('status', selectedStatuses.join(','));
       if (selectedCustomers.length) params.set('customerId', selectedCustomers.join(','));
       const today = new Date();
-      const toStr = (d) => d.toISOString().split('T')[0];
+      const toStr = (d: any) => d.toISOString().split('T')[0];
       if (dateRange && dateRange !== 'all') {
         if (dateRange === 'today') { const d = toStr(today); params.set('dateFrom', d); params.set('dateTo', d); }
         else if (dateRange === 'week') { const s = new Date(today); s.setDate(today.getDate() - today.getDay()); s.setHours(0,0,0,0); params.set('dateFrom', toStr(s)); }
@@ -116,7 +116,7 @@ export default function Quotations() {
     setShowQuotationForm(true);
   };
 
-  const handleEditQuotation = (quotation) => {
+  const handleEditQuotation = (quotation: any) => {
     setEditingQuotation(quotation);
     setShowQuotationForm(true);
   };
@@ -144,7 +144,7 @@ export default function Quotations() {
     if (selectedStatuses.length) params.set('status', selectedStatuses.join(','));
     if (selectedCustomers.length) params.set('customerId', selectedCustomers.join(','));
     const today = new Date();
-    const toStr = (d) => d.toISOString().split('T')[0];
+    const toStr = (d: any) => d.toISOString().split('T')[0];
     if (dateRange && dateRange !== 'all') {
       if (dateRange === 'today') { const d = toStr(today); params.set('dateFrom', d); params.set('dateTo', d); }
       else if (dateRange === 'week') { const s = new Date(today); s.setDate(today.getDate() - today.getDay()); s.setHours(0,0,0,0); params.set('dateFrom', toStr(s)); }
@@ -165,7 +165,7 @@ export default function Quotations() {
     const closedYears = financialYears.filter((y: any) => y.status === 'Closed');
     if (closedYears.length > 0) params.set('excludeYears', closedYears.map((cy: any) => `${cy.startDate},${cy.endDate}`).join(';'));
     const today = new Date();
-    const toStr = (d) => d.toISOString().split('T')[0];
+    const toStr = (d: any) => d.toISOString().split('T')[0];
     if (dateRange && dateRange !== 'all') {
       if (dateRange === 'today') { const d = toStr(today); params.set('dateFrom', d); params.set('dateTo', d); }
       else if (dateRange === 'week') { const s = new Date(today); s.setDate(today.getDate() - today.getDay()); s.setHours(0,0,0,0); params.set('dateFrom', toStr(s)); }
@@ -197,11 +197,11 @@ export default function Quotations() {
             columns={{
               quoteNumber: 'Quotation Number',
               customerName: 'Customer',
-              quoteDate: { label: 'Quotation Date', transform: (date) => date ? format(new Date(date), 'dd/MM/yy') : '' },
+              quoteDate: { label: 'Quotation Date', transform: (date: any) => date ? format(new Date(date), 'dd/MM/yy') : '' },
               reference: 'Reference',
-              totalAmount: { label: 'Subtotal (AED)', transform: (val) => `${val || 0}` },
-              vatAmount: { label: 'VAT (AED)', transform: (val) => `${val || 0}` },
-              grandTotal: { label: 'Total (AED)', transform: (val) => `${val || 0}` },
+              totalAmount: { label: 'Subtotal (AED)', transform: (val: any) => `${val || 0}` },
+              vatAmount: { label: 'VAT (AED)', transform: (val: any) => `${val || 0}` },
+              grandTotal: { label: 'Total (AED)', transform: (val: any) => `${val || 0}` },
               status: 'Status'
             }}
             isLoading={loading}
@@ -253,7 +253,7 @@ export default function Quotations() {
         currentUser={currentUser}
         onEdit={handleEditQuotation}
         onRefresh={handleRefresh}
-        onQuickView={(id) => setQuickViewQuotationId(id)}
+        onQuickView={(id: any) => setQuickViewQuotationId(id)}
       />
 
       {/* Pagination Controls */}
@@ -357,7 +357,7 @@ export default function Quotations() {
         onClose={() => setQuickViewQuotationId(null)}
         canEdit={canEdit}
         canOverride={canOverride}
-        onEdit={(quotation) => {
+        onEdit={(quotation: any) => {
           setQuickViewQuotationId(null);
           handleEditQuotation(quotation);
         }}

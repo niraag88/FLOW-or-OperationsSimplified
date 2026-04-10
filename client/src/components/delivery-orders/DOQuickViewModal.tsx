@@ -25,7 +25,7 @@ const STATUS_LABELS = {
   cancelled: "CANCELLED",
 };
 
-function Section({ title, children }) {
+function Section({ title, children }: any) {
   return (
     <div>
       <h3 className="text-sm font-semibold text-gray-500 uppercase tracking-wide mb-3">{title}</h3>
@@ -34,7 +34,7 @@ function Section({ title, children }) {
   );
 }
 
-function DocLink({ label, scanKey, onView }) {
+function DocLink({ label, scanKey, onView }: any) {
   return (
     <button
       onClick={() => onView(scanKey)}
@@ -47,7 +47,7 @@ function DocLink({ label, scanKey, onView }) {
   );
 }
 
-export default function DOQuickViewModal({ doId, open, onClose, canEdit, onEdit }) {
+export default function DOQuickViewModal({ doId, open, onClose, canEdit, onEdit }: any) {
   const [detail, setDetail] = useState<any>(null);
   const [loading, setLoading] = useState(false);
   const { toast } = useToast();
@@ -66,7 +66,7 @@ export default function DOQuickViewModal({ doId, open, onClose, canEdit, onEdit 
       .finally(() => setLoading(false));
   }, [open, doId]);
 
-  const handleViewDoc = async (scanKey) => {
+  const handleViewDoc = async (scanKey: any) => {
     try {
       const res = await fetch(`/api/storage/signed-get?key=${encodeURIComponent(scanKey)}`, {
         credentials: "include",
@@ -107,14 +107,14 @@ export default function DOQuickViewModal({ doId, open, onClose, canEdit, onEdit 
   const vatAmount = detail?.tax_amount ?? 0;
   const totalAmount = detail?.total_amount ?? 0;
 
-  const getDocFilename = (scanKey) => {
+  const getDocFilename = (scanKey: any) => {
     if (!scanKey) return 'Attachment';
     const last = scanKey.split('/').pop() || '';
     const stripped = last.replace(/^\d{10,}-/, '');
     return (stripped && stripped.includes('.')) ? stripped : 'Attachment';
   };
 
-  const statusLabel = detail?.status ? (STATUS_LABELS[detail.status] || detail.status.replace(/_/g, ' ').toUpperCase()) : null;
+  const statusLabel = detail?.status ? (STATUS_LABELS[detail.status as keyof typeof STATUS_LABELS] || detail.status.replace(/_/g, ' ').toUpperCase()) : null;
 
   return (
     <Dialog open={open} onOpenChange={(v) => !v && onClose()}>
@@ -127,7 +127,7 @@ export default function DOQuickViewModal({ doId, open, onClose, canEdit, onEdit 
               <>
                 <span className="font-bold text-lg">{detail?.do_number || '—'}</span>
                 {detail?.status && (
-                  <Badge className={`${STATUS_COLORS[detail.status] || STATUS_COLORS.draft} border text-xs`}>
+                  <Badge className={`${STATUS_COLORS[detail.status as keyof typeof STATUS_COLORS] || STATUS_COLORS.draft} border text-xs`}>
                     {statusLabel}
                   </Badge>
                 )}
@@ -199,7 +199,7 @@ export default function DOQuickViewModal({ doId, open, onClose, canEdit, onEdit 
                       </TableRow>
                     </TableHeader>
                     <TableBody>
-                      {detail.items.map((item, idx) => (
+                      {detail.items.map((item: any, idx: any) => (
                         <TableRow key={item.id || idx}>
                           <TableCell className="text-sm text-gray-600">{item.brand_name || '—'}</TableCell>
                           <TableCell className="text-sm text-gray-600">{item.product_code || '—'}</TableCell>

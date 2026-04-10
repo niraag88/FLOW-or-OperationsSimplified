@@ -7,7 +7,7 @@ import QuickActions from "../components/dashboard/QuickActions";
 
 const STALE_5MIN = 5 * 60 * 1000;
 
-function extractArray(value) {
+function extractArray(value: any) {
   if (!value) return [];
   if (Array.isArray(value)) return value;
   return value?.data ?? [];

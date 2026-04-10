@@ -7,7 +7,7 @@ import { useToast } from '@/hooks/use-toast';
 
 const QUOTA_BYTES = 50 * 1024 * 1024 * 1024; // 50 GiB — Replit Core plan limit
 
-const formatBytes = (bytes) => {
+const formatBytes = (bytes: any) => {
   if (!bytes || bytes === 0) return '0 B';
   const k = 1024;
   const sizes = ['B', 'KB', 'MB', 'GB', 'TB'];

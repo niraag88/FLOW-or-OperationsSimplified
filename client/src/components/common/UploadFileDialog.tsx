@@ -17,18 +17,18 @@ const ALLOWED_TYPES = {
   'image/png': { ext: 'png', label: 'PNG' },
 };
 
-function getFileExtension(mimeType) {
-  return ALLOWED_TYPES[mimeType]?.ext || 'pdf';
+function getFileExtension(mimeType: any) {
+  return ALLOWED_TYPES[mimeType as keyof typeof ALLOWED_TYPES]?.ext || 'pdf';
 }
 
-function buildStorageKey(recordType, documentNumber, file) {
+function buildStorageKey(recordType: any, documentNumber: any, file: any) {
   const year = new Date().getFullYear();
   const safeName = (documentNumber || 'doc').replace(/[^a-zA-Z0-9\-_]/g, '-');
   const origName = file.name.replace(/[^a-zA-Z0-9._-]/g, '-').toLowerCase();
   return `${recordType}/${year}/${safeName}/${Date.now()}-${origName}`;
 }
 
-export default function UploadFileDialog({ open, onClose, onSuccess, recordType, recordId, documentNumber, maxSizeMB = 2 }) {
+export default function UploadFileDialog({ open, onClose, onSuccess, recordType, recordId, documentNumber, maxSizeMB = 2 }: any) {
   const { toast } = useToast();
   const [selectedFile, setSelectedFile] = useState<any>(null);
   const [uploading, setUploading] = useState(false);
@@ -37,12 +37,12 @@ export default function UploadFileDialog({ open, onClose, onSuccess, recordType,
 
   const maxSizeBytes = maxSizeMB * 1024 * 1024;
 
-  const handleFileChange = (e) => {
+  const handleFileChange = (e: any) => {
     const file = e.target.files?.[0];
     setError('');
     if (!file) return;
 
-    if (!ALLOWED_TYPES[file.type]) {
+    if (!ALLOWED_TYPES[file.type as keyof typeof ALLOWED_TYPES]) {
       setError('Only PDF, JPG, and PNG files are accepted.');
       setSelectedFile(null);
       return;

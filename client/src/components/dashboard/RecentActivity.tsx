@@ -4,10 +4,10 @@ import { Badge } from "@/components/ui/badge";
 import { format, subDays, isAfter, parseISO } from "date-fns";
 import { ShoppingCart, Truck, FileText, Clock } from "lucide-react";
 
-export default function RecentActivity({ data }) {
+export default function RecentActivity({ data }: any) {
   const sevenDaysAgo = subDays(new Date(), 7);
 
-  const parseDate = (val) => {
+  const parseDate = (val: any) => {
     if (!val) return null;
     const d = typeof val === 'string' ? parseISO(val) : new Date(val);
     return isNaN(d.getTime()) ? null : d;
@@ -69,7 +69,7 @@ export default function RecentActivity({ data }) {
 
   const recentActivity = getRecentActivity();
 
-  const getStatusColor = (status) => {
+  const getStatusColor = (status: any) => {
     switch (status?.toLowerCase()) {
       case 'draft': return 'bg-gray-100 text-gray-700 border-gray-200';
       case 'confirmed': case 'sent': case 'submitted': return 'bg-blue-100 text-blue-700 border-blue-200';

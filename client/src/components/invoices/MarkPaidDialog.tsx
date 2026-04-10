@@ -13,7 +13,7 @@ import { Textarea } from "@/components/ui/textarea";
 import { CheckCircle, Pencil } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 
-export default function MarkPaidDialog({ open, onClose, invoice, onSuccess }) {
+export default function MarkPaidDialog({ open, onClose, invoice, onSuccess }: any) {
   const { toast } = useToast();
   const [loading, setLoading] = useState(false);
   const [paymentReceivedDate, setPaymentReceivedDate] = useState("");
@@ -37,7 +37,7 @@ export default function MarkPaidDialog({ open, onClose, invoice, onSuccess }) {
     }
   }, [open, invoice]);
 
-  const handleSubmit = async (e) => {
+  const handleSubmit = async (e: any) => {
     e.preventDefault();
     if (!invoice) return;
     setLoading(true);
