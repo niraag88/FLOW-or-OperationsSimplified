@@ -441,7 +441,7 @@ export default function POQuickViewModal({ poId, open, onClose }: POQuickViewMod
                             </TableBody>
                           </Table>
                           <div className="flex justify-end px-4 py-2 bg-gray-50 border-t">
-                            <span className="text-xs font-semibold text-gray-600 mr-3">Receipt Total</span>
+                            <span className="text-xs font-semibold text-gray-600 mr-3">Reference Amount</span>
                             <span className="text-xs font-bold">{formatCurrency(grnTotal, currency)}</span>
                           </div>
                         </div>
