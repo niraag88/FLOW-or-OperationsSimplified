@@ -264,6 +264,8 @@ export function registerPurchaseOrderRoutes(app: Express) {
         receiptNumber: grnTable.receiptNumber,
         receivedDate: grnTable.receivedDate,
         notes: grnTable.notes,
+        referenceNumber: grnTable.referenceNumber,
+        referenceDate: grnTable.referenceDate,
         scanKey1: grnTable.scanKey1,
         scanKey2: grnTable.scanKey2,
         scanKey3: grnTable.scanKey3,

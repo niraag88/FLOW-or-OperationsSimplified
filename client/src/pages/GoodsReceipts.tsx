@@ -10,7 +10,8 @@ import { Textarea } from "@/components/ui/textarea";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
-import { PackageCheck, Save, TrendingUp, AlertTriangle } from "lucide-react";
+import { PackageCheck, Save, TrendingUp, AlertTriangle, Pencil, X, Check } from "lucide-react";
+import { Label } from "@/components/ui/label";
 import { useToast } from "@/hooks/use-toast";
 import { format } from "date-fns";
 
@@ -21,7 +22,13 @@ export default function GoodsReceipts() {
   const [selectedPO, setSelectedPO] = useState<any>(null);
   const [receivingItems, setReceivingItems] = useState<any[]>([]);
   const [notes, setNotes] = useState("");
+  const [refNumber, setRefNumber] = useState("");
+  const [refDate, setRefDate] = useState("");
   const [creating, setCreating] = useState(false);
+  const [editingGrnId, setEditingGrnId] = useState<number | null>(null);
+  const [editRefNumber, setEditRefNumber] = useState("");
+  const [editRefDate, setEditRefDate] = useState("");
+  const [savingRef, setSavingRef] = useState(false);
   const { toast } = useToast();
 
   const { data: goodsReceipts = [], isLoading: loadingReceipts, error: grnError } = useQuery({
@@ -92,6 +99,38 @@ export default function GoodsReceipts() {
     );
   };
 
+  const startEditRef = (receipt: any) => {
+    setEditingGrnId(receipt.id);
+    setEditRefNumber(receipt.referenceNumber || "");
+    setEditRefDate(receipt.referenceDate || "");
+  };
+
+  const cancelEditRef = () => {
+    setEditingGrnId(null);
+    setEditRefNumber("");
+    setEditRefDate("");
+  };
+
+  const saveRef = async (grnId: number) => {
+    setSavingRef(true);
+    try {
+      const res = await fetch(`/api/goods-receipts/${grnId}/reference`, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        credentials: 'include',
+        body: JSON.stringify({ referenceNumber: editRefNumber || null, referenceDate: editRefDate || null }),
+      });
+      if (!res.ok) throw new Error('Failed to save');
+      await queryClient.invalidateQueries({ queryKey: ['/api/goods-receipts'] });
+      setEditingGrnId(null);
+      toast({ title: 'Reference saved' });
+    } catch {
+      toast({ title: 'Error', description: 'Could not save reference.', variant: 'destructive' });
+    } finally {
+      setSavingRef(false);
+    }
+  };
+
   const handleCreateReceipt = async () => {
     if (!selectedPO || receivingItems.length === 0) return;
 
@@ -122,7 +161,9 @@ export default function GoodsReceipts() {
             receivedQuantity: item.receivedQuantity,
             unitPrice: item.unitPrice
           })),
-          notes
+          notes,
+          referenceNumber: refNumber || undefined,
+          referenceDate: refDate || undefined,
         })
       });
 
@@ -142,6 +183,8 @@ export default function GoodsReceipts() {
       setSelectedPO(null);
       setReceivingItems([]);
       setNotes("");
+      setRefNumber("");
+      setRefDate("");
 
       queryClient.invalidateQueries({ queryKey: ['/api/goods-receipts'] });
       queryClient.invalidateQueries({ queryKey: ['/api/purchase-orders'] });
@@ -243,6 +286,30 @@ export default function GoodsReceipts() {
                     </Table>
                   </div>
 
+                  <div className="grid grid-cols-2 gap-4">
+                    <div>
+                      <Label htmlFor="ref-number" className="text-sm font-medium">Supplier Invoice Ref (Optional)</Label>
+                      <Input
+                        id="ref-number"
+                        type="text"
+                        placeholder="e.g. INV-2024-001"
+                        value={refNumber}
+                        onChange={(e) => setRefNumber(e.target.value)}
+                        className="mt-1"
+                      />
+                    </div>
+                    <div>
+                      <Label htmlFor="ref-date" className="text-sm font-medium">Ref Date (Optional)</Label>
+                      <Input
+                        id="ref-date"
+                        type="date"
+                        value={refDate}
+                        onChange={(e) => setRefDate(e.target.value)}
+                        className="mt-1"
+                      />
+                    </div>
+                  </div>
+
                   <div>
                     <label className="text-sm font-medium">Notes (Optional)</label>
                     <Textarea
@@ -256,7 +323,11 @@ export default function GoodsReceipts() {
                   <div className="flex justify-end gap-3">
                     <Button
                       variant="outline"
-                      onClick={() => setShowCreateDialog(false)}
+                      onClick={() => {
+                        setShowCreateDialog(false);
+                        setRefNumber("");
+                        setRefDate("");
+                      }}
                       disabled={creating}
                     >
                       Cancel
@@ -300,8 +371,11 @@ export default function GoodsReceipts() {
                   <TableHead>Receipt #</TableHead>
                   <TableHead>Purchase Order</TableHead>
                   <TableHead>Received Date</TableHead>
+                  <TableHead>Ref No.</TableHead>
+                  <TableHead>Ref Date</TableHead>
                   <TableHead>Status</TableHead>
                   <TableHead>Notes</TableHead>
+                  <TableHead className="w-10"></TableHead>
                 </TableRow>
               </TableHeader>
               <TableBody>
@@ -311,10 +385,36 @@ export default function GoodsReceipts() {
                       {receipt.receiptNumber}
                     </TableCell>
                     <TableCell>
-                      PO#{receipt.poId}
+                      {receipt.poNumber || `PO#${receipt.poId}`}
                     </TableCell>
                     <TableCell>
                       {format(new Date(receipt.receivedDate), 'dd/MM/yy')}
+                    </TableCell>
+                    <TableCell>
+                      {editingGrnId === receipt.id ? (
+                        <Input
+                          value={editRefNumber}
+                          onChange={(e) => setEditRefNumber(e.target.value)}
+                          placeholder="Ref no."
+                          className="h-7 text-xs w-36"
+                        />
+                      ) : (
+                        <span className="text-sm text-gray-700">{receipt.referenceNumber || "—"}</span>
+                      )}
+                    </TableCell>
+                    <TableCell>
+                      {editingGrnId === receipt.id ? (
+                        <Input
+                          type="date"
+                          value={editRefDate}
+                          onChange={(e) => setEditRefDate(e.target.value)}
+                          className="h-7 text-xs w-32"
+                        />
+                      ) : (
+                        <span className="text-sm text-gray-600">
+                          {receipt.referenceDate ? format(new Date(receipt.referenceDate), 'dd/MM/yy') : "—"}
+                        </span>
+                      )}
                     </TableCell>
                     <TableCell>
                       <div className="flex items-center gap-1.5 flex-wrap">
@@ -341,6 +441,36 @@ export default function GoodsReceipts() {
                     </TableCell>
                     <TableCell className="text-sm text-gray-600">
                       {receipt.notes || '-'}
+                    </TableCell>
+                    <TableCell>
+                      {editingGrnId === receipt.id ? (
+                        <div className="flex items-center gap-1">
+                          <button
+                            onClick={() => saveRef(receipt.id)}
+                            disabled={savingRef}
+                            className="p-1 text-green-600 hover:text-green-800 transition-colors"
+                            title="Save reference"
+                          >
+                            <Check className="w-4 h-4" />
+                          </button>
+                          <button
+                            onClick={cancelEditRef}
+                            disabled={savingRef}
+                            className="p-1 text-gray-400 hover:text-gray-600 transition-colors"
+                            title="Cancel"
+                          >
+                            <X className="w-4 h-4" />
+                          </button>
+                        </div>
+                      ) : (
+                        <button
+                          onClick={() => startEditRef(receipt)}
+                          className="p-1 text-gray-400 hover:text-blue-600 transition-colors"
+                          title="Edit supplier invoice reference"
+                        >
+                          <Pencil className="w-3.5 h-3.5" />
+                        </button>
+                      )}
                     </TableCell>
                   </TableRow>
                 ))}
