@@ -328,7 +328,7 @@ function SalesPaymentsSection({ invoices, companySettings, canExport }: { invoic
   );
 }
 
-function PurchasesPaymentsSection({ purchaseOrders, suppliers, companySettings, canExport }: { purchaseOrders: Record<string, any>[]; suppliers: Record<string, any>[]; companySettings: Record<string, any> | null; canExport: boolean }) {
+function PurchasesPaymentsSection({ purchaseOrders, goodsReceipts, suppliers, companySettings, canExport }: { purchaseOrders: Record<string, any>[]; goodsReceipts: Record<string, any>[]; suppliers: Record<string, any>[]; companySettings: Record<string, any> | null; canExport: boolean }) {
   const [paymentFilter, setPaymentFilter] = useState<any>("all");
   const [dateFrom, setDateFrom] = useState("");
   const [dateTo, setDateTo] = useState("");
@@ -345,28 +345,41 @@ function PurchasesPaymentsSection({ purchaseOrders, suppliers, companySettings, 
     return getRateToAed(po.currency || "GBP", companySettings);
   };
 
+  const poMap = useMemo(() => {
+    const m: Record<number, any> = {};
+    (purchaseOrders || []).forEach((po: any) => { m[po.id] = po; });
+    return m;
+  }, [purchaseOrders]);
+
   const enriched = useMemo(() => {
-    return purchaseOrders.map((po: any) => {
-      const origAmt = parseFloat(po.totalAmount || po.total_amount || 0);
-      const currency = po.currency || "GBP";
-      const rate = getFxRate(po);
-      const aed = currency === "AED" ? origAmt : origAmt * rate;
-      const ps = (po.paymentStatus || po.payment_status || "outstanding").toLowerCase();
-      const supplierName = po.supplierName || getSupplierName(po.supplierId || po.supplier_id);
-      return {
-        ...po,
-        _origAmount: origAmt,
-        _currency: currency,
-        _aed: aed,
-        _paymentStatus: ps,
-        _ref: po.poNumber || po.po_number || "",
-        _supplier: supplierName,
-        _date: po.orderDate || po.order_date || "",
-        _paymentDate: po.paymentMadeDate || po.payment_made_date || "",
-        _remarks: po.paymentRemarks || po.payment_remarks || "",
-      };
-    });
-  }, [purchaseOrders, suppliers, companySettings]);
+    const grns = goodsReceipts && goodsReceipts.length > 0 ? goodsReceipts : [];
+    return grns
+      .filter((grn: any) => grn.status !== 'cancelled')
+      .map((grn: any) => {
+        const poId = grn.poId || grn.po_id;
+        const po = poMap[poId];
+        const currency = po?.currency || "GBP";
+        const rate = po ? getFxRate(po) : 1;
+        const refAmt = parseFloat(grn.referenceAmount || 0);
+        const refAed = currency === "AED" ? refAmt : refAmt * rate;
+        const ps = (po?.paymentStatus || po?.payment_status || "outstanding").toLowerCase();
+        const supplierName = po?.supplierName || getSupplierName(po?.supplierId || po?.supplier_id || grn.supplierId || grn.supplier_id);
+        return {
+          ...grn,
+          _poNumber: po?.poNumber || po?.po_number || `PO-${poId}`,
+          _currency: currency,
+          _origAmount: refAmt,
+          _aed: refAed,
+          _paymentStatus: ps,
+          _supplier: supplierName,
+          _date: grn.receivedDate || grn.received_date || "",
+          _refNumber: grn.referenceNumber || grn.reference_number || "",
+          _refDate: grn.referenceDate || grn.reference_date || "",
+          _paymentDate: po?.paymentMadeDate || po?.payment_made_date || "",
+          _remarks: po?.paymentRemarks || po?.payment_remarks || "",
+        };
+      });
+  }, [goodsReceipts, poMap, suppliers, companySettings]);
 
   const filtered = useMemo(() => {
     const fromTs = dateFrom ? new Date(dateFrom).getTime() : null;
@@ -382,19 +395,23 @@ function PurchasesPaymentsSection({ purchaseOrders, suppliers, companySettings, 
       }
       if (search) {
         const q = search.toLowerCase();
-        if (!r._ref.toLowerCase().includes(q) && !r._supplier.toLowerCase().includes(q)) return false;
+        const grnNum = (r.receiptNumber || r.receipt_number || "").toLowerCase();
+        if (!grnNum.includes(q) && !r._poNumber.toLowerCase().includes(q) && !r._supplier.toLowerCase().includes(q) && !r._refNumber.toLowerCase().includes(q)) return false;
       }
       return true;
     });
   }, [enriched, paymentFilter, dateFrom, dateTo, search]);
 
   const exportData = filtered.map((r: any) => ({
-    po_number: r._ref,
+    grn_number: r.receiptNumber || r.receipt_number || "",
+    po_number: r._poNumber,
     supplier: r._supplier,
-    order_date: fmtDate(r._date),
+    received_date: fmtDate(r._date),
+    ref_number: r._refNumber,
+    ref_date: fmtDate(r._refDate),
     currency: r._currency,
-    amount_orig: fmt(r._origAmount),
-    amount_aed: `AED ${fmt(r._aed)}`,
+    ref_amount_orig: r._origAmount > 0 ? fmt(r._origAmount) : "",
+    ref_amount_aed: r._aed > 0 ? `AED ${fmt(r._aed)}` : "",
     payment_status: r._paymentStatus === "paid" ? "Paid" : "Outstanding",
     payment_made_date: fmtDate(r._paymentDate),
     payment_remarks: r._remarks,
@@ -402,14 +419,14 @@ function PurchasesPaymentsSection({ purchaseOrders, suppliers, companySettings, 
 
   return (
     <>
-      <SummaryTiles records={filtered} label="Purchase Orders" />
+      <SummaryTiles records={filtered} label="GRNs" />
       <div className="flex items-start justify-between gap-3 mb-5">
         <LedgerFilters
           paymentFilter={paymentFilter} setPaymentFilter={setPaymentFilter}
           dateFrom={dateFrom} setDateFrom={setDateFrom}
           dateTo={dateTo} setDateTo={setDateTo}
           search={search} setSearch={setSearch}
-          searchPlaceholder="Search by PO # or supplier…"
+          searchPlaceholder="Search by GRN #, PO #, supplier or ref…"
         />
         {canExport && (
           <div className="shrink-0 pt-0.5">
@@ -418,12 +435,15 @@ function PurchasesPaymentsSection({ purchaseOrders, suppliers, companySettings, 
               type="Purchases Payments Ledger"
               filename="purchases_payments_ledger"
               columns={{
+                grn_number: "GRN #",
                 po_number: "PO #",
                 supplier: "Supplier",
-                order_date: "Order Date",
+                received_date: "Received Date",
+                ref_number: "Ref No.",
+                ref_date: "Ref Date",
                 currency: "Currency",
-                amount_orig: "Amount (Original)",
-                amount_aed: "Amount (AED)",
+                ref_amount_orig: "Ref Amount (Original)",
+                ref_amount_aed: "Ref Amount (AED)",
                 payment_status: "Payment Status",
                 payment_made_date: "Payment Made Date",
                 payment_remarks: "Remarks",
@@ -437,12 +457,13 @@ function PurchasesPaymentsSection({ purchaseOrders, suppliers, companySettings, 
         <Table>
           <TableHeader>
             <TableRow className="bg-gray-50">
+              <TableHead className="font-semibold">GRN #</TableHead>
               <TableHead className="font-semibold">PO #</TableHead>
               <TableHead className="font-semibold">Supplier</TableHead>
-              <TableHead className="font-semibold">Order Date</TableHead>
-              <TableHead className="font-semibold">Currency</TableHead>
-              <TableHead className="font-semibold text-right">Amount (Original)</TableHead>
-              <TableHead className="font-semibold text-right">Amount (AED)</TableHead>
+              <TableHead className="font-semibold">Received Date</TableHead>
+              <TableHead className="font-semibold">Ref No.</TableHead>
+              <TableHead className="font-semibold">Ref Date</TableHead>
+              <TableHead className="font-semibold text-right">Ref Amount</TableHead>
               <TableHead className="font-semibold">Payment Status</TableHead>
               <TableHead className="font-semibold">Payment Date</TableHead>
               <TableHead className="font-semibold">Remarks</TableHead>
@@ -451,21 +472,24 @@ function PurchasesPaymentsSection({ purchaseOrders, suppliers, companySettings, 
           <TableBody>
             {filtered.length === 0 ? (
               <TableRow>
-                <TableCell colSpan={9} className="text-center py-10 text-gray-400">
-                  No purchase orders match the current filters
+                <TableCell colSpan={10} className="text-center py-10 text-gray-400">
+                  No goods receipts match the current filters
                 </TableCell>
               </TableRow>
             ) : (
               filtered.map((r: any) => (
                 <TableRow key={r.id} className="hover:bg-gray-50">
-                  <TableCell className="font-medium text-purple-700">{r._ref}</TableCell>
+                  <TableCell className="font-medium text-purple-700">{r.receiptNumber || r.receipt_number || `GRN-${r.id}`}</TableCell>
+                  <TableCell className="text-gray-600">{r._poNumber}</TableCell>
                   <TableCell>{r._supplier}</TableCell>
                   <TableCell className="text-gray-600">{fmtDate(r._date)}</TableCell>
-                  <TableCell>
-                    <Badge variant="outline" className="text-xs">{r._currency}</Badge>
+                  <TableCell className="text-gray-700">{r._refNumber || "—"}</TableCell>
+                  <TableCell className="text-gray-600">{r._refDate ? fmtDate(r._refDate) : "—"}</TableCell>
+                  <TableCell className="text-right font-medium">
+                    {r._origAmount > 0 ? (
+                      <span title={`${r._currency} ${fmt(r._origAmount)}`}>AED {fmt(r._aed)}</span>
+                    ) : "—"}
                   </TableCell>
-                  <TableCell className="text-right font-medium">{r._currency} {fmt(r._origAmount)}</TableCell>
-                  <TableCell className="text-right font-medium">AED {fmt(r._aed)}</TableCell>
                   <TableCell><PaymentStatusBadge status={r._paymentStatus} /></TableCell>
                   <TableCell className="text-gray-600">{fmtDate(r._paymentDate)}</TableCell>
                   <TableCell className="text-gray-500 max-w-48 truncate" title={r._remarks}>{r._remarks || "—"}</TableCell>
@@ -483,12 +507,13 @@ function PurchasesPaymentsSection({ purchaseOrders, suppliers, companySettings, 
 interface PaymentsLedgerProps {
   invoices: any[];
   purchaseOrders: any[];
+  goodsReceipts: any[];
   suppliers: any[];
   companySettings: Record<string, any> | null;
   canExport: boolean;
 }
 
-export default function PaymentsLedger({ invoices, purchaseOrders, suppliers, companySettings, canExport }: PaymentsLedgerProps) {
+export default function PaymentsLedger({ invoices, purchaseOrders, goodsReceipts, suppliers, companySettings, canExport }: PaymentsLedgerProps) {
   return (
     <div className="space-y-4">
       <CollapsibleSection
@@ -510,6 +535,7 @@ export default function PaymentsLedger({ invoices, purchaseOrders, suppliers, co
       >
         <PurchasesPaymentsSection
           purchaseOrders={purchaseOrders || []}
+          goodsReceipts={goodsReceipts || []}
           suppliers={suppliers || []}
           companySettings={companySettings}
           canExport={canExport}

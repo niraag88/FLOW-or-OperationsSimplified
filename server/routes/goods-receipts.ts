@@ -159,12 +159,19 @@ export function registerGoodsReceiptRoutes(app: Express) {
         receivedDate: goodsReceipts.receivedDate,
         status: goodsReceipts.status,
         notes: goodsReceipts.notes,
+        referenceNumber: goodsReceipts.referenceNumber,
+        referenceDate: goodsReceipts.referenceDate,
         scanKey1: goodsReceipts.scanKey1,
         scanKey2: goodsReceipts.scanKey2,
         scanKey3: goodsReceipts.scanKey3,
         createdAt: goodsReceipts.createdAt,
         poNumber: purchaseOrders.poNumber,
         supplierName: suppliers.name,
+        referenceAmount: sql<number>`COALESCE((
+          SELECT SUM(gri.received_quantity * gri.unit_price::numeric)
+          FROM goods_receipt_items gri
+          WHERE gri.receipt_id = ${goodsReceipts.id}
+        ), 0)`.as('referenceAmount'),
         isPartial: sql<boolean>`EXISTS (
           SELECT 1 FROM goods_receipt_items gri
           WHERE gri.receipt_id = ${goodsReceipts.id}
@@ -324,9 +331,49 @@ export function registerGoodsReceiptRoutes(app: Express) {
     }
   });
 
+  app.patch('/api/goods-receipts/:id/reference', requireAuth(), async (req: AuthenticatedRequest, res) => {
+    try {
+      const id = parseInt(req.params.id);
+      if (isNaN(id)) return res.status(400).json({ error: 'Invalid ID' });
+      const { referenceNumber, referenceDate } = req.body;
+
+      const [current] = await db.select({
+        id: goodsReceipts.id,
+        referenceNumber: goodsReceipts.referenceNumber,
+        referenceDate: goodsReceipts.referenceDate,
+        receiptNumber: goodsReceipts.receiptNumber,
+      }).from(goodsReceipts).where(eq(goodsReceipts.id, id));
+      if (!current) return res.status(404).json({ error: 'Goods receipt not found' });
+
+      const [updated] = await db
+        .update(goodsReceipts)
+        .set({
+          referenceNumber: referenceNumber || null,
+          referenceDate: referenceDate || null,
+          updatedAt: new Date(),
+        })
+        .where(eq(goodsReceipts.id, id))
+        .returning();
+
+      writeAuditLog({
+        actor: req.user!.id,
+        actorName: req.user?.username || String(req.user!.id),
+        targetId: String(id),
+        targetType: 'goods_receipt',
+        action: 'UPDATE',
+        details: `GRN ${current.receiptNumber} reference updated: ref_no="${referenceNumber || ''}" ref_date="${referenceDate || ''}" (was ref_no="${current.referenceNumber || ''}" ref_date="${current.referenceDate || ''}")`,
+      });
+
+      res.json(updated);
+    } catch (error) {
+      console.error('Error updating GRN reference:', error);
+      res.status(500).json({ error: 'Failed to update reference' });
+    }
+  });
+
   app.post('/api/goods-receipts', requireAuth(['Admin', 'Manager']), async (req: AuthenticatedRequest, res) => {
     try {
-      const { poId, items, notes, forceClose, receivedDate } = req.body;
+      const { poId, items, notes, forceClose, receivedDate, referenceNumber, referenceDate } = req.body;
 
       if (!poId || !items || !Array.isArray(items)) {
         return res.status(400).json({ error: 'Purchase Order ID and items are required' });
@@ -350,6 +397,8 @@ export function registerGoodsReceiptRoutes(app: Express) {
           receivedDate: receivedDate ? new Date(receivedDate) : new Date(),
           status: 'confirmed',
           notes: notes || '',
+          referenceNumber: referenceNumber || null,
+          referenceDate: referenceDate || null,
           createdBy: req.user!.id
         }).returning();
         receipt = newReceipt;
@@ -392,7 +441,8 @@ export function registerGoodsReceiptRoutes(app: Express) {
         }
       });
 
-      writeAuditLog({ actor: req.user!.id, actorName: req.user?.username || String(req.user!.id), targetId: String(receipt.id), targetType: 'goods_receipt', action: 'CREATE', details: `Goods receipt ${receipt.receiptNumber} from PO #${po.poNumber}` });
+      const refDetail = referenceNumber ? ` ref="${referenceNumber}"${referenceDate ? ` date="${referenceDate}"` : ''}` : '';
+      writeAuditLog({ actor: req.user!.id, actorName: req.user?.username || String(req.user!.id), targetId: String(receipt.id), targetType: 'goods_receipt', action: 'CREATE', details: `Goods receipt ${receipt.receiptNumber} from PO #${po.poNumber}${refDetail}` });
       res.status(201).json({
         id: receipt.id,
         receiptNumber: receipt.receiptNumber,

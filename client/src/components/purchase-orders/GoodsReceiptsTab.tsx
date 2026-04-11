@@ -92,6 +92,8 @@ export default function GoodsReceiptsTab({
   const [receiveQuantities, setReceiveQuantities] = useState<Record<string, number>>({});
   const [receiveNotes, setReceiveNotes] = useState('');
   const [receiveDate, setReceiveDate] = useState(() => new Date().toISOString().slice(0, 10));
+  const [receiveRefNumber, setReceiveRefNumber] = useState('');
+  const [receiveRefDate, setReceiveRefDate] = useState('');
   // State is now managed by parent component for context-aware export
   const [showDeleteDialog, setShowDeleteDialog] = useState(false);
   const [deletingPO, setDeletingPO] = useState<PORow | null>(null);
@@ -486,6 +488,8 @@ export default function GoodsReceiptsTab({
           notes: receiveNotes,
           forceClose: forceClose,
           receivedDate: receiveDate,
+          referenceNumber: receiveRefNumber || undefined,
+          referenceDate: receiveRefDate || undefined,
         }),
       });
 
@@ -522,6 +526,8 @@ export default function GoodsReceiptsTab({
       setReceiveQuantities({});
       setReceiveNotes('');
       setReceiveDate(new Date().toISOString().slice(0, 10));
+      setReceiveRefNumber('');
+      setReceiveRefDate('');
       
       // Refresh the data
       if (onRefresh) {
@@ -1130,6 +1136,8 @@ export default function GoodsReceiptsTab({
         setReceiveQuantities({});
         setReceiveNotes('');
         setReceiveDate(new Date().toISOString().slice(0, 10));
+        setReceiveRefNumber('');
+        setReceiveRefDate('');
         setPendingDocs([null, null, null]);
       }}>
         <DialogContent className="max-w-4xl max-h-[80vh] overflow-y-auto">
@@ -1214,6 +1222,27 @@ export default function GoodsReceiptsTab({
                 />
               </div>
             </div>
+            <div className="grid grid-cols-2 gap-4">
+              <div className="space-y-2">
+                <Label htmlFor="receive-ref-number">Supplier Invoice Ref (optional)</Label>
+                <Input
+                  id="receive-ref-number"
+                  type="text"
+                  placeholder="e.g. INV-2024-001"
+                  value={receiveRefNumber}
+                  onChange={(e) => setReceiveRefNumber(e.target.value)}
+                />
+              </div>
+              <div className="space-y-2">
+                <Label htmlFor="receive-ref-date">Ref Date (optional)</Label>
+                <Input
+                  id="receive-ref-date"
+                  type="date"
+                  value={receiveRefDate}
+                  onChange={(e) => setReceiveRefDate(e.target.value)}
+                />
+              </div>
+            </div>
 
             <div className="space-y-2 border-t pt-3">
               <Label>Attach Delivery Documents (optional)</Label>
@@ -1256,6 +1285,8 @@ export default function GoodsReceiptsTab({
               setReceiveQuantities({});
               setReceiveNotes('');
               setReceiveDate(new Date().toISOString().slice(0, 10));
+              setReceiveRefNumber('');
+              setReceiveRefDate('');
               setPendingDocs([null, null, null]);
             }}>
               Cancel

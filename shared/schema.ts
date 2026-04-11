@@ -521,6 +521,8 @@ export const goodsReceipts = pgTable("goods_receipts", {
   receivedDate: timestamp("received_date").defaultNow().notNull(),
   status: text("status").notNull().default("confirmed"), // confirmed | cancelled
   notes: text("notes"),
+  referenceNumber: text("reference_number"),
+  referenceDate: date("reference_date"),
   scanKey1: text("scan_key_1"),
   scanKey2: text("scan_key_2"),
   scanKey3: text("scan_key_3"),
@@ -701,6 +703,8 @@ export const insertGoodsReceiptSchema = createInsertSchema(goodsReceipts).pick({
   receivedDate: true,
   status: true,
   notes: true,
+  referenceNumber: true,
+  referenceDate: true,
   createdBy: true,
 });
 

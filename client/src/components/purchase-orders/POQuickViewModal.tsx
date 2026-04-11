@@ -9,11 +9,13 @@ import { Badge } from "@/components/ui/badge";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Separator } from "@/components/ui/separator";
 import { Skeleton } from "@/components/ui/skeleton";
-import { CheckCircle2, AlertTriangle, FileText, ExternalLink, Paperclip, Package, Trash2 } from "lucide-react";
+import { CheckCircle2, AlertTriangle, FileText, ExternalLink, Paperclip, Package, Trash2, Pencil, X, Check } from "lucide-react";
 import { formatDate } from "@/utils/dateUtils";
 import { formatCurrency } from "@/utils/currency";
 import { useToast } from "@/hooks/use-toast";
 import { queryClient } from "@/lib/queryClient";
+import { Input } from "@/components/ui/input";
+import { Button } from "@/components/ui/button";
 
 interface POQuickViewModalProps {
   poId: number | null;
@@ -58,7 +60,51 @@ export default function POQuickViewModal({ poId, open, onClose }: POQuickViewMod
   const [detail, setDetail] = useState<Record<string, any> | null>(null);
   const [loading, setLoading] = useState(false);
   const [confirmDeleteOpen, setConfirmDeleteOpen] = useState(false);
+  const [editingGrnId, setEditingGrnId] = useState<number | null>(null);
+  const [editRefNumber, setEditRefNumber] = useState('');
+  const [editRefDate, setEditRefDate] = useState('');
+  const [savingGrn, setSavingGrn] = useState(false);
   const { toast } = useToast();
+
+  const startEditGrn = (grn: any) => {
+    setEditingGrnId(grn.id);
+    setEditRefNumber(grn.referenceNumber || '');
+    setEditRefDate(grn.referenceDate || '');
+  };
+
+  const cancelEditGrn = () => {
+    setEditingGrnId(null);
+    setEditRefNumber('');
+    setEditRefDate('');
+  };
+
+  const saveGrnRef = async (grnId: number) => {
+    setSavingGrn(true);
+    try {
+      const res = await fetch(`/api/goods-receipts/${grnId}/reference`, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        credentials: 'include',
+        body: JSON.stringify({ referenceNumber: editRefNumber || null, referenceDate: editRefDate || null }),
+      });
+      if (!res.ok) throw new Error('Failed to save reference');
+      setDetail((prev) => {
+        if (!prev) return prev;
+        return {
+          ...prev,
+          grns: prev.grns?.map((g: any) =>
+            g.id === grnId ? { ...g, referenceNumber: editRefNumber || null, referenceDate: editRefDate || null } : g
+          ),
+        };
+      });
+      setEditingGrnId(null);
+      toast({ title: 'Reference saved' });
+    } catch {
+      toast({ title: 'Error', description: 'Could not save reference.', variant: 'destructive' });
+    } finally {
+      setSavingGrn(false);
+    }
+  };
 
   useEffect(() => {
     if (!open || !poId) return;
@@ -310,17 +356,57 @@ export default function POQuickViewModal({ poId, open, onClose }: POQuickViewMod
                       );
                       return (
                         <div key={grn.id} className="rounded-md border overflow-hidden">
-                          <div className={`flex items-center justify-between px-3 py-2 ${grnShort ? "bg-amber-50 border-b border-amber-100" : "bg-green-50 border-b border-green-100"}`}>
-                            <div className="flex items-center gap-2">
-                              <Package className="w-3.5 h-3.5 text-gray-500" />
-                              <span className="text-sm font-semibold">{grn.receiptNumber || `GRN-${grn.id}`}</span>
-                              {grn.receivedDate && (
-                                <span className="text-xs text-gray-500">— {formatDate(grn.receivedDate)}</span>
-                              )}
+                          <div className={`px-3 py-2 ${grnShort ? "bg-amber-50 border-b border-amber-100" : "bg-green-50 border-b border-green-100"}`}>
+                            <div className="flex items-center justify-between">
+                              <div className="flex items-center gap-2">
+                                <Package className="w-3.5 h-3.5 text-gray-500" />
+                                <span className="text-sm font-semibold">{grn.receiptNumber || `GRN-${grn.id}`}</span>
+                                {grn.receivedDate && (
+                                  <span className="text-xs text-gray-500">— {formatDate(grn.receivedDate)}</span>
+                                )}
+                              </div>
+                              <div className="flex items-center gap-2">
+                                <span className={`inline-flex items-center gap-1 text-xs font-semibold px-1.5 py-0.5 rounded border ${grnShort ? "text-amber-800 bg-amber-100 border-amber-200" : "text-green-800 bg-green-100 border-green-200"}`}>
+                                  {grnShort ? <><AlertTriangle className="w-3 h-3" /> Short delivery</> : <><CheckCircle2 className="w-3 h-3" /> Full delivery</>}
+                                </span>
+                                {editingGrnId !== grn.id && (
+                                  <button
+                                    onClick={() => startEditGrn(grn)}
+                                    className="p-1 text-gray-400 hover:text-blue-600 transition-colors"
+                                    title="Edit supplier invoice reference"
+                                  >
+                                    <Pencil className="w-3.5 h-3.5" />
+                                  </button>
+                                )}
+                              </div>
                             </div>
-                            <span className={`inline-flex items-center gap-1 text-xs font-semibold px-1.5 py-0.5 rounded border ${grnShort ? "text-amber-800 bg-amber-100 border-amber-200" : "text-green-800 bg-green-100 border-green-200"}`}>
-                              {grnShort ? <><AlertTriangle className="w-3 h-3" /> Short delivery</> : <><CheckCircle2 className="w-3 h-3" /> Full delivery</>}
-                            </span>
+                            {editingGrnId === grn.id ? (
+                              <div className="mt-2 flex items-center gap-2 flex-wrap">
+                                <Input
+                                  value={editRefNumber}
+                                  onChange={(e) => setEditRefNumber(e.target.value)}
+                                  placeholder="Supplier invoice ref"
+                                  className="h-7 text-xs w-44"
+                                />
+                                <Input
+                                  type="date"
+                                  value={editRefDate}
+                                  onChange={(e) => setEditRefDate(e.target.value)}
+                                  className="h-7 text-xs w-36"
+                                />
+                                <Button size="sm" className="h-7 px-2" onClick={() => saveGrnRef(grn.id)} disabled={savingGrn}>
+                                  <Check className="w-3.5 h-3.5" />
+                                </Button>
+                                <Button variant="ghost" size="sm" className="h-7 px-2" onClick={cancelEditGrn} disabled={savingGrn}>
+                                  <X className="w-3.5 h-3.5" />
+                                </Button>
+                              </div>
+                            ) : (grn.referenceNumber || grn.referenceDate) ? (
+                              <div className="mt-1 flex items-center gap-3 text-xs text-gray-600">
+                                {grn.referenceNumber && <span>Ref: <span className="font-medium">{grn.referenceNumber}</span></span>}
+                                {grn.referenceDate && <span>Date: <span className="font-medium">{formatDate(grn.referenceDate)}</span></span>}
+                              </div>
+                            ) : null}
                           </div>
                           <Table>
                             <TableHeader>
@@ -424,7 +510,9 @@ export default function POQuickViewModal({ poId, open, onClose }: POQuickViewMod
                           <span>
                             {grn.receiptNumber || `GRN-${grn.id}`}
                             {grn.receivedDate ? ` — received ${formatDate(grn.receivedDate)}` : ""}
-                            {grn.notes ? ` (${grn.notes})` : ""}
+                            {grn.referenceNumber ? ` — ref: ${grn.referenceNumber}` : ""}
+                            {grn.referenceDate ? ` (${formatDate(grn.referenceDate)})` : ""}
+                            {grn.notes ? ` — ${grn.notes}` : ""}
                           </span>
                         </div>
                       ))}

@@ -76,10 +76,11 @@ export default function Reports() {
   const loadAllData = async () => {
     setLoading(true);
     try {
-      const [dashboardRes, invoicesRes, booksRes] = await Promise.all([
+      const [dashboardRes, invoicesRes, booksRes, grnRes] = await Promise.all([
         fetch('/api/dashboard', { credentials: 'include' }),
         fetch('/api/invoices', { credentials: 'include' }),
         fetch('/api/books', { credentials: 'include' }),
+        fetch('/api/goods-receipts', { credentials: 'include' }),
       ]);
 
       if (!dashboardRes.ok) throw new Error('Failed to fetch dashboard data');
@@ -93,12 +94,13 @@ export default function Reports() {
       }
 
       const booksData = booksRes.ok ? await booksRes.json() : [];
+      const grnData = grnRes.ok ? await grnRes.json() : dashboardData.goodsReceipts;
 
       setData({
         products: dashboardData.products,
         lots: dashboardData.lots,
         purchaseOrders: dashboardData.purchaseOrders,
-        goodsReceipts: dashboardData.goodsReceipts,
+        goodsReceipts: Array.isArray(grnData) ? grnData : (grnData.data || dashboardData.goodsReceipts),
         invoices: invoicesData,
         customers: dashboardData.customers,
         suppliers: dashboardData.suppliers,
@@ -229,6 +231,7 @@ export default function Reports() {
           <PaymentsLedger
             invoices={data.invoices}
             purchaseOrders={data.purchaseOrders}
+            goodsReceipts={data.goodsReceipts}
             suppliers={data.suppliers}
             companySettings={data.companySettings}
             canExport={!!currentUser}

@@ -269,10 +269,14 @@ export default function PoGrnReport({ purchaseOrders, goodsReceipts, suppliers =
       const poAed = linkedPo ? calculateAEDAmount(linkedPo) : 0;
       const poCurrency = linkedPo?.currency || '';
       const poOriginal = Number(linkedPo?.totalAmount || linkedPo?.total_amount || 0);
+      const refNum = grn.referenceNumber || grn.reference_number || "";
+      const refDate = grn.referenceDate || grn.reference_date || "";
       return {
         type: 'Goods Receipt',
         document_number: grn.receiptNumber || grn.receipt_number || `GRN-${grn.id}`,
         date: formatDate(grn.receivedDate || grn.received_date),
+        ref_number: refNum,
+        ref_date: refDate ? formatDate(refDate) : "",
         supplier: getSupplierName(suppId),
         currency: poCurrency,
         total_original: poOriginal.toFixed(2),
@@ -387,6 +391,8 @@ export default function PoGrnReport({ purchaseOrders, goodsReceipts, suppliers =
                 type: 'Type',
                 document_number: 'Document Number',
                 date: 'Date',
+                ref_number: 'Ref No.',
+                ref_date: 'Ref Date',
                 supplier: 'Supplier',
                 currency: 'Currency',
                 total_original: 'Total (original currency)',
@@ -642,6 +648,8 @@ export default function PoGrnReport({ purchaseOrders, goodsReceipts, suppliers =
                   <TableHead>GRN Number</TableHead>
                   <TableHead>Supplier</TableHead>
                   <TableHead>Received Date</TableHead>
+                  <TableHead>Ref No.</TableHead>
+                  <TableHead>Ref Date</TableHead>
                   <TableHead>PO Reference</TableHead>
                   <TableHead className="text-right">Ordered Qty</TableHead>
                   <TableHead className="text-right">Received Qty</TableHead>
@@ -657,11 +665,15 @@ export default function PoGrnReport({ purchaseOrders, goodsReceipts, suppliers =
                   const totalOrdered = grn.totalOrdered ?? 0;
                   const totalReceived = grn.totalReceived ?? 0;
                   const isShort = totalOrdered > 0 && totalReceived < totalOrdered;
+                  const refNum = grn.referenceNumber || grn.reference_number || "";
+                  const refDate = grn.referenceDate || grn.reference_date || "";
                   return (
                     <TableRow key={grn.id}>
                       <TableCell className="font-medium">{grn.receiptNumber || grn.receipt_number || `GRN-${grn.id}`}</TableCell>
                       <TableCell>{getSupplierName(suppId)}</TableCell>
                       <TableCell>{formatDate(grn.receivedDate || grn.received_date)}</TableCell>
+                      <TableCell className="text-gray-700">{refNum || "—"}</TableCell>
+                      <TableCell className="text-gray-600">{refDate ? formatDate(refDate) : "—"}</TableCell>
                       <TableCell>
                         <Badge variant="outline">{linkedPo?.poNumber || linkedPo?.po_number || '-'}</Badge>
                       </TableCell>
