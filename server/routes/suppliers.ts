@@ -65,8 +65,13 @@ export function registerSupplierRoutes(app: Express) {
       await businessStorage.deleteSupplier(supplierId);
       writeAuditLog({ actor: req.user!.id, actorName: req.user?.username || String(req.user!.id), targetId: String(supplierId), targetType: 'supplier', action: 'DELETE', details: `Supplier '${supplierToDelete.name}' moved to recycle bin` });
       res.json({ success: true });
-    } catch (error) {
+    } catch (error: any) {
       console.error('Error deleting supplier:', error);
+      const errCode = error?.code ?? error?.cause?.code;
+      const errMsg = String(error?.message ?? '');
+      if (errCode === '23503' || errMsg.includes('foreign key') || errMsg.includes('violates foreign key')) {
+        return res.status(400).json({ error: 'Cannot delete supplier — it is referenced by one or more purchase orders. Delete or reassign those orders first.' });
+      }
       res.status(500).json({ error: 'Failed to delete supplier' });
     }
   });

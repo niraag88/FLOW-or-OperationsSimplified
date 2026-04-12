@@ -221,7 +221,7 @@ test.describe('Users', () => {
   });
 
   test('GET /api/users by Viewer (Staff role) → 403', async () => {
-    if (!viewerCookie) return;
+    expect(viewerCookie).toBeTruthy();
     const { status } = await api('GET', '/api/users', viewerCookie);
     expect(status).toBe(403);
   });
@@ -288,7 +288,7 @@ test.describe('Company Settings', () => {
   });
 
   test('PUT /api/company-settings by Viewer (Staff) → 403', async () => {
-    if (!viewerCookie) return;
+    expect(viewerCookie).toBeTruthy();
     const { status } = await api('PUT', '/api/company-settings', viewerCookie, {
       companyName: 'Should Not Change',
     });
@@ -296,7 +296,7 @@ test.describe('Company Settings', () => {
   });
 
   test('GET /api/company-settings by Viewer (Staff) → 200 (read-only access)', async () => {
-    if (!viewerCookie) return;
+    expect(viewerCookie).toBeTruthy();
     const { status } = await api('GET', '/api/company-settings', viewerCookie);
     expect(status).toBe(200);
   });
@@ -500,22 +500,17 @@ test.describe('Products', () => {
     expect(status).toBe(400);
   });
 
-  test('POST /api/products by Viewer (Staff) — documents permissive role BUG', async () => {
-    if (!viewerCookie || !IDs.brand) return;
-    const { status, data } = await api('POST', '/api/products', viewerCookie, {
+  test('POST /api/products by Viewer (Staff) → 403 (Admin/Manager only)', async () => {
+    expect(viewerCookie).toBeTruthy();
+    expect(IDs.brand).toBeGreaterThan(0);
+    const { status } = await api('POST', '/api/products', viewerCookie, {
       sku: 'AUDIT-VIEWER-SKU',
       name: 'Viewer Product',
       brandId: IDs.brand,
       unitPrice: '10.00',
       dataSource: 'e2e_test',
     });
-    if (status === 201 || status === 200) {
-      bug('POST /api/products has NO role restriction — Staff/Viewer users can create products (should be 403)');
-      test.info().annotations.push({ type: 'BUG', description: 'POST /api/products allows Viewer/Staff users to create products. Expected 403 Forbidden for non-Admin/Manager roles.' });
-      const vpId = (data as { id?: number }).id;
-      if (vpId) await api('DELETE', `/api/products/${vpId}`, adminCookie);
-    }
-    expect([201, 200, 403]).toContain(status);
+    expect(status).toBe(403);
   });
 
   test('GET /api/products list → 200, < 500ms', async () => {
@@ -783,7 +778,9 @@ test.describe('Purchase Orders', () => {
   });
 
   test('POST /api/purchase-orders by Viewer (Staff) → 403', async () => {
-    if (!viewerCookie || !IDs.supplier || !IDs.brand) return;
+    expect(viewerCookie).toBeTruthy();
+    expect(IDs.supplier).toBeGreaterThan(0);
+    expect(IDs.brand).toBeGreaterThan(0);
     const { status } = await api('POST', '/api/purchase-orders', viewerCookie, {
       supplierId: IDs.supplier,
       brandId: IDs.brand,
@@ -800,7 +797,7 @@ test.describe('Purchase Orders', () => {
   });
 
   test('GET /api/purchase-orders by Viewer (Staff) → 403', async () => {
-    if (!viewerCookie) return;
+    expect(viewerCookie).toBeTruthy();
     const { status } = await api('GET', '/api/purchase-orders', viewerCookie);
     expect(status).toBe(403);
   });
@@ -1257,19 +1254,20 @@ test.describe('Invoices', () => {
   });
 
   test('DELETE /api/invoices/:id by Viewer → 403', async () => {
-    if (!viewerCookie || !IDs.invoice) return;
+    expect(IDs.invoice).toBeGreaterThan(0);
+    expect(viewerCookie).toBeTruthy();
     const { status } = await api('DELETE', `/api/invoices/${IDs.invoice}`, viewerCookie);
     expect(status).toBe(403);
   });
 
   test('DELETE /api/invoices/:id without auth → 401', async () => {
-    if (!IDs.invoice) return;
+    expect(IDs.invoice).toBeGreaterThan(0);
     const { status } = await api('DELETE', `/api/invoices/${IDs.invoice}`, '');
     expect(status).toBe(401);
   });
 
   test('DELETE /api/invoices/:id by Admin → 200 (happy path)', async () => {
-    if (!IDs.invoice) return;
+    expect(IDs.invoice).toBeGreaterThan(0);
     const { status } = await api('DELETE', `/api/invoices/${IDs.invoice}`, adminCookie);
     expect(status).toBe(200);
     IDs.invoice = 0;
@@ -1542,7 +1540,7 @@ test.describe('System', () => {
   });
 
   test('GET /api/audit-logs Staff (Viewer) → 403', async () => {
-    if (!viewerCookie) return;
+    expect(viewerCookie).toBeTruthy();
     const { status } = await api('GET', '/api/audit-logs', viewerCookie);
     expect(status).toBe(403);
   });
@@ -1567,7 +1565,7 @@ test.describe('System', () => {
   });
 
   test('GET /api/ops/backup-runs Staff (Viewer) → 403', async () => {
-    if (!viewerCookie) return;
+    expect(viewerCookie).toBeTruthy();
     const { status } = await api('GET', '/api/ops/backup-runs', viewerCookie);
     expect(status).toBe(403);
   });
@@ -1578,7 +1576,7 @@ test.describe('System', () => {
   });
 
   test('POST /api/ops/factory-reset Staff (Viewer) → 403 (Admin-only)', async () => {
-    if (!viewerCookie) return;
+    expect(viewerCookie).toBeTruthy();
     const { status } = await api('POST', '/api/ops/factory-reset', viewerCookie);
     expect(status).toBe(403);
     note('POST /api/ops/factory-reset is Admin-only (requireRole("Admin")) — Staff/Viewer get 403');
@@ -1658,17 +1656,11 @@ test.describe('Edge Cases', () => {
     expect(status).toBe(200);
   });
 
-  test('DELETE /api/suppliers/:id with associated PO → FK constraint (400 or 500)', async () => {
+  test('DELETE /api/suppliers/:id with associated PO → 400 (FK constraint enforced)', async () => {
     if (!IDs.supplier || !IDs.po) return;
     const { status } = await api('DELETE', `/api/suppliers/${IDs.supplier}`, adminCookie);
-    if (status === 500) {
-      bug('DELETE /api/suppliers/:id with PO reference returns 500 — FK constraint not handled gracefully; should return 400 with a descriptive error');
-      test.info().annotations.push({ type: 'BUG', description: 'DELETE /api/suppliers/:id returns 500 when the supplier is referenced by a PO. Should return 400 with a human-readable constraint error.' });
-    } else if (status === 400 || status === 409) {
-      note('DELETE /api/suppliers/:id with PO reference correctly returns 4xx (referential constraint enforced)');
-    }
     note(`DELETE /api/suppliers with associated PO → ${status}`);
-    expect([400, 409, 500]).toContain(status);
+    expect(status).toBe(400);
   });
 
   test('GET /api/export/do documents PDF content-type behaviour', async () => {
