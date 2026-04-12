@@ -1225,11 +1225,11 @@ export default function GoodsReceiptsTab({
             </div>
             <div className="grid grid-cols-2 gap-4">
               <div className="space-y-2">
-                <Label htmlFor="receive-ref-number">Reference Number (optional)</Label>
+                <Label htmlFor="receive-ref-number">Reference No. (optional)</Label>
                 <Input
                   id="receive-ref-number"
                   type="text"
-                  placeholder="e.g. INV-2024-001"
+                  placeholder="e.g. REF-2024-001"
                   value={receiveRefNumber}
                   onChange={(e) => setReceiveRefNumber(e.target.value)}
                 />

@@ -22,7 +22,6 @@ const BulkAddProduct = lazy(() => import("@/pages/BulkAddProduct"));
 const EditProduct = lazy(() => import("@/pages/EditProduct"));
 const StockCountNew = lazy(() => import("@/pages/StockCountNew"));
 const GoodsReceipts = lazy(() => import("@/pages/GoodsReceipts"));
-const Customers = lazy(() => import("@/pages/Customers"));
 const Print = lazy(() => import("@/pages/Print"));
 const Quotations = lazy(() => import("@/pages/Quotations"));
 const UserManagement = lazy(() => import("@/pages/UserManagement"));
@@ -139,11 +138,6 @@ function PagesContent() {
         <Route path="/goods-receipts" element={
           <ProtectedRoute>
             <Layout currentPageName="Goods Receipts"><GoodsReceipts /></Layout>
-          </ProtectedRoute>
-        } />
-        <Route path="/customers" element={
-          <ProtectedRoute>
-            <Layout currentPageName="Customers"><Customers /></Layout>
           </ProtectedRoute>
         } />
         <Route path="/print" element={

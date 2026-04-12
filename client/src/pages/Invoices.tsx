@@ -17,7 +17,6 @@ import InvoiceForm from "../components/invoices/InvoiceForm";
 import InvoiceFilters from "../components/invoices/InvoiceFilters";
 import CreateFromExistingDialog from "../components/invoices/CreateFromExistingDialog";
 import InvoiceQuickViewModal from "../components/invoices/InvoiceQuickViewModal";
-import { getDerivedInvoiceStatus } from "../components/invoices/invoiceUtils";
 import ExportDropdown from "../components/common/ExportDropdown";
 import { format } from "date-fns";
 

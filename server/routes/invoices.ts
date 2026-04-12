@@ -291,7 +291,29 @@ export function registerInvoiceRoutes(app: Express) {
         await db.update(invoices).set({ companySnapshot: invCompanySnapshot }).where(eq(invoices.id, invoice.id));
       }
 
-      writeAuditLog({ actor: req.user!.id, actorName: req.user?.username || String(req.user!.id), targetId: String(invoice.id), targetType: 'invoice', action: 'CREATE', details: `Invoice #${invoice.invoiceNumber} created for ${customerName}` });
+      if (body.status === 'delivered') {
+        await db.transaction(async (tx) => {
+          const items = await tx.select().from(invoiceLineItems).where(eq(invoiceLineItems.invoiceId, invoice.id));
+          for (const item of items) {
+            if (item.productId) {
+              await updateProductStock(
+                item.productId,
+                -item.quantity,
+                'sale',
+                invoice.id,
+                'invoice',
+                parseFloat(item.unitPrice.toString()),
+                `Sale from Invoice #${invoice.invoiceNumber}`,
+                req.user!.id,
+                tx
+              );
+            }
+          }
+          await tx.update(invoices).set({ stockDeducted: true }).where(eq(invoices.id, invoice.id));
+        });
+      }
+
+      writeAuditLog({ actor: req.user!.id, actorName: req.user?.username || String(req.user!.id), targetId: String(invoice.id), targetType: 'invoice', action: 'CREATE', details: `Invoice #${invoice.invoiceNumber} created for ${customerName}${body.status === 'delivered' ? ' — stock deducted' : ''}` });
       res.status(201).json({ ...invoice, items: body.items || [] });
     } catch (error) {
       console.error('Error creating invoice:', error);

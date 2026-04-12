@@ -89,7 +89,6 @@ export default function QuotationForm({ open, onClose, editingQuotation, current
 
   const loadData = async () => {
     try {
-      console.time('📝 QuotationForm - Total Load Time');
       setLoading(true);
       
       // Use preloaded data if available, otherwise fetch from API (fallback)
@@ -226,7 +225,6 @@ export default function QuotationForm({ open, onClose, editingQuotation, current
       });
     } finally {
       setLoading(false);
-      console.timeEnd('📝 QuotationForm - Total Load Time');
     }
   };
 

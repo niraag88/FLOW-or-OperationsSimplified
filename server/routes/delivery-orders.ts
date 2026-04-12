@@ -123,11 +123,7 @@ export function registerDeliveryOrderRoutes(app: Express) {
         remarks: doRecord.notes || '',
         show_remarks: doRecord.showRemarks || false,
         tax_rate: taxRt,
-        tax_treatment: (() => {
-          if (taxAmt > 0 && doSubtotal > 0) return 'StandardRated';
-          const localTreatments = ['Local', 'standard', 'Standard', 'local'];
-          return localTreatments.includes(doRecord.customerVatTreatment || '') ? 'StandardRated' : 'ZeroRated';
-        })(),
+        tax_treatment: doRecord.taxTreatment || 'ZeroRated',
         status: doRecord.status,
         company_snapshot: doRecord.companySnapshot || null,
         scan_key: doRecord.scanKey || null,
