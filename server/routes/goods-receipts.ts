@@ -437,49 +437,53 @@ export function registerGoodsReceiptRoutes(app: Express) {
         return res.status(404).json({ error: 'Purchase order not found' });
       }
 
-      const existingPoItems = await db.select({
-        id: purchaseOrderItems.id,
-        quantity: purchaseOrderItems.quantity,
-        receivedQuantity: purchaseOrderItems.receivedQuantity,
-        productId: purchaseOrderItems.productId,
-        productName: products.name,
-      }).from(purchaseOrderItems)
-        .leftJoin(products, eq(products.id, purchaseOrderItems.productId))
-        .where(eq(purchaseOrderItems.poId, poId));
-
-      const poItemMap = new Map(existingPoItems.map(i => [i.id, i]));
-
-      const overReceiveErrors: string[] = [];
-      for (const item of items) {
-        if (item.receivedQuantity <= 0) continue;
-        const existing = poItemMap.get(item.poItemId);
-        if (!existing) continue;
-        const remaining = existing.quantity - (existing.receivedQuantity ?? 0);
-        const productLabel = existing.productName || `Product ID ${item.productId}`;
-        if (remaining === 0) {
-          overReceiveErrors.push(
-            `All units for "${productLabel}" have already been received on this PO`
-          );
-        } else if (item.receivedQuantity > remaining) {
-          overReceiveErrors.push(
-            `Cannot receive ${item.receivedQuantity} units for "${productLabel}" — only ${remaining} unit${remaining === 1 ? "" : "s"} remaining on this PO`
-          );
-        }
-      }
-
-      if (overReceiveErrors.length > 0) {
-        return res.status(400).json({
-          error: 'Over-receive not allowed',
-          details: overReceiveErrors
-        });
-      }
-
       const receiptNumber = await businessStorage.generateGrnNumber();
 
       let receipt!: typeof goodsReceipts.$inferSelect;
       let allReceived = false;
 
       await db.transaction(async (tx) => {
+        // Lock PO items inside the transaction to prevent concurrent over-receive
+        const lockedPoItems = await tx.select({
+          id: purchaseOrderItems.id,
+          quantity: purchaseOrderItems.quantity,
+          receivedQuantity: purchaseOrderItems.receivedQuantity,
+          productId: purchaseOrderItems.productId,
+          productName: products.name,
+        }).from(purchaseOrderItems)
+          .leftJoin(products, eq(products.id, purchaseOrderItems.productId))
+          .where(eq(purchaseOrderItems.poId, poId));
+
+        const poItemMap = new Map(lockedPoItems.map(i => [i.id, i]));
+
+        const overReceiveErrors: string[] = [];
+        for (const item of items) {
+          if (item.receivedQuantity <= 0) continue;
+          const existing = poItemMap.get(item.poItemId);
+          if (!existing) {
+            overReceiveErrors.push(`PO item ID ${item.poItemId} not found on PO ${po.poNumber}`);
+            continue;
+          }
+          const remaining = existing.quantity - (existing.receivedQuantity ?? 0);
+          const productLabel = existing.productName || `Product ID ${item.productId}`;
+          if (remaining === 0) {
+            overReceiveErrors.push(
+              `All units for "${productLabel}" have already been received on this PO`
+            );
+          } else if (item.receivedQuantity > remaining) {
+            overReceiveErrors.push(
+              `Cannot receive ${item.receivedQuantity} units for "${productLabel}" — only ${remaining} unit${remaining === 1 ? "" : "s"} remaining on this PO`
+            );
+          }
+        }
+
+        if (overReceiveErrors.length > 0) {
+          const err = new Error('Over-receive not allowed') as Error & { isOverReceive: boolean; details: string[] };
+          err.isOverReceive = true;
+          err.details = overReceiveErrors;
+          throw err;
+        }
+
         const [newReceipt] = await tx.insert(goodsReceipts).values({
           receiptNumber,
           poId,
@@ -539,7 +543,10 @@ export function registerGoodsReceiptRoutes(app: Express) {
         poStatus: (allReceived || forceClose) ? 'closed' : 'submitted',
         message: `Goods receipt ${receipt.receiptNumber} created and stock updated for ${items.filter(i => i.receivedQuantity > 0).length} products`
       });
-    } catch (error) {
+    } catch (error: any) {
+      if (error?.isOverReceive) {
+        return res.status(400).json({ error: 'Over-receive not allowed', details: error.details });
+      }
       console.error('Error creating goods receipt:', error);
       res.status(500).json({ error: 'Failed to create goods receipt' });
     }
