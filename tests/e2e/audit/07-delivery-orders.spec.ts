@@ -61,102 +61,57 @@ test.describe('Phase 7 — Delivery Orders', () => {
     test.info().annotations.push({ type: 'result', description: 'Create from Existing button visible on DO list' });
   });
 
-  test('7.3 attempt DO-01 creation from INV-01 via "Create from Existing" browser flow', async ({ page }) => {
-    test.info().annotations.push({ type: 'action', description: `Click Create from Existing; select invoice/customer; look for pre-filled items from INV-01 (${invoiceIds.inv01}); submit` });
+  test('7.3 DO-01 creation from INV-01 via "Create from Existing" browser flow', async ({ page }) => {
+    test.info().annotations.push({ type: 'action', description: `Click Create from Existing; select customer "Audit Customer One"; select first available invoice from INV-01 (${invoiceIds.inv01}); fill date; submit; capture DO id from API` });
     await browserLogin(page);
     await page.goto(`${BASE_URL}/DeliveryOrders`);
     await page.waitForLoadState('domcontentloaded', { timeout: 20000 });
     await page.waitForTimeout(2000);
 
     const fromExisting = page.locator('button').filter({ hasText: /create from existing|from existing/i }).first();
+    await expect(fromExisting).toBeVisible({ timeout: 10000 });
     await fromExisting.click();
     await page.waitForTimeout(2000);
 
     const customerCombo = page.locator('button[role="combobox"]').first();
     await expect(customerCombo).toBeVisible({ timeout: 10000 });
-
     await customerCombo.click();
     await page.waitForTimeout(1000);
-    const customerOption = page.locator('[role="option"], li').filter({ hasText: /audit customer 1/i }).first();
-    const customerOptionVisible = await customerOption.isVisible().catch(() => false);
-    if (customerOptionVisible) {
-      await customerOption.click();
-      await page.waitForTimeout(1000);
-    } else {
-      const firstOption = page.locator('[role="option"], li').first();
-      await firstOption.click().catch(() => {});
-      await page.waitForTimeout(1000);
-    }
+
+    const customerOption = page.locator('[role="option"], li').filter({ hasText: /audit customer one/i }).first();
+    await expect(customerOption).toBeVisible({ timeout: 5000 });
+    await customerOption.click();
+    await page.waitForTimeout(1500);
 
     const invoiceCombo = page.locator('button[role="combobox"]').nth(1);
-    const invoiceComboVisible = await invoiceCombo.isVisible().catch(() => false);
-    if (invoiceComboVisible) {
-      await invoiceCombo.click();
-      await page.waitForTimeout(1000);
-      const invOption = page.locator('[role="option"], li').first();
-      await invOption.click().catch(() => {});
-      await page.waitForTimeout(2000);
-    }
+    await expect(invoiceCombo).toBeVisible({ timeout: 10000 });
+    await invoiceCombo.click();
+    await page.waitForTimeout(1000);
+    const invOption = page.locator('[role="option"], li').first();
+    await expect(invOption).toBeVisible({ timeout: 5000 });
+    await invOption.click();
+    await page.waitForTimeout(2000);
 
     const deliveryDateInput = page.locator('input[type="date"], input[name*="date" i], input[placeholder*="date" i]').first();
-    const deliveryDateVisible = await deliveryDateInput.isVisible().catch(() => false);
-    if (deliveryDateVisible) {
+    if (await deliveryDateInput.isVisible({ timeout: 3000 }).catch(() => false)) {
       await deliveryDateInput.fill('2026-04-20');
     }
 
-    const notesInput = page.locator('textarea[name*="notes" i], textarea[name*="remark" i], textarea').first();
-    const notesVisible = await notesInput.isVisible().catch(() => false);
-    if (notesVisible) {
+    const notesInput = page.locator('textarea').first();
+    if (await notesInput.isVisible({ timeout: 3000 }).catch(() => false)) {
       await notesInput.fill('DO-01 delivery remarks — from INV-01 via Create from Existing');
     }
 
-    const submitBtn = page.locator('button[type="submit"], button').filter({ hasText: /submit|create|save/i }).first();
+    const submitBtn = page.locator('button').filter({ hasText: /submit|create|save/i }).first();
     await expect(submitBtn).toBeVisible({ timeout: 10000 });
     await submitBtn.click();
     await page.waitForTimeout(3000);
 
-    const currentUrl = page.url();
-    const pageBody = await page.locator('body').innerText();
-    test.info().annotations.push({ type: 'result', description: `After Create from Existing submit: URL=${currentUrl}; body length=${pageBody.length}` });
-    expect(pageBody.length).toBeGreaterThan(50);
-
     const dos = await (await fetch(`${BASE_URL}/api/delivery-orders`, { headers: { Cookie: cookie } })).json() as DeliveryOrderResponse[];
-    if (Array.isArray(dos) && dos.length > 0) {
-      do01Id = dos[dos.length - 1].id;
-    }
-    test.info().annotations.push({ type: 'result', description: `Latest DO after Create from Existing: id=${do01Id}` });
-  });
-
-  test('7.4 ensure DO-01 exists (create via API if browser flow did not produce an ID)', async () => {
-    test.info().annotations.push({ type: 'action', description: 'If do01Id not set, create DO-01 from INV-01 via API (fallback)' });
-    if (do01Id && do01Id > 0) {
-      test.info().annotations.push({ type: 'result', description: `DO-01 already created via browser: id=${do01Id}` });
-      return;
-    }
-
-    const invDetail = await (await fetch(`${BASE_URL}/api/invoices/${invoiceIds.inv01}`, { headers: { Cookie: cookie } })).json() as { items?: Array<{ product_id: number; quantity: number; unit_price: string; description?: string }> };
-    const invItems = invDetail.items ?? [];
-    const items = invItems.length > 0 ? invItems.map((it) => ({
-      product_id: it.product_id,
-      description: it.description ?? `DO item for product ${it.product_id}`,
-      quantity: it.quantity,
-      unit_price: it.unit_price ?? '25',
-    })) : productIds.slice(0, 3).map((pId, i) => ({
-      product_id: pId, description: `DO-01 item ${i + 1}`, quantity: 2, unit_price: '25',
-    }));
-
-    const { status, data } = await apiPost<DeliveryOrderResponse>('/api/delivery-orders', {
-      invoice_id: invoiceIds.inv01,
-      customer_id: customerIds[0],
-      delivery_date: '2026-04-20',
-      delivery_address: '1 Main St, Dubai, UAE',
-      notes: 'DO-01 from INV-01 — delivery remarks added (API fallback)',
-      status: 'submitted',
-      items,
-    }, cookie);
-    expect([200, 201]).toContain(status);
-    do01Id = data.id;
-    test.info().annotations.push({ type: 'result', description: `DO-01 created via API fallback: id=${do01Id} status=${data.status}` });
+    expect(Array.isArray(dos)).toBe(true);
+    expect(dos.length).toBeGreaterThan(0);
+    do01Id = dos[dos.length - 1].id;
+    test.info().annotations.push({ type: 'result', description: `DO-01 created via browser Create from Existing: id=${do01Id}` });
     expect(do01Id).toBeGreaterThan(0);
   });
 
@@ -230,8 +185,8 @@ test.describe('Phase 7 — Delivery Orders', () => {
     expect(inv.status).toBeTruthy();
   });
 
-  test('7.9 step 56: cancel DO-02 — verify cancellation via API (DO form status dropdown has no "cancelled" option; cancellation via browser edit form selecting status=cancelled is not available)', async ({ page }) => {
-    test.info().annotations.push({ type: 'action', description: `Navigate to /DeliveryOrders; open DO-02 Edit form via browser; note that DOForm status dropdown only offers Draft/Submitted/Delivered (no Cancelled); then cancel via API` });
+  test('7.9 step 56: cancel DO-02 via browser actions dropdown or API — verify cancelled in API and browser list', async ({ page }) => {
+    test.info().annotations.push({ type: 'action', description: `Navigate to /DeliveryOrders; find DO-02 row (${do02Id}); attempt browser cancel via actions dropdown; verify API status=cancelled` });
     expect(do02Id).toBeGreaterThan(0);
 
     await browserLogin(page);
@@ -239,28 +194,36 @@ test.describe('Phase 7 — Delivery Orders', () => {
     await page.waitForLoadState('domcontentloaded', { timeout: 20000 });
     await page.waitForTimeout(2000);
 
-    const do02Row = page.locator('tr, [role="row"]').filter({ hasText: new RegExp(String(do02Id), 'i') }).first();
-    const rowVisible = await do02Row.isVisible().catch(() => false);
-    if (rowVisible) {
-      const actionsBtn = do02Row.locator('button').last();
-      await actionsBtn.click();
+    const do02Row = page.locator('tr, [role="row"]').filter({ hasText: new RegExp(String(do02Id)) }).first();
+    await expect(do02Row).toBeVisible({ timeout: 10000 });
+
+    const actionsBtn = do02Row.locator('button').last();
+    await expect(actionsBtn).toBeVisible({ timeout: 5000 });
+    await actionsBtn.click();
+    await page.waitForTimeout(800);
+
+    const cancelItem = page.locator('[role="menuitem"]').filter({ hasText: /cancel/i }).first();
+    const hasCancelInMenu = await cancelItem.isVisible({ timeout: 2000 }).catch(() => false);
+    if (hasCancelInMenu) {
+      await cancelItem.click();
       await page.waitForTimeout(800);
-      const editItem = page.locator('[role="menuitem"]').filter({ hasText: /edit/i }).first();
-      const editVisible = await editItem.isVisible().catch(() => false);
-      if (editVisible) {
-        await editItem.click();
-        await page.waitForTimeout(1500);
-        const statusSelect = page.locator('[id*="status"], select').first();
-        const statusText = await statusSelect.innerText().catch(() => '');
-        test.info().annotations.push({ type: 'issue', description: `DO-02 Edit form opened; status dropdown options: "${statusText.slice(0, 200)}" — "cancelled" NOT available in DO form (DOForm.tsx only has Draft/Submitted/Delivered)` });
-        await page.keyboard.press('Escape');
+      const confirmBtn = page.locator('button').filter({ hasText: /yes.*cancel|confirm/i }).first();
+      if (await confirmBtn.isVisible({ timeout: 2000 }).catch(() => false)) {
+        await confirmBtn.click();
       }
+      await page.waitForTimeout(2000);
+      test.info().annotations.push({ type: 'result', description: 'DO-02 cancelled via browser actions dropdown' });
+    } else {
+      await page.keyboard.press('Escape');
+      test.info().annotations.push({ type: 'result', description: 'DO-02 no browser cancel menu item — cancelling via API (DOForm has no Cancelled status option)' });
+      const { status: cs, data } = await apiPut<DeliveryOrderResponse>(`/api/delivery-orders/${do02Id}`, { status: 'cancelled' }, cookie);
+      expect([200, 201]).toContain(cs);
+      expect(data.status).toBe('cancelled');
     }
 
-    const { status: cs, data } = await apiPut<DeliveryOrderResponse>(`/api/delivery-orders/${do02Id}`, { status: 'cancelled' }, cookie);
-    expect([200, 201]).toContain(cs);
-    test.info().annotations.push({ type: 'result', description: `DO-02 status via API cancel: ${data.status} (expected "cancelled"); UI gap: no browser cancel button for DOs` });
-    expect(data.status).toBe('cancelled');
+    const doDetail = await (await fetch(`${BASE_URL}/api/delivery-orders/${do02Id}`, { headers: { Cookie: cookie } })).json() as DeliveryOrderResponse;
+    test.info().annotations.push({ type: 'result', description: `DO-02 API status after cancel: ${doDetail.status} (expected "cancelled")` });
+    expect(doDetail.status).toBe('cancelled');
   });
 
   test('7.10 DO list shows delivered and cancelled statuses in browser', async ({ page }) => {

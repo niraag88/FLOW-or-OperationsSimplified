@@ -207,9 +207,9 @@ test.describe('Phase 5 — Quotations', () => {
     await page.waitForLoadState('domcontentloaded', { timeout: 20000 });
     await page.waitForTimeout(3000);
     const body = await page.locator('body').innerText();
-    test.info().annotations.push({ type: 'result', description: `QT-03 print body length: ${body.length}; Customer 2: ${/audit customer 2/i.test(body)}` });
+    test.info().annotations.push({ type: 'result', description: `QT-03 print body length: ${body.length}; Customer Two: ${/audit customer two/i.test(body)}` });
     expect(body.length).toBeGreaterThan(100);
-    expect(body).toMatch(/audit customer 2/i);
+    expect(body).toMatch(/audit customer two/i);
   });
 
   test('5.12 attempt to convert QT-01 to Invoice via browser (step 39); annotate whether action exists', async ({ page }) => {

@@ -95,7 +95,7 @@ test.describe('Phase 10 — Audit Log & Recycle Bin', () => {
   });
 
   test('10.5 step 69: soft-delete PO from PO list via browser actions dropdown (Delete → Yes Delete confirm)', async ({ page }) => {
-    test.info().annotations.push({ type: 'action', description: `Navigate to /PurchaseOrders; open actions dropdown for PO-${softDeletedPoId}; click Delete; click "Yes, Delete" confirm; assert PO moves to recycle bin` });
+    test.info().annotations.push({ type: 'action', description: `Navigate to /PurchaseOrders; find PO row (id=${softDeletedPoId}); open actions dropdown; click Delete; click "Yes, Delete" confirm; assert new entry in /api/recycle-bin` });
     expect(softDeletedPoId).toBeGreaterThan(0);
     await browserLogin(page);
     await page.goto(`${BASE_URL}/PurchaseOrders`);
@@ -106,40 +106,27 @@ test.describe('Phase 10 — Audit Log & Recycle Bin', () => {
     const binCountBefore = binBefore.length;
 
     const poRowText = softDeletedPoNumber.length > 0 ? softDeletedPoNumber : String(softDeletedPoId);
-    const poRow = page.locator('tr, [role="row"]').filter({ hasText: new RegExp(poRowText.replace('-', '\\-'), 'i') }).first();
-    const poRowVisible = await poRow.isVisible().catch(() => false);
+    const poRow = page.locator('tr, [role="row"]').filter({ hasText: new RegExp(poRowText.replace('-', '\\-')) }).first();
+    await expect(poRow).toBeVisible({ timeout: 10000 });
 
-    if (poRowVisible) {
-      const actionsBtn = poRow.locator('button[aria-haspopup="menu"], button[aria-label*="action" i], button').last();
-      await actionsBtn.click();
-      await page.waitForTimeout(1000);
-
-      const deleteMenuItem = page.locator('[role="menuitem"]').filter({ hasText: /delete/i }).first();
-      const deleteMenuItemVisible = await deleteMenuItem.isVisible().catch(() => false);
-      if (deleteMenuItemVisible) {
-        await deleteMenuItem.click();
-        await page.waitForTimeout(1000);
-
-        const confirmBtn = page.locator('button').filter({ hasText: /yes.*delete|confirm.*delete|yes, delete/i }).first();
-        const confirmVisible = await confirmBtn.isVisible().catch(() => false);
-        if (confirmVisible) {
-          await confirmBtn.click();
-          await page.waitForTimeout(2000);
-          test.info().annotations.push({ type: 'result', description: 'Clicked Yes Delete in confirmation dialog — PO soft-deleted' });
-        } else {
-          test.info().annotations.push({ type: 'result', description: 'Confirmation dialog not found after clicking Delete menu item' });
-        }
-      } else {
-        test.info().annotations.push({ type: 'result', description: 'Delete menu item not found in actions dropdown' });
-      }
-    } else {
-      test.info().annotations.push({ type: 'result', description: `PO row for "${poRowText}" not found in list — PO may be on a different page` });
-    }
-
+    const actionsBtn = poRow.locator('button').last();
+    await expect(actionsBtn).toBeVisible({ timeout: 5000 });
+    await actionsBtn.click();
     await page.waitForTimeout(1000);
+
+    const deleteMenuItem = page.locator('[role="menuitem"]').filter({ hasText: /delete/i }).first();
+    await expect(deleteMenuItem).toBeVisible({ timeout: 5000 });
+    await deleteMenuItem.click();
+    await page.waitForTimeout(1000);
+
+    const confirmBtn = page.locator('button').filter({ hasText: /yes.*delete|confirm.*delete|yes, delete/i }).first();
+    await expect(confirmBtn).toBeVisible({ timeout: 5000 });
+    await confirmBtn.click();
+    await page.waitForTimeout(2500);
+
     const binAfter = await (await fetch(`${BASE_URL}/api/recycle-bin`, { headers: { Cookie: cookie } })).json() as RecycleBinEntry[];
     const newEntry = binAfter.find((b) => b.document_id === String(softDeletedPoId));
-    test.info().annotations.push({ type: 'result', description: `Recycle bin count before: ${binCountBefore}; after: ${binAfter.length}; new entry for PO-${softDeletedPoId}: ${!!newEntry} type=${newEntry?.document_type}` });
+    test.info().annotations.push({ type: 'result', description: `Bin before: ${binCountBefore}; after: ${binAfter.length}; new entry for PO-${softDeletedPoId}: ${!!newEntry} type=${newEntry?.document_type}` });
     expect(newEntry).toBeTruthy();
     expect(newEntry!.document_type).toBe('PurchaseOrder');
     softDeletedBinId = newEntry!.id;
@@ -188,8 +175,8 @@ test.describe('Phase 10 — Audit Log & Recycle Bin', () => {
     expect(body).toMatch(/draft/i);
   });
 
-  test('10.9 step 71: soft-delete second PO from PO list via browser; permanently delete from Recycle Bin; PO gone from both', async ({ page }) => {
-    test.info().annotations.push({ type: 'action', description: `Step 71: Navigate to /PurchaseOrders; soft-delete PO-${permDeletePoId} via actions dropdown; then permanently delete from recycle bin; verify gone from both` });
+  test('10.9 step 71: soft-delete second PO (browser) → permanently delete from Recycle Bin; verify gone from both', async ({ page }) => {
+    test.info().annotations.push({ type: 'action', description: `Navigate to /PurchaseOrders; soft-delete PO-${permDeletePoId} via browser actions dropdown; then DELETE /api/recycle-bin/:id permanently; verify entry removed from bin` });
     expect(permDeletePoId).toBeGreaterThan(0);
     await browserLogin(page);
     await page.goto(`${BASE_URL}/PurchaseOrders`);
@@ -197,41 +184,27 @@ test.describe('Phase 10 — Audit Log & Recycle Bin', () => {
     await page.waitForTimeout(2500);
 
     const poRowText2 = permDeletePoNumber.length > 0 ? permDeletePoNumber : String(permDeletePoId);
-    const poRow2 = page.locator('tr, [role="row"]').filter({ hasText: new RegExp(poRowText2.replace('-', '\\-'), 'i') }).first();
-    const poRow2Visible = await poRow2.isVisible().catch(() => false);
+    const poRow2 = page.locator('tr, [role="row"]').filter({ hasText: new RegExp(poRowText2.replace('-', '\\-')) }).first();
+    await expect(poRow2).toBeVisible({ timeout: 10000 });
 
-    if (poRow2Visible) {
-      const actionsBtn2 = poRow2.locator('button[aria-haspopup="menu"], button[aria-label*="action" i], button').last();
-      await actionsBtn2.click();
-      await page.waitForTimeout(1000);
-      const deleteMenuItem2 = page.locator('[role="menuitem"]').filter({ hasText: /delete/i }).first();
-      const d2visible = await deleteMenuItem2.isVisible().catch(() => false);
-      if (d2visible) {
-        await deleteMenuItem2.click();
-        await page.waitForTimeout(1000);
-        const confirmBtn2 = page.locator('button').filter({ hasText: /yes.*delete|confirm.*delete|yes, delete/i }).first();
-        const c2visible = await confirmBtn2.isVisible().catch(() => false);
-        if (c2visible) {
-          await confirmBtn2.click();
-          await page.waitForTimeout(2000);
-        }
-      }
-    } else {
-      test.info().annotations.push({ type: 'result', description: `PO row for "${poRowText2}" not found in browser; soft-delete via API for test continuity` });
-      await fetch(`${BASE_URL}/api/recycle-bin`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json', Cookie: cookie },
-        body: JSON.stringify({
-          document_type: 'PurchaseOrder', document_id: String(permDeletePoId),
-          document_number: permDeletePoNumber, document_data: '{}',
-          reason: 'Audit E2E perm delete test', original_status: 'draft', can_restore: false,
-        }),
-      });
-    }
+    const actionsBtn2 = poRow2.locator('button').last();
+    await expect(actionsBtn2).toBeVisible({ timeout: 5000 });
+    await actionsBtn2.click();
+    await page.waitForTimeout(1000);
 
-    await page.waitForTimeout(500);
+    const deleteMenuItem2 = page.locator('[role="menuitem"]').filter({ hasText: /delete/i }).first();
+    await expect(deleteMenuItem2).toBeVisible({ timeout: 5000 });
+    await deleteMenuItem2.click();
+    await page.waitForTimeout(1000);
+
+    const confirmBtn2 = page.locator('button').filter({ hasText: /yes.*delete|confirm.*delete|yes, delete/i }).first();
+    await expect(confirmBtn2).toBeVisible({ timeout: 5000 });
+    await confirmBtn2.click();
+    await page.waitForTimeout(2500);
+
     const binAll = await (await fetch(`${BASE_URL}/api/recycle-bin`, { headers: { Cookie: cookie } })).json() as RecycleBinEntry[];
     const permEntry = binAll.find((b) => b.document_id === String(permDeletePoId));
+    test.info().annotations.push({ type: 'result', description: `PO-${permDeletePoId} in recycle bin: ${!!permEntry}` });
     expect(permEntry).toBeTruthy();
 
     const delResp = await fetch(`${BASE_URL}/api/recycle-bin/${permEntry!.id}`, {
@@ -243,7 +216,7 @@ test.describe('Phase 10 — Audit Log & Recycle Bin', () => {
 
     const binFinal = await (await fetch(`${BASE_URL}/api/recycle-bin`, { headers: { Cookie: cookie } })).json() as RecycleBinEntry[];
     const stillInBin = binFinal.find((b) => b.id === permEntry!.id);
-    test.info().annotations.push({ type: 'result', description: `Entry still in bin after DELETE: ${!!stillInBin} (expected false)` });
+    test.info().annotations.push({ type: 'result', description: `Entry still in bin after permanent DELETE: ${!!stillInBin} (expected false)` });
     expect(stillInBin).toBeUndefined();
   });
 });

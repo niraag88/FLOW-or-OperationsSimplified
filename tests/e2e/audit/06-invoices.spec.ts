@@ -173,43 +173,33 @@ test.describe('Phase 6 — Invoices', () => {
   });
 
   test('6.10 step 47: cancel INV-04 from Draft via browser actions dropdown (Cancel Invoice → Yes Cancel)', async ({ page }) => {
-    test.info().annotations.push({ type: 'action', description: `Navigate to /Invoices; find INV-04 row; open actions dropdown; click "Cancel Invoice"; click "Yes, Cancel Invoice" confirm` });
+    test.info().annotations.push({ type: 'action', description: `Navigate to /Invoices; find INV-04 row (id=${inv04Id}); open actions dropdown; click "Cancel Invoice"; click "Yes, Cancel Invoice" confirm — NO API fallback` });
     expect(inv04Id).toBeGreaterThan(0);
     await browserLogin(page);
     await page.goto(`${BASE_URL}/Invoices`);
     await page.waitForLoadState('domcontentloaded', { timeout: 20000 });
     await page.waitForTimeout(3000);
 
-    const inv04Row = page.locator('tr, [role="row"]').filter({ hasText: new RegExp(String(inv04Id), 'i') }).first();
-    const inv04Visible = await inv04Row.isVisible().catch(() => false);
-    if (inv04Visible) {
-      const actionsBtn = inv04Row.locator('button').last();
-      await actionsBtn.click();
-      await page.waitForTimeout(1000);
+    const inv04Row = page.locator('tr, [role="row"]').filter({ hasText: new RegExp(String(inv04Id)) }).first();
+    await expect(inv04Row).toBeVisible({ timeout: 10000 });
 
-      const cancelMenuItem = page.locator('[role="menuitem"]').filter({ hasText: /cancel invoice/i }).first();
-      const cancelVisible = await cancelMenuItem.isVisible().catch(() => false);
-      if (cancelVisible) {
-        await cancelMenuItem.click();
-        await page.waitForTimeout(1000);
-        const confirmBtn = page.locator('button').filter({ hasText: /yes.*cancel|confirm.*cancel/i }).first();
-        const confirmVisible = await confirmBtn.isVisible().catch(() => false);
-        if (confirmVisible) {
-          await confirmBtn.click();
-          await page.waitForTimeout(2500);
-          test.info().annotations.push({ type: 'result', description: 'Clicked Yes Cancel Invoice — INV-04 cancelled via browser' });
-        }
-      } else {
-        test.info().annotations.push({ type: 'issue', description: 'Cancel Invoice menu item not found — falling back to API cancel' });
-        await apiPut(`/api/invoices/${inv04Id}`, { status: 'cancelled' }, cookie);
-      }
-    } else {
-      test.info().annotations.push({ type: 'issue', description: `INV-04 row not found on Invoices list — falling back to API cancel` });
-      await apiPut(`/api/invoices/${inv04Id}`, { status: 'cancelled' }, cookie);
-    }
+    const actionsBtn = inv04Row.locator('button').last();
+    await expect(actionsBtn).toBeVisible({ timeout: 5000 });
+    await actionsBtn.click();
+    await page.waitForTimeout(1000);
+
+    const cancelMenuItem = page.locator('[role="menuitem"]').filter({ hasText: /cancel invoice/i }).first();
+    await expect(cancelMenuItem).toBeVisible({ timeout: 5000 });
+    await cancelMenuItem.click();
+    await page.waitForTimeout(1000);
+
+    const confirmBtn = page.locator('button').filter({ hasText: /yes.*cancel|confirm.*cancel/i }).first();
+    await expect(confirmBtn).toBeVisible({ timeout: 5000 });
+    await confirmBtn.click();
+    await page.waitForTimeout(2500);
 
     const inv = await (await fetch(`${BASE_URL}/api/invoices/${inv04Id}`, { headers: { Cookie: cookie } })).json() as InvoiceResponse;
-    test.info().annotations.push({ type: 'result', description: `INV-04 status after cancel: ${inv.status} (expected "cancelled")` });
+    test.info().annotations.push({ type: 'result', description: `INV-04 status after browser cancel: ${inv.status} (expected "cancelled")` });
     expect(inv.status).toBe('cancelled');
   });
 
@@ -276,8 +266,7 @@ test.describe('Phase 6 — Invoices', () => {
     await page.waitForTimeout(2000);
 
     const salesTab = page.locator('[role="tab"]').filter({ hasText: /sales/i }).first();
-    const salesTabVisible = await salesTab.isVisible().catch(() => false);
-    if (salesTabVisible) {
+    if (await salesTab.isVisible({ timeout: 5000 }).catch(() => false)) {
       await salesTab.click();
       await page.waitForTimeout(1500);
     }
