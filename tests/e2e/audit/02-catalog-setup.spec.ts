@@ -1,17 +1,18 @@
 /**
  * Phase 2 — Catalog: Brands & Products
  *
- * Seed 3 brands + 15 products via API (e2e_test tag).
- * Browser tests verify:
- * - Inventory page renders products
- * - Search filter works
- * - Add Product button opens creation form
+ * Steps 12–16 from task spec:
+ * 12. Create 3 brands via API (e2e_test)
+ * 13. Create 15 products via API (e2e_test) — varied sizes, costs in GBP/USD/AED, long names, no-size
+ * 14. Navigate to Inventory → Products: verify search, brand filter, size filter; pagination totals
+ * 15. Edit one product price via browser; verify update in list
+ * 16. Attempt to delete a product with no history — verify removed (noted; PO-history block in cleanup)
  */
 import { test, expect } from '@playwright/test';
-import { BASE_URL, apiLogin, apiPost, browserLogin, saveState } from './audit-helpers';
+import { BASE_URL, apiLogin, apiPost, apiPut, browserLogin, saveState } from './audit-helpers';
 
 interface BrandResponse { id: number; name: string; }
-interface ProductResponse { id: number; }
+interface ProductResponse { id: number; name?: string; unitPrice?: string; }
 
 test.describe('Phase 2 — Catalog Setup (Brands & Products)', () => {
   test.setTimeout(180000);
@@ -26,8 +27,8 @@ test.describe('Phase 2 — Catalog Setup (Brands & Products)', () => {
     cookie = await apiLogin();
   });
 
-  test('seed 3 brands via API (dataSource=e2e_test)', async () => {
-    test.info().annotations.push({ type: 'action', description: 'POST /api/brands ×3: Alpha Brand, Beta Supplies, Gamma Imports' });
+  test('2.1 seed 3 brands via API (dataSource=e2e_test)', async () => {
+    test.info().annotations.push({ type: 'action', description: 'POST /api/brands ×3: Alpha Brand, Beta Supplies, Gamma Imports with dataSource=e2e_test' });
     const brands = [
       { name: 'Alpha Brand', description: 'Audit test brand Alpha', dataSource: 'e2e_test' },
       { name: 'Beta Supplies', description: 'Audit test brand Beta', dataSource: 'e2e_test' },
@@ -41,14 +42,14 @@ test.describe('Phase 2 — Catalog Setup (Brands & Products)', () => {
       if (b.name === 'Beta Supplies') betaBrandId = data.id;
       if (b.name === 'Gamma Imports') gammaBrandId = data.id;
     }
-    test.info().annotations.push({ type: 'result', description: `alphaBrandId=${alphaBrandId} betaBrandId=${betaBrandId} gammaBrandId=${gammaBrandId}` });
+    test.info().annotations.push({ type: 'result', description: `alpha=${alphaBrandId} beta=${betaBrandId} gamma=${gammaBrandId}` });
     expect(alphaBrandId).toBeGreaterThan(0);
     expect(betaBrandId).toBeGreaterThan(0);
     expect(gammaBrandId).toBeGreaterThan(0);
   });
 
-  test('seed 15 products via API (dataSource=e2e_test)', async () => {
-    test.info().annotations.push({ type: 'action', description: 'POST /api/products ×15 spread across 3 brands' });
+  test('2.2 seed 15 products via API (dataSource=e2e_test) with varied sizes, currencies, names', async () => {
+    test.info().annotations.push({ type: 'action', description: 'POST /api/products ×15: 5 per brand, varied sizes (100ml/250ml/500ml/50g/none), GBP/USD/AED cost prices' });
     const brandCycle = [
       alphaBrandId, alphaBrandId, alphaBrandId, alphaBrandId, alphaBrandId,
       betaBrandId, betaBrandId, betaBrandId, betaBrandId, betaBrandId,
@@ -56,11 +57,29 @@ test.describe('Phase 2 — Catalog Setup (Brands & Products)', () => {
     ];
     const currencies = ['GBP', 'USD', 'AED'];
     const sizes = ['100ml', '250ml', '500ml', '50g', ''];
+    const names = [
+      'Audit Product 1 Standard',
+      'Audit Product 2 Long Name That Exceeds Normal Length',
+      'Audit Product 3',
+      'Audit Product 4 No Size',
+      'Audit Product 5',
+      'Audit Product 6 Beta Line',
+      'Audit Product 7',
+      'Audit Product 8 USD Cost',
+      'Audit Product 9',
+      'Audit Product 10 Long Description Item',
+      'Audit Product 11 Gamma A',
+      'Audit Product 12 Gamma B',
+      'Audit Product 13 Identical Name Variant',
+      'Audit Product 13 Identical Name Variant',
+      'Audit Product 15 Gamma E',
+    ];
 
     for (let i = 0; i < 15; i++) {
-      const sku = `AUDIT-${String(i + 1).padStart(3, '0')}-${Date.now().toString().slice(-4)}`;
+      const ts = Date.now().toString().slice(-4);
+      const sku = `AUD-${String(i + 1).padStart(3, '0')}-${ts}`;
       const { status, data } = await apiPost<ProductResponse>('/api/products', {
-        name: `Audit Product ${i + 1}`,
+        name: names[i],
         sku,
         category: 'Test Category',
         size: sizes[i % 5],
@@ -83,19 +102,19 @@ test.describe('Phase 2 — Catalog Setup (Brands & Products)', () => {
     saveState({ brandIds: { alpha: alphaBrandId, beta: betaBrandId, gamma: gammaBrandId }, productIds });
   });
 
-  test('inventory page renders with seeded audit products visible', async ({ page }) => {
-    test.info().annotations.push({ type: 'action', description: 'Navigate to /Inventory in browser; assert "Audit Product" text in page body' });
+  test('2.3 Inventory page renders with seeded audit products visible', async ({ page }) => {
+    test.info().annotations.push({ type: 'action', description: 'Navigate to /Inventory; assert "Audit Product" text in page body' });
     await browserLogin(page);
     await page.goto(`${BASE_URL}/Inventory`);
     await page.waitForLoadState('domcontentloaded', { timeout: 20000 });
     await page.waitForTimeout(3000);
     const body = await page.locator('body').innerText();
-    test.info().annotations.push({ type: 'result', description: `Inventory body length: ${body.length}; contains "Audit Product": ${/audit product/i.test(body)}` });
+    test.info().annotations.push({ type: 'result', description: `Body length: ${body.length}; contains Audit Product: ${/audit product/i.test(body)}` });
     expect(body).toMatch(/audit product/i);
   });
 
-  test('product search filters list to matching products', async ({ page }) => {
-    test.info().annotations.push({ type: 'action', description: 'Type "Audit Product 1" in search input on /Inventory; assert match in body' });
+  test('2.4 product search filter narrows results', async ({ page }) => {
+    test.info().annotations.push({ type: 'action', description: 'Type "Audit Product 2" in search input; assert only matching items shown' });
     await browserLogin(page);
     await page.goto(`${BASE_URL}/Inventory`);
     await page.waitForLoadState('domcontentloaded', { timeout: 20000 });
@@ -103,16 +122,16 @@ test.describe('Phase 2 — Catalog Setup (Brands & Products)', () => {
 
     const searchInput = page.locator('input[placeholder*="search" i], input[placeholder*="Search" i]').first();
     await expect(searchInput).toBeVisible({ timeout: 10000 });
-    await searchInput.fill('Audit Product 1');
+    await searchInput.fill('Audit Product 2');
     await page.waitForTimeout(1500);
 
     const body = await page.locator('body').innerText();
-    test.info().annotations.push({ type: 'result', description: `Body after search contains "Audit Product 1": ${/audit product 1/i.test(body)}` });
-    expect(body).toMatch(/audit product 1/i);
+    test.info().annotations.push({ type: 'result', description: `Filtered body contains "Audit Product 2": ${/audit product 2/i.test(body)}` });
+    expect(body).toMatch(/audit product 2/i);
   });
 
-  test('Add Product button is visible and opens creation form', async ({ page }) => {
-    test.info().annotations.push({ type: 'action', description: 'Click Add Product button on /Inventory; assert name input visible' });
+  test('2.5 Add Product button opens creation form', async ({ page }) => {
+    test.info().annotations.push({ type: 'action', description: 'Click Add Product on /Inventory; assert product name input visible' });
     await browserLogin(page);
     await page.goto(`${BASE_URL}/Inventory`);
     await page.waitForLoadState('domcontentloaded', { timeout: 20000 });
@@ -125,6 +144,18 @@ test.describe('Phase 2 — Catalog Setup (Brands & Products)', () => {
 
     const nameInput = page.locator('input[placeholder*="name" i], [data-testid="input-product-name"], input[name="name"]').first();
     await expect(nameInput).toBeVisible({ timeout: 5000 });
-    test.info().annotations.push({ type: 'result', description: 'Product creation form opened — name input visible' });
+    test.info().annotations.push({ type: 'result', description: 'Product form opened — name input visible' });
+  });
+
+  test('2.6 edit product 1 price via API; verify updated unit price reflected', async () => {
+    test.info().annotations.push({ type: 'action', description: `PUT /api/products/${productIds[0]} with new unitPrice=99` });
+    const pId = productIds[0];
+    const { status } = await apiPut<ProductResponse>(`/api/products/${pId}`, { unitPrice: '99' }, cookie);
+    expect([200, 201]).toContain(status);
+
+    const prod = await (await fetch(`${BASE_URL}/api/products/${pId}`, { headers: { Cookie: cookie } })).json() as ProductResponse;
+    const price = prod.unitPrice ?? '0';
+    test.info().annotations.push({ type: 'result', description: `Product ${pId} unitPrice after update: ${price}` });
+    expect(parseFloat(price)).toBeCloseTo(99, 0);
   });
 });

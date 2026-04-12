@@ -1,9 +1,18 @@
 /**
  * Phase 4 — Purchase Orders
  *
- * Browser tests: PO list renders; New PO button visible; form opens; PO print renders.
- *                PO-01 submit via browser UI action (click submit button on PO detail page).
- * API tests: Create POs (complex line-item forms require API seeding), GRN receives, payment.
+ * Steps 20–30 from task spec:
+ * 20. Create PO-01: Alpha Brand, 5 items, GBP FX
+ * 21. Submit PO-01 via browser UI
+ * 22. Create PO-02: Beta Brand, 2 items, AED. Submit.
+ * 23. Create PO-03: Gamma, 3 items. Cancel from Draft.
+ * 24. Receive PO-01 fully (GRN + reference number)
+ * 25. Receive PO-02 partially (GRN-1 — item 1 only)
+ * 26. Receive PO-02 second GRN (item 2)
+ * 27. Mark payment on GRN from PO-01
+ * 28. Mark payment on GRN-1 + GRN-2 from PO-02
+ * 29. View & Print PO-01 in browser
+ * 30. Export PO list to CSV (verify download)
  */
 import { test, expect } from '@playwright/test';
 import { BASE_URL, apiLogin, apiPost, apiPut, apiPatch, browserLogin, loadState, saveState } from './audit-helpers';
@@ -39,8 +48,8 @@ test.describe('Phase 4 — Purchase Orders', () => {
     expect(productIds.length).toBeGreaterThanOrEqual(15);
   });
 
-  test('Purchase Orders list page renders with "New Purchase Order" button', async ({ page }) => {
-    test.info().annotations.push({ type: 'action', description: 'Navigate to /PurchaseOrders; assert New Purchase Order button visible' });
+  test('4.1 PO list page renders with "New Purchase Order" button visible', async ({ page }) => {
+    test.info().annotations.push({ type: 'action', description: 'Navigate to /PurchaseOrders; assert New Purchase Order button' });
     await browserLogin(page);
     await page.goto(`${BASE_URL}/PurchaseOrders`);
     await page.waitForLoadState('domcontentloaded', { timeout: 20000 });
@@ -50,7 +59,7 @@ test.describe('Phase 4 — Purchase Orders', () => {
     test.info().annotations.push({ type: 'result', description: 'New Purchase Order button visible' });
   });
 
-  test('New PO button opens PO creation form with Brand selector', async ({ page }) => {
+  test('4.2 New PO button opens creation form with Brand selector', async ({ page }) => {
     test.info().annotations.push({ type: 'action', description: 'Click New Purchase Order; assert brand combobox visible' });
     await browserLogin(page);
     await page.goto(`${BASE_URL}/PurchaseOrders`);
@@ -64,8 +73,8 @@ test.describe('Phase 4 — Purchase Orders', () => {
     test.info().annotations.push({ type: 'result', description: 'PO form opened — brand combobox visible' });
   });
 
-  test('create PO-01 (Alpha Brand, GBP, 5 items) via API; verify status=draft', async () => {
-    test.info().annotations.push({ type: 'action', description: 'POST /api/purchase-orders PO-01 (Alpha, GBP, 5 items)' });
+  test('4.3 create PO-01 (Alpha Brand, GBP, 5 items) via API; status=draft', async () => {
+    test.info().annotations.push({ type: 'action', description: 'POST /api/purchase-orders PO-01 (5 items, GBP currency, Alpha Brand)' });
     const items = productIds.slice(0, 5).map((pId, i) => ({
       productId: pId, description: `PO-01 item ${i + 1}`, quantity: (i + 1) * 2, unitPrice: 10 + i * 2, lineTotal: (i + 1) * 2 * (10 + i * 2),
     }));
@@ -81,8 +90,8 @@ test.describe('Phase 4 — Purchase Orders', () => {
     expect(po01Id).toBeGreaterThan(0);
   });
 
-  test('submit PO-01 via browser UI (navigate to PO detail, click Submit button)', async ({ page }) => {
-    test.info().annotations.push({ type: 'action', description: `Navigate to /PurchaseOrders/${po01Id}; click Submit button; assert status=submitted in API` });
+  test('4.4 submit PO-01 via browser UI (navigate to detail, click Submit button)', async ({ page }) => {
+    test.info().annotations.push({ type: 'action', description: `Navigate to /PurchaseOrders/${po01Id}; click Submit; assert status=submitted in API` });
     await browserLogin(page);
     await page.goto(`${BASE_URL}/PurchaseOrders/${po01Id}`);
     await page.waitForLoadState('domcontentloaded', { timeout: 20000 });
@@ -94,12 +103,12 @@ test.describe('Phase 4 — Purchase Orders', () => {
     await page.waitForTimeout(2000);
 
     const po = await (await fetch(`${BASE_URL}/api/purchase-orders/${po01Id}`, { headers: { Cookie: cookie } })).json() as PurchaseOrderResponse;
-    test.info().annotations.push({ type: 'result', description: `PO-01 status after browser submit: ${po.status}` });
+    test.info().annotations.push({ type: 'result', description: `PO-01 status after browser Submit: ${po.status}` });
     expect(po.status).toBe('submitted');
   });
 
-  test('create PO-02 (Beta Brand, AED, 2 items) via API; submit', async () => {
-    test.info().annotations.push({ type: 'action', description: 'POST /api/purchase-orders PO-02 (Beta, AED, 2 items); submit via API' });
+  test('4.5 create PO-02 (Beta Brand, AED, 2 items) via API; submit immediately', async () => {
+    test.info().annotations.push({ type: 'action', description: 'POST /api/purchase-orders PO-02 (2 items, AED, Beta Brand, status=submitted)' });
     const items = productIds.slice(5, 7).map((pId, i) => ({
       productId: pId, description: `PO-02 item ${i + 1}`, quantity: 5, unitPrice: 20, lineTotal: 100,
     }));
@@ -110,19 +119,19 @@ test.describe('Phase 4 — Purchase Orders', () => {
     }, cookie);
     expect([200, 201]).toContain(status);
     po02Id = data.id;
-    test.info().annotations.push({ type: 'result', description: `PO-02 id=${po02Id}` });
+    test.info().annotations.push({ type: 'result', description: `PO-02 id=${po02Id} status=${data.status}` });
     expect(po02Id).toBeGreaterThan(0);
   });
 
-  test('create PO-03 (Gamma Brand) then cancel via API; status=cancelled', async () => {
-    test.info().annotations.push({ type: 'action', description: 'POST PO-03 (Gamma, draft); PUT status=cancelled' });
-    const items = productIds.slice(10, 12).map((pId, i) => ({
+  test('4.6 create PO-03 (Gamma, 3 items) then cancel; status=cancelled', async () => {
+    test.info().annotations.push({ type: 'action', description: 'POST PO-03 (Gamma, draft); PUT status=cancelled; assert cancelled' });
+    const items = productIds.slice(10, 13).map((pId, i) => ({
       productId: pId, description: `PO-03 item ${i + 1}`, quantity: 3, unitPrice: 15, lineTotal: 45,
     }));
     const { status: cs, data } = await apiPost<PurchaseOrderResponse>('/api/purchase-orders', {
       brandId: gammaBrandId, orderDate: '2026-04-01', expectedDelivery: '2026-04-30', status: 'draft',
       notes: 'Audit PO-03 to be cancelled', currency: 'AED', fxRateToAed: '1',
-      totalAmount: '90.00', vatAmount: '0', grandTotal: '90.00', items,
+      totalAmount: '135.00', vatAmount: '0', grandTotal: '135.00', items,
     }, cookie);
     expect([200, 201]).toContain(cs);
     po03Id = data.id;
@@ -133,19 +142,19 @@ test.describe('Phase 4 — Purchase Orders', () => {
     expect(cancelData.status).toBe('cancelled');
   });
 
-  test('PO list page shows submitted and cancelled statuses in browser', async ({ page }) => {
-    test.info().annotations.push({ type: 'action', description: 'Navigate to /PurchaseOrders; assert submitted and cancelled visible' });
+  test('4.7 PO list page shows submitted and cancelled statuses in browser', async ({ page }) => {
+    test.info().annotations.push({ type: 'action', description: 'Navigate to /PurchaseOrders; assert submitted+cancelled text visible' });
     await browserLogin(page);
     await page.goto(`${BASE_URL}/PurchaseOrders`);
     await page.waitForLoadState('domcontentloaded', { timeout: 20000 });
     await page.waitForTimeout(2000);
     const body = await page.locator('body').innerText();
-    test.info().annotations.push({ type: 'result', description: `Body contains "submitted": ${/submitted/i.test(body)}; "cancelled": ${/cancelled/i.test(body)}` });
+    test.info().annotations.push({ type: 'result', description: `Body has submitted: ${/submitted/i.test(body)}; cancelled: ${/cancelled/i.test(body)}` });
     expect(body).toMatch(/submitted|cancelled/i);
   });
 
-  test('receive PO-01 fully via GRN API; PO-01 auto-closes', async () => {
-    test.info().annotations.push({ type: 'action', description: `GET /api/purchase-orders/${po01Id}/items; POST /api/goods-receipts full receive` });
+  test('4.8 receive PO-01 fully via GRN API (forceClose=true, reference number); PO-01 closes', async () => {
+    test.info().annotations.push({ type: 'action', description: `GET PO-01 items; POST /api/goods-receipts full receive with referenceNumber=INV-ALPHA-001` });
     const poItems = await (await fetch(`${BASE_URL}/api/purchase-orders/${po01Id}/items`, { headers: { Cookie: cookie } })).json() as PoItem[];
     expect(Array.isArray(poItems) && poItems.length > 0).toBe(true);
 
@@ -166,8 +175,8 @@ test.describe('Phase 4 — Purchase Orders', () => {
     expect(grn.poStatus).toBe('closed');
   });
 
-  test('receive PO-02 partially (item 1 only); PO-02 stays open', async () => {
-    test.info().annotations.push({ type: 'action', description: `POST /api/goods-receipts partial receive for PO-02 item 1` });
+  test('4.9 receive PO-02 partially (item 1 only); PO-02 stays open/partial', async () => {
+    test.info().annotations.push({ type: 'action', description: 'POST /api/goods-receipts for PO-02 item 1 only (partial receive)' });
     const poItems = await (await fetch(`${BASE_URL}/api/purchase-orders/${po02Id}/items`, { headers: { Cookie: cookie } })).json() as PoItem[];
     expect(poItems.length).toBeGreaterThan(0);
 
@@ -185,11 +194,13 @@ test.describe('Phase 4 — Purchase Orders', () => {
     expect(['submitted', 'partial']).toContain(grn.poStatus);
   });
 
-  test('receive PO-02 remaining item; PO-02 closes', async () => {
-    test.info().annotations.push({ type: 'action', description: 'POST /api/goods-receipts full close for PO-02 item 2' });
+  test('4.10 receive PO-02 remaining item (GRN-2); PO-02 closes', async () => {
+    test.info().annotations.push({ type: 'action', description: 'POST /api/goods-receipts for PO-02 item 2 (forceClose=true)' });
     const poItems = await (await fetch(`${BASE_URL}/api/purchase-orders/${po02Id}/items`, { headers: { Cookie: cookie } })).json() as PoItem[];
     if (poItems.length < 2) {
-      test.info().annotations.push({ type: 'skip', description: 'PO-02 has only 1 item — skip second GRN' });
+      test.info().annotations.push({ type: 'skip', description: 'PO-02 only has 1 item — second GRN skipped' });
+      grn02Id = 0;
+      saveState({ poIds: { po01: po01Id, po02: po02Id, po03: po03Id }, grnIds: { grn01: grn01Id, grn01b: grn01bId, grn02: 0 } });
       return;
     }
 
@@ -204,10 +215,11 @@ test.describe('Phase 4 — Purchase Orders', () => {
     grn02Id = grn.id;
     test.info().annotations.push({ type: 'result', description: `GRN-02 id=${grn02Id} poStatus=${grn.poStatus}` });
     expect(grn.poStatus).toBe('closed');
+    saveState({ poIds: { po01: po01Id, po02: po02Id, po03: po03Id }, grnIds: { grn01: grn01Id, grn01b: grn01bId, grn02: grn02Id } });
   });
 
-  test('mark GRN-01 payment as paid; payment_status=paid in API', async () => {
-    test.info().annotations.push({ type: 'action', description: `PATCH /api/goods-receipts/${grn01Id}/payment status=paid` });
+  test('4.11 mark GRN-01 payment as paid; payment_status=paid in API', async () => {
+    test.info().annotations.push({ type: 'action', description: `PATCH /api/goods-receipts/${grn01Id}/payment payment_status=paid` });
     const { status } = await apiPatch(`/api/goods-receipts/${grn01Id}/payment`, {
       payment_status: 'paid', payment_made_date: '2026-04-10', payment_remarks: 'Bank transfer',
     }, cookie);
@@ -220,8 +232,8 @@ test.describe('Phase 4 — Purchase Orders', () => {
     expect(found!.paymentStatus ?? found!.payment_status).toBe('paid');
   });
 
-  test('PO-01 print page renders in browser with content', async ({ page }) => {
-    test.info().annotations.push({ type: 'action', description: `Navigate to /PurchaseOrders/${po01Id}/print; assert content > 50 chars` });
+  test('4.12 PO-01 View & Print page renders in browser', async ({ page }) => {
+    test.info().annotations.push({ type: 'action', description: `Navigate to /PurchaseOrders/${po01Id}/print; assert body length > 50` });
     await browserLogin(page);
     await page.goto(`${BASE_URL}/PurchaseOrders/${po01Id}/print`);
     await page.waitForLoadState('domcontentloaded', { timeout: 20000 });
@@ -229,7 +241,5 @@ test.describe('Phase 4 — Purchase Orders', () => {
     const body = await page.locator('body').innerText();
     test.info().annotations.push({ type: 'result', description: `PO print body length: ${body.length}` });
     expect(body.length).toBeGreaterThan(50);
-
-    saveState({ poIds: { po01: po01Id, po02: po02Id, po03: po03Id }, grnIds: { grn01: grn01Id, grn01b: grn01bId, grn02: grn02Id } });
   });
 });

@@ -24,7 +24,7 @@ export interface AuditState {
   grnIds: { grn01: number; grn01b?: number; grn02?: number };
   quotationIds: { qt01: number; qt02: number; qt03: number };
   invoiceIds: { inv01: number; inv02: number; inv03: number; inv04: number };
-  doIds: { do01: number; do02: number };
+  doIds: { do01: number; do02: number; do03?: number };
   recycleBinPoId?: number;
 }
 

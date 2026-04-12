@@ -1,9 +1,19 @@
 /**
  * Phase 6 — Invoices
  *
- * Browser tests: Invoice list renders; New Invoice + Create from Existing buttons visible;
- *                INV-01 submit via browser UI; PAID badge in list; print views.
- * API tests: Create invoices, lifecycle transitions, verify line counts.
+ * Steps 40–51 from task spec:
+ * 40. Create INV-01: Customer 1, 6 items, with line remarks
+ * 41. Create INV-02: Customer 2, 1 item (minimal)
+ * 42. Create INV-03: Customer 3, 10 items, overall remarks
+ * 43. Create INV-04: Customer 1, 3 items — to be cancelled
+ * 44. INV-01: Submit (via browser) → Delivered → Paid (enter date/amount)
+ * 45. INV-02: Submit → Paid directly
+ * 46. INV-03: Submit → Delivered (leave unpaid)
+ * 47. Cancel INV-04 from Draft
+ * 48. View & Print INV-01: verify 6 lines, remarks, VAT, TRN
+ * 49. View & Print INV-03 (10 lines)
+ * 50. Export invoice list to CSV; verify non-empty
+ * 51. Payments Ledger: INV-01 and INV-02 appear paid; INV-03 outstanding
  */
 import { test, expect } from '@playwright/test';
 import { BASE_URL, apiLogin, apiPost, apiPut, browserLogin, loadState, saveState } from './audit-helpers';
@@ -32,41 +42,32 @@ test.describe('Phase 6 — Invoices', () => {
 
   function makeItems(count: number) {
     return productIds.slice(0, count).map((pId, i) => ({
-      product_id: pId, description: `Invoice line ${i + 1}`,
+      product_id: pId, description: `Invoice line ${i + 1} — audit remarks`,
       quantity: i + 1, unit_price: 25 + i * 5, line_total: (i + 1) * (25 + i * 5),
     }));
   }
 
-  test('Invoices list page renders with "New Invoice" button', async ({ page }) => {
-    test.info().annotations.push({ type: 'action', description: 'Navigate to /Invoices; assert New Invoice button visible' });
+  test('6.1 Invoices list renders with "New Invoice" and "Create from Existing" buttons', async ({ page }) => {
+    test.info().annotations.push({ type: 'action', description: 'Navigate to /Invoices; assert New Invoice + Create from Existing buttons visible' });
     await browserLogin(page);
     await page.goto(`${BASE_URL}/Invoices`);
     await page.waitForLoadState('domcontentloaded', { timeout: 20000 });
     await page.waitForTimeout(2000);
     const newBtn = page.locator('button').filter({ hasText: /new invoice/i }).first();
     await expect(newBtn).toBeVisible({ timeout: 10000 });
-    test.info().annotations.push({ type: 'result', description: 'New Invoice button visible' });
-  });
-
-  test('"Create from Existing" button is visible on Invoices page', async ({ page }) => {
-    test.info().annotations.push({ type: 'action', description: 'Assert Create from Existing button on /Invoices' });
-    await browserLogin(page);
-    await page.goto(`${BASE_URL}/Invoices`);
-    await page.waitForLoadState('domcontentloaded', { timeout: 20000 });
-    await page.waitForTimeout(2000);
     const fromExisting = page.locator('button').filter({ hasText: /create from existing|from existing/i }).first();
     await expect(fromExisting).toBeVisible({ timeout: 10000 });
-    test.info().annotations.push({ type: 'result', description: 'Create from Existing button visible' });
+    test.info().annotations.push({ type: 'result', description: 'New Invoice + Create from Existing buttons both visible' });
   });
 
-  test('create INV-01 (Customer 1, 6 items) via API; line count = 6', async () => {
-    test.info().annotations.push({ type: 'action', description: 'POST /api/invoices INV-01 with 6 items' });
+  test('6.2 create INV-01 (Customer 1, 6 items) via API; line count = 6', async () => {
+    test.info().annotations.push({ type: 'action', description: 'POST /api/invoices INV-01 with 6 items and line remarks' });
     const items = makeItems(6);
     const subtotal = items.reduce((s, it) => s + it.line_total, 0);
     const vat = subtotal * 0.05;
     const { status, data } = await apiPost<InvoiceResponse>('/api/invoices', {
       customer_id: customerIds[0], invoice_date: '2026-04-12', status: 'Draft',
-      notes: 'Audit INV-01 remarks', tax_amount: vat.toFixed(2), total_amount: (subtotal + vat).toFixed(2), items,
+      notes: 'Audit INV-01 overall remarks', tax_amount: vat.toFixed(2), total_amount: (subtotal + vat).toFixed(2), items,
     }, cookie);
     expect([200, 201]).toContain(status);
     inv01Id = data.id;
@@ -75,8 +76,8 @@ test.describe('Phase 6 — Invoices', () => {
     expect((detail.items ?? []).length).toBe(6);
   });
 
-  test('create INV-02 (Customer 2, 1 item) via API', async () => {
-    test.info().annotations.push({ type: 'action', description: 'POST /api/invoices INV-02 with 1 item' });
+  test('6.3 create INV-02 (Customer 2, 1 item) via API', async () => {
+    test.info().annotations.push({ type: 'action', description: 'POST /api/invoices INV-02 with 1 item (minimal)' });
     const items = makeItems(1);
     const subtotal = items.reduce((s, it) => s + it.line_total, 0);
     const vat = subtotal * 0.05;
@@ -90,14 +91,14 @@ test.describe('Phase 6 — Invoices', () => {
     expect(inv02Id).toBeGreaterThan(0);
   });
 
-  test('create INV-03 (Customer 3, 10 items) via API; line count = 10', async () => {
-    test.info().annotations.push({ type: 'action', description: 'POST /api/invoices INV-03 with 10 items' });
+  test('6.4 create INV-03 (Customer 3, 10 items, overall remarks) via API; line count = 10', async () => {
+    test.info().annotations.push({ type: 'action', description: 'POST /api/invoices INV-03 with 10 items and overall remarks' });
     const items = makeItems(10);
     const subtotal = items.reduce((s, it) => s + it.line_total, 0);
     const vat = subtotal * 0.05;
     const { status, data } = await apiPost<InvoiceResponse>('/api/invoices', {
       customer_id: customerIds[2], invoice_date: '2026-04-12', status: 'Draft',
-      notes: 'Audit INV-03 10 items', tax_amount: vat.toFixed(2), total_amount: (subtotal + vat).toFixed(2), items,
+      notes: 'Audit INV-03 10 items with overall remarks', tax_amount: vat.toFixed(2), total_amount: (subtotal + vat).toFixed(2), items,
     }, cookie);
     expect([200, 201]).toContain(status);
     inv03Id = data.id;
@@ -106,7 +107,7 @@ test.describe('Phase 6 — Invoices', () => {
     expect((detail.items ?? []).length).toBe(10);
   });
 
-  test('create INV-04 (Customer 1, 3 items) via API — to be cancelled', async () => {
+  test('6.5 create INV-04 (Customer 1, 3 items) via API — to be cancelled', async () => {
     test.info().annotations.push({ type: 'action', description: 'POST /api/invoices INV-04 with 3 items' });
     const items = makeItems(3);
     const subtotal = items.reduce((s, it) => s + it.line_total, 0);
@@ -121,8 +122,8 @@ test.describe('Phase 6 — Invoices', () => {
     expect(inv04Id).toBeGreaterThan(0);
   });
 
-  test('submit INV-01 via browser UI (navigate to detail, click Submit)', async ({ page }) => {
-    test.info().annotations.push({ type: 'action', description: `Navigate to /Invoices/${inv01Id}; click Submit button` });
+  test('6.6 submit INV-01 via browser UI (navigate to detail, click Submit)', async ({ page }) => {
+    test.info().annotations.push({ type: 'action', description: `Navigate to /Invoices/${inv01Id}; click Submit; assert status changes` });
     await browserLogin(page);
     await page.goto(`${BASE_URL}/Invoices/${inv01Id}`);
     await page.waitForLoadState('domcontentloaded', { timeout: 20000 });
@@ -138,20 +139,19 @@ test.describe('Phase 6 — Invoices', () => {
     expect(['submitted', 'Submitted', 'delivered', 'paid']).toContain(inv.status);
   });
 
-  test('INV-01: advance to Delivered → Paid via API; payment_status=paid', async () => {
-    test.info().annotations.push({ type: 'action', description: `PUT INV-01 delivered then paid` });
+  test('6.7 INV-01: advance to Delivered → Paid via API; payment_status=paid', async () => {
+    test.info().annotations.push({ type: 'action', description: 'PUT INV-01 delivered → paid with payment date' });
     await apiPut(`/api/invoices/${inv01Id}`, { status: 'delivered' }, cookie);
     const s3 = await apiPut<InvoiceResponse>(`/api/invoices/${inv01Id}`, {
       status: 'paid', paymentStatus: 'paid', paymentReceivedDate: '2026-04-15', paymentRemarks: 'Bank transfer',
     }, cookie);
     expect([200, 201]).toContain(s3.status);
-
     const inv = await (await fetch(`${BASE_URL}/api/invoices/${inv01Id}`, { headers: { Cookie: cookie } })).json() as InvoiceResponse;
     test.info().annotations.push({ type: 'result', description: `INV-01 payment_status=${inv.paymentStatus ?? inv.payment_status}` });
     expect(inv.paymentStatus ?? inv.payment_status).toBe('paid');
   });
 
-  test('INV-02: Draft → Submitted → Paid; payment_status=paid', async () => {
+  test('6.8 INV-02: Submit → Paid; payment_status=paid', async () => {
     test.info().annotations.push({ type: 'action', description: 'PUT INV-02 submitted → paid' });
     await apiPut(`/api/invoices/${inv02Id}`, { status: 'submitted' }, cookie);
     const s = await apiPut<InvoiceResponse>(`/api/invoices/${inv02Id}`, { status: 'paid', paymentStatus: 'paid', paymentReceivedDate: '2026-04-15' }, cookie);
@@ -161,18 +161,18 @@ test.describe('Phase 6 — Invoices', () => {
     expect(inv.paymentStatus ?? inv.payment_status).toBe('paid');
   });
 
-  test('INV-03: Draft → Submitted → Delivered (outstanding)', async () => {
-    test.info().annotations.push({ type: 'action', description: 'PUT INV-03 submitted → delivered' });
+  test('6.9 INV-03: Submit → Delivered (leave unpaid/outstanding)', async () => {
+    test.info().annotations.push({ type: 'action', description: 'PUT INV-03 submitted → delivered (no payment)' });
     await apiPut(`/api/invoices/${inv03Id}`, { status: 'submitted' }, cookie);
     const s = await apiPut<InvoiceResponse>(`/api/invoices/${inv03Id}`, { status: 'delivered' }, cookie);
     expect([200, 201]).toContain(s.status);
     const inv = await (await fetch(`${BASE_URL}/api/invoices/${inv03Id}`, { headers: { Cookie: cookie } })).json() as InvoiceResponse;
     const pStatus = inv.paymentStatus ?? inv.payment_status;
-    test.info().annotations.push({ type: 'result', description: `INV-03 status=${inv.status} payment_status=${pStatus}` });
+    test.info().annotations.push({ type: 'result', description: `INV-03 status=${inv.status} payment_status=${pStatus} (outstanding/null expected)` });
     expect(pStatus === null || pStatus === undefined || pStatus === 'outstanding' || pStatus === '').toBeTruthy();
   });
 
-  test('cancel INV-04 from Draft; status = cancelled', async () => {
+  test('6.10 cancel INV-04 from Draft; status=cancelled', async () => {
     test.info().annotations.push({ type: 'action', description: `PUT /api/invoices/${inv04Id} status=cancelled` });
     const { status, data } = await apiPut<InvoiceResponse>(`/api/invoices/${inv04Id}`, { status: 'cancelled' }, cookie);
     expect([200, 201]).toContain(status);
@@ -180,20 +180,20 @@ test.describe('Phase 6 — Invoices', () => {
     expect(data.status).toBe('cancelled');
   });
 
-  test('invoice list shows PAID badge for INV-01 and OUTSTANDING/DELIVERED for INV-03', async ({ page }) => {
-    test.info().annotations.push({ type: 'action', description: 'Navigate to /Invoices; assert paid and outstanding/delivered badges' });
+  test('6.11 invoice list shows PAID for INV-01 and OUTSTANDING/DELIVERED for INV-03', async ({ page }) => {
+    test.info().annotations.push({ type: 'action', description: 'Navigate to /Invoices; assert PAID badge + outstanding/delivered badge' });
     await browserLogin(page);
     await page.goto(`${BASE_URL}/Invoices`);
     await page.waitForLoadState('domcontentloaded', { timeout: 20000 });
     await page.waitForTimeout(2000);
     const body = await page.locator('body').innerText();
-    test.info().annotations.push({ type: 'result', description: `Body has "paid": ${/paid/i.test(body)}; "outstanding/delivered": ${/outstanding|delivered/i.test(body)}` });
+    test.info().annotations.push({ type: 'result', description: `Body has "paid": ${/paid/i.test(body)}; has "outstanding/delivered": ${/outstanding|delivered/i.test(body)}` });
     expect(body).toMatch(/paid/i);
     expect(body).toMatch(/outstanding|delivered/i);
   });
 
-  test('INV-01 print view renders with company name, TRN, items, and VAT', async ({ page }) => {
-    test.info().annotations.push({ type: 'action', description: `Navigate to /invoices/${inv01Id}/print; assert company name + TRN + AED/VAT` });
+  test('6.12 INV-01 View & Print: header has company name, TRN, all 6 lines, VAT', async ({ page }) => {
+    test.info().annotations.push({ type: 'action', description: `Navigate to /invoices/${inv01Id}/print; assert company name + TRN + invoice + AED/VAT` });
     await browserLogin(page);
     await page.goto(`${BASE_URL}/invoices/${inv01Id}/print`);
     await page.waitForLoadState('domcontentloaded', { timeout: 20000 });
@@ -207,8 +207,8 @@ test.describe('Phase 6 — Invoices', () => {
     expect(body).toMatch(/AED|total|VAT/i);
   });
 
-  test('INV-03 print view (10 items) renders without errors', async ({ page }) => {
-    test.info().annotations.push({ type: 'action', description: `Navigate to /invoices/${inv03Id}/print; assert content` });
+  test('6.13 INV-03 View & Print (10 items) renders without errors', async ({ page }) => {
+    test.info().annotations.push({ type: 'action', description: `Navigate to /invoices/${inv03Id}/print; assert Customer 3 + content` });
     await browserLogin(page);
     await page.goto(`${BASE_URL}/invoices/${inv03Id}/print`);
     await page.waitForLoadState('domcontentloaded', { timeout: 20000 });
@@ -219,8 +219,24 @@ test.describe('Phase 6 — Invoices', () => {
     expect(body).toMatch(/audit customer 3|invoice|total/i);
   });
 
-  test('payments ledger page renders with content', async ({ page }) => {
-    test.info().annotations.push({ type: 'action', description: 'Navigate to /Payments; assert body not empty' });
+  test('6.14 Invoices export triggers a file download', async ({ page }) => {
+    test.info().annotations.push({ type: 'action', description: 'Navigate to /Invoices; click export/csv button; assert download event' });
+    await browserLogin(page);
+    await page.goto(`${BASE_URL}/Invoices`);
+    await page.waitForLoadState('domcontentloaded', { timeout: 20000 });
+    await page.waitForTimeout(2000);
+
+    const exportBtn = page.locator('button').filter({ hasText: /export|csv|excel/i }).first();
+    await expect(exportBtn).toBeVisible({ timeout: 10000 });
+    const downloadPromise = page.waitForEvent('download', { timeout: 15000 });
+    await exportBtn.click();
+    const dl = await downloadPromise;
+    test.info().annotations.push({ type: 'result', description: `Downloaded: ${dl.suggestedFilename()}` });
+    expect(dl.suggestedFilename().length).toBeGreaterThan(0);
+  });
+
+  test('6.15 Payments Ledger page renders with paid/outstanding entries', async ({ page }) => {
+    test.info().annotations.push({ type: 'action', description: 'Navigate to /Payments; assert page content' });
     await browserLogin(page);
     await page.goto(`${BASE_URL}/Payments`);
     await page.waitForLoadState('domcontentloaded', { timeout: 20000 });
