@@ -592,14 +592,14 @@ export default function POForm({ open, onClose, editingPO, currentUser, onSucces
                   </TableHeader>
                   <TableBody>
                     {formData.items.map((item, index) => (
-                      <TableRow key={index}>
+                      <TableRow key={index} data-testid={`po-item-row-${index}`}>
                         <TableCell>
                           <Select
                             value={String(item.productId)}
                             onValueChange={(value) => updateItem(index, 'productId', value)}
                             disabled={!canEdit}
                           >
-                            <SelectTrigger>
+                            <SelectTrigger data-testid={`select-product-${index}`}>
                               <SelectValue placeholder="Select product" />
                             </SelectTrigger>
                             <SelectContent>
@@ -619,6 +619,7 @@ export default function POForm({ open, onClose, editingPO, currentUser, onSucces
                             disabled={!canEdit}
                             className="w-full"
                             placeholder="Description"
+                            data-testid={`input-description-${index}`}
                           />
                         </TableCell>
                         <TableCell>
@@ -628,6 +629,7 @@ export default function POForm({ open, onClose, editingPO, currentUser, onSucces
                             disabled={!canEdit}
                             className="w-full"
                             placeholder="Size"
+                            data-testid={`input-size-${index}`}
                           />
                         </TableCell>
                         <TableCell>
@@ -638,6 +640,7 @@ export default function POForm({ open, onClose, editingPO, currentUser, onSucces
                             onChange={(e) => updateItem(index, 'quantity', parseInt(e.target.value) || 0)}
                             disabled={!canEdit}
                             className="w-full text-right"
+                            data-testid={`input-quantity-${index}`}
                           />
                         </TableCell>
                         <TableCell>
@@ -648,6 +651,7 @@ export default function POForm({ open, onClose, editingPO, currentUser, onSucces
                             onChange={(e) => updateItem(index, 'unitPrice', parseFloat(e.target.value) || 0)}
                             disabled={!canEdit}
                             className="w-full text-right"
+                            data-testid={`input-unit-price-${index}`}
                           />
                         </TableCell>
                         <TableCell className="text-right font-medium">{item.lineTotal.toFixed(2)}</TableCell>

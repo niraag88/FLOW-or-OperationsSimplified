@@ -328,13 +328,14 @@ export default function DOForm({ open, onClose, editingDO, currentUser, onSucces
           </DialogDescription>
         </DialogHeader>
 
-        <form onSubmit={handleSubmit} className="space-y-6">
+        <form onSubmit={handleSubmit} className="space-y-6" data-testid="do-form">
           {/* Header Fields */}
           <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
             <div className="space-y-2">
               <Label htmlFor="do_number">DO Number *</Label>
               <Input 
                 id="do_number" 
+                data-testid="input-do-number"
                 value={formData.do_number} 
                 onChange={(e) => handleInputChange('do_number', e.target.value)} 
                 required 
@@ -343,7 +344,7 @@ export default function DOForm({ open, onClose, editingDO, currentUser, onSucces
             <div className="space-y-2">
               <Label htmlFor="customer">Customer *</Label>
               <Select value={formData.customer_id ? formData.customer_id.toString() : ''} onValueChange={(value) => handleInputChange('customer_id', value)} disabled={!isEditable}>
-                <SelectTrigger id="customer">
+                <SelectTrigger id="customer" data-testid="select-customer">
                   <SelectValue placeholder="Select customer" />
                 </SelectTrigger>
                 <SelectContent>
@@ -409,7 +410,7 @@ export default function DOForm({ open, onClose, editingDO, currentUser, onSucces
             <div className="flex items-center justify-between">
               <h3 className="text-lg font-semibold">Line Items</h3>
               {isEditable && (
-                <Button type="button" variant="outline" onClick={addItem}>
+                <Button type="button" variant="outline" onClick={addItem} data-testid="button-add-item">
                   <Plus className="w-4 h-4 mr-2" />
                   Add Item
                 </Button>
@@ -419,7 +420,7 @@ export default function DOForm({ open, onClose, editingDO, currentUser, onSucces
             {formData.items.length > 0 && (
               <div className="space-y-4">
                 {formData.items.map((item, index) => (
-                  <Card key={index} className="p-4">
+                  <Card key={index} className="p-4" data-testid={`do-item-row-${index}`}>
                     <div className="grid grid-cols-1 md:grid-cols-6 gap-4 items-end">
                       <div className="space-y-2">
                         <Label>Brand</Label>
@@ -428,7 +429,7 @@ export default function DOForm({ open, onClose, editingDO, currentUser, onSucces
                           onValueChange={(v) => updateItem(index, 'brand_id', v)} 
                           disabled={!isEditable}
                         >
-                          <SelectTrigger>
+                          <SelectTrigger data-testid={`select-brand-${index}`}>
                             <SelectValue placeholder="Select brand" />
                           </SelectTrigger>
                           <SelectContent>
@@ -446,7 +447,7 @@ export default function DOForm({ open, onClose, editingDO, currentUser, onSucces
                           onValueChange={(v) => updateItem(index, 'product_id', v)} 
                           disabled={!isEditable || !item.brand_id}
                         >
-                          <SelectTrigger>
+                          <SelectTrigger data-testid={`select-product-${index}`}>
                             <SelectValue placeholder="Select product" />
                           </SelectTrigger>
                           <SelectContent>
@@ -467,7 +468,8 @@ export default function DOForm({ open, onClose, editingDO, currentUser, onSucces
                         <Input 
                           value={item.description} 
                           onChange={(e) => updateItem(index, 'description', e.target.value)} 
-                          disabled={!isEditable} 
+                          disabled={!isEditable}
+                          data-testid={`input-description-${index}`}
                         />
                       </div>
 
@@ -478,7 +480,8 @@ export default function DOForm({ open, onClose, editingDO, currentUser, onSucces
                           min="1" 
                           value={item.quantity} 
                           onChange={(e) => updateItem(index, 'quantity', e.target.value)} 
-                          disabled={!isEditable} 
+                          disabled={!isEditable}
+                          data-testid={`input-quantity-${index}`}
                         />
                       </div>
 
@@ -489,7 +492,8 @@ export default function DOForm({ open, onClose, editingDO, currentUser, onSucces
                           step="0.01" 
                           value={item.unit_price} 
                           onChange={(e) => updateItem(index, 'unit_price', e.target.value)} 
-                          disabled={!isEditable} 
+                          disabled={!isEditable}
+                          data-testid={`input-unit-price-${index}`}
                         />
                       </div>
 
@@ -568,7 +572,7 @@ export default function DOForm({ open, onClose, editingDO, currentUser, onSucces
               Cancel
             </Button>
             {isEditable && (
-              <Button type="submit" disabled={loading} className="bg-amber-600 hover:bg-amber-700">
+              <Button type="submit" disabled={loading} className="bg-amber-600 hover:bg-amber-700" data-testid="button-save-do">
                 {loading ? "Saving..." : (editingDO && editingDO.id ? "Update" : "Create")}
               </Button>
             )}

@@ -27,25 +27,22 @@ test.describe('Phase 11 — Cleanup', () => {
     cookie = await apiLogin();
   });
 
-  test('delete-dummy-data script runs and reports removing e2e_test records', async () => {
-    test.info().annotations.push({ type: 'action', description: 'Execute scripts/delete-dummy-data.ts via npx tsx' });
+  test('delete-dummy-data script runs successfully and removes e2e_test records', async () => {
+    test.info().annotations.push({ type: 'action', description: 'Execute scripts/delete-dummy-data.ts via npx tsx; script MUST exit 0 for test to pass' });
     let output = '';
-    let scriptError = '';
     try {
       output = execSync('npx tsx scripts/delete-dummy-data.ts', {
         cwd: process.cwd(),
         encoding: 'utf-8',
         timeout: 60000,
+        stdio: ['pipe', 'pipe', 'pipe'],
       });
     } catch (e: unknown) {
-      scriptError = e instanceof Error ? e.message : String(e);
-      if (scriptError.includes('ENOENT') || scriptError.includes('No such file')) {
-        throw new Error('delete-dummy-data.ts script not found — cannot proceed with cleanup');
-      }
+      const msg = e instanceof Error ? e.message : String(e);
+      throw new Error(`delete-dummy-data.ts script FAILED: ${msg.slice(0, 500)}`);
     }
-    const combined = output + scriptError;
-    test.info().annotations.push({ type: 'result', description: `Script output: ${combined.slice(0, 300)}` });
-    expect(combined.length).toBeGreaterThan(0);
+    test.info().annotations.push({ type: 'result', description: `Script exited successfully; output: ${output.slice(0, 300)}` });
+    expect(output.length).toBeGreaterThan(0);
   });
 
   test('step 73: products list returns empty array (all e2e_test products deleted)', async () => {

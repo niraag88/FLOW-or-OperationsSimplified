@@ -434,13 +434,14 @@ export default function InvoiceForm({ open, onClose, editingInvoice, currentUser
           </DialogDescription>
         </DialogHeader>
 
-        <form onSubmit={handleSubmit} className="space-y-6">
+        <form onSubmit={handleSubmit} className="space-y-6" data-testid="invoice-form">
           {/* Header Fields */}
           <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
             <div className="space-y-2">
               <Label htmlFor="invoice_number">Invoice Number *</Label>
               <Input 
                 id="invoice_number" 
+                data-testid="input-invoice-number"
                 value={formData.invoice_number || ''} 
                 onChange={(e) => handleInputChange('invoice_number', e.target.value)} 
                 disabled={(!!editingInvoice && !!editingInvoice.id) || !isCurrentlyEditable} 
@@ -450,7 +451,7 @@ export default function InvoiceForm({ open, onClose, editingInvoice, currentUser
             <div className="space-y-2">
               <Label htmlFor="customer">Customer *</Label>
               <Select value={formData.customer_id ? formData.customer_id.toString() : ''} onValueChange={(value) => handleInputChange('customer_id', value)} disabled={!isCurrentlyEditable}>
-                <SelectTrigger id="customer">
+                <SelectTrigger id="customer" data-testid="select-customer">
                   <SelectValue placeholder="Select customer" />
                 </SelectTrigger>
                 <SelectContent>
@@ -516,7 +517,7 @@ export default function InvoiceForm({ open, onClose, editingInvoice, currentUser
             <div className="flex items-center justify-between">
               <h3 className="text-lg font-semibold">Line Items</h3>
               {isCurrentlyEditable && (
-                <Button type="button" variant="outline" onClick={addItem}>
+                <Button type="button" variant="outline" onClick={addItem} data-testid="button-add-item">
                   <Plus className="w-4 h-4 mr-2" />
                   Add Item
                 </Button>
@@ -526,7 +527,7 @@ export default function InvoiceForm({ open, onClose, editingInvoice, currentUser
             {formData.items.length > 0 && (
               <div className="space-y-4">
                 {formData.items.map((item, index) => (
-                  <Card key={index} className="p-4">
+                  <Card key={index} className="p-4" data-testid={`invoice-item-${index}`}>
                     <div className="grid grid-cols-1 md:grid-cols-6 gap-4 items-end">
                       <div className="space-y-2">
                         <Label>Brand</Label>
@@ -535,7 +536,7 @@ export default function InvoiceForm({ open, onClose, editingInvoice, currentUser
                           onValueChange={(v) => updateItem(index, 'brand_id', v)} 
                           disabled={!isCurrentlyEditable}
                         >
-                          <SelectTrigger>
+                          <SelectTrigger data-testid={`select-brand-${index}`}>
                             <SelectValue placeholder="Select brand" />
                           </SelectTrigger>
                           <SelectContent>
@@ -553,7 +554,7 @@ export default function InvoiceForm({ open, onClose, editingInvoice, currentUser
                           onValueChange={(v) => updateItem(index, 'product_id', v)} 
                           disabled={!isCurrentlyEditable || !item.brand_id}
                         >
-                          <SelectTrigger>
+                          <SelectTrigger data-testid={`select-product-${index}`}>
                             <SelectValue placeholder="Select product" />
                           </SelectTrigger>
                           <SelectContent>
@@ -581,7 +582,8 @@ export default function InvoiceForm({ open, onClose, editingInvoice, currentUser
                         <Input 
                           value={item.description || ''} 
                           onChange={(e) => updateItem(index, 'description', e.target.value)} 
-                          disabled={!isCurrentlyEditable} 
+                          disabled={!isCurrentlyEditable}
+                          data-testid={`input-description-${index}`}
                         />
                       </div>
 
@@ -592,7 +594,8 @@ export default function InvoiceForm({ open, onClose, editingInvoice, currentUser
                           min="1" 
                           value={item.quantity} 
                           onChange={(e) => updateItem(index, 'quantity', e.target.value)} 
-                          disabled={!isCurrentlyEditable} 
+                          disabled={!isCurrentlyEditable}
+                          data-testid={`input-quantity-${index}`}
                         />
                       </div>
 
@@ -603,20 +606,22 @@ export default function InvoiceForm({ open, onClose, editingInvoice, currentUser
                           step="0.01" 
                           value={item.unit_price} 
                           onChange={(e) => updateItem(index, 'unit_price', e.target.value)} 
-                          disabled={!isCurrentlyEditable} 
+                          disabled={!isCurrentlyEditable}
+                          data-testid={`input-unit-price-${index}`}
                         />
                       </div>
 
                       <div className="space-y-2">
                         <Label>Total</Label>
                         <div className="flex items-center gap-2">
-                          <span className="font-medium">AED {(item.line_total || 0).toFixed(2)}</span>
+                          <span className="font-medium" data-testid={`text-line-total-${index}`}>AED {(item.line_total || 0).toFixed(2)}</span>
                           {isCurrentlyEditable && (
                             <Button 
                               type="button" 
                               variant="ghost" 
-                                                              size="sm"
+                              size="sm"
                               onClick={() => removeItem(index)}
+                              data-testid={`button-remove-item-${index}`}
                             >
                               <Trash2 className="w-4 h-4 text-red-500" />
                             </Button>
@@ -668,6 +673,7 @@ export default function InvoiceForm({ open, onClose, editingInvoice, currentUser
             </div>
             <Textarea
               id="remarks"
+              data-testid="textarea-remarks"
               value={formData.remarks || ''}
               onChange={(e) => handleInputChange('remarks', e.target.value)}
               disabled={!isCurrentlyEditable}
@@ -682,7 +688,7 @@ export default function InvoiceForm({ open, onClose, editingInvoice, currentUser
               Cancel
             </Button>
             {isCurrentlyEditable && (
-              <Button type="submit" disabled={loading} className="bg-purple-600 hover:bg-purple-700">
+              <Button type="submit" disabled={loading} className="bg-purple-600 hover:bg-purple-700" data-testid="button-save-invoice">
                 {loading ? "Saving..." : (editingInvoice && editingInvoice.id ? "Update" : "Create")}
               </Button>
             )}

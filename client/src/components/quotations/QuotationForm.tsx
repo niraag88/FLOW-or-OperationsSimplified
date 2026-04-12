@@ -461,12 +461,13 @@ export default function QuotationForm({ open, onClose, editingQuotation, current
           </DialogDescription>
         </DialogHeader>
 
-        <form onSubmit={handleSubmit} className="space-y-6">
+        <form onSubmit={handleSubmit} className="space-y-6" data-testid="quotation-form">
           <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
             <div className="space-y-2">
               <Label htmlFor="quotation_number">Quotation Number *</Label>
               <Input 
                 id="quotation_number" 
+                data-testid="input-quotation-number"
                 value={formData.quotation_number} 
                 onChange={(e) => handleInputChange('quotation_number', e.target.value)} 
                 disabled={!!editingQuotation || !isEditable} 
@@ -476,7 +477,7 @@ export default function QuotationForm({ open, onClose, editingQuotation, current
             <div className="space-y-2">
               <Label htmlFor="customer">Customer *</Label>
               <Select value={formData.customer_id ? formData.customer_id.toString() : ''} onValueChange={(value) => handleInputChange('customer_id', value)} disabled={!isEditable}>
-                <SelectTrigger id="customer">
+                <SelectTrigger id="customer" data-testid="select-customer">
                   <SelectValue placeholder="Select customer" />
                 </SelectTrigger>
                 <SelectContent>
@@ -569,7 +570,7 @@ export default function QuotationForm({ open, onClose, editingQuotation, current
             <div className="flex items-center justify-between">
               <h3 className="text-lg font-semibold">Line Items</h3>
               {isEditable && (
-                <Button type="button" variant="outline" onClick={addItem}>
+                <Button type="button" variant="outline" onClick={addItem} data-testid="button-add-item">
                   <Plus className="w-4 h-4 mr-2" />
                   Add Item
                 </Button>
@@ -601,14 +602,14 @@ export default function QuotationForm({ open, onClose, editingQuotation, current
                   </TableHeader>
                   <TableBody>
                     {formData.items.map((item, index) => (
-                      <TableRow key={index}>
+                      <TableRow key={index} data-testid={`qt-item-row-${index}`}>
                         <TableCell>
                           <Select 
                             value={item.brand_id ? item.brand_id.toString() : ''} 
                             onValueChange={(v) => updateItem(index, 'brand_id', v)} 
                             disabled={!isEditable}
                           >
-                            <SelectTrigger>
+                            <SelectTrigger data-testid={`select-brand-${index}`}>
                               <SelectValue placeholder="Select brand" />
                             </SelectTrigger>
                             <SelectContent>
@@ -624,7 +625,7 @@ export default function QuotationForm({ open, onClose, editingQuotation, current
                             onValueChange={(v) => updateItem(index, 'product_id', v)} 
                             disabled={!isEditable || !item.brand_id}
                           >
-                            <SelectTrigger>
+                            <SelectTrigger data-testid={`select-product-${index}`}>
                               <SelectValue placeholder={item.brand_id ? "Select product" : "Select brand first"} />
                             </SelectTrigger>
                             <SelectContent>
@@ -642,6 +643,7 @@ export default function QuotationForm({ open, onClose, editingQuotation, current
                             onChange={(e) => updateItem(index, 'description', e.target.value)} 
                             disabled={!isEditable}
                             className="border-0 bg-transparent p-0 h-auto"
+                            data-testid={`input-description-${index}`}
                           />
                         </TableCell>
                         <TableCell>
@@ -652,6 +654,7 @@ export default function QuotationForm({ open, onClose, editingQuotation, current
                             onChange={(e) => updateItem(index, 'quantity', e.target.value)}
                             disabled={!isEditable}
                             className="w-full text-right"
+                            data-testid={`input-quantity-${index}`}
                           />
                         </TableCell>
                         <TableCell>
@@ -662,6 +665,7 @@ export default function QuotationForm({ open, onClose, editingQuotation, current
                             onChange={(e) => updateItem(index, 'unit_price', e.target.value)}
                             disabled={!isEditable}
                             className="w-full text-right"
+                            data-testid={`input-unit-price-${index}`}
                           />
                         </TableCell>
                         <TableCell className="text-right font-medium">{(item.line_total || 0).toFixed(2)}</TableCell>
@@ -670,8 +674,9 @@ export default function QuotationForm({ open, onClose, editingQuotation, current
                             <Button
                               type="button"
                               variant="ghost"
-                                                            size="sm"
+                              size="sm"
                               onClick={() => removeItem(index)}
+                              data-testid={`button-remove-item-${index}`}
                             >
                               <Trash2 className="w-4 h-4" />
                             </Button>
@@ -737,7 +742,7 @@ export default function QuotationForm({ open, onClose, editingQuotation, current
               Cancel
             </Button>
             {isEditable && (
-              <Button type="submit" disabled={loading} className="bg-sky-600 hover:bg-sky-700">
+              <Button type="submit" disabled={loading} className="bg-sky-600 hover:bg-sky-700" data-testid="button-save-quotation">
                 {loading ? "Saving..." : (editingQuotation ? "Update" : "Create")}
               </Button>
             )}
