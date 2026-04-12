@@ -140,7 +140,8 @@ async function createPOviaBrowser(
  * Creates a Goods Receipt via the /GoodsReceipts browser UI.
  * Clicks "Receive Goods", selects the PO by number, fills reference number,
  * and clicks "Create Receipt & Update Stock".
- * Returns the GRN id from the API.
+ * If partialReceiveFirstOnly=true, sets all quantity inputs after the first one to 0
+ * so only item 1 is received (partial GRN). Returns the GRN id from the API.
  */
 async function createGRNviaBrowser(
   page: Page,
@@ -148,6 +149,7 @@ async function createGRNviaBrowser(
   poNumber: string,
   refNumber: string,
   refDate: string,
+  partialReceiveFirstOnly = false,
 ): Promise<{ grnId: number; poStatus: string }> {
   await page.goto(`${BASE_URL}/GoodsReceipts`);
   await page.waitForLoadState('domcontentloaded', { timeout: 20000 });
@@ -168,6 +170,16 @@ async function createGRNviaBrowser(
   await expect(poOption).toBeVisible({ timeout: 8000 });
   await poOption.click();
   await page.waitForTimeout(1500);
+
+  // If partial receive: set all inputs AFTER the first one to 0 (leaving item 1 at full qty)
+  if (partialReceiveFirstOnly) {
+    const qtyInputs = page.locator('input[type="number"]');
+    const inputCount = await qtyInputs.count();
+    for (let i = 1; i < inputCount; i++) {
+      await qtyInputs.nth(i).fill('0');
+    }
+    await page.waitForTimeout(500);
+  }
 
   // Fill reference number
   const refInput = page.locator('#ref-number');
@@ -446,10 +458,10 @@ test.describe('Phase 4 — Purchase Orders', () => {
     expect(po.status).toBe('closed');
   });
 
-  test('4.10 receive PO-02 via GRN browser UI (all items, first GRN); verify GRN in list', async ({ page }) => {
-    test.info().annotations.push({ type: 'action', description: 'Navigate to /GoodsReceipts, click "Receive Goods", select PO-02, fill reference INV-BETA-001, submit; verify GRN appears in list' });
+  test('4.10 receive PO-02 partially via GRN browser UI (item 1 only, qty inputs 2+ set to 0); PO-02 stays open/partial', async ({ page }) => {
+    test.info().annotations.push({ type: 'action', description: 'Navigate to /GoodsReceipts; click "Receive Goods"; select PO-02; set all quantity inputs after the first to 0 (partial receive); fill reference INV-BETA-001; submit; verify GRN in list; assert PO-02 status != closed' });
     await browserLogin(page);
-    const { grnId, poStatus } = await createGRNviaBrowser(page, cookie, po02Number, 'INV-BETA-001', '2026-04-06');
+    const { grnId, poStatus } = await createGRNviaBrowser(page, cookie, po02Number, 'INV-BETA-001', '2026-04-06', true);
     grn01bId = grnId;
     test.info().annotations.push({ type: 'result', description: `GRN-01b id=${grn01bId} poStatus=${poStatus}` });
     expect(grn01bId).toBeGreaterThan(0);
@@ -461,21 +473,76 @@ test.describe('Phase 4 — Purchase Orders', () => {
     const body = await page.locator('body').innerText();
     expect(body).toMatch(/INV-BETA-001/i);
 
-    // Save state (grn02 = 0 since PO-02 is fully received in one browser GRN)
-    grn02Id = 0;
-    saveState({ grnIds: { grn01: grn01Id, grn01b: grn01bId, grn02: grn02Id } });
+    // Verify PO-02 is not fully closed after partial receive
+    const po = await (await fetch(`${BASE_URL}/api/purchase-orders/${po02Id}`, { headers: { Cookie: cookie } })).json() as { status: string };
+    test.info().annotations.push({ type: 'result', description: `PO-02 status after partial GRN: ${po.status} (expected submitted or partial)` });
+    expect(['submitted', 'partial']).toContain(po.status);
   });
 
-  test('4.11 verify PO-02 status=closed after full GRN; GoodsReceipts list has at least 2 entries', async () => {
-    test.info().annotations.push({ type: 'action', description: 'GET /api/purchase-orders/po02Id; assert status closed or submitted. GET /api/goods-receipts; assert >= 2 entries' });
-    const po = await (await fetch(`${BASE_URL}/api/purchase-orders/${po02Id}`, { headers: { Cookie: cookie } })).json() as { status: string };
-    test.info().annotations.push({ type: 'result', description: `PO-02 status=${po.status}` });
-    expect(['closed', 'submitted', 'partial']).toContain(po.status);
+  test('4.11 receive PO-02 remaining items (item 2 only) via second GRN browser UI; PO-02 status=closed', async ({ page }) => {
+    test.info().annotations.push({ type: 'action', description: 'Navigate to /GoodsReceipts; click "Receive Goods"; select PO-02; set first qty input to 0 (item 1 already received), receive item 2; fill reference INV-BETA-002; submit; verify PO-02 status=closed' });
+    await browserLogin(page);
+    // Use partialReceiveFirstOnly=false but we need to set item 1 to 0 and receive item 2 only
+    // We do this by selecting PO-02 and setting FIRST input to 0 (opposite of partialReceiveFirstOnly)
+    await page.goto(`${BASE_URL}/GoodsReceipts`);
+    await page.waitForLoadState('domcontentloaded', { timeout: 20000 });
+    await page.waitForTimeout(2000);
 
-    const grns = await (await fetch(`${BASE_URL}/api/goods-receipts`, { headers: { Cookie: cookie } })).json() as Array<{ id: number }>;
+    const receiveBtn = page.locator('button').filter({ hasText: /receive goods/i }).first();
+    await expect(receiveBtn).toBeVisible({ timeout: 10000 });
+    await receiveBtn.click();
+    await page.waitForTimeout(1500);
+
+    const poSelect = page.locator('[role="combobox"]').first();
+    await expect(poSelect).toBeVisible({ timeout: 8000 });
+    await poSelect.click();
+    await page.waitForTimeout(600);
+    const poOption = page.locator('[role="option"]').filter({ hasText: new RegExp(po02Number, 'i') }).first();
+    await expect(poOption).toBeVisible({ timeout: 8000 });
+    await poOption.click();
+    await page.waitForTimeout(1500);
+
+    // Set first item qty to 0 (already received), keep remaining items at full qty
+    const qtyInputs = page.locator('input[type="number"]');
+    const inputCount = await qtyInputs.count();
+    expect(inputCount).toBeGreaterThan(0);
+    await qtyInputs.first().fill('0');
+    await page.waitForTimeout(500);
+
+    // Fill reference
+    const refInput = page.locator('#ref-number');
+    if (await refInput.isVisible({ timeout: 3000 }).catch(() => false)) {
+      await refInput.fill('INV-BETA-002');
+    }
+    const refDateInput = page.locator('#ref-date');
+    if (await refDateInput.isVisible({ timeout: 3000 }).catch(() => false)) {
+      await refDateInput.fill('2026-04-07');
+    }
+
+    const createBtn = page.locator('button').filter({ hasText: /create receipt.*update stock/i }).first();
+    await expect(createBtn).toBeVisible({ timeout: 8000 });
+    await createBtn.click();
+    await page.waitForTimeout(3000);
+
+    const grns = await (await fetch(`${BASE_URL}/api/goods-receipts`, { headers: { Cookie: cookie } })).json() as Array<{ id: number; referenceNumber?: string; }>;
     const allGrns = Array.isArray(grns) ? grns : [];
-    test.info().annotations.push({ type: 'result', description: `GRN list count: ${allGrns.length}` });
-    expect(allGrns.length).toBeGreaterThanOrEqual(2);
+    const found = allGrns.find((g) => g.referenceNumber === 'INV-BETA-002') ?? allGrns[allGrns.length - 1];
+    grn02Id = found?.id ?? 0;
+    test.info().annotations.push({ type: 'result', description: `GRN-02 id=${grn02Id}` });
+    expect(grn02Id).toBeGreaterThan(0);
+    saveState({ grnIds: { grn01: grn01Id, grn01b: grn01bId, grn02: grn02Id } });
+
+    // Verify GRN-02 appears in list
+    await page.goto(`${BASE_URL}/GoodsReceipts`);
+    await page.waitForLoadState('domcontentloaded', { timeout: 20000 });
+    await page.waitForTimeout(2000);
+    const body = await page.locator('body').innerText();
+    expect(body).toMatch(/INV-BETA-002/i);
+
+    // Verify PO-02 is now closed
+    const po = await (await fetch(`${BASE_URL}/api/purchase-orders/${po02Id}`, { headers: { Cookie: cookie } })).json() as { status: string };
+    test.info().annotations.push({ type: 'result', description: `PO-02 status after second GRN: ${po.status} (expected closed)` });
+    expect(po.status).toBe('closed');
   });
 
   test('4.12 mark GRN-01 (PO-01 full GRN) payment as paid; verify payment_status=paid', async () => {

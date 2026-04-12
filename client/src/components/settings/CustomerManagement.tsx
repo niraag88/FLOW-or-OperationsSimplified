@@ -416,7 +416,7 @@ export default function CustomerManagement() {
                     <Label htmlFor="phone">Phone Number</Label>
                     <Input
                       id="phone"
-                      value={(formData as any).phone ?? ''}
+                      value={formData.phone}
                       onChange={(e) => setFormData(prev => ({ ...prev, phone: e.target.value }))}
                       placeholder="+971 50 123 4567"
                     />
@@ -428,7 +428,7 @@ export default function CustomerManagement() {
                   <Input
                     id="email"
                     type="email"
-                    value={(formData as any).email ?? ''}
+                    value={formData.email}
                     onChange={(e) => setFormData(prev => ({ ...prev, email: e.target.value }))}
                     placeholder="customer@example.com"
                   />
