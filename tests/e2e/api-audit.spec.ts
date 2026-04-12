@@ -393,6 +393,7 @@ test.describe('Brands', () => {
     const { status, data } = await api('POST', '/api/brands', adminCookie, {
       name: 'AuditBrand_Primary',
       description: 'Brand for API audit tests',
+      dataSource: 'e2e_test',
     });
     expect(status).toBe(201);
     IDs.brand = (data as { id: number }).id;
@@ -402,6 +403,7 @@ test.describe('Brands', () => {
   test('POST /api/brands create secondary brand → 201', async () => {
     const { status, data } = await api('POST', '/api/brands', adminCookie, {
       name: 'AuditBrand_Secondary',
+      dataSource: 'e2e_test',
     });
     expect(status).toBe(201);
     IDs.brand2 = (data as { id: number }).id;
@@ -485,6 +487,7 @@ test.describe('Products', () => {
       costPrice: '50.00',
       costPriceCurrency: 'AED',
       stockQuantity: 0,
+      dataSource: 'e2e_test',
     });
     expect(status).toBe(201);
     IDs.product = (data as { id: number }).id;
@@ -620,6 +623,7 @@ test.describe('Customers', () => {
       billingAddress: '123 Test St, Dubai, UAE',
       vatNumber: 'TRN999888777666555',
       vatTreatment: 'Local',
+      dataSource: 'e2e_test',
     });
     expect(status).toBe(201);
     IDs.customer = (data as { id: number }).id;
@@ -685,6 +689,7 @@ test.describe('Suppliers', () => {
       email: 'supplier@audit.test',
       phone: '+441234567890',
       address: '1 London St, UK',
+      dataSource: 'e2e_test',
     });
     expect(status).toBe(201);
     IDs.supplier = (data as { id: number }).id;
@@ -1117,9 +1122,11 @@ test.describe('Quotations', () => {
 
 test.describe('Invoices', () => {
   let adminCookie = '';
+  let viewerCookie = '';
 
   test.beforeAll(async () => {
     adminCookie = await loginAs('admin', 'admin123');
+    viewerCookie = await loginAs('viewer_audit_test', 'Viewer123!');
   });
 
   test('POST /api/invoices create with items → 201', async () => {
@@ -1221,12 +1228,16 @@ test.describe('Invoices', () => {
     expect(status).toBe(200);
   });
 
-  test('DELETE /api/invoices/:id — documents whether route exists', async () => {
+  test('DELETE /api/invoices/:id by Viewer → 403', async () => {
+    if (!viewerCookie || !IDs.invoice) return;
+    const { status } = await api('DELETE', `/api/invoices/${IDs.invoice}`, viewerCookie);
+    expect(status).toBe(403);
+  });
+
+  test('DELETE /api/invoices/:id without auth → 401', async () => {
     if (!IDs.invoice) return;
-    const { status } = await api('DELETE', `/api/invoices/${IDs.invoice}`, adminCookie);
-    if (status === 404 || status === 405) {
-      note('DELETE /api/invoices/:id does not exist — invoices cannot be directly deleted; use status transitions');
-    }
+    const { status } = await api('DELETE', `/api/invoices/${IDs.invoice}`, '');
+    expect(status).toBe(401);
   });
 });
 

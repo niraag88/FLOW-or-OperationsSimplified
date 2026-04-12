@@ -49,29 +49,48 @@ export function registerProductRoutes(app: Express) {
       const [brandToDelete] = await db.select().from(brandsTable).where(eq(brandsTable.id, brandId));
       if (!brandToDelete) return res.status(404).json({ error: 'Brand not found' });
 
-      // Delete any inactive products that reference this brand (active ones should be moved first)
-      const brandProducts = await db.select({ id: products.id, isActive: products.isActive })
+      const brandProducts = await db.select({ id: products.id, name: products.name, isActive: products.isActive })
         .from(products).where(eq(products.brandId, brandId));
-      for (const prod of brandProducts) {
-        if (!prod.isActive) {
-          await db.delete(stockMovements).where(eq(stockMovements.productId, prod.id));
-          await db.delete(products).where(eq(products.id, prod.id));
-        }
+
+      const activeProducts = brandProducts.filter(p => p.isActive);
+      if (activeProducts.length > 0) {
+        return res.status(400).json({ error: `Cannot delete brand — ${activeProducts.length} active product(s) still reference it. Deactivate or reassign them first.` });
       }
 
-      await db.insert(recycleBin).values({
-        documentType: 'Brand',
-        documentId: String(brandId),
-        documentNumber: brandToDelete.name,
-        documentData: JSON.stringify({ header: brandToDelete, items: [] }),
-        deletedBy: req.user?.username || 'unknown',
-        deletedDate: new Date(),
-        reason: 'Deleted from UI',
-        originalStatus: brandToDelete.isActive ? 'Active' : 'Inactive',
-        canRestore: true,
+      const inactiveProducts = brandProducts.filter(p => !p.isActive);
+      const userEmail = req.user?.username || 'unknown';
+
+      await db.transaction(async (tx) => {
+        for (const prod of inactiveProducts) {
+          await tx.delete(stockMovements).where(eq(stockMovements.productId, prod.id));
+          await tx.insert(recycleBin).values({
+            documentType: 'Product',
+            documentId: String(prod.id),
+            documentNumber: prod.name,
+            documentData: JSON.stringify({ header: prod, items: [], note: `Cascade-deleted with brand '${brandToDelete.name}'` }),
+            deletedBy: userEmail,
+            deletedDate: new Date(),
+            reason: `Brand '${brandToDelete.name}' deleted`,
+            originalStatus: 'Inactive',
+            canRestore: false,
+          });
+          await tx.delete(products).where(eq(products.id, prod.id));
+        }
+        await tx.insert(recycleBin).values({
+          documentType: 'Brand',
+          documentId: String(brandId),
+          documentNumber: brandToDelete.name,
+          documentData: JSON.stringify({ header: brandToDelete, items: [] }),
+          deletedBy: userEmail,
+          deletedDate: new Date(),
+          reason: 'Deleted from UI',
+          originalStatus: brandToDelete.isActive ? 'Active' : 'Inactive',
+          canRestore: true,
+        });
+        await tx.delete(brandsTable).where(eq(brandsTable.id, brandId));
       });
-      await businessStorage.deleteBrand(brandId);
-      writeAuditLog({ actor: req.user!.id, actorName: req.user?.username || String(req.user!.id), targetId: String(brandId), targetType: 'brand', action: 'DELETE', details: `Brand '${brandToDelete.name}' moved to recycle bin` });
+
+      writeAuditLog({ actor: req.user!.id, actorName: req.user?.username || String(req.user!.id), targetId: String(brandId), targetType: 'brand', action: 'DELETE', details: `Brand '${brandToDelete.name}' deleted${inactiveProducts.length > 0 ? ` (cascaded ${inactiveProducts.length} inactive product(s))` : ''}` });
       res.json({ success: true });
     } catch (error) {
       console.error('Error deleting brand:', error);
