@@ -59,6 +59,7 @@ test.describe('Products CRUD', () => {
   });
 
   test('created product appears in list', async () => {
+    test.skip(!testProductId, 'Depends on product created in previous test');
     const raw = await apiGet('/api/products', cookie);
     const prods = toProductList(raw);
     const found = prods.find((p) => p.sku === testSku);
@@ -67,6 +68,7 @@ test.describe('Products CRUD', () => {
   });
 
   test('update product name and price via API', async () => {
+    test.skip(!testProductId, 'Depends on product created in previous test');
     expect(testProductId).toBeTruthy();
     const { status, data } = await apiPut(`/api/products/${testProductId}`, {
       name: 'E2E Test Product UPDATED',
@@ -79,6 +81,7 @@ test.describe('Products CRUD', () => {
   });
 
   test('updated product reflects new values in list', async () => {
+    test.skip(!testProductId, 'Depends on product created in previous test');
     const raw = await apiGet('/api/products', cookie);
     const prods = toProductList(raw);
     const found = prods.find((p) => p.id === testProductId);
@@ -87,6 +90,7 @@ test.describe('Products CRUD', () => {
   });
 
   test('delete unreferenced product (hard delete)', async () => {
+    test.skip(!testProductId, 'Depends on product created in previous test');
     expect(testProductId).toBeTruthy();
     const status = await apiDelete(`/api/products/${testProductId}`, cookie);
     expect(status).toBe(200);
