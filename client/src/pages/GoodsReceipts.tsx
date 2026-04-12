@@ -396,7 +396,7 @@ export default function GoodsReceipts() {
                         <Input
                           value={editRefNumber}
                           onChange={(e) => setEditRefNumber(e.target.value)}
-                          placeholder="Ref no."
+                          placeholder="Reference number"
                           className="h-7 text-xs w-36"
                         />
                       ) : (
