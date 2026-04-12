@@ -65,6 +65,7 @@ export default function QuotationForm({ open, onClose, editingQuotation, current
     quotation_number: "",
     customer_id: "",
     quotation_date: new Date().toISOString().split('T')[0],
+    valid_until: new Date(Date.now() + 30 * 24 * 60 * 60 * 1000).toISOString().split('T')[0],
     reference: "",
     reference_date: "",
     status: "draft",
@@ -123,6 +124,7 @@ export default function QuotationForm({ open, onClose, editingQuotation, current
           quotation_number: editingQuotation.quoteNumber || "",
           customer_id: editingQuotation.customerId ? editingQuotation.customerId.toString() : "",
           quotation_date: editingQuotation.quoteDate ? new Date(editingQuotation.quoteDate).toISOString().split('T')[0] : new Date().toISOString().split('T')[0],
+          valid_until: editingQuotation.validUntil ? new Date(editingQuotation.validUntil).toISOString().split('T')[0] : new Date(Date.now() + 30 * 24 * 60 * 60 * 1000).toISOString().split('T')[0],
           reference: editingQuotation.reference || "",
           reference_date: editingQuotation.referenceDate ? new Date(editingQuotation.referenceDate).toISOString().split('T')[0] : "",
           status: editingQuotation.status || "draft",
@@ -195,7 +197,8 @@ export default function QuotationForm({ open, onClose, editingQuotation, current
             setFormData(prev => ({ 
               ...prev, 
               quotation_number: nextNumber,
-              quotation_date: new Date().toISOString().split('T')[0]
+              quotation_date: new Date().toISOString().split('T')[0],
+              valid_until: new Date(Date.now() + 30 * 24 * 60 * 60 * 1000).toISOString().split('T')[0]
             }));
           } else {
             console.error('Failed to fetch next quotation number');
@@ -203,7 +206,8 @@ export default function QuotationForm({ open, onClose, editingQuotation, current
             setFormData(prev => ({ 
               ...prev, 
               quotation_number: '',
-              quotation_date: new Date().toISOString().split('T')[0]
+              quotation_date: new Date().toISOString().split('T')[0],
+              valid_until: new Date(Date.now() + 30 * 24 * 60 * 60 * 1000).toISOString().split('T')[0]
             }));
           }
         } catch (error: unknown) {
@@ -212,7 +216,8 @@ export default function QuotationForm({ open, onClose, editingQuotation, current
           setFormData(prev => ({ 
             ...prev, 
             quotation_number: '',
-            quotation_date: new Date().toISOString().split('T')[0]
+            quotation_date: new Date().toISOString().split('T')[0],
+            valid_until: new Date(Date.now() + 30 * 24 * 60 * 60 * 1000).toISOString().split('T')[0]
           }));
         }
       }
@@ -234,6 +239,14 @@ export default function QuotationForm({ open, onClose, editingQuotation, current
         ...prev,
         [field]: value
       };
+
+      // When quotation date changes, shift valid_until by the same offset (+30 days from new date)
+      if (field === 'quotation_date' && typeof value === 'string' && value) {
+        const newQuoteDate = new Date(value);
+        if (!isNaN(newQuoteDate.getTime())) {
+          newState.valid_until = new Date(newQuoteDate.getTime() + 30 * 24 * 60 * 60 * 1000).toISOString().split('T')[0];
+        }
+      }
 
       // Specific logic for customer_id
       if (field === 'customer_id') {
@@ -366,9 +379,8 @@ export default function QuotationForm({ open, onClose, editingQuotation, current
 
     setLoading(true);
     try {
-      // Calculate validUntil as 30 days from quote date
       const quoteDate = new Date(formData.quotation_date);
-      const validUntil = new Date(quoteDate.getTime() + 30 * 24 * 60 * 60 * 1000); // 30 days later
+      const validUntil = formData.valid_until ? new Date(formData.valid_until) : new Date(quoteDate.getTime() + 30 * 24 * 60 * 60 * 1000);
 
       const quotationData = {
         // Map frontend snake_case fields to backend camelCase schema fields
@@ -494,7 +506,7 @@ export default function QuotationForm({ open, onClose, editingQuotation, current
             </div>
           </div>
 
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+          <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
             <div className="space-y-2">
               <Label htmlFor="quotation_date">Quotation Date *</Label>
               <Input 
@@ -504,6 +516,16 @@ export default function QuotationForm({ open, onClose, editingQuotation, current
                 onChange={(e) => handleInputChange('quotation_date', e.target.value)} 
                 disabled={!isEditable} 
                 required 
+              />
+            </div>
+            <div className="space-y-2">
+              <Label htmlFor="valid_until">Valid Until</Label>
+              <Input 
+                id="valid_until" 
+                type="date" 
+                value={formData.valid_until} 
+                onChange={(e) => handleInputChange('valid_until', e.target.value)} 
+                disabled={!isEditable} 
               />
             </div>
             <div className="space-y-2">
