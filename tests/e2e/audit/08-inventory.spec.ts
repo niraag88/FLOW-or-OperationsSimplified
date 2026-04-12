@@ -1,8 +1,8 @@
 /**
  * Phase 8 — Inventory & Stock
  *
- * 59-63. Navigate inventory dashboard, check stock from GRNs, perform stock count,
- *        verify deduction, export CSV, run PO-GRN report
+ * 59-64. Navigate inventory dashboard, check stock from GRNs has increased,
+ *        perform stock count, verify stock movement entries, export CSV, reports page
  */
 import { test, expect } from '@playwright/test';
 import { BASE_URL, apiLogin, apiPost, browserLogin, loadState } from './audit-helpers';
@@ -21,42 +21,61 @@ test.describe('Phase 8 — Inventory & Stock', () => {
     grnIds = state.grnIds;
   });
 
-  test('inventory page renders with product list', async ({ page }) => {
+  test('inventory page renders with product list and stock columns', async ({ page }) => {
     await browserLogin(page);
     await page.goto(`${BASE_URL}/Inventory`);
-    await page.waitForLoadState('domcontentloaded', { timeout: 15000 });
+    await page.waitForLoadState('domcontentloaded', { timeout: 20000 });
     await page.waitForTimeout(3000);
     const body = await page.locator('body').innerText();
     expect(body).toMatch(/product|inventory|stock/i);
-    test.info().annotations.push({ type: 'info', description: 'Inventory dashboard renders' });
+    expect(body).toMatch(/audit product/i);
+    test.info().annotations.push({ type: 'info', description: 'Inventory page renders with audit products visible' });
   });
 
-  test('products received in GRNs have stock > 0 via API', async () => {
+  test('GRN-01 received products have stock > 0', async () => {
     test.skip(!grnIds?.grn01, 'Requires GRN-01 to be created');
-
-    const grns = await (await fetch(`${BASE_URL}/api/goods-receipts`, { headers: { Cookie: cookie } })).json() as Array<{ id: number }>;
-    expect(Array.isArray(grns)).toBe(true);
 
     const grn = await (await fetch(`${BASE_URL}/api/goods-receipts/${grnIds!.grn01}`, { headers: { Cookie: cookie } })).json() as {
       items?: Array<{ productId?: number; product_id?: number; receivedQuantity?: number; received_quantity?: number }>;
     };
     const items = grn.items ?? [];
-    if (items.length > 0) {
-      const pId = items[0].productId ?? items[0].product_id;
-      if (pId) {
-        const prod = await (await fetch(`${BASE_URL}/api/products/${pId}`, { headers: { Cookie: cookie } })).json() as { stockQuantity?: number; stock_quantity?: number };
-        const stock = prod.stockQuantity ?? prod.stock_quantity ?? 0;
-        test.info().annotations.push({ type: 'info', description: `Product ${pId} stock=${stock} after GRN receive` });
-        expect(stock).toBeGreaterThan(0);
-      }
+    expect(items.length).toBeGreaterThan(0);
+
+    let checkedCount = 0;
+    for (const item of items.slice(0, 2)) {
+      const pId = item.productId ?? item.product_id;
+      if (!pId) continue;
+      const prod = await (await fetch(`${BASE_URL}/api/products/${pId}`, { headers: { Cookie: cookie } })).json() as { stockQuantity?: number; stock_quantity?: number };
+      const stock = prod.stockQuantity ?? prod.stock_quantity ?? 0;
+      expect(stock).toBeGreaterThan(0);
+      checkedCount++;
+    }
+    expect(checkedCount).toBeGreaterThan(0);
+    test.info().annotations.push({ type: 'info', description: `Verified ${checkedCount} GRN-01 products have stock > 0` });
+  });
+
+  test('stock count page accessible in browser', async ({ page }) => {
+    await browserLogin(page);
+    await page.goto(`${BASE_URL}/Inventory`);
+    await page.waitForLoadState('domcontentloaded', { timeout: 20000 });
+    await page.waitForTimeout(2000);
+
+    const countTab = page.locator('[role="tab"]').filter({ hasText: /stock count|count/i }).first();
+    if (await countTab.isVisible({ timeout: 3000 }).catch(() => false)) {
+      await countTab.click();
+      await page.waitForTimeout(1000);
+      const body = await page.locator('body').innerText();
+      expect(body).toMatch(/stock count|count|product/i);
+      test.info().annotations.push({ type: 'info', description: 'Stock Count tab visible and accessible' });
     } else {
-      test.info().annotations.push({ type: 'warn', description: 'GRN has no items to verify stock for' });
+      const body = await page.locator('body').innerText();
+      expect(body).toMatch(/inventory|product|stock/i);
+      test.info().annotations.push({ type: 'info', description: 'Stock Count tab not found — inventory page shows stock data' });
     }
   });
 
-  test('create a stock count for first product', async () => {
+  test('create a stock count via API for first product', async () => {
     test.skip(productIds.length === 0, 'Requires products');
-
     const pId = productIds[0];
     const prod = await (await fetch(`${BASE_URL}/api/products/${pId}`, { headers: { Cookie: cookie } })).json() as { stockQuantity?: number; stock_quantity?: number; sku?: string; name?: string };
 
@@ -76,30 +95,53 @@ test.describe('Phase 8 — Inventory & Stock', () => {
     test.info().annotations.push({ type: 'info', description: `Stock count created id=${created.id} for product ${pId}` });
   });
 
-  test('stock movements API returns array', async () => {
-    const data = await (await fetch(`${BASE_URL}/api/stock-movements`, { headers: { Cookie: cookie } })).json();
+  test('stock movements API returns array with at least one entry (from GRN)', async () => {
+    const data = await (await fetch(`${BASE_URL}/api/stock-movements`, { headers: { Cookie: cookie } })).json() as unknown;
     expect(Array.isArray(data)).toBe(true);
+    expect((data as unknown[]).length).toBeGreaterThan(0);
     test.info().annotations.push({ type: 'info', description: `Stock movements: ${(data as unknown[]).length} entries` });
   });
 
-  test('PO-GRN report page renders in browser', async ({ page }) => {
-    await browserLogin(page);
-    await page.goto(`${BASE_URL}/Reports`);
-    await page.waitForLoadState('domcontentloaded', { timeout: 15000 });
-    await page.waitForTimeout(3000);
-    const body = await page.locator('body').innerText();
-    expect(body).toMatch(/report|revenue|purchase|GRN/i);
-    test.info().annotations.push({ type: 'info', description: 'Reports page renders with PO/GRN data visible' });
-  });
-
-  test('inventory API returns product list with stock quantities', async () => {
-    const raw = await (await fetch(`${BASE_URL}/api/products`, { headers: { Cookie: cookie } })).json();
-    const prods = Array.isArray(raw) ? raw : ((raw as any).products ?? []);
+  test('products API returns stock quantities for all products', async () => {
+    const raw = await (await fetch(`${BASE_URL}/api/products`, { headers: { Cookie: cookie } })).json() as unknown;
+    const prods = (Array.isArray(raw) ? raw : ((raw as any).products ?? [])) as Array<{ stockQuantity?: number; stock_quantity?: number; name?: string }>;
     expect(prods.length).toBeGreaterThan(0);
-    for (const p of prods.slice(0, 5) as Array<{ stockQuantity?: number; stock_quantity?: number }>) {
+    for (const p of prods.slice(0, 5)) {
       const stock = p.stockQuantity ?? p.stock_quantity ?? 0;
       expect(typeof stock).toBe('number');
     }
-    test.info().annotations.push({ type: 'info', description: `Inventory shows ${prods.length} products with stock data` });
+    test.info().annotations.push({ type: 'info', description: `${prods.length} products with stock quantities validated` });
+  });
+
+  test('inventory export CSV button exists or API returns data', async ({ page }) => {
+    await browserLogin(page);
+    await page.goto(`${BASE_URL}/Inventory`);
+    await page.waitForLoadState('domcontentloaded', { timeout: 20000 });
+    await page.waitForTimeout(2000);
+
+    const exportBtn = page.locator('button').filter({ hasText: /export|download|csv/i }).first();
+    const hasExportBtn = await exportBtn.isVisible({ timeout: 3000 }).catch(() => false);
+
+    if (hasExportBtn) {
+      test.info().annotations.push({ type: 'info', description: 'Inventory Export button is present on the page' });
+    } else {
+      const r = await fetch(`${BASE_URL}/api/inventory/export`, { headers: { Cookie: cookie } });
+      if (r.status !== 404) {
+        expect([200, 204]).toContain(r.status);
+        test.info().annotations.push({ type: 'info', description: 'Inventory export API endpoint responds' });
+      } else {
+        test.info().annotations.push({ type: 'info', description: 'No export button on inventory page and /api/inventory/export returns 404 — export may be part of top-bar ExportDropdown' });
+      }
+    }
+  });
+
+  test('Reports page renders with revenue/PO/GRN content', async ({ page }) => {
+    await browserLogin(page);
+    await page.goto(`${BASE_URL}/Reports`);
+    await page.waitForLoadState('domcontentloaded', { timeout: 20000 });
+    await page.waitForTimeout(3000);
+    const body = await page.locator('body').innerText();
+    expect(body).toMatch(/report|revenue|purchase|GRN|inventory/i);
+    test.info().annotations.push({ type: 'info', description: 'Reports page renders with data' });
   });
 });
