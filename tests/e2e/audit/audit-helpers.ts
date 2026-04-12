@@ -33,7 +33,7 @@ export function loadState(): Partial<AuditState> {
     if (fs.existsSync(STATE_FILE)) {
       return JSON.parse(fs.readFileSync(STATE_FILE, 'utf-8')) as AuditState;
     }
-  } catch {}
+  } catch { /* state file not yet written */ }
   return {};
 }
 
@@ -52,39 +52,44 @@ export async function apiLogin(username = ADMIN.username, password = ADMIN.passw
   return cookie;
 }
 
-export async function apiGet(path: string, cookie: string): Promise<unknown> {
-  const r = await fetch(`${BASE_URL}${path}`, { headers: { Cookie: cookie } });
-  return r.json();
+export interface ApiResult<T = unknown> {
+  status: number;
+  data: T;
 }
 
-export async function apiPost(path: string, body: object, cookie: string) {
+export async function apiGet<T = unknown>(path: string, cookie: string): Promise<T> {
+  const r = await fetch(`${BASE_URL}${path}`, { headers: { Cookie: cookie } });
+  return r.json() as Promise<T>;
+}
+
+export async function apiPost<T = unknown>(path: string, body: object, cookie: string): Promise<ApiResult<T>> {
   const r = await fetch(`${BASE_URL}${path}`, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json', Cookie: cookie },
     body: JSON.stringify(body),
   });
-  return { status: r.status, data: (await r.json()) as unknown };
+  return { status: r.status, data: (await r.json()) as T };
 }
 
-export async function apiPut(path: string, body: object, cookie: string) {
+export async function apiPut<T = unknown>(path: string, body: object, cookie: string): Promise<ApiResult<T>> {
   const r = await fetch(`${BASE_URL}${path}`, {
     method: 'PUT',
     headers: { 'Content-Type': 'application/json', Cookie: cookie },
     body: JSON.stringify(body),
   });
-  return { status: r.status, data: (await r.json()) as unknown };
+  return { status: r.status, data: (await r.json()) as T };
 }
 
-export async function apiPatch(path: string, body: object, cookie: string) {
+export async function apiPatch<T = unknown>(path: string, body: object, cookie: string): Promise<ApiResult<T>> {
   const r = await fetch(`${BASE_URL}${path}`, {
     method: 'PATCH',
     headers: { 'Content-Type': 'application/json', Cookie: cookie },
     body: JSON.stringify(body),
   });
-  return { status: r.status, data: (await r.json()) as unknown };
+  return { status: r.status, data: (await r.json()) as T };
 }
 
-export async function apiDelete(path: string, cookie: string) {
+export async function apiDelete(path: string, cookie: string): Promise<number> {
   const r = await fetch(`${BASE_URL}${path}`, {
     method: 'DELETE',
     headers: { Cookie: cookie },
@@ -92,30 +97,25 @@ export async function apiDelete(path: string, cookie: string) {
   return r.status;
 }
 
-export async function browserLogin(page: Page, username = ADMIN.username, password = ADMIN.password) {
+export async function browserLogin(page: Page, username = ADMIN.username, password = ADMIN.password): Promise<void> {
   await page.goto(`${BASE_URL}/login`);
   const usernameField = page.locator('[data-testid="input-username"]');
   await usernameField.waitFor({ timeout: 15000 });
   await usernameField.fill(username);
   await page.locator('[data-testid="input-password"]').fill(password);
   await page.locator('[data-testid="button-login"]').click();
-  await page.waitForURL((url) => !url.pathname.includes('/login'), { timeout: 20000 }).catch(() => {});
-  await page.waitForLoadState('domcontentloaded', { timeout: 10000 }).catch(() => {});
+  await page.waitForURL((url) => !url.pathname.includes('/login'), { timeout: 20000 }).catch(() => { /* may already be navigated */ });
+  await page.waitForLoadState('domcontentloaded', { timeout: 10000 }).catch(() => { /* best effort */ });
   await page.waitForTimeout(1000);
 }
 
 export async function browserLoginFetch(page: Page, username: string, password: string): Promise<boolean> {
   await page.goto(`${BASE_URL}/login`);
   const userField = page.locator('[data-testid="input-username"]');
-  await userField.waitFor({ timeout: 10000 }).catch(() => {});
-  if (!await userField.isVisible()) return false;
+  await userField.waitFor({ timeout: 10000 });
   await userField.fill(username);
   await page.locator('[data-testid="input-password"]').fill(password);
   await page.locator('[data-testid="button-login"]').click();
   await page.waitForTimeout(2500);
   return !page.url().includes('/login');
-}
-
-export function annotate(annotations: Array<{ type: string; description: string }>, type: string, description: string) {
-  annotations.push({ type, description });
 }
