@@ -14,6 +14,7 @@ import { PackageCheck, Save, TrendingUp, AlertTriangle, Pencil, X, Check } from 
 import { Label } from "@/components/ui/label";
 import { useToast } from "@/hooks/use-toast";
 import { format } from "date-fns";
+import { formatDate } from "@/utils/dateUtils";
 
 const STALE_3MIN = 3 * 60 * 1000;
 
@@ -412,7 +413,7 @@ export default function GoodsReceipts() {
                         />
                       ) : (
                         <span className="text-sm text-gray-600">
-                          {receipt.referenceDate ? format(new Date(receipt.referenceDate), 'dd/MM/yy') : "—"}
+                          {receipt.referenceDate ? formatDate(receipt.referenceDate) : "—"}
                         </span>
                       )}
                     </TableCell>

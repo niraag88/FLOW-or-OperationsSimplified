@@ -110,6 +110,9 @@ export default function POQuickViewModal({ poId, open, onClose }: POQuickViewMod
     if (!open || !poId) return;
     setDetail(null);
     setLoading(true);
+    setEditingGrnId(null);
+    setEditRefNumber('');
+    setEditRefDate('');
     fetch(`/api/purchase-orders/${poId}/detail`, { credentials: "include" })
       .then((r) => r.json())
       .then((data) => setDetail(data))
