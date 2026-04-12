@@ -6,7 +6,7 @@
  * API tests: Verify stock > 0 post-GRN; stock movements exist; stock count create.
  */
 import { test, expect } from '@playwright/test';
-import { BASE_URL, apiLogin, apiPost, browserLogin, loadState } from './audit-helpers';
+import { BASE_URL, apiLogin, browserLogin, loadState } from './audit-helpers';
 
 interface ProductDetail { stockQuantity?: number; stock_quantity?: number; sku?: string; name?: string; }
 interface GrnDetail { items?: Array<{ productId?: number; product_id?: number }>; }
@@ -75,19 +75,31 @@ test.describe('Phase 8 — Inventory & Stock', () => {
     expect(data.length).toBeGreaterThan(0);
   });
 
-  test('create a stock count via API; ID returned', async () => {
-    test.info().annotations.push({ type: 'action', description: 'POST /api/stock-counts with 1 item' });
-    const pId = productIds[0];
-    const prod = await (await fetch(`${BASE_URL}/api/products/${pId}`, { headers: { Cookie: cookie } })).json() as ProductDetail;
-    const { status, data } = await apiPost<StockCountResponse>('/api/stock-counts', {
-      items: [{
-        product_id: pId, product_code: prod.sku ?? 'AUDIT-001', product_name: prod.name ?? 'Audit Product 1',
-        brand_name: '', size: '', quantity: 5,
-      }],
-    }, cookie);
-    expect([200, 201]).toContain(status);
-    test.info().annotations.push({ type: 'result', description: `Stock count created id=${data.id}` });
-    expect(data.id).toBeGreaterThan(0);
+  test('create stock count via browser UI (/stock-count page); verify stock count appears in list', async ({ page }) => {
+    test.info().annotations.push({ type: 'action', description: 'Navigate to /stock-count; fill qty for first product; click "Create Stock Count"; verify success' });
+    await browserLogin(page);
+    await page.goto(`${BASE_URL}/stock-count`);
+    await page.waitForLoadState('domcontentloaded', { timeout: 20000 });
+    await page.waitForTimeout(3000);
+
+    // Find any quantity input and fill with 5
+    const qtyInputs = page.locator('input[type="number"]');
+    const count = await qtyInputs.count();
+    expect(count).toBeGreaterThan(0);
+    await qtyInputs.first().fill('5');
+    await page.waitForTimeout(500);
+
+    // Click "Create Stock Count" button
+    const createBtn = page.locator('[data-testid="button-create-stock-count"]');
+    await expect(createBtn).toBeVisible({ timeout: 5000 });
+    await createBtn.click();
+    await page.waitForTimeout(3000);
+
+    // Verify stock counts list via API
+    const counts = await (await fetch(`${BASE_URL}/api/stock-counts`, { headers: { Cookie: cookie } })).json() as StockCountResponse[];
+    const allCounts = Array.isArray(counts) ? counts : [];
+    test.info().annotations.push({ type: 'result', description: `Stock counts in DB: ${allCounts.length}` });
+    expect(allCounts.length).toBeGreaterThan(0);
   });
 
   test('Reports page renders with revenue/PO/inventory content', async ({ page }) => {

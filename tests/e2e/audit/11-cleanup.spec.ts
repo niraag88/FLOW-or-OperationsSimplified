@@ -219,7 +219,7 @@ test.describe('Phase 11 — Cleanup', () => {
       '',
       '- Master data (brands, products, customers) tagged `dataSource=e2e_test` for deterministic cleanup via scripts/delete-dummy-data.ts.',
       '- Transactional documents (POs, GRNs, Invoices, QTs, DOs) have no dataSource field in schema — cleaned by next factory reset.',
-      '- Intentional deviations: QT-03 (12 items) and INV-03 (10 items) created via API (extremely large browser forms — browser print rendering tests verify all lines); DO-03 API-assisted (browser budget consumed by DO-01 Create from Existing + DO-02 New DO form). GRN/payment steps use API (payment sub-forms lack stable data-testids in current UI).',
+      '- Intentional deviations: QT-03 (12 items) and INV-03 (10 items) created via API (extremely large browser forms — browser print rendering tests verify all lines); DO-03 API-assisted (browser budget consumed by DO-01 Create from Existing + DO-02 New DO form). GRN payment status marking uses API (GRN payment sub-form has no stable data-testids). GRN creation (4.9–4.11) and Invoice Mark as Paid (6.7, 6.8) are fully browser-driven. Stock count (Phase 8) browser-driven via /stock-count page.',
       '- Viewer role: Edit/New buttons hidden on /Invoices confirmed by test 9.14.',
       '- All print views verify: body length > 200, company name "Audit Test Co", TRN "100123456700003", AED/VAT strings.',
       '- Export tests assert a real Playwright `download` event fires when clicking export buttons.',

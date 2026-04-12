@@ -91,43 +91,36 @@ test.describe('Phase 0 — Reset & Company Setup', () => {
     await emailField.clear();
     await emailField.fill('audit@audittestco.ae');
 
-    // Fill UAE address
+    // Fill UAE address — hard-fail if field not visible (it exists in CompanySettings form)
     const addressField = page.locator('#company_address');
-    if (await addressField.isVisible({ timeout: 3000 }).catch(() => false)) {
-      await addressField.clear();
-      await addressField.fill('Office 101, Business Bay, Dubai, UAE, PO Box 99999');
-      test.info().annotations.push({ type: 'result', description: 'UAE address field filled: Office 101, Business Bay, Dubai, UAE' });
-    } else {
-      test.info().annotations.push({ type: 'issue', description: '#company_address field not visible — address fill skipped' });
-    }
-
-    // Set default currency to AED (verify AED is selected or select it)
-    const currencySelect = page.locator('#default_currency, [id*="currency"]').first();
-    if (await currencySelect.isVisible({ timeout: 3000 }).catch(() => false)) {
-      const currentCurrency = await currencySelect.inputValue().catch(() => '');
-      test.info().annotations.push({ type: 'result', description: `Currency field found; current value: ${currentCurrency}` });
-    } else {
-      // Try dropdown trigger for currency
-      const currencyTrigger = page.locator('[data-testid="select-currency"], button').filter({ hasText: /AED|USD|currency/i }).first();
-      if (await currencyTrigger.isVisible({ timeout: 2000 }).catch(() => false)) {
-        test.info().annotations.push({ type: 'result', description: 'Currency trigger found — AED is default' });
-      } else {
-        test.info().annotations.push({ type: 'issue', description: 'Currency select not found in standard locations — AED is the platform default' });
-      }
-    }
+    await expect(addressField).toBeVisible({ timeout: 5000 });
+    await addressField.clear();
+    await addressField.fill('Office 101, Business Bay, Dubai, UAE, PO Box 99999');
+    test.info().annotations.push({ type: 'result', description: 'UAE address field filled: Office 101, Business Bay, Dubai, UAE' });
 
     const saveBtn = page.locator('button').filter({ hasText: /save/i }).first();
     await expect(saveBtn).toBeVisible({ timeout: 5000 });
     await saveBtn.click();
     await page.waitForTimeout(2000);
 
+    // Verify persistence via API (authoritative store)
+    const settings = await (await fetch(`${BASE_URL}/api/company-settings`, { headers: { Cookie: cookie } })).json() as { name?: string; address?: string; taxNumber?: string; company_name?: string; company_address?: string; tax_number?: string; };
+    const persName = settings.name ?? settings.company_name ?? '';
+    const persAddress = settings.address ?? settings.company_address ?? '';
+    const persTrn = settings.taxNumber ?? settings.tax_number ?? '';
+    test.info().annotations.push({ type: 'result', description: `API: name="${persName}"; address="${persAddress}"; TRN="${persTrn}"` });
+    expect(persName).toMatch(/audit test co/i);
+    expect(persTrn).toContain('100123456700003');
+    expect(persAddress).toContain('Business Bay');
+
+    // Verify Settings page loads with company name visible in DOM
     await page.goto(`${BASE_URL}/Settings`);
     await page.waitForLoadState('domcontentloaded', { timeout: 20000 });
     await page.waitForTimeout(2000);
-    const pageBody = await page.locator('body').innerText();
-    test.info().annotations.push({ type: 'result', description: `Settings shows company "Audit Test Co": ${/audit test co/i.test(pageBody)}; TRN: ${pageBody.includes('100123456700003')}; address: ${pageBody.includes('Business Bay')}` });
-    expect(pageBody).toMatch(/audit test co/i);
-    expect(pageBody).toContain('100123456700003');
+    const addressInput = page.locator('#company_address');
+    await expect(addressInput).toBeVisible({ timeout: 5000 });
+    const addressValue = await addressInput.inputValue();
+    expect(addressValue).toContain('Business Bay');
   });
 
   test('0.7 logo upload via #logo-upload file input accepted', async ({ page }) => {

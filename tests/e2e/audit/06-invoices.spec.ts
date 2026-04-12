@@ -273,26 +273,45 @@ test.describe('Phase 6 — Invoices', () => {
     expect(['submitted', 'Submitted', 'delivered', 'paid']).toContain(inv.status);
   });
 
-  test('6.7 INV-01: advance to Delivered → Paid via status transitions; payment_status=paid', async () => {
-    test.info().annotations.push({ type: 'action', description: 'PUT INV-01 delivered → paid with payment date (status transition API — payment sub-form is a complex widget)' });
-    await fetch(`${BASE_URL}/api/invoices/${inv01Id}`, {
-      method: 'PUT',
-      headers: { 'Content-Type': 'application/json', Cookie: cookie },
-      body: JSON.stringify({ status: 'delivered' }),
-    });
-    const paidResp = await fetch(`${BASE_URL}/api/invoices/${inv01Id}`, {
-      method: 'PUT',
-      headers: { 'Content-Type': 'application/json', Cookie: cookie },
-      body: JSON.stringify({ status: 'paid', paymentStatus: 'paid', paymentReceivedDate: '2026-04-15', paymentRemarks: 'Bank transfer' }),
-    });
-    expect([200, 201]).toContain(paidResp.status);
+  test('6.7 INV-01: Mark as Paid via browser actions dropdown → MarkPaidDialog; verify payment_status=paid', async ({ page }) => {
+    test.info().annotations.push({ type: 'action', description: 'Navigate to /Invoices; find row with data-invoice-id; open actions; click [data-testid="menuitem-mark-paid"]; fill #payment_received_date; submit' });
+    await browserLogin(page);
+    await page.goto(`${BASE_URL}/Invoices`);
+    await page.waitForLoadState('domcontentloaded', { timeout: 20000 });
+    await page.waitForTimeout(2000);
+
+    // Find INV-01 row by data-invoice-id and click its actions button
+    const invoiceRow = page.locator(`tr[data-invoice-id="${inv01Id}"]`);
+    await expect(invoiceRow).toBeVisible({ timeout: 8000 });
+    const rowActionsBtn = invoiceRow.locator('button').last();
+    await rowActionsBtn.click();
+    await page.waitForTimeout(600);
+
+    // Click "Mark as Paid" menu item
+    const markPaidItem = page.locator('[data-testid="menuitem-mark-paid"]');
+    await expect(markPaidItem).toBeVisible({ timeout: 5000 });
+    await markPaidItem.click();
+    await page.waitForTimeout(800);
+
+    // Fill payment date in dialog
+    const paymentDateInput = page.locator('#payment_received_date');
+    await expect(paymentDateInput).toBeVisible({ timeout: 5000 });
+    await paymentDateInput.fill('2026-04-15');
+
+    // Submit the dialog
+    const submitPaidBtn = page.locator('button[type="submit"]').filter({ hasText: /mark as paid/i });
+    await expect(submitPaidBtn).toBeVisible({ timeout: 5000 });
+    await submitPaidBtn.click();
+    await page.waitForTimeout(2000);
+
+    // Verify via API
     const inv = await (await fetch(`${BASE_URL}/api/invoices/${inv01Id}`, { headers: { Cookie: cookie } })).json() as InvoiceResponse;
     test.info().annotations.push({ type: 'result', description: `INV-01 payment_status=${inv.paymentStatus ?? inv.payment_status}` });
     expect(inv.paymentStatus ?? inv.payment_status).toBe('paid');
   });
 
-  test('6.8 INV-02: Submit via browser → advance to Paid; payment_status=paid', async ({ page }) => {
-    test.info().annotations.push({ type: 'action', description: `Navigate to /Invoices/${inv02Id}; submit via browser; then advance to paid via API` });
+  test('6.8 INV-02: Submit via browser → Mark as Paid via browser MarkPaidDialog; payment_status=paid', async ({ page }) => {
+    test.info().annotations.push({ type: 'action', description: `Navigate to /Invoices/${inv02Id}; submit invoice via browser; navigate to /Invoices; find row data-invoice-id=${inv02Id}; open actions → [data-testid="menuitem-mark-paid"] → fill date → submit` });
     await browserLogin(page);
     await page.goto(`${BASE_URL}/Invoices/${inv02Id}`);
     await page.waitForLoadState('domcontentloaded', { timeout: 20000 });
@@ -304,12 +323,32 @@ test.describe('Phase 6 — Invoices', () => {
       await page.waitForTimeout(2000);
     }
 
-    // Advance to paid via API
-    await fetch(`${BASE_URL}/api/invoices/${inv02Id}`, {
-      method: 'PUT',
-      headers: { 'Content-Type': 'application/json', Cookie: cookie },
-      body: JSON.stringify({ status: 'paid', paymentStatus: 'paid', paymentReceivedDate: '2026-04-15' }),
-    });
+    // Navigate to invoice list, find INV-02 row by data-invoice-id, open actions → Mark as Paid
+    await page.goto(`${BASE_URL}/Invoices`);
+    await page.waitForLoadState('domcontentloaded', { timeout: 20000 });
+    await page.waitForTimeout(2000);
+
+    const invoiceRow2 = page.locator(`tr[data-invoice-id="${inv02Id}"]`);
+    await expect(invoiceRow2).toBeVisible({ timeout: 8000 });
+    const rowActionsBtn2 = invoiceRow2.locator('button').last();
+    await rowActionsBtn2.click();
+    await page.waitForTimeout(600);
+
+    const markPaidItem = page.locator('[data-testid="menuitem-mark-paid"]');
+    await expect(markPaidItem).toBeVisible({ timeout: 5000 });
+    await markPaidItem.click();
+    await page.waitForTimeout(800);
+
+    const paymentDateInput = page.locator('#payment_received_date');
+    await expect(paymentDateInput).toBeVisible({ timeout: 5000 });
+    await paymentDateInput.fill('2026-04-16');
+
+    const submitPaidBtn = page.locator('button[type="submit"]').filter({ hasText: /mark as paid/i });
+    await expect(submitPaidBtn).toBeVisible({ timeout: 5000 });
+    await submitPaidBtn.click();
+    await page.waitForTimeout(2000);
+
+    // Verify via API
     const inv = await (await fetch(`${BASE_URL}/api/invoices/${inv02Id}`, { headers: { Cookie: cookie } })).json() as InvoiceResponse;
     test.info().annotations.push({ type: 'result', description: `INV-02 payment_status=${inv.paymentStatus ?? inv.payment_status}` });
     expect(inv.paymentStatus ?? inv.payment_status).toBe('paid');

@@ -217,12 +217,12 @@ export default function InvoiceActionsDropdown({ invoice, canEdit, canOverride, 
             <>
               <DropdownMenuSeparator />
               {invoice.paymentStatus !== 'paid' && invoice.paymentStatus !== 'paid' ? (
-                <DropdownMenuItem onClick={() => setShowMarkPaidDialog(true)} className="text-green-700 focus:text-green-700">
+                <DropdownMenuItem data-testid="menuitem-mark-paid" onClick={() => setShowMarkPaidDialog(true)} className="text-green-700 focus:text-green-700">
                   <CheckCircle className="w-4 h-4 mr-2" />
                   Mark as Paid
                 </DropdownMenuItem>
               ) : (
-                <DropdownMenuItem onClick={handleMarkOutstanding} className="text-amber-700 focus:text-amber-700">
+                <DropdownMenuItem data-testid="menuitem-mark-outstanding" onClick={handleMarkOutstanding} className="text-amber-700 focus:text-amber-700">
                   <RotateCcw className="w-4 h-4 mr-2" />
                   Mark as Outstanding
                 </DropdownMenuItem>

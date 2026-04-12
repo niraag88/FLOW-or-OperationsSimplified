@@ -146,7 +146,7 @@ export default function InvoiceList({ invoices, totalCount, loading, canEdit, ca
                   const formattedPayDate = formatDate(paidDate);
 
                   return (
-                    <TableRow key={invoice.id} className="hover:bg-gray-50">
+                    <TableRow key={invoice.id} data-invoice-id={invoice.id} className="hover:bg-gray-50">
                       <TableCell className="font-medium">
                         <div className="flex items-center gap-1.5">
                           <button
