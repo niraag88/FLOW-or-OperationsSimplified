@@ -91,6 +91,14 @@ export async function executeFactoryReset(
       await client.query('DELETE FROM company_settings');
       await client.query(`INSERT INTO company_settings (company_name) VALUES ('')`);
       console.log(`  RESET company_settings (blank row inserted)`);
+
+      // Audit log entry — inside the transaction for reliability
+      await client.query(
+        `INSERT INTO audit_log (actor, actor_name, target_id, target_type, action, details, timestamp)
+         VALUES ($1, $2, $3, $4, $5, $6, NOW())`,
+        ['cli', 'CLI:delete-dummy-data', 'system', 'system', 'FACTORY_RESET',
+         'All business data wiped via delete-dummy-data --all-user-data'],
+      );
     } else {
       console.log(`  [dry] company_settings would be reset to blank row`);
     }

@@ -1029,16 +1029,21 @@ export function registerSystemRoutes(app: Express) {
       await client.query('DELETE FROM company_settings');
       await client.query(`INSERT INTO company_settings (company_name) VALUES ('')`);
 
-      await client.query('COMMIT');
+      // 4. Insert audit entry inside the transaction so it is guaranteed to persist
+      await client.query(
+        `INSERT INTO audit_log (actor, actor_name, target_id, target_type, action, details, timestamp)
+         VALUES ($1, $2, $3, $4, $5, $6, NOW())`,
+        [
+          req.user!.id,
+          req.user!.username,
+          'system',
+          'system',
+          'FACTORY_RESET',
+          'All business data wiped via factory reset',
+        ],
+      );
 
-      writeAuditLog({
-        actor: req.user!.id,
-        actorName: req.user!.username,
-        targetId: 'system',
-        targetType: 'system',
-        action: 'FACTORY_RESET',
-        details: 'All business data wiped via factory reset',
-      });
+      await client.query('COMMIT');
 
       res.json({ ok: true, message: 'Factory reset complete. All business data has been wiped.' });
     } catch (error: any) {
