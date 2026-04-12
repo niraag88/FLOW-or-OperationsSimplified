@@ -409,15 +409,11 @@ test.describe('Brands', () => {
     IDs.brand2 = (data as { id: number }).id;
   });
 
-  test('POST /api/brands with missing required name → not 200', async () => {
+  test('POST /api/brands with missing required name → 400', async () => {
     const { status } = await api('POST', '/api/brands', adminCookie, {
       description: 'No name field',
     });
-    if (status === 500) {
-      bug('POST /api/brands: missing "name" returns 500 — Zod validation error not caught as 400');
-      test.info().annotations.push({ type: 'BUG', description: 'POST /api/brands with missing required field returns 500 instead of 400. Zod parse error is uncaught.' });
-    }
-    expect([400, 422, 500]).toContain(status);
+    expect(status).toBe(400);
   });
 
   test('GET /api/brands list → 200 array, < 500ms', async () => {
@@ -494,34 +490,32 @@ test.describe('Products', () => {
     expect(IDs.product).toBeGreaterThan(0);
   });
 
-  test('POST /api/products with missing unitPrice → not 200', async () => {
+  test('POST /api/products with missing unitPrice → 400', async () => {
     if (!IDs.brand) return;
     const { status } = await api('POST', '/api/products', adminCookie, {
       sku: 'AUDIT-SKU-BAD',
       name: 'Bad Product',
       brandId: IDs.brand,
     });
-    if (status === 500) {
-      bug('POST /api/products: missing required fields returns 500 — Zod parse error not caught as 400');
-      test.info().annotations.push({ type: 'BUG', description: 'POST /api/products with missing required fields returns 500 instead of 400.' });
-    }
-    expect([400, 422, 500]).toContain(status);
+    expect(status).toBe(400);
   });
 
-  test('POST /api/products by Viewer (Staff) — documents role restriction', async () => {
+  test('POST /api/products by Viewer (Staff) — documents permissive role BUG', async () => {
     if (!viewerCookie || !IDs.brand) return;
     const { status, data } = await api('POST', '/api/products', viewerCookie, {
       sku: 'AUDIT-VIEWER-SKU',
       name: 'Viewer Product',
       brandId: IDs.brand,
       unitPrice: '10.00',
+      dataSource: 'e2e_test',
     });
     if (status === 201 || status === 200) {
-      note('POST /api/products has NO role restriction — Staff/Viewer users can create products');
-      test.info().annotations.push({ type: 'NOTE', description: 'POST /api/products allows any authenticated user (no Admin/Manager restriction).' });
+      bug('POST /api/products has NO role restriction — Staff/Viewer users can create products (should be 403)');
+      test.info().annotations.push({ type: 'BUG', description: 'POST /api/products allows Viewer/Staff users to create products. Expected 403 Forbidden for non-Admin/Manager roles.' });
       const vpId = (data as { id?: number }).id;
       if (vpId) await api('DELETE', `/api/products/${vpId}`, adminCookie);
     }
+    expect([201, 200, 403]).toContain(status);
   });
 
   test('GET /api/products list → 200, < 500ms', async () => {
@@ -582,7 +576,8 @@ test.describe('Products', () => {
     const result = data as { created?: number };
     expect(result.created).toBe(1);
     note('Bulk import endpoint is POST /api/products/bulk (not /api/products/bulk-import)');
-    note('[BUG] Bulk import SKU validation rejects hyphens — /^[A-Za-z0-9]{1,50}$/ disallows common SKU formats like "BULK-001"');
+    bug('Bulk import SKU validation rejects hyphens — /^[A-Za-z0-9]{1,50}$/ disallows common SKU formats like "BULK-001"');
+    test.info().annotations.push({ type: 'BUG', description: 'Bulk import SKU regex /^[A-Za-z0-9]{1,50}$/ rejects hyphenated SKUs (e.g. BULK-001), limiting import compatibility.' });
   });
 
   test('POST /api/products/bulk import with empty rows → 400', async () => {
@@ -630,15 +625,11 @@ test.describe('Customers', () => {
     expect(IDs.customer).toBeGreaterThan(0);
   });
 
-  test('POST /api/customers missing required name → not 200', async () => {
+  test('POST /api/customers missing required name → 400', async () => {
     const { status } = await api('POST', '/api/customers', adminCookie, {
       email: 'noname@test.ae',
     });
-    if (status === 500) {
-      bug('POST /api/customers: missing "name" returns 500 — Zod parse error not caught as 400');
-      test.info().annotations.push({ type: 'BUG', description: 'POST /api/customers with missing required "name" field returns 500 instead of 400.' });
-    }
-    expect([400, 422, 500]).toContain(status);
+    expect(status).toBe(400);
   });
 
   test('GET /api/customers → 200', async () => {
@@ -696,15 +687,11 @@ test.describe('Suppliers', () => {
     expect(IDs.supplier).toBeGreaterThan(0);
   });
 
-  test('POST /api/suppliers missing name → not 200', async () => {
+  test('POST /api/suppliers missing name → 400', async () => {
     const { status } = await api('POST', '/api/suppliers', adminCookie, {
       email: 'noname@supplier.test',
     });
-    if (status === 500) {
-      bug('POST /api/suppliers: missing "name" returns 500 — Zod parse error not caught as 400');
-      test.info().annotations.push({ type: 'BUG', description: 'POST /api/suppliers with missing required "name" returns 500 instead of 400.' });
-    }
-    expect([400, 422, 500]).toContain(status);
+    expect(status).toBe(400);
   });
 
   test('GET /api/suppliers → 200 array', async () => {
@@ -808,7 +795,7 @@ test.describe('Purchase Orders', () => {
     test.info().annotations.push({ type: 'NOTE', description: `PO default status is "${detail.status}" — POs have no draft state; they are submitted immediately on creation. Only submitted↔closed transitions exist.` });
   });
 
-  test('POST /api/purchase-orders with fxRateToAed as number → 500 (BUG: should coerce)', async () => {
+  test('POST /api/purchase-orders with fxRateToAed as number → 201 (coerced to string)', async () => {
     if (!IDs.supplier || !IDs.brand) return;
     const { status, data } = await api('POST', '/api/purchase-orders', adminCookie, {
       supplierId: IDs.supplier,
@@ -817,15 +804,9 @@ test.describe('Purchase Orders', () => {
       fxRateToAed: 1,
       items: [],
     });
-    if (status === 500) {
-      bug('POST /api/purchase-orders: fxRateToAed sent as JS number returns 500 — Zod decimal schema expects string; server should coerce number → string before validation');
-      test.info().annotations.push({ type: 'BUG', description: 'POST /api/purchase-orders with fxRateToAed: 1 (number) returns 500. Drizzle decimal Zod schema expects a string; clients naturally send numbers. Server should coerce.' });
-    } else {
-      note(`POST /api/purchase-orders fxRateToAed:1 (number) → ${status} (server coerces correctly)`);
-      const tempPoId = (data as { id?: number }).id;
-      if (tempPoId) await api('DELETE', `/api/purchase-orders/${tempPoId}`, adminCookie);
-    }
-    expect([201, 400, 500]).toContain(status);
+    const tempPoId = (data as { id?: number }).id;
+    if (tempPoId) await api('DELETE', `/api/purchase-orders/${tempPoId}`, adminCookie);
+    expect(status).toBe(201);
   });
 
   test('POST /api/purchase-orders with negative unit price — documents behaviour', async () => {
@@ -1577,17 +1558,13 @@ test.describe('Edge Cases', () => {
     }
   });
 
-  test('Malformed JSON body → 400 (not 500 crash)', async () => {
+  test('Malformed JSON body → 400 (Express json middleware rejects)', async () => {
     const resp = await fetch(`${BASE_URL}/api/invoices`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json', Cookie: adminCookie },
       body: 'this is not json{{{',
     });
-    if (resp.status === 500) {
-      bug('Malformed JSON body to POST endpoint returns 500 — server should return 400 for invalid JSON');
-      test.info().annotations.push({ type: 'BUG', description: 'Malformed JSON POST body returns 500 (Express global error handler should catch this and return 400).' });
-    }
-    expect([400, 500]).toContain(resp.status);
+    expect(resp.status).toBe(400);
   });
 
   test('GET /api/export/invoice without auth → 401', async () => {
@@ -1605,20 +1582,17 @@ test.describe('Edge Cases', () => {
     expect(status).toBe(200);
   });
 
-  test('DELETE /api/suppliers/:id with associated PO → 400 or 500 (FK constraint)', async () => {
+  test('DELETE /api/suppliers/:id with associated PO → FK constraint (400 or 500)', async () => {
     if (!IDs.supplier || !IDs.po) return;
     const { status } = await api('DELETE', `/api/suppliers/${IDs.supplier}`, adminCookie);
-    if (status === 200) {
-      note('DELETE /api/suppliers/:id with PO reference succeeds — no FK constraint enforced (cascade delete or soft delete)');
-      test.info().annotations.push({ type: 'NOTE', description: 'Supplier with associated PO can be deleted — no referential integrity constraint enforced at API level.' });
+    if (status === 500) {
+      bug('DELETE /api/suppliers/:id with PO reference returns 500 — FK constraint not handled gracefully; should return 400 with a descriptive error');
+      test.info().annotations.push({ type: 'BUG', description: 'DELETE /api/suppliers/:id returns 500 when the supplier is referenced by a PO. Should return 400 with a human-readable constraint error.' });
     } else if (status === 400 || status === 409) {
       note('DELETE /api/suppliers/:id with PO reference correctly returns 4xx (referential constraint enforced)');
-    } else if (status === 500) {
-      bug('DELETE /api/suppliers/:id with PO reference returns 500 (FK constraint not handled gracefully — should return 400 with message)');
-      test.info().annotations.push({ type: 'BUG', description: 'DELETE /api/suppliers/:id fails with 500 when referenced by PO — should return 400 with human-readable constraint error.' });
     }
-    expect([200, 400, 409, 500]).toContain(status);
     note(`DELETE /api/suppliers with associated PO → ${status}`);
+    expect([400, 409, 500]).toContain(status);
   });
 
   test('GET /api/export/do documents PDF content-type behaviour', async () => {

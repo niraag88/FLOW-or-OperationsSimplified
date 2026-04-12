@@ -1,5 +1,6 @@
 import type { Express } from "express";
 import ExcelJS from 'exceljs';
+import { ZodError } from 'zod';
 import { products, recycleBin, stockMovements, brands as brandsTable } from "@shared/schema";
 import { insertBrandSchema, insertProductSchema } from "@shared/schema";
 import { db } from "../db";
@@ -25,6 +26,9 @@ export function registerProductRoutes(app: Express) {
       writeAuditLog({ actor: req.user!.id, actorName: req.user?.username || String(req.user!.id), targetId: String(brand.id), targetType: 'brand', action: 'CREATE', details: `Brand '${brand.name}' created` });
       res.status(201).json(brand);
     } catch (error) {
+      if (error instanceof ZodError) {
+        return res.status(400).json({ error: 'Validation failed', details: error.errors });
+      }
       console.error('Error creating brand:', error);
       res.status(500).json({ error: 'Failed to create brand' });
     }
@@ -49,48 +53,19 @@ export function registerProductRoutes(app: Express) {
       const [brandToDelete] = await db.select().from(brandsTable).where(eq(brandsTable.id, brandId));
       if (!brandToDelete) return res.status(404).json({ error: 'Brand not found' });
 
-      const brandProducts = await db.select({ id: products.id, name: products.name, isActive: products.isActive })
-        .from(products).where(eq(products.brandId, brandId));
-
-      const activeProducts = brandProducts.filter(p => p.isActive);
-      if (activeProducts.length > 0) {
-        return res.status(400).json({ error: `Cannot delete brand — ${activeProducts.length} active product(s) still reference it. Deactivate or reassign them first.` });
-      }
-
-      const inactiveProducts = brandProducts.filter(p => !p.isActive);
-      const userEmail = req.user?.username || 'unknown';
-
-      await db.transaction(async (tx) => {
-        for (const prod of inactiveProducts) {
-          await tx.delete(stockMovements).where(eq(stockMovements.productId, prod.id));
-          await tx.insert(recycleBin).values({
-            documentType: 'Product',
-            documentId: String(prod.id),
-            documentNumber: prod.name,
-            documentData: JSON.stringify({ header: prod, items: [], note: `Cascade-deleted with brand '${brandToDelete.name}'` }),
-            deletedBy: userEmail,
-            deletedDate: new Date(),
-            reason: `Brand '${brandToDelete.name}' deleted`,
-            originalStatus: 'Inactive',
-            canRestore: false,
-          });
-          await tx.delete(products).where(eq(products.id, prod.id));
-        }
-        await tx.insert(recycleBin).values({
-          documentType: 'Brand',
-          documentId: String(brandId),
-          documentNumber: brandToDelete.name,
-          documentData: JSON.stringify({ header: brandToDelete, items: [] }),
-          deletedBy: userEmail,
-          deletedDate: new Date(),
-          reason: 'Deleted from UI',
-          originalStatus: brandToDelete.isActive ? 'Active' : 'Inactive',
-          canRestore: true,
-        });
-        await tx.delete(brandsTable).where(eq(brandsTable.id, brandId));
+      await db.insert(recycleBin).values({
+        documentType: 'Brand',
+        documentId: String(brandId),
+        documentNumber: brandToDelete.name,
+        documentData: JSON.stringify({ header: brandToDelete, items: [] }),
+        deletedBy: req.user?.username || 'unknown',
+        deletedDate: new Date(),
+        reason: 'Deleted from UI',
+        originalStatus: brandToDelete.isActive ? 'Active' : 'Inactive',
+        canRestore: true,
       });
-
-      writeAuditLog({ actor: req.user!.id, actorName: req.user?.username || String(req.user!.id), targetId: String(brandId), targetType: 'brand', action: 'DELETE', details: `Brand '${brandToDelete.name}' deleted${inactiveProducts.length > 0 ? ` (cascaded ${inactiveProducts.length} inactive product(s))` : ''}` });
+      await businessStorage.deleteBrand(brandId);
+      writeAuditLog({ actor: req.user!.id, actorName: req.user?.username || String(req.user!.id), targetId: String(brandId), targetType: 'brand', action: 'DELETE', details: `Brand '${brandToDelete.name}' moved to recycle bin` });
       res.json({ success: true });
     } catch (error) {
       console.error('Error deleting brand:', error);
@@ -397,6 +372,9 @@ export function registerProductRoutes(app: Express) {
       writeAuditLog({ actor: req.user!.id, actorName: req.user?.username || String(req.user!.id), targetId: String(product.id), targetType: 'product', action: 'CREATE', details: `Product '${product.name}' (SKU: ${product.sku}) created` });
       res.status(201).json(product);
     } catch (error) {
+      if (error instanceof ZodError) {
+        return res.status(400).json({ error: 'Validation failed', details: error.errors });
+      }
       console.error('Error creating product:', error);
       res.status(500).json({ error: 'Failed to create product' });
     }

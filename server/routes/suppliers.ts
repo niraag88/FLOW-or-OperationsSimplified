@@ -1,4 +1,5 @@
 import type { Express } from "express";
+import { ZodError } from 'zod';
 import { suppliers, customers, recycleBin } from "@shared/schema";
 import { insertSupplierSchema, insertCustomerSchema } from "@shared/schema";
 import { db } from "../db";
@@ -24,6 +25,9 @@ export function registerSupplierRoutes(app: Express) {
       writeAuditLog({ actor: req.user!.id, actorName: req.user?.username || String(req.user!.id), targetId: String(supplier.id), targetType: 'supplier', action: 'CREATE', details: `Supplier '${supplier.name}' created` });
       res.status(201).json(supplier);
     } catch (error) {
+      if (error instanceof ZodError) {
+        return res.status(400).json({ error: 'Validation failed', details: error.errors });
+      }
       console.error('Error creating supplier:', error);
       res.status(500).json({ error: 'Failed to create supplier' });
     }
@@ -84,6 +88,9 @@ export function registerSupplierRoutes(app: Express) {
       writeAuditLog({ actor: req.user!.id, actorName: req.user?.username || String(req.user!.id), targetId: String(customer.id), targetType: 'customer', action: 'CREATE', details: `Customer '${customer.name}' created` });
       res.status(201).json(customer);
     } catch (error) {
+      if (error instanceof ZodError) {
+        return res.status(400).json({ error: 'Validation failed', details: error.errors });
+      }
       console.error('Error creating customer:', error);
       res.status(500).json({ error: 'Failed to create customer' });
     }

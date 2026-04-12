@@ -58,7 +58,8 @@ export function registerPurchaseOrderRoutes(app: Express) {
       const transformedBody = {
         ...req.body,
         orderDate: req.body.orderDate ? new Date(req.body.orderDate) : undefined,
-        expectedDelivery: req.body.expectedDelivery ? new Date(req.body.expectedDelivery) : undefined
+        expectedDelivery: req.body.expectedDelivery ? new Date(req.body.expectedDelivery) : undefined,
+        fxRateToAed: req.body.fxRateToAed !== undefined ? String(req.body.fxRateToAed) : undefined,
       };
 
       const validatedData = insertPurchaseOrderSchema.parse({
