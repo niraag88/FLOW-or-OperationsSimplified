@@ -5,6 +5,15 @@ import { eq, desc, sql, inArray, and } from "drizzle-orm";
 import { businessStorage } from "../businessStorage";
 import { requireAuth, writeAuditLog, updateProductStock, objectStorageClient, type AuthenticatedRequest } from "../middleware";
 
+class OverReceiveError extends Error {
+  readonly details: string[];
+  constructor(details: string[]) {
+    super('Over-receive not allowed');
+    this.name = 'OverReceiveError';
+    this.details = details;
+  }
+}
+
 export function registerGoodsReceiptRoutes(app: Express) {
   app.get('/api/stock-counts', requireAuth(), async (req: AuthenticatedRequest, res) => {
     try {
@@ -443,18 +452,25 @@ export function registerGoodsReceiptRoutes(app: Express) {
       let allReceived = false;
 
       await db.transaction(async (tx) => {
-        // Lock PO items inside the transaction to prevent concurrent over-receive
+        // Validate inside the transaction so no partial inserts occur on failure.
+        // Lock PO item rows with FOR UPDATE to prevent concurrent over-receive.
         const lockedPoItems = await tx.select({
           id: purchaseOrderItems.id,
           quantity: purchaseOrderItems.quantity,
           receivedQuantity: purchaseOrderItems.receivedQuantity,
           productId: purchaseOrderItems.productId,
-          productName: products.name,
         }).from(purchaseOrderItems)
-          .leftJoin(products, eq(products.id, purchaseOrderItems.productId))
-          .where(eq(purchaseOrderItems.poId, poId));
+          .where(eq(purchaseOrderItems.poId, poId))
+          .for('update');
 
-        const poItemMap = new Map(lockedPoItems.map(i => [i.id, i]));
+        // Fetch product names separately (FOR UPDATE cannot be applied to LEFT JOIN nullable side)
+        const productIds = lockedPoItems.map(i => i.productId).filter((id): id is number => id !== null);
+        const productNames = productIds.length > 0
+          ? await tx.select({ id: products.id, name: products.name }).from(products).where(inArray(products.id, productIds))
+          : [];
+        const productNameMap = new Map(productNames.map(p => [p.id, p.name]));
+
+        const poItemMap = new Map(lockedPoItems.map(i => [i.id, { ...i, productName: productNameMap.get(i.productId!) ?? null }]));
 
         const overReceiveErrors: string[] = [];
         for (const item of items) {
@@ -478,10 +494,7 @@ export function registerGoodsReceiptRoutes(app: Express) {
         }
 
         if (overReceiveErrors.length > 0) {
-          const err = new Error('Over-receive not allowed') as Error & { isOverReceive: boolean; details: string[] };
-          err.isOverReceive = true;
-          err.details = overReceiveErrors;
-          throw err;
+          throw new OverReceiveError(overReceiveErrors);
         }
 
         const [newReceipt] = await tx.insert(goodsReceipts).values({
@@ -543,8 +556,8 @@ export function registerGoodsReceiptRoutes(app: Express) {
         poStatus: (allReceived || forceClose) ? 'closed' : 'submitted',
         message: `Goods receipt ${receipt.receiptNumber} created and stock updated for ${items.filter(i => i.receivedQuantity > 0).length} products`
       });
-    } catch (error: any) {
-      if (error?.isOverReceive) {
+    } catch (error) {
+      if (error instanceof OverReceiveError) {
         return res.status(400).json({ error: 'Over-receive not allowed', details: error.details });
       }
       console.error('Error creating goods receipt:', error);
