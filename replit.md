@@ -125,3 +125,14 @@ The project follows a monorepo layout with separate directories for client, serv
 
 ## Platform Integration
 - **Base44 SDK**: Business operations platform (shimmed for demo mode).
+
+## Dependency Security Notes (Task #256 — last reviewed Apr 2026)
+
+`npm audit` resolved 7 vulnerabilities (6 auto-fixed via `npm audit fix`, 1 manual drizzle-orm upgrade). Remaining accepted/deferred items:
+
+| Package | Severity | Status | Reason |
+|---------|----------|--------|--------|
+| `jspdf` 3.0.2 | Critical | **Deferred** | Fix requires 3.x → 4.x major upgrade. Two code patterns in `export.tsx` carry real format-breakage risk (old `doc.autoTable()` call style on line 90; non-standard `drawHorizontalLine`/`drawVerticalLine` callbacks in PO PDF). Exploitability for internal use is low (requires crafting malicious PDF to attack the *reader*). Planned as a separate task with visual before/after PDF comparison. |
+| `xlsx` 0.18.5 | High | **Accepted** | No upstream fix available. Prototype pollution risk is theoretical — all data written to XLSX comes from our own database, not raw user input. |
+| `@replit/object-storage` chain | Low (×5) | **Accepted** | Vendor dependency via `@google-cloud/storage`. No fix available upstream. Low severity, no workaround. |
+| `vite` / `drizzle-kit` / `esbuild` | Moderate (×5) | **Accepted** | Dev-only tooling — not included in the production runtime bundle. The esbuild CVE (GHSA-67mh-4wv8-2f99) affects the Vite dev server only; fixing it requires Vite 8 (massive breaking change). |
