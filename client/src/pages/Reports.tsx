@@ -235,6 +235,7 @@ export default function Reports() {
             suppliers={data.suppliers}
             companySettings={data.companySettings}
             canExport={!!currentUser}
+            onPaymentUpdated={loadAllData}
           />
         </TabsContent>
         <TabsContent value="statements" className="mt-6">

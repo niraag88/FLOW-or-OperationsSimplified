@@ -333,7 +333,7 @@ function SalesPaymentsSection({ invoices, companySettings, canExport }: { invoic
   );
 }
 
-function PurchasesPaymentsSection({ purchaseOrders, goodsReceipts, suppliers, companySettings, canExport }: { purchaseOrders: Record<string, any>[]; goodsReceipts: Record<string, any>[]; suppliers: Record<string, any>[]; companySettings: Record<string, any> | null; canExport: boolean }) {
+function PurchasesPaymentsSection({ purchaseOrders, goodsReceipts, suppliers, companySettings, canExport, onPaymentUpdated }: { purchaseOrders: Record<string, any>[]; goodsReceipts: Record<string, any>[]; suppliers: Record<string, any>[]; companySettings: Record<string, any> | null; canExport: boolean; onPaymentUpdated?: () => void }) {
   const { toast } = useToast();
   const [paymentFilter, setPaymentFilter] = useState<any>("all");
   const [dateFrom, setDateFrom] = useState("");
@@ -436,6 +436,10 @@ function PurchasesPaymentsSection({ purchaseOrders, goodsReceipts, suppliers, co
 
   const handleSavePayment = useCallback(async (markPaid: boolean) => {
     if (!dialogGrn) return;
+    if (markPaid && !dialogDate) {
+      toast({ title: "Date required", description: "Please enter a payment date.", variant: "destructive" });
+      return;
+    }
     setSaving(true);
     try {
       await apiRequest("PATCH", `/api/goods-receipts/${dialogGrn.id}/payment`, {
@@ -443,15 +447,15 @@ function PurchasesPaymentsSection({ purchaseOrders, goodsReceipts, suppliers, co
         paymentMadeDate: markPaid ? (dialogDate || null) : null,
         paymentRemarks: dialogRemarks || null,
       });
-      await queryClient.invalidateQueries({ queryKey: ['/api/goods-receipts'] });
       toast({ title: markPaid ? "Marked as Paid" : "Marked as Outstanding", description: `${dialogGrn.receiptNumber || dialogGrn.receipt_number} payment updated.` });
       setDialogOpen(false);
+      onPaymentUpdated?.();
     } catch {
       toast({ title: "Error", description: "Failed to update payment.", variant: "destructive" });
     } finally {
       setSaving(false);
     }
-  }, [dialogGrn, dialogDate, dialogRemarks]);
+  }, [dialogGrn, dialogDate, dialogRemarks, onPaymentUpdated]);
 
   const exportData = filtered.map((r: any) => ({
     grn_number: r.receiptNumber || r.receipt_number || "",
@@ -642,9 +646,10 @@ interface PaymentsLedgerProps {
   suppliers: any[];
   companySettings: Record<string, any> | null;
   canExport: boolean;
+  onPaymentUpdated?: () => void;
 }
 
-export default function PaymentsLedger({ invoices, purchaseOrders, goodsReceipts, suppliers, companySettings, canExport }: PaymentsLedgerProps) {
+export default function PaymentsLedger({ invoices, purchaseOrders, goodsReceipts, suppliers, companySettings, canExport, onPaymentUpdated }: PaymentsLedgerProps) {
   return (
     <div className="space-y-4">
       <CollapsibleSection
@@ -670,6 +675,7 @@ export default function PaymentsLedger({ invoices, purchaseOrders, goodsReceipts
           suppliers={suppliers || []}
           companySettings={companySettings}
           canExport={canExport}
+          onPaymentUpdated={onPaymentUpdated}
         />
       </CollapsibleSection>
     </div>
