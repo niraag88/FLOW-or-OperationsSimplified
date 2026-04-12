@@ -332,7 +332,7 @@ export default function Quotations() {
                 </Button>
                 
                 <span className="sm:hidden text-sm text-gray-700">
-                  {currentPage} / {totalPages}
+                  Page {currentPage} of {totalPages}
                 </span>
                 
                 <div className="hidden sm:flex items-center gap-1">

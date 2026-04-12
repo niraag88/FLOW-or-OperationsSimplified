@@ -388,7 +388,7 @@ export default function PurchaseOrders() {
                     </Button>
                     
                     <span className="sm:hidden text-sm text-gray-700">
-                      {currentPage} / {totalPagesPos}
+                      Page {currentPage} of {totalPagesPos}
                     </span>
                     
                     <div className="hidden sm:flex items-center gap-1">
