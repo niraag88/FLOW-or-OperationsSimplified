@@ -49,7 +49,6 @@ export default function POList({ purchaseOrders, totalCount, loading, canEdit, c
   };
 
   const isShortDelivered = (po: any) => {
-    if (po.status !== 'closed') return false;
     const ordered = Number(po.orderedQty) || 0;
     const received = Number(po.receivedQty) || 0;
     return ordered > 0 && received < ordered;

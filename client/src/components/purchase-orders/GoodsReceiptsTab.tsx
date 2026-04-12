@@ -1224,7 +1224,7 @@ export default function GoodsReceiptsTab({
             </div>
             <div className="grid grid-cols-2 gap-4">
               <div className="space-y-2">
-                <Label htmlFor="receive-ref-number">Supplier Invoice Ref (optional)</Label>
+                <Label htmlFor="receive-ref-number">Reference Number (optional)</Label>
                 <Input
                   id="receive-ref-number"
                   type="text"
@@ -1234,7 +1234,7 @@ export default function GoodsReceiptsTab({
                 />
               </div>
               <div className="space-y-2">
-                <Label htmlFor="receive-ref-date">Ref Date (optional)</Label>
+                <Label htmlFor="receive-ref-date">Reference Date (optional)</Label>
                 <Input
                   id="receive-ref-date"
                   type="date"

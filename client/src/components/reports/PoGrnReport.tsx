@@ -253,7 +253,7 @@ export default function PoGrnReport({ purchaseOrders, goodsReceipts, suppliers =
         type: 'Purchase Order',
         document_number: po.poNumber || po.po_number,
         date: formatDate(po.orderDate || po.order_date),
-        supplier: getSupplierName(po.supplierId || po.supplier_id),
+        supplier: po.brandName || getSupplierName(po.supplierId || po.supplier_id) || "—",
         currency: po.currency || 'GBP',
         total_original: originalAmount.toFixed(2),
         total_aed: aedAmount.toFixed(2),
@@ -277,7 +277,7 @@ export default function PoGrnReport({ purchaseOrders, goodsReceipts, suppliers =
         date: formatDate(grn.receivedDate || grn.received_date),
         ref_number: refNum,
         ref_date: refDate ? formatDate(refDate) : "",
-        supplier: getSupplierName(suppId),
+        supplier: linkedPo?.brandName || getSupplierName(suppId) || "—",
         currency: poCurrency,
         total_original: poOriginal.toFixed(2),
         total_aed: poAed.toFixed(2),
@@ -391,9 +391,9 @@ export default function PoGrnReport({ purchaseOrders, goodsReceipts, suppliers =
                 type: 'Type',
                 document_number: 'Document Number',
                 date: 'Date',
-                ref_number: 'Ref No.',
-                ref_date: 'Ref Date',
-                supplier: 'Supplier',
+                ref_number: 'Reference Number',
+                ref_date: 'Reference Date',
+                supplier: 'Brand',
                 currency: 'Currency',
                 total_original: 'Total (original currency)',
                 total_aed: 'Total (AED)',
@@ -520,7 +520,7 @@ export default function PoGrnReport({ purchaseOrders, goodsReceipts, suppliers =
               <TableHeader>
                 <TableRow>
                   <TableHead>PO Number</TableHead>
-                  <TableHead>Supplier</TableHead>
+                  <TableHead>Brand</TableHead>
                   <TableHead>Order Date</TableHead>
                   <TableHead className="text-right">Total (original)</TableHead>
                   <TableHead className="text-right">Total (AED)</TableHead>
@@ -536,7 +536,7 @@ export default function PoGrnReport({ purchaseOrders, goodsReceipts, suppliers =
                   return (
                     <TableRow key={po.id}>
                       <TableCell className="font-medium">{po.poNumber || po.po_number}</TableCell>
-                      <TableCell>{getSupplierName(suppId)}</TableCell>
+                      <TableCell>{po.brandName || getSupplierName(suppId) || "—"}</TableCell>
                       <TableCell>{formatDate(po.orderDate || po.order_date)}</TableCell>
                       <TableCell className="text-right">{formatCurrency(originalAmount, currency)}</TableCell>
                       <TableCell className="text-right">{formatCurrency(aedAmount, 'AED')}</TableCell>
@@ -646,10 +646,10 @@ export default function PoGrnReport({ purchaseOrders, goodsReceipts, suppliers =
               <TableHeader>
                 <TableRow>
                   <TableHead>GRN Number</TableHead>
-                  <TableHead>Supplier</TableHead>
+                  <TableHead>Brand</TableHead>
                   <TableHead>Received Date</TableHead>
-                  <TableHead>Ref No.</TableHead>
-                  <TableHead>Ref Date</TableHead>
+                  <TableHead>Reference Number</TableHead>
+                  <TableHead>Reference Date</TableHead>
                   <TableHead>PO Reference</TableHead>
                   <TableHead className="text-right">Ordered Qty</TableHead>
                   <TableHead className="text-right">Received Qty</TableHead>
@@ -670,7 +670,7 @@ export default function PoGrnReport({ purchaseOrders, goodsReceipts, suppliers =
                   return (
                     <TableRow key={grn.id}>
                       <TableCell className="font-medium">{grn.receiptNumber || grn.receipt_number || `GRN-${grn.id}`}</TableCell>
-                      <TableCell>{getSupplierName(suppId)}</TableCell>
+                      <TableCell>{linkedPo?.brandName || getSupplierName(suppId) || "—"}</TableCell>
                       <TableCell>{formatDate(grn.receivedDate || grn.received_date)}</TableCell>
                       <TableCell className="text-gray-700">{refNum || "—"}</TableCell>
                       <TableCell className="text-gray-600">{refDate ? formatDate(refDate) : "—"}</TableCell>

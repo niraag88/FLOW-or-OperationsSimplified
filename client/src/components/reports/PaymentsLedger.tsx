@@ -363,7 +363,7 @@ function PurchasesPaymentsSection({ purchaseOrders, goodsReceipts, suppliers, co
         const refAmt = parseFloat(grn.referenceAmount || 0);
         const refAed = currency === "AED" ? refAmt : refAmt * rate;
         const ps = (po?.paymentStatus || po?.payment_status || "outstanding").toLowerCase();
-        const supplierName = po?.supplierName || getSupplierName(po?.supplierId || po?.supplier_id || grn.supplierId || grn.supplier_id);
+        const supplierName = po?.brandName || po?.supplierName || getSupplierName(po?.supplierId || po?.supplier_id || grn.supplierId || grn.supplier_id);
         return {
           ...grn,
           _poNumber: po?.poNumber || po?.po_number || `PO-${poId}`,
@@ -426,7 +426,7 @@ function PurchasesPaymentsSection({ purchaseOrders, goodsReceipts, suppliers, co
           dateFrom={dateFrom} setDateFrom={setDateFrom}
           dateTo={dateTo} setDateTo={setDateTo}
           search={search} setSearch={setSearch}
-          searchPlaceholder="Search by GRN #, PO #, supplier or ref…"
+          searchPlaceholder="Search by GRN #, PO #, brand or reference…"
         />
         {canExport && (
           <div className="shrink-0 pt-0.5">
@@ -437,10 +437,10 @@ function PurchasesPaymentsSection({ purchaseOrders, goodsReceipts, suppliers, co
               columns={{
                 grn_number: "GRN #",
                 po_number: "PO #",
-                supplier: "Supplier",
+                supplier: "Brand",
                 received_date: "Received Date",
-                ref_number: "Ref No.",
-                ref_date: "Ref Date",
+                ref_number: "Reference Number",
+                ref_date: "Reference Date",
                 currency: "Currency",
                 ref_amount_orig: "Ref Amount (Original)",
                 ref_amount_aed: "Ref Amount (AED)",
@@ -459,10 +459,10 @@ function PurchasesPaymentsSection({ purchaseOrders, goodsReceipts, suppliers, co
             <TableRow className="bg-gray-50">
               <TableHead className="font-semibold">GRN #</TableHead>
               <TableHead className="font-semibold">PO #</TableHead>
-              <TableHead className="font-semibold">Supplier</TableHead>
+              <TableHead className="font-semibold">Brand</TableHead>
               <TableHead className="font-semibold">Received Date</TableHead>
-              <TableHead className="font-semibold">Ref No.</TableHead>
-              <TableHead className="font-semibold">Ref Date</TableHead>
+              <TableHead className="font-semibold">Reference Number</TableHead>
+              <TableHead className="font-semibold">Reference Date</TableHead>
               <TableHead className="font-semibold text-right">Ref Amount</TableHead>
               <TableHead className="font-semibold">Payment Status</TableHead>
               <TableHead className="font-semibold">Payment Date</TableHead>

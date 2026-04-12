@@ -289,7 +289,7 @@ export default function GoodsReceipts() {
 
                   <div className="grid grid-cols-2 gap-4">
                     <div>
-                      <Label htmlFor="ref-number" className="text-sm font-medium">Supplier Invoice Ref (Optional)</Label>
+                      <Label htmlFor="ref-number" className="text-sm font-medium">Reference Number (Optional)</Label>
                       <Input
                         id="ref-number"
                         type="text"
@@ -300,7 +300,7 @@ export default function GoodsReceipts() {
                       />
                     </div>
                     <div>
-                      <Label htmlFor="ref-date" className="text-sm font-medium">Ref Date (Optional)</Label>
+                      <Label htmlFor="ref-date" className="text-sm font-medium">Reference Date (Optional)</Label>
                       <Input
                         id="ref-date"
                         type="date"
@@ -372,8 +372,8 @@ export default function GoodsReceipts() {
                   <TableHead>Receipt #</TableHead>
                   <TableHead>Purchase Order</TableHead>
                   <TableHead>Received Date</TableHead>
-                  <TableHead>Ref No.</TableHead>
-                  <TableHead>Ref Date</TableHead>
+                  <TableHead>Reference Number</TableHead>
+                  <TableHead>Reference Date</TableHead>
                   <TableHead>Status</TableHead>
                   <TableHead>Notes</TableHead>
                   <TableHead className="w-10"></TableHead>
@@ -467,7 +467,7 @@ export default function GoodsReceipts() {
                         <button
                           onClick={() => startEditRef(receipt)}
                           className="p-1 text-gray-400 hover:text-blue-600 transition-colors"
-                          title="Edit supplier invoice reference"
+                          title="Edit reference"
                         >
                           <Pencil className="w-3.5 h-3.5" />
                         </button>

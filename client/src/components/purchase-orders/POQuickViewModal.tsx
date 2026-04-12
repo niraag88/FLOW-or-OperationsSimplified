@@ -169,9 +169,14 @@ export default function POQuickViewModal({ poId, open, onClose }: POQuickViewMod
       const label = grn.receiptNumber
         ? `GRN ${grn.receiptNumber}`
         : `GRN ${grn.receivedDate ? formatDate(grn.receivedDate) : grn.id}`;
-      if (grn.scanKey1) allDocs.push({ label: `${label} — Document 1`, key: grn.scanKey1 });
-      if (grn.scanKey2) allDocs.push({ label: `${label} — Document 2`, key: grn.scanKey2 });
-      if (grn.scanKey3) allDocs.push({ label: `${label} — Document 3`, key: grn.scanKey3 });
+      const extractFilename = (key: string, fallback: string) => {
+        const last = key.split('/').pop() || '';
+        const stripped = last.replace(/^\d{10,}-/, '');
+        return (stripped && stripped.includes('.')) ? stripped : fallback;
+      };
+      if (grn.scanKey1) allDocs.push({ label: `${label} — ${extractFilename(grn.scanKey1, 'Document 1')}`, key: grn.scanKey1 });
+      if (grn.scanKey2) allDocs.push({ label: `${label} — ${extractFilename(grn.scanKey2, 'Document 2')}`, key: grn.scanKey2 });
+      if (grn.scanKey3) allDocs.push({ label: `${label} — ${extractFilename(grn.scanKey3, 'Document 3')}`, key: grn.scanKey3 });
     }
   }
 
@@ -376,7 +381,7 @@ export default function POQuickViewModal({ poId, open, onClose }: POQuickViewMod
                                   <button
                                     onClick={() => startEditGrn(grn)}
                                     className="p-1 text-gray-400 hover:text-blue-600 transition-colors"
-                                    title="Edit supplier invoice reference"
+                                    title="Edit reference"
                                   >
                                     <Pencil className="w-3.5 h-3.5" />
                                   </button>
@@ -388,7 +393,7 @@ export default function POQuickViewModal({ poId, open, onClose }: POQuickViewMod
                                 <Input
                                   value={editRefNumber}
                                   onChange={(e) => setEditRefNumber(e.target.value)}
-                                  placeholder="Supplier invoice ref"
+                                  placeholder="Reference number"
                                   className="h-7 text-xs w-44"
                                 />
                                 <Input
@@ -406,8 +411,8 @@ export default function POQuickViewModal({ poId, open, onClose }: POQuickViewMod
                               </div>
                             ) : (grn.referenceNumber || grn.referenceDate) ? (
                               <div className="mt-1 flex items-center gap-3 text-xs text-gray-600">
-                                {grn.referenceNumber && <span>Ref: <span className="font-medium">{grn.referenceNumber}</span></span>}
-                                {grn.referenceDate && <span>Date: <span className="font-medium">{formatDate(grn.referenceDate)}</span></span>}
+                                {grn.referenceNumber && <span>Reference: <span className="font-medium">{grn.referenceNumber}</span></span>}
+                                {grn.referenceDate && <span>Reference Date: <span className="font-medium">{formatDate(grn.referenceDate)}</span></span>}
                               </div>
                             ) : null}
                           </div>
