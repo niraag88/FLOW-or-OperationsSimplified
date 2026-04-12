@@ -216,7 +216,9 @@ export default function Layout({ children, currentPageName = "" }: LayoutProps) 
                       <DropdownMenuTrigger asChild>
                         <Button
                           variant="ghost"
-                          onMouseEnter={() => item.items.forEach((sub: any) => sub.preload?.())}
+                          onMouseEnter={() => item.items
+                            .filter((sub: any) => !sub.adminOnly || currentUser?.role === 'Admin')
+                            .forEach((sub: any) => sub.preload?.())}
                           className={`flex items-center gap-2 px-4 py-2 rounded-lg text-sm font-medium transition-all duration-200 ${
                             isActive
                               ? 'bg-emerald-500 text-white shadow-lg'
