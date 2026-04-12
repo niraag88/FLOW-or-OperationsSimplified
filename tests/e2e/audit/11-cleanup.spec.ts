@@ -110,13 +110,13 @@ test.describe('Phase 11 — Cleanup', () => {
     expect(body.length).toBeGreaterThan(10);
   });
 
-  test('generate AUDIT_REPORT.md from run state', async () => {
-    test.info().annotations.push({ type: 'action', description: 'Read /tmp/audit-state.json and write AUDIT_REPORT.md' });
+  test('step 75: generate AUDIT_REPORT.md from run state and Playwright JSON report if available', async () => {
+    test.info().annotations.push({ type: 'action', description: 'Read /tmp/audit-state.json + any playwright-report/results.json; write comprehensive AUDIT_REPORT.md with pass/fail counts and anomalies' });
     const state = loadState();
     const now = new Date().toISOString();
 
-    function pass(condition: boolean, label: string): string {
-      return `| ${label} | ${condition ? 'PASS' : 'FAIL'} |`;
+    function statusRow(condition: boolean, label: string): string {
+      return `| ${label} | ${condition ? '✅ PASS' : '❌ FAIL'} |`;
     }
 
     const brandCount = state.brandIds ? 3 : 0;
@@ -128,28 +128,60 @@ test.describe('Phase 11 — Cleanup', () => {
     const invIds = state.invoiceIds;
     const doIds = state.doIds;
 
-    const rows = [
-      pass(brandCount === 3, `Brand seeding: 3 brands (alpha=${state.brandIds?.alpha ?? 'N/A'})`),
-      pass(productCount >= 15, `Product seeding: ${productCount}/15 products`),
-      pass(customerCount >= 4, `Customer seeding: ${customerCount}/4+ customers`),
-      pass(!!poIds?.po01, `PO-01 created (id=${poIds?.po01 ?? 'N/A'})`),
-      pass(!!poIds?.po02, `PO-02 created (id=${poIds?.po02 ?? 'N/A'})`),
-      pass(!!poIds?.po03, `PO-03 created + cancelled (id=${poIds?.po03 ?? 'N/A'})`),
-      pass(!!grnIds?.grn01, `GRN-01 full receive (id=${grnIds?.grn01 ?? 'N/A'})`),
-      pass(!!grnIds?.grn01b, `GRN-01b partial receive (id=${grnIds?.grn01b ?? 'N/A'})`),
-      pass(!!qtIds?.qt01, `QT-01 (8 items) created (id=${qtIds?.qt01 ?? 'N/A'})`),
-      pass(!!qtIds?.qt02, `QT-02 created + cancelled (id=${qtIds?.qt02 ?? 'N/A'})`),
-      pass(!!qtIds?.qt03, `QT-03 (12 items) created (id=${qtIds?.qt03 ?? 'N/A'})`),
-      pass(!!invIds?.inv01, `INV-01 (6 items → Paid) (id=${invIds?.inv01 ?? 'N/A'})`),
-      pass(!!invIds?.inv02, `INV-02 (1 item → Paid) (id=${invIds?.inv02 ?? 'N/A'})`),
-      pass(!!invIds?.inv03, `INV-03 (10 items → Delivered) (id=${invIds?.inv03 ?? 'N/A'})`),
-      pass(!!invIds?.inv04, `INV-04 (cancelled) (id=${invIds?.inv04 ?? 'N/A'})`),
-      pass(!!doIds?.do01, `DO-01 (delivered) (id=${doIds?.do01 ?? 'N/A'})`),
-      pass(!!doIds?.do02, `DO-02 (cancelled) (id=${doIds?.do02 ?? 'N/A'})`),
+    const entityRows = [
+      statusRow(brandCount === 3, `Brand seeding: 3 brands (alpha=${state.brandIds?.alpha ?? 'N/A'} beta=${state.brandIds?.beta ?? 'N/A'} gamma=${state.brandIds?.gamma ?? 'N/A'})`),
+      statusRow(productCount >= 14, `Product seeding: ${productCount} products (expect ≥14 after 1 deletion test)`),
+      statusRow(customerCount >= 5, `Customer seeding: ${customerCount} customers (all 5 via browser form)`),
+      statusRow(!!poIds?.po01, `PO-01 created: Alpha Brand, 5 items, GBP (id=${poIds?.po01 ?? 'N/A'})`),
+      statusRow(!!poIds?.po02, `PO-02 created: Beta Supplies, 2 items, AED (id=${poIds?.po02 ?? 'N/A'})`),
+      statusRow(!!poIds?.po03, `PO-03 created: Gamma Imports, 3 items, draft→cancelled (id=${poIds?.po03 ?? 'N/A'})`),
+      statusRow(!!grnIds?.grn01, `GRN-01: PO-01 full receive + reference INV-ALPHA-001 (id=${grnIds?.grn01 ?? 'N/A'})`),
+      statusRow(!!grnIds?.grn01b, `GRN-01b: PO-02 partial receive (id=${grnIds?.grn01b ?? 'N/A'})`),
+      statusRow(!!grnIds?.grn02, `GRN-02: PO-02 second receive → close (id=${grnIds?.grn02 ?? 'N/A'})`),
+      statusRow(!!qtIds?.qt01, `QT-01: Customer 1, 8 items, remarks (id=${qtIds?.qt01 ?? 'N/A'})`),
+      statusRow(!!qtIds?.qt02, `QT-02: Customer 1, 1 item, cancelled (id=${qtIds?.qt02 ?? 'N/A'})`),
+      statusRow(!!qtIds?.qt03, `QT-03: Customer 2, 12 items (id=${qtIds?.qt03 ?? 'N/A'})`),
+      statusRow(!!invIds?.inv01, `INV-01: Customer 1, 6 items, → Paid (id=${invIds?.inv01 ?? 'N/A'})`),
+      statusRow(!!invIds?.inv02, `INV-02: Customer 2, 1 item, → Paid (id=${invIds?.inv02 ?? 'N/A'})`),
+      statusRow(!!invIds?.inv03, `INV-03: Customer 3, 10 items, → Delivered (id=${invIds?.inv03 ?? 'N/A'})`),
+      statusRow(!!invIds?.inv04, `INV-04: Customer 1, 3 items, → Cancelled (id=${invIds?.inv04 ?? 'N/A'})`),
+      statusRow(!!doIds?.do01, `DO-01: from INV-01, → Delivered (id=${doIds?.do01 ?? 'N/A'})`),
+      statusRow(!!doIds?.do02, `DO-02: manual, → Cancelled (id=${doIds?.do02 ?? 'N/A'})`),
     ];
 
-    const passCount = rows.filter((r) => r.includes('| PASS |')).length;
-    const failCount = rows.filter((r) => r.includes('| FAIL |')).length;
+    const entityPass = entityRows.filter((r) => r.includes('✅ PASS')).length;
+    const entityFail = entityRows.filter((r) => r.includes('❌ FAIL')).length;
+
+    let pwJsonSection = '';
+    const jsonReportPaths = [
+      'playwright-report/results.json',
+      'test-results/results.json',
+      '/tmp/playwright-results.json',
+    ];
+    for (const rp of jsonReportPaths) {
+      if (fs.existsSync(rp)) {
+        try {
+          const raw = JSON.parse(fs.readFileSync(rp, 'utf-8')) as { suites?: unknown[]; stats?: { expected?: number; unexpected?: number; passed?: number; failed?: number; } };
+          const stats = raw.stats ?? {};
+          const totalPassed = stats.expected ?? stats.passed ?? 'N/A';
+          const totalFailed = stats.unexpected ?? stats.failed ?? 'N/A';
+          pwJsonSection = `\n## Playwright Run Results (from ${rp})\n\n| Metric | Value |\n|--------|-------|\n| Tests Passed | ${totalPassed} |\n| Tests Failed | ${totalFailed} |\n`;
+          test.info().annotations.push({ type: 'result', description: `Playwright JSON found at ${rp}: passed=${totalPassed} failed=${totalFailed}` });
+          break;
+        } catch (_) {
+          test.info().annotations.push({ type: 'issue', description: `Could not parse Playwright JSON at ${rp}` });
+        }
+      }
+    }
+
+    const anomalies: string[] = [];
+    if (entityFail > 0) {
+      anomalies.push(`${entityFail} entity lifecycle checks FAILED (see Entity Lifecycle table above)`);
+    }
+    const unusedStateKeys = ['poIds', 'grnIds', 'quotationIds', 'invoiceIds', 'doIds'] as const;
+    for (const k of unusedStateKeys) {
+      if (!state[k]) anomalies.push(`State key "${k}" missing — phase that creates it may have failed`);
+    }
 
     const reportPath = path.join('tests/e2e/audit', 'AUDIT_REPORT.md');
     const report = [
@@ -158,44 +190,47 @@ test.describe('Phase 11 — Cleanup', () => {
       `**Generated:** ${now}`,
       `**Base URL:** ${BASE_URL}`,
       `**Suite:** tests/e2e/audit/ (Phases 00–11)`,
-      `**Entity Lifecycle Results:** ${passCount} PASS / ${failCount} FAIL`,
-      '',
-      '## Entity Lifecycle Results (from run state)',
+      `**Entity Check Results:** ${entityPass} PASS / ${entityFail} FAIL`,
+      pwJsonSection,
+      '## Entity Lifecycle Results',
+      '(Derived from /tmp/audit-state.json — records created during the run)',
       '',
       '| Entity / Action | Status |',
       '|-----------------|--------|',
-      ...rows,
+      ...entityRows,
       '',
       '## Phase Test Coverage',
       '',
-      '| Phase | Spec | Key Browser Assertions | Key API Verifications |',
-      '|-------|------|------------------------|----------------------|',
-      '| 0 | 00-reset-and-company | Login form, Settings edit form (company_name TRN email), logo upload, TRN persists | Anon reset=403, DB reset=200, idempotent=200 |',
-      '| 1 | 01-user-management | Browser form login with new password, users page renders | 3 users created, roles verified, password change, deactivate/reactivate login |',
-      '| 2 | 02-catalog-setup | Inventory page shows Audit Products, search filter, Add Product form opens | 3 brands + 15 products seeded (e2e_test) |',
-      '| 3 | 03-customers | Customer list shows names, New Customer browser form, search filter | 4 API + 1 browser created, email edit persists |',
-      '| 4 | 04-purchase-orders | PO list, New PO form, PO-01 submit via browser, statuses in list, PO print page | GRN full+partial, payment paid, status=closed |',
-      '| 5 | 05-quotations | QT list, New QT form, QT-01 submit via browser, statuses, export button, print ×2 | QT-01 8 items, QT-03 12 items, cancel QT-02 |',
-      '| 6 | 06-invoices | Invoice list, New Invoice + Create from Existing, INV-01 submit via browser, PAID+OUTSTANDING badges, print ×2, payments page | 6+1+10+3 items, lifecycle ×4, payment_status=paid |',
-      '| 7 | 07-delivery-orders | DO list, New DO form, DO-01 deliver via browser, delivered+cancelled in list | DO-01 3 items+delivered, DO-02 cancelled |',
-      '| 8 | 08-inventory | Inventory page shows audit products, non-zero stock in browser | Stock > 0 post-GRN, stock movements, stock count |',
-      '| 9 | 09-documents-and-exports | INV print (company, TRN, items, VAT), INV-03, PO, QT ×2 print views, export button, download event, viewer access | — |',
-      '| 10 | 10-system-audit | Settings page renders | Audit log FACTORY_RESET + diverse, recycle bin soft-delete + perm delete |',
-      '| 11 | 11-cleanup | Browser login post-cleanup | Script ran, 0 e2e_test records, admin login OK |',
+      '| Phase | Spec | Primary Browser Assertions | API Verifications |',
+      '|-------|------|----------------------------|-------------------|',
+      '| 0 | 00-reset-and-company | Factory reset → login form → Settings company edit form (company_name, TRN, email, logo upload) → verify TRN persists on page | POST /api/ops/factory-reset (admin=200, anon=403), idempotent=200 |',
+      '| 1 | 01-user-management | 3 users created via /user-management browser form (data-testid selectors) → manager password change edit form → browser login with new password → viewer deactivate toggle → reactivate toggle | Old password=401, deactivated login=401/403, reactivated login=200 |',
+      '| 2 | 02-catalog-setup | /Inventory page shows products → search filter → brand filter popover → size filter popover → pagination total ≥15 → product edit via /products/:id/edit page → delete product with no history | 3 brands + 15 products seeded via API (dataSource=e2e_test) |',
+      '| 3 | 03-customers | All 5 customers created via Settings → Customers browser form → search filter → edit Customer 1 paymentTerms → verify persists after page reload | customerIds tagged e2e_test via PUT |',
+      '| 4 | 04-purchase-orders | PO list renders → New PO form → PO-01 submit via detail page browser button → GRN forms → payment dialogs → PO print view → CSV export download | GRN full/partial/close, payment paid, PO status=closed/submitted |',
+      '| 5 | 05-quotations | QT list renders → New QT form → QT-01 submit via browser → QT-02 cancelled (API, no browser cancel button for QTs) → cancelled QT shows "cancelled" badge → export download → QT print views ×2 → convert to invoice attempt | QT statuses, 8+12 items confirmed |',
+      '| 6 | 06-invoices | Invoice list renders → INV-01 submit via browser → INV-04 cancel via browser actions dropdown (Cancel Invoice → Yes Cancel) → PAID/OUTSTANDING badges → invoice print views ×2 → payments ledger | Lifecycle: submit/deliver/pay via API (no dedicated browser submit button in INV actions); cancel confirmed |',
+      '| 7 | 07-delivery-orders | DO list renders → New DO form → DO-01 created from INV-01 → DO-01 delivered via browser → DO-02 cancelled (API, no browser cancel in DOForm status dropdown) → DO list shows delivered/cancelled → DO print view → export download | DO status propagation to invoice |',
+      '| 8 | 08-inventory | /Inventory stock quantities visible → stock > 0 products → stock count form → stock movements tab | CSV export download |',
+      '| 9 | 09-documents-and-exports | INV print ×2 (company name, TRN, AED, VAT) → PO print → QT print ×2 → DO print → Invoices/QTs/POs CSV export download → Inventory PDF export → Viewer role: print view accessible + Edit/New buttons hidden on /Invoices | — |',
+      '| 10 | 10-system-audit | /Settings renders → audit log: FACTORY_RESET entry present + diverse actions → PO soft-delete via actions dropdown browser flow → verify in recycle bin → restore via API → restored PO in list → second PO soft-delete + permanent delete | Audit log entries, recycle bin state |',
+      '| 11 | 11-cleanup | delete-dummy-data script ran → 0 e2e_test products/customers/brands → admin login OK → browser renders after cleanup | All e2e_test records removed |',
+      '',
+      anomalies.length > 0 ? '## Anomalies Found\n\n' + anomalies.map((a) => `- ⚠️ ${a}`).join('\n') + '\n' : '## Anomalies\n\nNone detected.',
       '',
       '## Notes',
       '',
-      '- Master data (brands, products, customers) tagged `dataSource=e2e_test` for deterministic cleanup.',
-      '- Transactional documents (POs, GRNs, Invoices, QTs, DOs) have no dataSource field in schema.',
-      '  These are cleaned by the next factory reset.',
-      '- Browser-driven status transitions: PO-01 Submit, QT-01 Send, INV-01 Submit, DO-01 Deliver.',
-      '- All print views verify content length > 200 chars and key strings (company name, TRN, customer name, AED/VAT).',
-      '- Export test asserts a real `download` event from the Invoices page export button.',
+      '- Master data (brands, products, customers) tagged `dataSource=e2e_test` for deterministic cleanup via scripts/delete-dummy-data.ts.',
+      '- Transactional documents (POs, GRNs, Invoices, QTs, DOs) have no dataSource field in schema — cleaned by next factory reset.',
+      '- UI gap documented: Quotations has no browser Cancel button (status dropdown only has Draft); Delivery Orders has no browser Cancel button in DOForm.',
+      '- Viewer role: Edit/New buttons hidden on /Invoices confirmed by test 9.14.',
+      '- All print views verify: body length > 200, company name "Audit Test Co", TRN "100123456700003", AED/VAT strings.',
+      '- Export tests assert a real Playwright `download` event fires when clicking export buttons.',
     ].join('\n');
 
     fs.writeFileSync(reportPath, report, 'utf-8');
     const written = fs.readFileSync(reportPath, 'utf-8');
-    test.info().annotations.push({ type: 'result', description: `AUDIT_REPORT.md: ${passCount} PASS / ${failCount} FAIL; length=${written.length}` });
+    test.info().annotations.push({ type: 'result', description: `AUDIT_REPORT.md written: entity ${entityPass} PASS / ${entityFail} FAIL; total length=${written.length}; anomalies=${anomalies.length}` });
     expect(fs.existsSync(reportPath)).toBe(true);
     expect(written.length).toBeGreaterThan(1000);
   });

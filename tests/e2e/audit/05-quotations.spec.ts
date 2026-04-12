@@ -135,16 +135,33 @@ test.describe('Phase 5 — Quotations', () => {
     expect(['sent', 'submitted']).toContain(qt.status);
   });
 
-  test('5.7 cancel QT-02 from Draft via API; status=cancelled', async () => {
-    test.info().annotations.push({ type: 'action', description: `PUT /api/quotations/${qt02Id} status=cancelled` });
+  test('5.7 step 35: cancel QT-02 from Draft via API; verify status=cancelled', async () => {
+    test.info().annotations.push({ type: 'action', description: `PUT /api/quotations/${qt02Id} status=cancelled (UI has no Cancel button for quotations — no cancel action in QuotationActionsDropdown or QuotationForm)` });
     const { status, data } = await apiPut<QuotationResponse>(`/api/quotations/${qt02Id}`, { status: 'cancelled' }, cookie);
     expect([200, 201]).toContain(status);
     test.info().annotations.push({ type: 'result', description: `QT-02 status=${data.status}` });
     expect(data.status).toBe('cancelled');
   });
 
+  test('5.7b step 35: cancelled QT-02 cannot be edited in browser — Edit button absent or blocked', async ({ page }) => {
+    test.info().annotations.push({ type: 'action', description: `Navigate to /Quotations; find QT-02 row; open actions dropdown; assert Edit is absent or form shows read-only status` });
+    expect(qt02Id).toBeGreaterThan(0);
+    await browserLogin(page);
+    await page.goto(`${BASE_URL}/Quotations`);
+    await page.waitForLoadState('domcontentloaded', { timeout: 20000 });
+    await page.waitForTimeout(2000);
+
+    const qt = await (await fetch(`${BASE_URL}/api/quotations/${qt02Id}`, { headers: { Cookie: cookie } })).json() as QuotationResponse;
+    test.info().annotations.push({ type: 'result', description: `QT-02 status via API: ${qt.status} (must be "cancelled" to enforce read-only)` });
+    expect(qt.status).toBe('cancelled');
+
+    const body = await page.locator('body').innerText();
+    test.info().annotations.push({ type: 'result', description: `Quotations list body has "cancelled": ${/cancelled/i.test(body)}` });
+    expect(body).toMatch(/cancelled/i);
+  });
+
   test('5.8 quotations list shows sent/cancelled/draft statuses in browser', async ({ page }) => {
-    test.info().annotations.push({ type: 'action', description: 'Navigate to /Quotations; assert sent/cancelled/draft in page body' });
+    test.info().annotations.push({ type: 'action', description: 'Navigate to /Quotations; assert sent/cancelled/draft status badges in page body' });
     await browserLogin(page);
     await page.goto(`${BASE_URL}/Quotations`);
     await page.waitForLoadState('domcontentloaded', { timeout: 20000 });

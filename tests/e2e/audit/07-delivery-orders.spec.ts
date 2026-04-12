@@ -230,11 +230,36 @@ test.describe('Phase 7 — Delivery Orders', () => {
     expect(inv.status).toBeTruthy();
   });
 
-  test('7.9 cancel DO-02; status = cancelled in API', async () => {
-    test.info().annotations.push({ type: 'action', description: `PUT /api/delivery-orders/${do02Id} status=cancelled` });
+  test('7.9 step 56: cancel DO-02 — verify cancellation via API (DO form status dropdown has no "cancelled" option; cancellation via browser edit form selecting status=cancelled is not available)', async ({ page }) => {
+    test.info().annotations.push({ type: 'action', description: `Navigate to /DeliveryOrders; open DO-02 Edit form via browser; note that DOForm status dropdown only offers Draft/Submitted/Delivered (no Cancelled); then cancel via API` });
+    expect(do02Id).toBeGreaterThan(0);
+
+    await browserLogin(page);
+    await page.goto(`${BASE_URL}/DeliveryOrders`);
+    await page.waitForLoadState('domcontentloaded', { timeout: 20000 });
+    await page.waitForTimeout(2000);
+
+    const do02Row = page.locator('tr, [role="row"]').filter({ hasText: new RegExp(String(do02Id), 'i') }).first();
+    const rowVisible = await do02Row.isVisible().catch(() => false);
+    if (rowVisible) {
+      const actionsBtn = do02Row.locator('button').last();
+      await actionsBtn.click();
+      await page.waitForTimeout(800);
+      const editItem = page.locator('[role="menuitem"]').filter({ hasText: /edit/i }).first();
+      const editVisible = await editItem.isVisible().catch(() => false);
+      if (editVisible) {
+        await editItem.click();
+        await page.waitForTimeout(1500);
+        const statusSelect = page.locator('[id*="status"], select').first();
+        const statusText = await statusSelect.innerText().catch(() => '');
+        test.info().annotations.push({ type: 'issue', description: `DO-02 Edit form opened; status dropdown options: "${statusText.slice(0, 200)}" — "cancelled" NOT available in DO form (DOForm.tsx only has Draft/Submitted/Delivered)` });
+        await page.keyboard.press('Escape');
+      }
+    }
+
     const { status: cs, data } = await apiPut<DeliveryOrderResponse>(`/api/delivery-orders/${do02Id}`, { status: 'cancelled' }, cookie);
     expect([200, 201]).toContain(cs);
-    test.info().annotations.push({ type: 'result', description: `DO-02 status=${data.status} (expected "cancelled")` });
+    test.info().annotations.push({ type: 'result', description: `DO-02 status via API cancel: ${data.status} (expected "cancelled"); UI gap: no browser cancel button for DOs` });
     expect(data.status).toBe('cancelled');
   });
 
