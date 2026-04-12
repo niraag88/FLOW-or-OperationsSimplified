@@ -1124,8 +1124,11 @@ export const exportStatementToXLSX = ({ type, entity, companySettings, records, 
       ]);
     });
   } else {
-    rows.push(["#", "GRN #", "PO #", "Brand", "Reference No.", "Reference Date", "Amount (AED)", "Status", "Payment Date", "Remarks"]);
+    rows.push(["#", "GRN #", "PO #", "Brand", "Reference No.", "Reference Date", "Amount", "Status", "Payment Date", "Remarks"]);
     records.forEach((r: any, i: any) => {
+      const amt = r._currency && r._currency !== "AED"
+        ? `${r._currency} ${fmtAmt(r._origAmount)}`
+        : `AED ${fmtAmt(r._origAmount)}`;
       rows.push([
         i + 1,
         r._ref,
@@ -1133,7 +1136,7 @@ export const exportStatementToXLSX = ({ type, entity, companySettings, records, 
         r._brand || "—",
         r._refNo || "—",
         r._refDate ? fmtD(r._refDate) : "—",
-        `AED ${fmtAmt(r._aed)}`,
+        amt,
         r._paymentStatus === "paid" ? "Paid" : "Outstanding",
         fmtD(r._paymentDate),
         r._remarks || "",
