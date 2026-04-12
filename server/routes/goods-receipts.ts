@@ -410,7 +410,7 @@ export function registerGoodsReceiptRoutes(app: Express) {
         targetId: String(id),
         targetType: 'goods_receipt',
         action: 'UPDATE',
-        details: `GRN ${current.receiptNumber} payment updated: status="${paymentStatus || current.paymentStatus}" date="${paymentMadeDate || ''}" (was status="${current.paymentStatus}" date="${current.paymentMadeDate || ''}")`,
+        details: `GRN ${current.receiptNumber} payment updated: status="${updated.paymentStatus || 'outstanding'}" date="${updated.paymentMadeDate || ''}" remarks="${updated.paymentRemarks || ''}" (was status="${current.paymentStatus || 'inherited'}" date="${current.paymentMadeDate || ''}" remarks="${current.paymentRemarks || ''}")`,
       });
 
       res.json(updated);

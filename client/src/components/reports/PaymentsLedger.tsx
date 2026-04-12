@@ -376,17 +376,17 @@ function PurchasesPaymentsSection({ purchaseOrders, goodsReceipts, suppliers, co
         const refAed = currency === "AED" ? refAmt : refAmt * rate;
         const supplierName = po?.brandName || po?.supplierName || getSupplierName(po?.supplierId || po?.supplier_id || grn.supplierId || grn.supplier_id);
 
-        const grnPs = grn.paymentStatus || grn.payment_status;
-        const poPs = po?.paymentStatus || po?.payment_status;
-        const ps = (grnPs || poPs || "outstanding").toLowerCase();
+        const grnPs = grn.paymentStatus || grn.payment_status || null;
+        const poPs = (po?.paymentStatus || po?.payment_status || "outstanding").toLowerCase();
+        const ps = grnPs ? grnPs.toLowerCase() : poPs;
 
-        const grnPayDate = grn.paymentMadeDate || grn.payment_made_date;
-        const poPayDate = po?.paymentMadeDate || po?.payment_made_date;
-        const payDate = grnPayDate || (ps === "paid" ? poPayDate : "") || "";
+        const grnPayDate = grn.paymentMadeDate || grn.payment_made_date || null;
+        const poPayDate = po?.paymentMadeDate || po?.payment_made_date || null;
+        const payDate = grnPayDate || (grnPs === null && ps === "paid" ? poPayDate : null) || "";
 
-        const grnRemarks = grn.paymentRemarks || grn.payment_remarks;
-        const poRemarks = po?.paymentRemarks || po?.payment_remarks;
-        const remarks = grnRemarks || (ps === "paid" ? poRemarks : "") || "";
+        const grnRemarks = grn.paymentRemarks || grn.payment_remarks || null;
+        const poRemarks = po?.paymentRemarks || po?.payment_remarks || null;
+        const remarks = grnRemarks || (grnPs === null && ps === "paid" ? poRemarks : null) || "";
 
         return {
           ...grn,
