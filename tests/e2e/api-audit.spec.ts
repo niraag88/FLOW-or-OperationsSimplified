@@ -576,8 +576,41 @@ test.describe('Products', () => {
     const result = data as { created?: number };
     expect(result.created).toBe(1);
     note('Bulk import endpoint is POST /api/products/bulk (not /api/products/bulk-import)');
-    bug('Bulk import SKU validation rejects hyphens — /^[A-Za-z0-9]{1,50}$/ disallows common SKU formats like "BULK-001"');
-    test.info().annotations.push({ type: 'BUG', description: 'Bulk import SKU regex /^[A-Za-z0-9]{1,50}$/ rejects hyphenated SKUs (e.g. BULK-001), limiting import compatibility.' });
+  });
+
+  test('POST /api/products/bulk import with hyphenated SKU → documents validation behaviour', async () => {
+    if (!IDs.brand) return;
+    const brandResp = await api('GET', '/api/brands', adminCookie);
+    const brands = brandResp.data as Array<{ id: number; name: string }>;
+    const auditBrand = brands.find(b => b.name === 'AuditBrand_Primary_Updated') ?? brands.find(b => b.name?.startsWith('AuditBrand_'));
+    if (!auditBrand) return;
+    const { status, data } = await api('POST', '/api/products/bulk', adminCookie, {
+      rows: [
+        {
+          brandName: auditBrand.name,
+          productCode: 'BULK-HYP-001',
+          productName: 'Bulk Hyphen SKU Test',
+          salePrice: '5.00',
+          purchasePrice: '2.00',
+          purchasePriceCurrency: 'AED',
+        },
+      ],
+    });
+    const result = data as { created?: number; errors?: unknown[]; failed?: number };
+    if (status === 200 || status === 201) {
+      if ((result.created ?? 0) === 0 || (result.failed ?? 0) > 0) {
+        bug('POST /api/products/bulk: hyphenated productCode "BULK-HYP-001" was rejected — /^[A-Za-z0-9]{1,50}$/ disallows hyphens in SKUs');
+        test.info().annotations.push({ type: 'BUG', description: 'Bulk import SKU regex /^[A-Za-z0-9]{1,50}$/ rejects hyphenated SKUs (e.g. BULK-HYP-001), limiting import compatibility for real-world SKU formats.' });
+      } else {
+        note('POST /api/products/bulk: hyphenated SKU "BULK-HYP-001" was accepted ✓');
+        const bulkHypId = (data as { ids?: number[] }).ids?.[0];
+        if (bulkHypId) await api('DELETE', `/api/products/${bulkHypId}`, adminCookie);
+      }
+    } else {
+      bug(`POST /api/products/bulk: hyphenated productCode "BULK-HYP-001" returned ${status} — SKUs with hyphens are rejected`);
+      test.info().annotations.push({ type: 'BUG', description: `Bulk import with hyphenated SKU returns ${status}. Common real-world SKUs use hyphens; the strict regex /^[A-Za-z0-9]{1,50}$/ is too restrictive.` });
+    }
+    expect([200, 201, 400]).toContain(status);
   });
 
   test('POST /api/products/bulk import with empty rows → 400', async () => {
@@ -1693,6 +1726,19 @@ test.describe('Cleanup', () => {
   test('delete test supplier', async () => {
     if (!IDs.supplier) return;
     await api('DELETE', `/api/suppliers/${IDs.supplier}`, adminCookie);
+  });
+
+  test('POST /api/ops/factory-reset by Admin → 200 (run last, after all test data is cleaned up)', async () => {
+    const { status, data } = await api('POST', '/api/ops/factory-reset', adminCookie);
+    if (status === 200) {
+      const result = data as { ok?: boolean; message?: string };
+      expect(result.ok).toBe(true);
+      note('POST /api/ops/factory-reset Admin → 200: factory reset succeeded after test data cleanup');
+    } else {
+      bug(`POST /api/ops/factory-reset Admin → ${status} (expected 200; check server logs for factory reset failure)`);
+      test.info().annotations.push({ type: 'BUG', description: `Factory reset returned ${status} instead of 200 for Admin user.` });
+    }
+    expect(status).toBe(200);
   });
 
   test('print audit summary', async () => {
