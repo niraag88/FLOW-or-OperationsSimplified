@@ -36,7 +36,8 @@ const navigationItems: any[] = [
     title: "Dashboard",
     url: createPageUrl("Dashboard"),
     icon: LayoutDashboard,
-    type: "single"
+    type: "single",
+    preload: () => import("@/pages/Dashboard"),
   },
   {
     title: "Internal",
@@ -47,16 +48,19 @@ const navigationItems: any[] = [
         title: "Inventory",
         url: createPageUrl("Inventory"),
         icon: Package,
+        preload: () => import("@/pages/Inventory"),
       },
       {
         title: "Purchase Orders",
         url: createPageUrl("Purchase Orders"),
         icon: ShoppingCart,
+        preload: () => import("@/pages/PurchaseOrders"),
       },
       {
         title: "Reports",
         url: createPageUrl("Reports"),
         icon: BarChart3,
+        preload: () => import("@/pages/Reports"),
       }
     ]
   },
@@ -69,16 +73,19 @@ const navigationItems: any[] = [
         title: "Quotations",
         url: createPageUrl("Quotations"),
         icon: ClipboardList,
+        preload: () => import("@/pages/Quotations"),
       },
       {
         title: "Invoices",
         url: createPageUrl("Invoices"),
         icon: FileText,
+        preload: () => import("@/pages/Invoices"),
       },
       {
         title: "Delivery Orders",
         url: createPageUrl("Delivery Orders"),
         icon: Truck,
+        preload: () => import("@/pages/DeliveryOrders"),
       }
     ]
   },
@@ -91,12 +98,14 @@ const navigationItems: any[] = [
         title: "General Settings",
         url: createPageUrl("Settings"),
         icon: Settings,
+        preload: () => import("@/pages/Settings"),
       },
       {
         title: "User Management",
         url: createPageUrl("User Management"),
         icon: Users2,
-        adminOnly: true
+        adminOnly: true,
+        preload: () => import("@/pages/UserManagement"),
       }
     ]
   },
@@ -190,6 +199,7 @@ export default function Layout({ children, currentPageName = "" }: LayoutProps) 
                     <Link
                       key={item.title}
                       to={item.url}
+                      onMouseEnter={() => item.preload?.()}
                       className={`flex items-center gap-2 px-4 py-2 rounded-lg text-sm font-medium transition-all duration-200 ${
                         isActive
                           ? 'bg-emerald-500 text-white shadow-lg'
@@ -206,6 +216,7 @@ export default function Layout({ children, currentPageName = "" }: LayoutProps) 
                       <DropdownMenuTrigger asChild>
                         <Button
                           variant="ghost"
+                          onMouseEnter={() => item.items.forEach((sub: any) => sub.preload?.())}
                           className={`flex items-center gap-2 px-4 py-2 rounded-lg text-sm font-medium transition-all duration-200 ${
                             isActive
                               ? 'bg-emerald-500 text-white shadow-lg'
@@ -224,6 +235,7 @@ export default function Layout({ children, currentPageName = "" }: LayoutProps) 
                           <DropdownMenuItem key={subItem.title} asChild>
                             <Link
                               to={subItem.url}
+                              onMouseEnter={() => subItem.preload?.()}
                               className="flex items-center gap-2 cursor-pointer"
                             >
                               <subItem.icon className="w-4 h-4" />
@@ -283,6 +295,7 @@ export default function Layout({ children, currentPageName = "" }: LayoutProps) 
                       key={item.title}
                       to={item.url}
                       onClick={() => setMobileMenuOpen(false)}
+                      onMouseEnter={() => item.preload?.()}
                       className={`flex items-center gap-3 px-3 py-3 rounded-lg text-sm font-medium transition-all duration-200 ${
                         isActive
                           ? 'bg-emerald-500 text-white'
@@ -309,6 +322,7 @@ export default function Layout({ children, currentPageName = "" }: LayoutProps) 
                             key={subItem.title}
                             to={subItem.url}
                             onClick={() => setMobileMenuOpen(false)}
+                            onMouseEnter={() => subItem.preload?.()}
                             className={`flex items-center gap-3 px-6 py-2 rounded-lg text-sm transition-all duration-200 ${
                               isActive
                                 ? 'bg-emerald-500 text-white'
