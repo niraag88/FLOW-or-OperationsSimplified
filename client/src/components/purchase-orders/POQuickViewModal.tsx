@@ -174,9 +174,9 @@ export default function POQuickViewModal({ poId, open, onClose }: POQuickViewMod
         const stripped = last.replace(/^\d{10,}-/, '');
         return (stripped && stripped.includes('.')) ? stripped : fallback;
       };
-      if (grn.scanKey1) allDocs.push({ label: extractFilename(grn.scanKey1, `${label} — Document 1`), key: grn.scanKey1 });
-      if (grn.scanKey2) allDocs.push({ label: extractFilename(grn.scanKey2, `${label} — Document 2`), key: grn.scanKey2 });
-      if (grn.scanKey3) allDocs.push({ label: extractFilename(grn.scanKey3, `${label} — Document 3`), key: grn.scanKey3 });
+      if (grn.scanKey1) allDocs.push({ label: extractFilename(grn.scanKey1, 'Document 1'), key: grn.scanKey1 });
+      if (grn.scanKey2) allDocs.push({ label: extractFilename(grn.scanKey2, 'Document 2'), key: grn.scanKey2 });
+      if (grn.scanKey3) allDocs.push({ label: extractFilename(grn.scanKey3, 'Document 3'), key: grn.scanKey3 });
     }
   }
 
