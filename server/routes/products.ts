@@ -1,6 +1,6 @@
 import type { Express } from "express";
 import ExcelJS from 'exceljs';
-import { products, recycleBin, stockMovements, brands as brandsTable, purchaseOrderItems } from "@shared/schema";
+import { products, recycleBin, stockMovements, brands as brandsTable } from "@shared/schema";
 import { insertBrandSchema, insertProductSchema } from "@shared/schema";
 import { db } from "../db";
 import { eq, sql } from "drizzle-orm";
@@ -55,7 +55,6 @@ export function registerProductRoutes(app: Express) {
       for (const prod of brandProducts) {
         if (!prod.isActive) {
           await db.delete(stockMovements).where(eq(stockMovements.productId, prod.id));
-          await db.delete(purchaseOrderItems).where(eq(purchaseOrderItems.productId, prod.id));
           await db.delete(products).where(eq(products.id, prod.id));
         }
       }

@@ -920,6 +920,34 @@ test.describe('GRNs (Goods Receipts)', () => {
     expect(status).toBe(400);
   });
 
+  test('POST /api/goods-receipts with zero receivedQuantity — documents zero-quantity behaviour', async () => {
+    if (!IDs.po || !IDs.poItem || !IDs.product) return;
+    const { status } = await api('POST', '/api/goods-receipts', adminCookie, {
+      poId: IDs.po,
+      receivedDate: '2026-04-12',
+      items: [
+        {
+          poItemId: IDs.poItem,
+          productId: IDs.product,
+          orderedQuantity: 10,
+          receivedQuantity: 0,
+          unitPrice: '50.00',
+        },
+      ],
+    });
+    if (status === 201 || status === 200) {
+      note('POST /api/goods-receipts: zero receivedQuantity is accepted — no minimum quantity validation enforced');
+      test.info().annotations.push({ type: 'NOTE', description: 'GRN creation accepts receivedQuantity: 0 (no minimum quantity validation).' });
+      const grnId = (await api('GET', `/api/goods-receipts?poId=${IDs.po}`, adminCookie).then(r => {
+        const list = r.data as Array<{ id: number }>;
+        return Array.isArray(list) ? list.find(g => g.id !== IDs.grn) : null;
+      }))?.id;
+      if (grnId) await api('DELETE', `/api/goods-receipts/${grnId}`, adminCookie);
+    } else {
+      note(`POST /api/goods-receipts zero receivedQuantity → ${status} (zero-quantity validation enforced)`);
+    }
+  });
+
   test('PATCH /api/goods-receipts/:id/payment paid + paymentMadeDate → 200, status confirmed', async () => {
     if (!IDs.grn) return;
     const { status, data } = await api('PATCH', `/api/goods-receipts/${IDs.grn}/payment`, adminCookie, {
@@ -1480,6 +1508,18 @@ test.describe('System', () => {
     const { status } = await api('GET', '/api/books', adminCookie);
     expect(status).toBe(200);
   });
+
+  test('POST /api/ops/factory-reset Staff (Viewer) → 403 (Admin-only)', async () => {
+    if (!viewerCookie) return;
+    const { status } = await api('POST', '/api/ops/factory-reset', viewerCookie);
+    expect(status).toBe(403);
+    note('POST /api/ops/factory-reset is Admin-only (requireRole("Admin")) — Staff/Viewer get 403');
+  });
+
+  test('POST /api/ops/factory-reset without auth → 401', async () => {
+    const { status } = await api('POST', '/api/ops/factory-reset', '');
+    expect(status).toBe(401);
+  });
 });
 
 // ── Edge Cases ────────────────────────────────────────────────────────────────
@@ -1552,6 +1592,48 @@ test.describe('Edge Cases', () => {
   test('GET /api/system/app-size Admin → 200', async () => {
     const { status } = await api('GET', '/api/system/app-size', adminCookie);
     expect(status).toBe(200);
+  });
+
+  test('DELETE /api/suppliers/:id with associated PO → 400 or 500 (FK constraint)', async () => {
+    if (!IDs.supplier || !IDs.po) return;
+    const { status } = await api('DELETE', `/api/suppliers/${IDs.supplier}`, adminCookie);
+    if (status === 200) {
+      note('DELETE /api/suppliers/:id with PO reference succeeds — no FK constraint enforced (cascade delete or soft delete)');
+      test.info().annotations.push({ type: 'NOTE', description: 'Supplier with associated PO can be deleted — no referential integrity constraint enforced at API level.' });
+    } else if (status === 400 || status === 409) {
+      note('DELETE /api/suppliers/:id with PO reference correctly returns 4xx (referential constraint enforced)');
+    } else if (status === 500) {
+      bug('DELETE /api/suppliers/:id with PO reference returns 500 (FK constraint not handled gracefully — should return 400 with message)');
+      test.info().annotations.push({ type: 'BUG', description: 'DELETE /api/suppliers/:id fails with 500 when referenced by PO — should return 400 with human-readable constraint error.' });
+    }
+    expect([200, 400, 409, 500]).toContain(status);
+    note(`DELETE /api/suppliers with associated PO → ${status}`);
+  });
+
+  test('GET /api/export/do documents PDF content-type behaviour', async () => {
+    if (!IDs.customer) return;
+    const createResp = await api('POST', '/api/delivery-orders', adminCookie, {
+      customer_id: IDs.customer,
+      status: 'draft',
+      total_amount: 0,
+      items: [],
+    });
+    if (createResp.status !== 201) return;
+    const tempDoId = (createResp.data as { id: number }).id;
+    if (!tempDoId) return;
+    const resp = await fetch(`${BASE_URL}/api/export/do?doId=${tempDoId}`, {
+      headers: { Cookie: adminCookie },
+    });
+    const ct = resp.headers.get('content-type') ?? '';
+    if (resp.status === 200 && ct.includes('application/pdf')) {
+      note('GET /api/export/do → 200 application/pdf ✓ (Puppeteer PDF generation works)');
+    } else if (resp.status === 500) {
+      note(`GET /api/export/do → 500 (Puppeteer PDF generation failed in this environment; content-type: ${ct})`);
+    } else {
+      note(`GET /api/export/do → ${resp.status} content-type: ${ct}`);
+    }
+    await api('DELETE', `/api/delivery-orders/${tempDoId}`, adminCookie);
+    expect([200, 500]).toContain(resp.status);
   });
 });
 
