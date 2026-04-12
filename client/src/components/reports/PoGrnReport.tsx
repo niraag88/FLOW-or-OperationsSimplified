@@ -294,13 +294,13 @@ export default function PoGrnReport({ purchaseOrders, goodsReceipts, suppliers =
     <Popover>
       <PopoverTrigger asChild>
         <Button variant="outline" className="justify-between w-48">
-          {selected.length === 0 ? "All Suppliers" : `${selected.length} selected`}
+          {selected.length === 0 ? "All Brands" : `${selected.length} selected`}
           <ChevronDown className="ml-2 h-4 w-4" />
         </Button>
       </PopoverTrigger>
       <PopoverContent className="w-60 p-4">
         <div className="space-y-3">
-          <h4 className="font-medium leading-none">Select Suppliers</h4>
+          <h4 className="font-medium leading-none">Select Brands</h4>
           <div className="space-y-2 max-h-60 overflow-y-auto">
             {sortedSuppliers.map((supplier: any) => (
               <div key={supplier.id} className="flex items-center space-x-2">

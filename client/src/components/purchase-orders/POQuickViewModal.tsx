@@ -166,9 +166,6 @@ export default function POQuickViewModal({ poId, open, onClose }: POQuickViewMod
   }
   if (detail?.grns) {
     for (const grn of detail.grns) {
-      const label = grn.receiptNumber
-        ? `GRN ${grn.receiptNumber}`
-        : `GRN ${grn.receivedDate ? formatDate(grn.receivedDate) : grn.id}`;
       const extractFilename = (key: string, fallback: string) => {
         const last = key.split('/').pop() || '';
         const stripped = last.replace(/^\d{10,}-/, '');
