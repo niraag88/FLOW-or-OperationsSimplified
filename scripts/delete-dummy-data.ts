@@ -9,8 +9,14 @@
  * are NEVER touched.
  *
  * Usage:
- *   npx tsx scripts/delete-dummy-data.ts           # live delete
- *   npx tsx scripts/delete-dummy-data.ts --dry-run  # show counts only, no changes
+ *   npx tsx scripts/delete-dummy-data.ts              # live delete (seed/e2e only)
+ *   npx tsx scripts/delete-dummy-data.ts --dry-run    # show counts only, no changes
+ *   npx tsx scripts/delete-dummy-data.ts --all-user-data          # FULL factory reset
+ *   npx tsx scripts/delete-dummy-data.ts --all-user-data --dry-run # preview full reset
+ *
+ * --all-user-data wipes EVERYTHING (equivalent to POST /api/ops/factory-reset).
+ * It deletes all business tables in FK-safe order, then re-inserts a blank
+ * company_settings row.  The users table and ops schema are preserved.
  *
  * Safe to run multiple times (idempotent).
  */
@@ -20,6 +26,87 @@ const { Pool } = pkg;
 
 const pool = new Pool({ connectionString: process.env.DATABASE_URL });
 const DRY_RUN = process.argv.includes('--dry-run');
+const ALL_USER_DATA = process.argv.includes('--all-user-data');
+
+/**
+ * executeFactoryReset — shared reset logic used by both this CLI script and
+ * the POST /api/ops/factory-reset HTTP endpoint.
+ *
+ * Deletes all business data in FK-safe order and re-inserts a blank
+ * company_settings row.  Runs inside a single pg transaction.
+ *
+ * @param client - a connected pg PoolClient (caller must release it)
+ * @param dryRun - if true, prints what would be deleted but rolls back
+ */
+export async function executeFactoryReset(
+  client: pkg.PoolClient,
+  dryRun = false,
+): Promise<{ tablesCleared: string[]; rowsDeleted: number }> {
+  const tablesCleared: string[] = [];
+  let rowsDeleted = 0;
+
+  const wipe = async (table: string) => {
+    const count = await client.query(`SELECT COUNT(*) AS n FROM ${table}`);
+    const n = parseInt(count.rows[0].n, 10);
+    if (!dryRun) {
+      await client.query(`DELETE FROM ${table}`);
+    }
+    if (n > 0) {
+      tablesCleared.push(table);
+      rowsDeleted += n;
+    }
+    console.log(`  ${dryRun ? '[dry]' : 'DEL '} ${table.padEnd(30)} ${n} rows`);
+  };
+
+  await client.query('BEGIN');
+  try {
+    // Children before parents — mirrors HTTP route order
+    await wipe('stock_movements');
+    await wipe('stock_count_items');
+    await wipe('stock_counts');
+    await wipe('goods_receipt_items');
+    await wipe('goods_receipts');
+    await wipe('purchase_order_items');
+    await wipe('purchase_orders');
+    await wipe('invoice_line_items');
+    await wipe('invoices');
+    await wipe('delivery_order_items');
+    await wipe('delivery_orders');
+    await wipe('quotation_items');
+    await wipe('quotations');
+    await wipe('products');
+    await wipe('customers');
+    await wipe('suppliers');
+    await wipe('brands');
+    await wipe('recycle_bin');
+    await wipe('storage_objects');
+    await wipe('audit_log');
+    await wipe('vat_returns');
+    await wipe('financial_years');
+    await wipe('backup_runs');
+    await wipe('signed_tokens');
+    await wipe('storage_monitoring');
+
+    if (!dryRun) {
+      await client.query('DELETE FROM company_settings');
+      await client.query(`INSERT INTO company_settings (company_name) VALUES ('')`);
+      console.log(`  RESET company_settings (blank row inserted)`);
+    } else {
+      console.log(`  [dry] company_settings would be reset to blank row`);
+    }
+
+    if (dryRun) {
+      await client.query('ROLLBACK');
+    } else {
+      await client.query('COMMIT');
+    }
+  } catch (err) {
+    await client.query('ROLLBACK').catch(() => {});
+    throw err;
+  }
+
+  return { tablesCleared, rowsDeleted };
+}
 
 const DUMMY = `('seed', 'e2e_test')`;
 
@@ -50,6 +137,29 @@ async function printCounts(label: string) {
 }
 
 async function main() {
+  // ── --all-user-data: full factory reset path ──────────────────────────────
+  if (ALL_USER_DATA) {
+    const mode = DRY_RUN ? '=== DRY RUN — FULL FACTORY RESET (no data will be deleted) ===' : '=== FULL FACTORY RESET — deleting ALL business data ===';
+    console.log(mode);
+    if (!DRY_RUN) {
+      console.log('  ⚠  This will wipe EVERY product, order, invoice, and customer record.');
+      console.log('  ⚠  Users and ops.restore_runs are preserved.');
+    }
+    const client = await pool.connect();
+    try {
+      const { rowsDeleted } = await executeFactoryReset(client, DRY_RUN);
+      console.log(`\n${DRY_RUN ? '[DRY RUN] Would have deleted' : 'Deleted'} ${rowsDeleted} rows total.`);
+      if (!DRY_RUN) {
+        console.log('\n✓ Factory reset complete. All business data removed; blank company_settings inserted.');
+      }
+    } finally {
+      client.release();
+      await pool.end();
+    }
+    return;
+  }
+
+  // ── default path: seed/e2e data only ──────────────────────────────────────
   console.log(DRY_RUN ? '=== DRY RUN — no data will be deleted ===' : '=== DELETING dummy data ===');
 
   await printCounts('Before:');

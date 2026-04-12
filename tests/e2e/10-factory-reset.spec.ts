@@ -21,14 +21,20 @@ test.describe('Factory Reset', () => {
     cookie = await apiLogin();
   });
 
-  test('factory reset endpoint returns 403 without auth', async () => {
+  test('factory reset endpoint returns 401 without any auth cookie', async () => {
     const r = await fetch(`${BASE_URL}/api/ops/factory-reset`, { method: 'POST' });
     expect(r.status).toBe(401);
   });
 
-  test('factory reset endpoint requires Admin role', async () => {
-    // The Admin cookie from apiLogin() is an Admin account — this should succeed.
-    // If the system has a non-admin user it could test 403; we verify 200 here.
+  test('factory reset endpoint denies access with an invalid/expired session', async () => {
+    const r = await fetch(`${BASE_URL}/api/ops/factory-reset`, {
+      method: 'POST',
+      headers: { Cookie: 'connect.sid=s%3Ainvalid-session-id.bad-signature' },
+    });
+    expect([401, 403]).toContain(r.status);
+  });
+
+  test('factory reset endpoint succeeds for Admin and returns ok:true', async () => {
     const r = await fetch(`${BASE_URL}/api/ops/factory-reset`, {
       method: 'POST',
       headers: { Cookie: cookie },
