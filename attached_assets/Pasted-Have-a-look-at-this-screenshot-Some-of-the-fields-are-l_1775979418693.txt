@@ -1,0 +1,25 @@
+Have a look at this screenshot. Some of the fields are left aligned; some are center aligned. I would have preferred if all of them were left aligned like it was. The only thing that I had said at that time was that there was a gap in the left-aligned indentation. That was the only thing but I guess it's better if it's left aligned just so that it all looks the same. This will now be applicable everywhere if you've done the same thing in invoices, delivery orders, and quotations as well. That's the same thing; the formatting will be
+
+Click Create Receipt in your example. There's no Create Receipt. There's only Save and Save and Close.
+
+You call it REF INS2402. Firstly the R should be capital; secondly REF may not mean a lot. I think the full form of reference number should be there. I'm okay with the date just showing up like that but also the issue is that when I receive the goods you call it supplier invoice reference.
+
+Now we discuss that we won't call it supplier invoice reference because then the word invoice will get mixed up with our invoice portal and we just said it would be supplier reference. I guess we can keep supplier reference number and supplier reference date but I like the whole word reference not REF; everything has to be full form so either you can call it supplier reference number and supplier reference date or reference number and reference date.
+
+If you look at the second attachment, then you will notice that the words are not the same. Even in the third attachment you will see that the text is not aligned: supplier invoice ref and then reference date. I guess they should both be similar in the sense that if it's supplier invoice reference then it should be supplier reference date and if it is supplier reference then it should be supplier reference date. That's how it should be. I ideally prefer that we don't use the word invoice here just so that it doesn't get confusing.
+
+Attachment: you will see that when I uploaded the supplier invoice, you have then changed that invoice name to just call it GRN-001. Now it's confusing for me because I think that GRN is the internal PDF that the portal has created, that the app has created. When I opened it I realized no, this is the invoice that I had uploaded.
+
+I would prefer if you don't rename the document that I have uploaded and leave it with the name that I had left it with. Whatever was the original name at the time of upload is exactly how it should be.
+
+You said the PO now shows partially delivered. Can you tell me where it shows that because I couldn't find it? If you see PO 119 there is that sign of partial delivery, that exclamation, which for example is at PO 113 but it didn't show up for PO 119 when we've had a partial delivery. I think there's still some error around that. It probably was working fine previously but isn't now.
+
+Okay now the issue is about marking POs paid. In this scenario we received it at the same date but what could sometimes happen is that, because we have a credit system with our supplier, let's say half the order was received today and half the order was received two months later. The payment due dates for both of them are different and thus just by marking one entire PO paid is difficult because that PO is now split into two supplier invoices.
+
+If you look at this table here you will see that the supplier name isn't loading correctly. Also previous GRNs do not show the reference number, which might be okay because there isn't one so that's fine. Just check that the payment date remarks and all of that is working.
+The GRN number: remember that no GRN number can be reused so you can see previously there is the first one, GRN 001, 002; then comes 003, 004, 005, then suddenly it's 16 and 17. What happened in the middle? The number should only continue. Let's say PO 117 had GRN 002; then PO 118 will have GRN 003; it should continue because otherwise it will get a bit confusing when the numbers start to look the same. Look for issues like this throughout the entire working of our platform:
+continuity issues
+slight, mild formatting
+broken code
+anything like that
+Things like this around this. Let's perfect this element that we are testing first and then you can move to the next.
