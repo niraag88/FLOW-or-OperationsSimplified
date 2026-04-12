@@ -203,10 +203,10 @@ function buildStatementHtml({ type, entity, companySettings, records, dateFrom, 
 
   const headerRow = type === "invoices"
     ? `<th style="${thStyle}">Invoice #</th><th style="${thC}">Date</th><th style="${thR}">Subtotal</th><th style="${thR}">VAT</th><th style="${thR}">Total (AED)</th><th style="${thC}">Status</th><th style="${thC}">Received</th>`
-    : `<th style="${thStyle}">GRN #</th><th style="${thStyle}">PO #</th><th style="${thStyle}">Brand</th><th style="${thC}">Receipt Date</th><th style="${thStyle}">Reference No.</th><th style="${thC}">Reference Date</th><th style="${thR}">Amount (AED)</th><th style="${thC}">Status</th><th style="${thC}">Payment Date</th><th style="${thStyle}">Remarks</th>`;
+    : `<th style="${thStyle}">GRN #</th><th style="${thStyle}">PO #</th><th style="${thStyle}">Brand</th><th style="${thStyle}">Reference No.</th><th style="${thC}">Reference Date</th><th style="${thR}">Amount (AED)</th><th style="${thC}">Status</th><th style="${thC}">Payment Date</th><th style="${thStyle}">Remarks</th>`;
 
   const dataRows = records.length === 0
-    ? `<tr><td colspan="${type === "invoices" ? 8 : 11}" style="text-align:center;padding:16px;color:#9ca3af">No records</td></tr>`
+    ? `<tr><td colspan="${type === "invoices" ? 8 : 10}" style="text-align:center;padding:16px;color:#9ca3af">No records</td></tr>`
     : records.map((r: any, i: any) => {
         const statusBg    = r._paymentStatus === "paid" ? "#dcfce7" : "#fef3c7";
         const statusColor = r._paymentStatus === "paid" ? "#166534" : "#92400e";
@@ -229,7 +229,6 @@ function buildStatementHtml({ type, entity, companySettings, records, dateFrom, 
           <td style="${tdStyle}color:#7e22ce;font-weight:500">${esc(r._ref)}</td>
           <td style="${tdStyle}color:#6b7280;font-size:9px">${esc(r._poRef || "")}</td>
           <td style="${tdStyle}font-size:9px">${esc(r._brand || "—")}</td>
-          <td style="${tdC}">${esc(fmtDate(r._date))}</td>
           <td style="${tdStyle}color:#6b7280;font-size:9px">${esc(r._refNo || "—")}</td>
           <td style="${tdC}">${esc(r._refDate ? fmtDate(r._refDate) : "—")}</td>
           <td style="${tdR}font-weight:600">AED ${esc(fmt(r._aed))}</td>
@@ -427,7 +426,6 @@ function StatementLayout({ type, entity, companySettings, records, dateFrom, dat
                     <th className="p-2 font-bold text-emerald-900 text-left">GRN #</th>
                     <th className="p-2 font-bold text-emerald-900 text-left">PO #</th>
                     <th className="p-2 font-bold text-emerald-900 text-left">Brand</th>
-                    <th className="text-center p-2 font-bold text-emerald-900">Receipt Date</th>
                     <th className="p-2 font-bold text-emerald-900 text-left">Reference No.</th>
                     <th className="text-center p-2 font-bold text-emerald-900">Reference Date</th>
                     <th className="text-right p-2 font-bold text-emerald-900">Amount (AED)</th>
@@ -440,7 +438,7 @@ function StatementLayout({ type, entity, companySettings, records, dateFrom, dat
             </thead>
             <tbody>
               {records.length === 0 ? (
-                <tr><td colSpan={type === "invoices" ? 8 : 11} className="text-center py-6 text-gray-400">No records</td></tr>
+                <tr><td colSpan={type === "invoices" ? 8 : 10} className="text-center py-6 text-gray-400">No records</td></tr>
               ) : records.map((r: any, i: any) => (
                 <tr key={r.id || i} className="border-b border-gray-100">
                   <td className="text-center p-2 text-gray-500">{i + 1}</td>
@@ -459,7 +457,6 @@ function StatementLayout({ type, entity, companySettings, records, dateFrom, dat
                       <td className="p-2 font-medium text-purple-700">{r._ref}</td>
                       <td className="p-2 text-gray-500 text-[10px]">{r._poRef}</td>
                       <td className="p-2 text-[10px]">{r._brand || "—"}</td>
-                      <td className="text-center p-2 text-gray-600">{fmtDate(r._date)}</td>
                       <td className="p-2 text-gray-500 text-[10px]">{r._refNo || "—"}</td>
                       <td className="text-center p-2 text-gray-600">{r._refDate ? fmtDate(r._refDate) : "—"}</td>
                       <td className="text-right p-2 font-semibold">AED {fmt(r._aed)}</td>
@@ -983,7 +980,7 @@ function PurchaseOrdersSection({ goodsReceipts, companySettings }: { goodsReceip
           <TableBody>
             {filtered.length === 0 ? (
               <TableRow>
-                <TableCell colSpan={12} className="text-center py-10 text-gray-400">
+                <TableCell colSpan={11} className="text-center py-10 text-gray-400">
                   {selectedBrandId
                     ? "No goods receipts match the current filters"
                     : eligibleBrands.length === 0

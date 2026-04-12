@@ -1124,14 +1124,13 @@ export const exportStatementToXLSX = ({ type, entity, companySettings, records, 
       ]);
     });
   } else {
-    rows.push(["#", "GRN #", "PO #", "Brand", "Receipt Date", "Reference No.", "Reference Date", "Amount (AED)", "Status", "Payment Date", "Remarks"]);
+    rows.push(["#", "GRN #", "PO #", "Brand", "Reference No.", "Reference Date", "Amount (AED)", "Status", "Payment Date", "Remarks"]);
     records.forEach((r: any, i: any) => {
       rows.push([
         i + 1,
         r._ref,
         r._poRef || "",
         r._brand || "—",
-        fmtD(r._date),
         r._refNo || "—",
         r._refDate ? fmtD(r._refDate) : "—",
         `AED ${fmtAmt(r._aed)}`,
@@ -1144,7 +1143,7 @@ export const exportStatementToXLSX = ({ type, entity, companySettings, records, 
 
   rows.push([]);
 
-  const colCount = type === "invoices" ? 8 : 11;
+  const colCount = type === "invoices" ? 8 : 10;
   const pad = (n: any) => Array(n).fill("");
 
   if (showDual) {
@@ -1165,7 +1164,7 @@ export const exportStatementToXLSX = ({ type, entity, companySettings, records, 
 
   worksheet["!cols"] = type === "invoices"
     ? [{ width: 6 }, { width: 16 }, { width: 12 }, { width: 16 }, { width: 14 }, { width: 16 }, { width: 14 }, { width: 14 }]
-    : [{ width: 6 }, { width: 14 }, { width: 14 }, { width: 16 }, { width: 13 }, { width: 16 }, { width: 13 }, { width: 14 }, { width: 14 }, { width: 14 }, { width: 20 }];
+    : [{ width: 6 }, { width: 14 }, { width: 14 }, { width: 16 }, { width: 16 }, { width: 13 }, { width: 14 }, { width: 14 }, { width: 14 }, { width: 22 }];
 
   XLSX.utils.book_append_sheet(workbook, worksheet, "Statement");
 
