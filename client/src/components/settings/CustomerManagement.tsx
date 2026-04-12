@@ -39,6 +39,8 @@ export default function CustomerManagement() {
     vatTreatment: "Local",
     vatNumber: "",
     paymentTerms: "",
+    phone: "",
+    email: "",
     isActive: true
   });
 
@@ -66,6 +68,8 @@ export default function CustomerManagement() {
       vatTreatment: "Local",
       vatNumber: "",
       paymentTerms: "",
+      phone: "",
+      email: "",
       isActive: true
     });
     setEditingCustomer(null);
@@ -397,15 +401,37 @@ export default function CustomerManagement() {
                   )}
                 </div>
 
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                  <div className="space-y-2">
+                    <Label htmlFor="paymentTerms">Payment Terms</Label>
+                    <Input
+                      id="paymentTerms"
+                      value={formData.paymentTerms}
+                      onChange={(e) => setFormData(prev => ({ ...prev, paymentTerms: e.target.value }))}
+                      placeholder="e.g., Cash, Net 30, Net 45, Credit"
+                    />
+                    <p className="text-xs text-gray-500">Payment terms for this customer</p>
+                  </div>
+                  <div className="space-y-2">
+                    <Label htmlFor="phone">Phone Number</Label>
+                    <Input
+                      id="phone"
+                      value={(formData as any).phone ?? ''}
+                      onChange={(e) => setFormData(prev => ({ ...prev, phone: e.target.value }))}
+                      placeholder="+971 50 123 4567"
+                    />
+                  </div>
+                </div>
+
                 <div className="space-y-2">
-                  <Label htmlFor="paymentTerms">Payment Terms</Label>
+                  <Label htmlFor="email">Email Address</Label>
                   <Input
-                    id="paymentTerms"
-                    value={formData.paymentTerms}
-                    onChange={(e) => setFormData(prev => ({ ...prev, paymentTerms: e.target.value }))}
-                    placeholder="e.g., Cash, Net 30, Net 45, Credit"
+                    id="email"
+                    type="email"
+                    value={(formData as any).email ?? ''}
+                    onChange={(e) => setFormData(prev => ({ ...prev, email: e.target.value }))}
+                    placeholder="customer@example.com"
                   />
-                  <p className="text-xs text-gray-500">Payment terms for this customer (will appear on quotations, invoices, and delivery notes)</p>
                 </div>
 
                 <div className="flex items-center space-x-2">
