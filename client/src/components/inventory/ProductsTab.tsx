@@ -332,9 +332,9 @@ export default function ProductsTab({
                       <TableHead>Brand</TableHead>
                       <TableHead>Product Code</TableHead>
                       <TableHead>Product Name</TableHead>
-                      <TableHead>Size</TableHead>
-                      <TableHead className="text-right">Cost Price</TableHead>
-                      <TableHead className="text-right">Sale Price</TableHead>
+                      <TableHead className="hidden sm:table-cell">Size</TableHead>
+                      <TableHead className="hidden md:table-cell text-right">Cost Price</TableHead>
+                      <TableHead className="hidden sm:table-cell text-right">Sale Price</TableHead>
                       {(canEdit || canDelete) && <TableHead>Actions</TableHead>}
                     </TableRow>
                   </TableHeader>
@@ -350,9 +350,9 @@ export default function ProductsTab({
                         <TableCell>
                           <div>{product.name}</div>
                         </TableCell>
-                        <TableCell>{product.size || '-'}</TableCell>
-                        <TableCell className="text-right">{formatCurrency(product.costPrice, product.costPriceCurrency || 'GBP')}</TableCell>
-                        <TableCell className="text-right">AED {parseFloat(product.unitPrice || 0).toFixed(2)}</TableCell>
+                        <TableCell className="hidden sm:table-cell">{product.size || '-'}</TableCell>
+                        <TableCell className="hidden md:table-cell text-right">{formatCurrency(product.costPrice, product.costPriceCurrency || 'GBP')}</TableCell>
+                        <TableCell className="hidden sm:table-cell text-right">AED {parseFloat(product.unitPrice || 0).toFixed(2)}</TableCell>
                         {(canEdit || canDelete) && (
                           <TableCell>
                             <DropdownMenu>

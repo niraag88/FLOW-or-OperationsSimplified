@@ -321,11 +321,13 @@ export default function PurchaseOrders() {
           />
         </div>
         
-        <POFilters 
-          filters={filters} 
-          onFiltersChange={setFilters}
-          onFilterChange={resetPagination}
-        />
+        <div className="overflow-x-auto">
+          <POFilters 
+            filters={filters} 
+            onFiltersChange={setFilters}
+            onFilterChange={resetPagination}
+          />
+        </div>
       </div>
 
       {/* Tabs */}

@@ -220,7 +220,7 @@ export default function Quotations() {
           <p className="text-gray-600">Manage quotations (All amounts in AED)</p>
         </div>
         
-        <div className="flex items-center gap-3">
+        <div className="flex flex-wrap items-center gap-3">
           <ExportDropdown 
             data={visibleQuotations}
             fetchAllData={fetchAllForExport}
@@ -264,16 +264,18 @@ export default function Quotations() {
           />
         </div>
         
-        <QuotationFilters 
-          selectedStatuses={selectedStatuses}
-          setSelectedStatuses={setSelectedStatuses}
-          selectedCustomers={selectedCustomers}
-          setSelectedCustomers={setSelectedCustomers}
-          dateRange={dateRange}
-          setDateRange={setDateRange}
-          resetPagination={resetPagination}
-          customers={availableCustomers}
-        />
+        <div className="overflow-x-auto">
+          <QuotationFilters 
+            selectedStatuses={selectedStatuses}
+            setSelectedStatuses={setSelectedStatuses}
+            selectedCustomers={selectedCustomers}
+            setSelectedCustomers={setSelectedCustomers}
+            dateRange={dateRange}
+            setDateRange={setDateRange}
+            resetPagination={resetPagination}
+            customers={availableCustomers}
+          />
+        </div>
       </div>
 
       <QuotationList 

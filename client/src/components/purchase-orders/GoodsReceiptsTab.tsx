@@ -320,13 +320,13 @@ export default function GoodsReceiptsTab({
         <TableRow>
           <TableHead className="w-[120px]">PO Number</TableHead>
           <TableHead className="w-[130px]">Brand</TableHead>
-          <TableHead className="w-[100px]">Order Date</TableHead>
-          <TableHead className="w-[110px] text-right">Total</TableHead>
-          <TableHead className="w-[110px] text-right">Total (AED)</TableHead>
-          <TableHead className="w-[80px]">Lines</TableHead>
-          <TableHead className="w-[70px]">Ordered</TableHead>
-          <TableHead className="w-[70px]">Received</TableHead>
-          {isClosedSection && <TableHead className="w-[90px]">Delivery</TableHead>}
+          <TableHead className="hidden sm:table-cell w-[100px]">Order Date</TableHead>
+          <TableHead className="hidden md:table-cell w-[110px] text-right">Total</TableHead>
+          <TableHead className="hidden sm:table-cell w-[110px] text-right">Total (AED)</TableHead>
+          <TableHead className="hidden lg:table-cell w-[80px]">Lines</TableHead>
+          <TableHead className="hidden md:table-cell w-[70px]">Ordered</TableHead>
+          <TableHead className="hidden md:table-cell w-[70px]">Received</TableHead>
+          {isClosedSection && <TableHead className="hidden sm:table-cell w-[90px]">Delivery</TableHead>}
           <TableHead className="w-[90px]">Status</TableHead>
           <TableHead className="w-[90px]">Actions</TableHead>
         </TableRow>
@@ -340,16 +340,16 @@ export default function GoodsReceiptsTab({
           <TableRow key={po.id}>
             <TableCell className="font-medium w-[120px]">{po.poNumber}</TableCell>
             <TableCell className="w-[130px]">{po.brandName || 'Unknown Brand'}</TableCell>
-            <TableCell className="w-[100px]">
+            <TableCell className="hidden sm:table-cell w-[100px]">
               {po.orderDate && !isNaN(new Date(String(po.orderDate)).getTime()) ? format(new Date(String(po.orderDate)), 'dd/MM/yy') : '-'}
             </TableCell>
-            <TableCell className="w-[110px] text-right">{formatCurrency(parseFloat(String(po.totalAmount || 0)) || 0, String(po.currency || 'GBP'))}</TableCell>
-            <TableCell className="w-[110px] text-right">{formatCurrency(getAedEquivalent(po), 'AED')}</TableCell>
-            <TableCell className="w-[80px]">{getLineItemsCount(po)}</TableCell>
-            <TableCell className="w-[70px]">{ordQty}</TableCell>
-            <TableCell className="w-[70px]">{recQty}</TableCell>
+            <TableCell className="hidden md:table-cell w-[110px] text-right">{formatCurrency(parseFloat(String(po.totalAmount || 0)) || 0, String(po.currency || 'GBP'))}</TableCell>
+            <TableCell className="hidden sm:table-cell w-[110px] text-right">{formatCurrency(getAedEquivalent(po), 'AED')}</TableCell>
+            <TableCell className="hidden lg:table-cell w-[80px]">{getLineItemsCount(po)}</TableCell>
+            <TableCell className="hidden md:table-cell w-[70px]">{ordQty}</TableCell>
+            <TableCell className="hidden md:table-cell w-[70px]">{recQty}</TableCell>
             {isClosedSection && (
-              <TableCell className="w-[90px]">
+              <TableCell className="hidden sm:table-cell w-[90px]">
                 {ordQty > 0 && (isPartial ? (
                   <Tooltip>
                     <TooltipTrigger asChild>

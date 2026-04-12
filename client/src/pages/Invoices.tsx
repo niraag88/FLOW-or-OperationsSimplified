@@ -521,18 +521,20 @@ export default function Invoices() {
           />
         </div>
         
-        <InvoiceFilters 
-          selectedStatuses={selectedStatuses}
-          setSelectedStatuses={setSelectedStatuses}
-          selectedCustomers={selectedCustomers}
-          setSelectedCustomers={setSelectedCustomers}
-          dateRange={dateRange}
-          setDateRange={setDateRange}
-          resetPagination={resetPagination}
-          customers={availableCustomers.map(c => ({ ...c, name: c.name || '' }))}
-          paymentStatusFilter={paymentStatusFilter}
-          setPaymentStatusFilter={setPaymentStatusFilter}
-        />
+        <div className="overflow-x-auto">
+          <InvoiceFilters 
+            selectedStatuses={selectedStatuses}
+            setSelectedStatuses={setSelectedStatuses}
+            selectedCustomers={selectedCustomers}
+            setSelectedCustomers={setSelectedCustomers}
+            dateRange={dateRange}
+            setDateRange={setDateRange}
+            resetPagination={resetPagination}
+            customers={availableCustomers.map(c => ({ ...c, name: c.name || '' }))}
+            paymentStatusFilter={paymentStatusFilter}
+            setPaymentStatusFilter={setPaymentStatusFilter}
+          />
+        </div>
       </div>
 
       {/* Invoices List */}

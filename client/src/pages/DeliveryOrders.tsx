@@ -299,18 +299,20 @@ export default function DeliveryOrders() {
           />
         </div>
         
-        <DOFilters 
-          selectedStatuses={selectedStatuses}
-          setSelectedStatuses={setSelectedStatuses}
-          selectedCustomers={selectedCustomers}
-          setSelectedCustomers={setSelectedCustomers}
-          selectedTaxTreatments={selectedTaxTreatments}
-          setSelectedTaxTreatments={setSelectedTaxTreatments}
-          dateRange={dateRange}
-          setDateRange={setDateRange}
-          resetPagination={resetPagination}
-          customers={availableCustomers.map(c => ({ ...c, name: c.name || '' }))}
-        />
+        <div className="overflow-x-auto">
+          <DOFilters 
+            selectedStatuses={selectedStatuses}
+            setSelectedStatuses={setSelectedStatuses}
+            selectedCustomers={selectedCustomers}
+            setSelectedCustomers={setSelectedCustomers}
+            selectedTaxTreatments={selectedTaxTreatments}
+            setSelectedTaxTreatments={setSelectedTaxTreatments}
+            dateRange={dateRange}
+            setDateRange={setDateRange}
+            resetPagination={resetPagination}
+            customers={availableCustomers.map(c => ({ ...c, name: c.name || '' }))}
+          />
+        </div>
       </div>
 
       {/* Delivery Orders List */}
