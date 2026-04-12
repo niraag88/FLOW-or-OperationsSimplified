@@ -48,31 +48,43 @@ test.describe('Phase 11 — Cleanup', () => {
     expect(combined.length).toBeGreaterThan(0);
   });
 
-  test('products list has 0 e2e_test records after cleanup (verify all gone)', async () => {
-    test.info().annotations.push({ type: 'action', description: 'GET /api/products; assert 0 records with dataSource=e2e_test remain' });
+  test('step 73: products list returns empty array (all e2e_test products deleted)', async () => {
+    test.info().annotations.push({ type: 'action', description: 'GET /api/products; assert 0 records total — all 15 seeded products were e2e_test tagged and deleted' });
     const raw = await (await fetch(`${BASE_URL}/api/products`, { headers: { Cookie: cookie } })).json() as EntityWithDataSource[] | { products?: EntityWithDataSource[] };
     const prods = Array.isArray(raw) ? raw : (raw.products ?? []);
     const e2eProds = prods.filter((p) => (p.dataSource ?? p.data_source) === 'e2e_test');
-    test.info().annotations.push({ type: 'result', description: `Total products: ${prods.length}; e2e_test remaining: ${e2eProds.length}` });
+    test.info().annotations.push({ type: 'result', description: `Total products: ${prods.length}; e2e_test remaining: ${e2eProds.length} (task step 73 requires empty array: ${prods.length === 0})` });
     expect(e2eProds.length).toBe(0);
+    if (prods.length > 0) {
+      test.info().annotations.push({ type: 'issue', description: `WARNING: ${prods.length} non-e2e_test products remain — these were NOT seeded by this audit suite (pre-existing data)` });
+    }
+    expect(prods.length).toBe(0);
   });
 
-  test('customers list has 0 e2e_test records after cleanup (verify all gone)', async () => {
-    test.info().annotations.push({ type: 'action', description: 'GET /api/customers; assert 0 records with dataSource=e2e_test remain' });
+  test('step 73: customers list returns empty array (all e2e_test customers deleted)', async () => {
+    test.info().annotations.push({ type: 'action', description: 'GET /api/customers; assert 0 records total — all 5 seeded customers were e2e_test tagged and deleted' });
     const raw = await (await fetch(`${BASE_URL}/api/customers`, { headers: { Cookie: cookie } })).json() as EntityWithDataSource[] | { customers?: EntityWithDataSource[] };
     const custs = Array.isArray(raw) ? raw : (raw.customers ?? []);
     const e2eCusts = custs.filter((c) => (c.dataSource ?? c.data_source) === 'e2e_test');
-    test.info().annotations.push({ type: 'result', description: `Total customers: ${custs.length}; e2e_test remaining: ${e2eCusts.length}` });
+    test.info().annotations.push({ type: 'result', description: `Total customers: ${custs.length}; e2e_test remaining: ${e2eCusts.length} (empty: ${custs.length === 0})` });
     expect(e2eCusts.length).toBe(0);
+    if (custs.length > 0) {
+      test.info().annotations.push({ type: 'issue', description: `WARNING: ${custs.length} non-e2e_test customers remain — pre-existing data` });
+    }
+    expect(custs.length).toBe(0);
   });
 
-  test('brands list has 0 e2e_test records after cleanup (verify all gone)', async () => {
-    test.info().annotations.push({ type: 'action', description: 'GET /api/brands; assert 0 records with dataSource=e2e_test remain' });
+  test('step 73: brands list returns empty array (all e2e_test brands deleted)', async () => {
+    test.info().annotations.push({ type: 'action', description: 'GET /api/brands; assert 0 records total — all 3 seeded brands were e2e_test tagged and deleted' });
     const raw = await (await fetch(`${BASE_URL}/api/brands`, { headers: { Cookie: cookie } })).json() as EntityWithDataSource[] | { brands?: EntityWithDataSource[] };
     const brnds = Array.isArray(raw) ? raw : (raw.brands ?? []);
     const e2eBrands = brnds.filter((b) => (b.dataSource ?? b.data_source) === 'e2e_test');
-    test.info().annotations.push({ type: 'result', description: `Total brands: ${brnds.length}; e2e_test remaining: ${e2eBrands.length}` });
+    test.info().annotations.push({ type: 'result', description: `Total brands: ${brnds.length}; e2e_test remaining: ${e2eBrands.length} (empty: ${brnds.length === 0})` });
     expect(e2eBrands.length).toBe(0);
+    if (brnds.length > 0) {
+      test.info().annotations.push({ type: 'issue', description: `WARNING: ${brnds.length} non-e2e_test brands remain — pre-existing data` });
+    }
+    expect(brnds.length).toBe(0);
   });
 
   test('admin user can still log in after cleanup', async () => {
