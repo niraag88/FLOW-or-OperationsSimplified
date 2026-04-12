@@ -441,7 +441,11 @@ export function registerGoodsReceiptRoutes(app: Express) {
         id: purchaseOrderItems.id,
         quantity: purchaseOrderItems.quantity,
         receivedQuantity: purchaseOrderItems.receivedQuantity,
-      }).from(purchaseOrderItems).where(eq(purchaseOrderItems.poId, poId));
+        productId: purchaseOrderItems.productId,
+        productName: products.name,
+      }).from(purchaseOrderItems)
+        .leftJoin(products, eq(products.id, purchaseOrderItems.productId))
+        .where(eq(purchaseOrderItems.poId, poId));
 
       const poItemMap = new Map(existingPoItems.map(i => [i.id, i]));
 
@@ -451,9 +455,14 @@ export function registerGoodsReceiptRoutes(app: Express) {
         const existing = poItemMap.get(item.poItemId);
         if (!existing) continue;
         const remaining = existing.quantity - (existing.receivedQuantity ?? 0);
-        if (item.receivedQuantity > remaining) {
+        const productLabel = existing.productName || `Product ID ${item.productId}`;
+        if (remaining === 0) {
           overReceiveErrors.push(
-            `Product ID ${item.productId}: receiving ${item.receivedQuantity} but only ${remaining} remaining (ordered ${existing.quantity}, already received ${existing.receivedQuantity ?? 0})`
+            `All units for "${productLabel}" have already been received on this PO`
+          );
+        } else if (item.receivedQuantity > remaining) {
+          overReceiveErrors.push(
+            `Cannot receive ${item.receivedQuantity} units for "${productLabel}" — only ${remaining} unit${remaining === 1 ? "" : "s"} remaining on this PO`
           );
         }
       }
