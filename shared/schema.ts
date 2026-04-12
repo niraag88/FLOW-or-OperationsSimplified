@@ -526,7 +526,7 @@ export const goodsReceipts = pgTable("goods_receipts", {
   scanKey1: text("scan_key_1"),
   scanKey2: text("scan_key_2"),
   scanKey3: text("scan_key_3"),
-  paymentStatus: text("payment_status"),
+  paymentStatus: text("payment_status").default("outstanding"),
   paymentMadeDate: date("payment_made_date"),
   paymentRemarks: text("payment_remarks"),
   createdBy: varchar("created_by").references(() => users.id).notNull(),
