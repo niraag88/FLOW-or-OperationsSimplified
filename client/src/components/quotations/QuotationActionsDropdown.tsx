@@ -8,7 +8,7 @@ import {
   DropdownMenuSeparator,
 } from "@/components/ui/dropdown-menu";
 import { Button } from "@/components/ui/button";
-import { MoreHorizontal, Edit2, Download, Trash2, Eye } from "lucide-react";
+import { MoreHorizontal, Edit2, Download, Trash2, Eye, XCircle } from "lucide-react";
 import { exportToCsv, exportQuotationToXLSX } from "../utils/export";
 import { format, isValid, parseISO } from 'date-fns';
 import { useToast } from "@/hooks/use-toast";
@@ -30,6 +30,7 @@ interface QuotationActionsDropdownProps {
 export default function QuotationActionsDropdown({ quotation, canEdit, canCreate, canOverride, onEdit, onRefresh, currentUser }: QuotationActionsDropdownProps) {
   const { toast } = useToast();
   const [showDeleteDialog, setShowDeleteDialog] = useState(false);
+  const [showCancelDialog, setShowCancelDialog] = useState(false);
 
   const formatDate = (dateString: any) => {
     if (!dateString) return '';
@@ -95,6 +96,32 @@ export default function QuotationActionsDropdown({ quotation, canEdit, canCreate
     }
   };
 
+  const handleCancel = async () => {
+    try {
+      await fetch(`/api/quotations/${quotation.id}`, {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        credentials: 'include',
+        body: JSON.stringify({ status: 'cancelled' }),
+      });
+      toast({
+        title: 'Quotation Cancelled',
+        description: `${quotation.quotation_number || quotation.quoteNumber} has been cancelled.`,
+      });
+      setShowCancelDialog(false);
+      onRefresh();
+    } catch (error: any) {
+      console.error('Error cancelling quotation:', error);
+      toast({
+        title: 'Cancel Failed',
+        description: 'Failed to cancel the quotation. Please try again.',
+        variant: 'destructive',
+      });
+    }
+  };
+
+  const isCancellable = canEdit && quotation.status !== 'cancelled' && quotation.status !== 'paid';
+
 
   return (
     <>
@@ -119,6 +146,19 @@ export default function QuotationActionsDropdown({ quotation, canEdit, canCreate
             <Download className="w-4 h-4 mr-2" />
             Export to XLSX
           </DropdownMenuItem>
+          {isCancellable && (
+            <>
+              <DropdownMenuSeparator />
+              <DropdownMenuItem
+                onClick={() => setShowCancelDialog(true)}
+                className="text-orange-600 focus:text-orange-600"
+                data-testid="menuitem-cancel-quotation"
+              >
+                <XCircle className="w-4 h-4 mr-2" />
+                Cancel Quotation
+              </DropdownMenuItem>
+            </>
+          )}
           {canEdit && (
             <>
               <DropdownMenuSeparator />
@@ -141,6 +181,15 @@ export default function QuotationActionsDropdown({ quotation, canEdit, canCreate
         title="Confirm Deletion"
         description={`Do you wish to confirm deleting Quotation "${quotation.quotation_number || quotation.quoteNumber}"? It will be moved to the recycle bin.`}
         confirmText="Yes, Delete"
+        confirmVariant="destructive"
+      />
+      <SimpleConfirmDialog
+        open={showCancelDialog}
+        onClose={() => setShowCancelDialog(false)}
+        onConfirm={handleCancel}
+        title="Cancel Quotation"
+        description={`Are you sure you want to cancel Quotation "${quotation.quotation_number || quotation.quoteNumber}"? This action cannot be undone.`}
+        confirmText="Yes, Cancel Quotation"
         confirmVariant="destructive"
       />
     </>

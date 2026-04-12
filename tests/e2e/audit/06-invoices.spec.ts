@@ -30,6 +30,7 @@ import { test, expect, Page } from '@playwright/test';
 import { BASE_URL, apiLogin, browserLogin, loadState, saveState } from './audit-helpers';
 
 interface InvoiceResponse { id: number; status: string; paymentStatus?: string; payment_status?: string; items?: unknown[]; }
+interface InvoiceListResponse { invoices?: InvoiceResponse[]; }
 
 /**
  * Creates an Invoice via browser form using InvoiceForm data-testids.
@@ -176,7 +177,8 @@ test.describe('Phase 6 — Invoices', () => {
 
     // Find the newly created invoice
     const invs = await (await fetch(`${BASE_URL}/api/invoices`, { headers: { Cookie: cookie } })).json() as InvoiceResponse[];
-    const allInvs = Array.isArray(invs) ? invs : (invs as any).invoices ?? [];
+    const invData = invs as InvoiceResponse[] | InvoiceListResponse;
+    const allInvs = Array.isArray(invData) ? invData : (invData.invoices ?? []);
     const recent = allInvs[allInvs.length - 1];
     inv01Id = recent?.id ?? 0;
     expect(inv01Id).toBeGreaterThan(0);
@@ -196,7 +198,8 @@ test.describe('Phase 6 — Invoices', () => {
     test.info().annotations.push({ type: 'result', description: `INV-02 form saved; invoice number: ${invNumber}` });
 
     const invs = await (await fetch(`${BASE_URL}/api/invoices`, { headers: { Cookie: cookie } })).json() as InvoiceResponse[];
-    const allInvs = Array.isArray(invs) ? invs : (invs as any).invoices ?? [];
+    const invData = invs as InvoiceResponse[] | InvoiceListResponse;
+    const allInvs = Array.isArray(invData) ? invData : (invData.invoices ?? []);
     const recent = allInvs[allInvs.length - 1];
     inv02Id = recent?.id ?? 0;
     expect(inv02Id).toBeGreaterThan(0);
@@ -242,7 +245,8 @@ test.describe('Phase 6 — Invoices', () => {
     test.info().annotations.push({ type: 'result', description: `INV-04 form saved; invoice number: ${invNumber}` });
 
     const invs = await (await fetch(`${BASE_URL}/api/invoices`, { headers: { Cookie: cookie } })).json() as InvoiceResponse[];
-    const allInvs = Array.isArray(invs) ? invs : (invs as any).invoices ?? [];
+    const invData = invs as InvoiceResponse[] | InvoiceListResponse;
+    const allInvs = Array.isArray(invData) ? invData : (invData.invoices ?? []);
     const recent = allInvs[allInvs.length - 1];
     inv04Id = recent?.id ?? 0;
     expect(inv04Id).toBeGreaterThan(0);

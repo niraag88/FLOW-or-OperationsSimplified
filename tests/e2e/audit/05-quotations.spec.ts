@@ -265,49 +265,34 @@ test.describe('Phase 5 — Quotations', () => {
     expect(['sent', 'submitted']).toContain(qt.status);
   });
 
-  test('5.7 cancel QT-02 from Draft via browser actions menu; verify status=cancelled', async ({ page }) => {
-    test.info().annotations.push({ type: 'action', description: `Navigate to /Quotations/${qt02Id}; open actions menu; click Cancel; confirm; verify status=cancelled` });
+  test('5.7 cancel QT-02 from Draft via browser actions menu (Cancel Quotation → Yes, Cancel Quotation)', async ({ page }) => {
+    test.info().annotations.push({ type: 'action', description: `Navigate to /Quotations list; find QT-02 row; open actions dropdown; click "Cancel Quotation"; click "Yes, Cancel Quotation" — strict browser, NO API fallback` });
     await browserLogin(page);
-    await page.goto(`${BASE_URL}/Quotations/${qt02Id}`);
+    await page.goto(`${BASE_URL}/Quotations`);
     await page.waitForLoadState('domcontentloaded', { timeout: 20000 });
-    await page.waitForTimeout(2500);
+    await page.waitForTimeout(2000);
 
-    // Try to find cancel button on detail page or in actions dropdown
-    const cancelBtn = page.locator('button').filter({ hasText: /cancel/i }).first();
-    const hasCancelBtn = await cancelBtn.isVisible({ timeout: 5000 }).catch(() => false);
-    if (hasCancelBtn) {
-      await cancelBtn.click();
-      await page.waitForTimeout(1500);
-      // Confirm dialog if present
-      const confirmBtn = page.locator('button').filter({ hasText: /yes|confirm/i }).first();
-      if (await confirmBtn.isVisible({ timeout: 3000 })) {
-        await confirmBtn.click();
-        await page.waitForTimeout(2000);
-      }
-    } else {
-      // Try actions dropdown on list page
-      await page.goto(`${BASE_URL}/Quotations`);
-      await page.waitForLoadState('domcontentloaded', { timeout: 20000 });
-      await page.waitForTimeout(2000);
-      // Open actions for QT-02 row
-      const actionsBtn = page.locator(`[data-id="${qt02Id}"] button, tr:has-text("${qt02Id}") button`).filter({ hasText: /actions|⋮|…/i }).first();
-      if (await actionsBtn.isVisible({ timeout: 3000 })) {
-        await actionsBtn.click();
-        await page.waitForTimeout(500);
-        const menuCancel = page.locator('[role="menuitem"]').filter({ hasText: /cancel/i }).first();
-        await expect(menuCancel).toBeVisible({ timeout: 5000 });
-        await menuCancel.click();
-        await page.waitForTimeout(2000);
-      } else {
-        // No cancel UI found — use API as last resort (annotated)
-        test.info().annotations.push({ type: 'note', description: 'No cancel button/menu found in browser — quotation cancel via API fallback' });
-        await fetch(`${BASE_URL}/api/quotations/${qt02Id}`, {
-          method: 'PUT',
-          headers: { 'Content-Type': 'application/json', Cookie: cookie },
-          body: JSON.stringify({ status: 'cancelled' }),
-        });
-      }
-    }
+    // Find the QT-02 row
+    const qt02Row = page.locator('tr, [role="row"]').filter({ hasText: new RegExp(String(qt02Id)) }).first();
+    await expect(qt02Row).toBeVisible({ timeout: 10000 });
+
+    // Open actions dropdown (last button in the row)
+    const actionsBtn = qt02Row.locator('button').last();
+    await expect(actionsBtn).toBeVisible({ timeout: 5000 });
+    await actionsBtn.click();
+    await page.waitForTimeout(800);
+
+    // Click "Cancel Quotation" menu item
+    const cancelMenuItem = page.locator('[role="menuitem"]').filter({ hasText: /cancel quotation/i }).first();
+    await expect(cancelMenuItem).toBeVisible({ timeout: 5000 });
+    await cancelMenuItem.click();
+    await page.waitForTimeout(1000);
+
+    // Confirm the cancel dialog
+    const confirmBtn = page.locator('button').filter({ hasText: /yes.*cancel|yes, cancel/i }).first();
+    await expect(confirmBtn).toBeVisible({ timeout: 5000 });
+    await confirmBtn.click();
+    await page.waitForTimeout(2500);
 
     const qt = await (await fetch(`${BASE_URL}/api/quotations/${qt02Id}`, { headers: { Cookie: cookie } })).json() as QuotationResponse;
     test.info().annotations.push({ type: 'result', description: `QT-02 status=${qt.status} (expected "cancelled")` });
