@@ -1,6 +1,6 @@
 import type { Express } from "express";
 import ExcelJS from 'exceljs';
-import { products, recycleBin, stockMovements, brands as brandsTable } from "@shared/schema";
+import { products, recycleBin, stockMovements, brands as brandsTable, purchaseOrderItems } from "@shared/schema";
 import { insertBrandSchema, insertProductSchema } from "@shared/schema";
 import { db } from "../db";
 import { eq, sql } from "drizzle-orm";
@@ -48,6 +48,18 @@ export function registerProductRoutes(app: Express) {
       const brandId = parseInt(req.params.id);
       const [brandToDelete] = await db.select().from(brandsTable).where(eq(brandsTable.id, brandId));
       if (!brandToDelete) return res.status(404).json({ error: 'Brand not found' });
+
+      // Delete any inactive products that reference this brand (active ones should be moved first)
+      const brandProducts = await db.select({ id: products.id, isActive: products.isActive })
+        .from(products).where(eq(products.brandId, brandId));
+      for (const prod of brandProducts) {
+        if (!prod.isActive) {
+          await db.delete(stockMovements).where(eq(stockMovements.productId, prod.id));
+          await db.delete(purchaseOrderItems).where(eq(purchaseOrderItems.productId, prod.id));
+          await db.delete(products).where(eq(products.id, prod.id));
+        }
+      }
+
       await db.insert(recycleBin).values({
         documentType: 'Brand',
         documentId: String(brandId),
@@ -422,10 +434,14 @@ export function registerProductRoutes(app: Express) {
             canRestore: true,
           }).returning({ id: recycleBin.id });
           binEntryId = binEntry.id;
+          await tx.delete(stockMovements).where(eq(stockMovements.productId, productId));
           await tx.delete(products).where(eq(products.id, productId));
         });
       } catch (deleteErr) {
-        const pgCode = (deleteErr instanceof Object && 'code' in deleteErr) ? String((deleteErr as Record<string, unknown>).code) : '';
+        const cause = (deleteErr instanceof Object && 'cause' in deleteErr) ? (deleteErr as Record<string, unknown>).cause : undefined;
+        const pgCode = (deleteErr instanceof Object && 'code' in deleteErr)
+          ? String((deleteErr as Record<string, unknown>).code)
+          : (cause instanceof Object && 'code' in cause ? String((cause as Record<string, unknown>).code) : '');
         if (pgCode === '23503') {
           await db.update(products).set({ isActive: false }).where(eq(products.id, productId));
           writeAuditLog({ actor: req.user!.id, actorName: req.user?.username || String(req.user!.id), targetId: String(productId), targetType: 'product', action: 'DEACTIVATE', details: `Product '${productToDelete?.name || productId}' (SKU: ${productToDelete?.sku || '?'}) deactivated (has order history)` });
