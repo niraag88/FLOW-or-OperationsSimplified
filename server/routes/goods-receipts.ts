@@ -472,23 +472,29 @@ export function registerGoodsReceiptRoutes(app: Express) {
 
         const poItemMap = new Map(lockedPoItems.map(i => [i.id, { ...i, productName: productNameMap.get(i.productId!) ?? null }]));
 
-        const overReceiveErrors: string[] = [];
+        // Aggregate requested quantities per poItemId to catch duplicate-line over-receive
+        const requestedByPoItem = new Map<number, number>();
         for (const item of items) {
           if (item.receivedQuantity <= 0) continue;
-          const existing = poItemMap.get(item.poItemId);
+          requestedByPoItem.set(item.poItemId, (requestedByPoItem.get(item.poItemId) ?? 0) + item.receivedQuantity);
+        }
+
+        const overReceiveErrors: string[] = [];
+        for (const [poItemId, totalRequested] of requestedByPoItem) {
+          const existing = poItemMap.get(poItemId);
           if (!existing) {
-            overReceiveErrors.push(`PO item ID ${item.poItemId} not found on PO ${po.poNumber}`);
+            overReceiveErrors.push(`PO item ID ${poItemId} not found on PO ${po.poNumber}`);
             continue;
           }
           const remaining = existing.quantity - (existing.receivedQuantity ?? 0);
-          const productLabel = existing.productName || `Product ID ${item.productId}`;
+          const productLabel = existing.productName || `Product ID ${existing.productId}`;
           if (remaining === 0) {
             overReceiveErrors.push(
               `All units for "${productLabel}" have already been received on this PO`
             );
-          } else if (item.receivedQuantity > remaining) {
+          } else if (totalRequested > remaining) {
             overReceiveErrors.push(
-              `Cannot receive ${item.receivedQuantity} units for "${productLabel}" — only ${remaining} unit${remaining === 1 ? "" : "s"} remaining on this PO`
+              `Cannot receive ${totalRequested} units for "${productLabel}" — only ${remaining} unit${remaining === 1 ? "" : "s"} remaining on this PO`
             );
           }
         }
