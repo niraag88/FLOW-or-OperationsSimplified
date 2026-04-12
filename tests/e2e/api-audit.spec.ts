@@ -1242,6 +1242,20 @@ test.describe('Invoices', () => {
     expect(status).toBe(200);
   });
 
+  test('PATCH /api/invoices/:id/cancel Admin → 200 (status transitions to cancelled)', async () => {
+    if (!IDs.invoice) return;
+    const { status, data } = await api('PATCH', `/api/invoices/${IDs.invoice}/cancel`, adminCookie);
+    expect(status).toBe(200);
+    const inv = data as { status?: string };
+    expect(inv.status).toBe('cancelled');
+  });
+
+  test('PATCH /api/invoices/:id/cancel already cancelled → 409', async () => {
+    if (!IDs.invoice) return;
+    const { status } = await api('PATCH', `/api/invoices/${IDs.invoice}/cancel`, adminCookie);
+    expect(status).toBe(409);
+  });
+
   test('DELETE /api/invoices/:id by Viewer → 403', async () => {
     if (!viewerCookie || !IDs.invoice) return;
     const { status } = await api('DELETE', `/api/invoices/${IDs.invoice}`, viewerCookie);
@@ -1252,6 +1266,13 @@ test.describe('Invoices', () => {
     if (!IDs.invoice) return;
     const { status } = await api('DELETE', `/api/invoices/${IDs.invoice}`, '');
     expect(status).toBe(401);
+  });
+
+  test('DELETE /api/invoices/:id by Admin → 200 (happy path)', async () => {
+    if (!IDs.invoice) return;
+    const { status } = await api('DELETE', `/api/invoices/${IDs.invoice}`, adminCookie);
+    expect(status).toBe(200);
+    IDs.invoice = 0;
   });
 });
 
@@ -1306,6 +1327,28 @@ test.describe('Delivery Orders', () => {
   test('GET /api/delivery-orders without auth → 401', async () => {
     const { status } = await api('GET', '/api/delivery-orders', '');
     expect(status).toBe(401);
+  });
+
+  test('PUT /api/delivery-orders/:id status → cancelled (cancellation path)', async () => {
+    if (!IDs.customer) return;
+    const createResp = await api('POST', '/api/delivery-orders', adminCookie, {
+      customer_id: IDs.customer,
+      status: 'draft',
+      total_amount: 0,
+      items: [],
+    });
+    if (createResp.status !== 201) return;
+    const tempDoId = (createResp.data as { id: number }).id;
+    const { status, data } = await api('PUT', `/api/delivery-orders/${tempDoId}`, adminCookie, {
+      customer_id: IDs.customer,
+      status: 'cancelled',
+      total_amount: 0,
+      items: [],
+    });
+    expect(status).toBe(200);
+    const updated = data as { status?: string };
+    expect(updated.status).toBe('cancelled');
+    await api('DELETE', `/api/delivery-orders/${tempDoId}`, adminCookie);
   });
 
   test('PATCH /api/delivery-orders/:id/scan-key → 200', async () => {
