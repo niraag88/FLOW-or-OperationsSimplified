@@ -1,0 +1,128 @@
+1. You now have two competing payment truths
+
+This is the biggest remaining issue.
+
+You now track payments at the GRN level, which makes sense for supplier paperwork and partial deliveries.
+
+But the app still also has PO-level payment status in other parts of the system:
+
+Purchase Orders page
+PO actions like “Mark as Paid”
+PO filters
+purchase statements in StatementsTab
+PO print view
+
+There is no sync logic that keeps PO payment status aligned with GRN payment status.
+
+So this can happen:
+
+a PO is marked paid while one or more GRNs under it are still outstanding
+GRNs are marked paid individually, but the PO still shows outstanding
+reports disagree depending on which page you look at
+
+That is now the main business-logic weakness in the app.
+
+What I recommend
+
+Pick one source of truth for purchase payments.
+
+Given your new design, I think the correct answer is:
+
+GRN-level payment should be the real payable truth.
+
+Then do one of these:
+
+remove/de-emphasize PO-level payment actions and statuses
+or derive PO payment status from its GRNs:
+all GRNs paid → PO paid
+some paid, some outstanding → PO partial
+none paid → PO outstanding
+
+Right now, keeping both as editable independent statuses is risky.
+
+2. GRN creation still lacks server-side protection against over-receiving
+
+This is the other important one.
+
+In POST /api/goods-receipts, the server trusts the incoming receivedQuantity values and inserts them as long as they are greater than zero.
+
+The UI does clamp to the remaining quantity, which is good.
+But the server does not enforce that rule.
+
+So a modified request or a bug could:
+
+receive more than the remaining quantity
+overstate stock
+overstate payable value
+distort reconciliation and payment reports
+
+For a business operations system, this matters.
+
+What I recommend
+
+On the server, before inserting each GRN item:
+
+fetch the current receivedQuantity for that PO item
+compute remaining quantity
+reject any receivedQuantity greater than remaining
+optionally allow a manager-only override later if you ever need it, but not by default
+
+This should be enforced server-side, not only in the UI.
+
+Medium-priority issues
+3. Purchase statements are still on the old PO payment model
+
+StatementsTab for purchase orders still renders one row per PO using PO-level payment fields.
+
+That means the new GRN reference/payment model has not fully reached the statements area.
+
+So if someone uses:
+
+Payments tab
+PO statements
+PO list
+
+they may still get different answers.
+
+This is really part of issue #1, but it is where the mismatch becomes visible.
+
+4. Naming is still a little vague
+
+The feature works, but the wording is still generic:
+
+Reference Number
+Reference Date
+Reference Amount
+
+That is usable, but not as clear as it could be.
+
+For long-term clarity, I still think these would be better:
+
+Supplier Ref. No.
+Supplier Ref. Date
+GRN Value instead of “Reference Amount”
+
+This is not a bug. It is a clarity improvement.
+
+5. Dependency risk is still worth reviewing
+
+After installing dependencies, npm reported:
+
+21 vulnerabilities
+including 2 critical
+
+That does not automatically mean your app is broken or exploitable.
+But before wider deployment, I would review the dependency tree and see which ones are actually relevant to runtime.
+
+For internal-only use behind auth, this is less urgent than the two business-logic issues above.
+Still worth cleaning up over time.
+
+Low-priority observations
+
+These are not blockers:
+
+build warns that some chunks are large, especially Reports/export-related bundles
+there are still some runtime logs in backup/restore paths
+route naming is cleaner than before but not perfectly uniform
+
+None of those would stop me from using the app internally.
