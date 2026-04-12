@@ -73,9 +73,9 @@ test.describe('Phase 9 — Documents, PDFs & Exports', () => {
     await page.waitForLoadState('domcontentloaded', { timeout: 20000 });
     await page.waitForTimeout(3000);
     const body = await page.locator('body').innerText();
-    test.info().annotations.push({ type: 'result', description: `INV-03 print body length: ${body.length}; has Customer 3: ${/audit customer 3/i.test(body)}` });
+    test.info().annotations.push({ type: 'result', description: `INV-03 print body length: ${body.length}; has Customer Three: ${/audit customer three/i.test(body)}` });
     expect(body.length).toBeGreaterThan(200);
-    expect(body).toMatch(/audit customer 3/i);
+    expect(body).toMatch(/audit customer three/i);
   });
 
   test('9.5 step 64: PO-01 print view — company header, purchase order content renders', async ({ page }) => {
