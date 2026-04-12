@@ -51,7 +51,7 @@ export default function POList({ purchaseOrders, totalCount, loading, canEdit, c
   const isShortDelivered = (po: any) => {
     const ordered = Number(po.orderedQty) || 0;
     const received = Number(po.receivedQty) || 0;
-    return ordered > 0 && received < ordered;
+    return ordered > 0 && received > 0 && received < ordered;
   };
 
   const handleEditPayment = (po: any) => {
