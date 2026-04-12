@@ -194,4 +194,31 @@ test.describe('Phase 5 — Quotations', () => {
     expect(body.length).toBeGreaterThan(100);
     expect(body).toMatch(/audit customer 2/i);
   });
+
+  test('5.12 attempt to convert QT-01 to Invoice via browser (step 39); annotate whether action exists', async ({ page }) => {
+    test.info().annotations.push({ type: 'action', description: `Navigate to QT-01 detail page /Quotations/${qt01Id}; look for "Convert to Invoice" or "Create Invoice" button; annotate result` });
+    await browserLogin(page);
+    await page.goto(`${BASE_URL}/Quotations/${qt01Id}`);
+    await page.waitForLoadState('domcontentloaded', { timeout: 20000 });
+    await page.waitForTimeout(2500);
+
+    const convertBtn = page.locator('button').filter({ hasText: /convert to invoice|create invoice|invoice from/i }).first();
+    const convertBtnVisible = await convertBtn.isVisible().catch(() => false);
+    test.info().annotations.push({
+      type: 'result',
+      description: convertBtnVisible
+        ? 'Convert to Invoice button EXISTS on QT-01 detail page'
+        : 'Convert to Invoice button NOT found on QT-01 detail page (action may not be implemented in UI)',
+    });
+
+    if (convertBtnVisible) {
+      await convertBtn.click();
+      await page.waitForTimeout(2500);
+      const newUrl = page.url();
+      const newBody = await page.locator('body').innerText();
+      const convertedToInvoice = /invoice/i.test(newUrl) || /invoice/i.test(newBody);
+      test.info().annotations.push({ type: 'result', description: `After clicking Convert: URL=${newUrl}; navigated to invoice: ${convertedToInvoice}` });
+      expect(newBody.length).toBeGreaterThan(50);
+    }
+  });
 });
