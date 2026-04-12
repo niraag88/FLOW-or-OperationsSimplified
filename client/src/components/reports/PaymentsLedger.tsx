@@ -12,7 +12,7 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "
 import { ChevronDown, ChevronRight, CreditCard, TrendingUp, TrendingDown, Search, Pencil, Check } from "lucide-react";
 import ExportDropdown from "../common/ExportDropdown";
 import { getRateToAed } from "@/utils/currency";
-import { apiRequest, queryClient } from "@/lib/queryClient";
+import { apiRequest } from "@/lib/queryClient";
 import { useToast } from "@/hooks/use-toast";
 
 const fmt = (v: any) => new Intl.NumberFormat("en-US", { minimumFractionDigits: 2, maximumFractionDigits: 2 }).format(v);
@@ -382,11 +382,11 @@ function PurchasesPaymentsSection({ purchaseOrders, goodsReceipts, suppliers, co
 
         const grnPayDate = grn.paymentMadeDate || grn.payment_made_date || null;
         const poPayDate = po?.paymentMadeDate || po?.payment_made_date || null;
-        const payDate = grnPayDate || (grnPs === null && poPs === "paid" ? poPayDate : null) || "";
+        const payDate = grnPayDate || (ps === "paid" ? poPayDate : null) || "";
 
         const grnRemarks = grn.paymentRemarks || grn.payment_remarks || null;
         const poRemarks = po?.paymentRemarks || po?.payment_remarks || null;
-        const remarks = grnRemarks || (grnPs === null && poPs === "paid" ? poRemarks : null) || "";
+        const remarks = grnRemarks || (ps === "paid" ? poRemarks : null) || "";
 
         return {
           ...grn,
@@ -395,7 +395,6 @@ function PurchasesPaymentsSection({ purchaseOrders, goodsReceipts, suppliers, co
           _origAmount: refAmt,
           _aed: refAed,
           _paymentStatus: ps,
-          _ownStatus: !!grnPs,
           _supplier: supplierName,
           _date: grn.receivedDate || grn.received_date || "",
           _refNumber: grn.referenceNumber || grn.reference_number || "",
