@@ -982,6 +982,74 @@ export function registerSystemRoutes(app: Express) {
     }
   });
 
+  /**
+   * POST /api/ops/factory-reset
+   *
+   * Wipes ALL business data from the public schema and re-inserts a blank
+   * company_settings row.  The ops schema (restore_runs) is intentionally
+   * untouched.  Users table is preserved — only the Admin can call this.
+   *
+   * Deletion order respects FK constraints (children before parents).
+   */
+  app.post('/api/ops/factory-reset', requireRole('Admin'), async (req: AuthenticatedRequest, res) => {
+    const client = await pool.connect();
+    try {
+      await client.query('BEGIN');
+
+      // 1. Children of leaf tables first
+      await client.query('DELETE FROM stock_movements');
+      await client.query('DELETE FROM stock_count_items');
+      await client.query('DELETE FROM stock_counts');
+      await client.query('DELETE FROM goods_receipt_items');
+      await client.query('DELETE FROM goods_receipts');
+      await client.query('DELETE FROM purchase_order_items');
+      await client.query('DELETE FROM purchase_orders');
+      await client.query('DELETE FROM invoice_line_items');
+      await client.query('DELETE FROM invoices');
+      await client.query('DELETE FROM delivery_order_items');
+      await client.query('DELETE FROM delivery_orders');
+      await client.query('DELETE FROM quotation_items');
+      await client.query('DELETE FROM quotations');
+      await client.query('DELETE FROM products');
+      await client.query('DELETE FROM customers');
+      await client.query('DELETE FROM suppliers');
+      await client.query('DELETE FROM brands');
+
+      // 2. Support tables
+      await client.query('DELETE FROM recycle_bin');
+      await client.query('DELETE FROM storage_objects');
+      await client.query('DELETE FROM audit_log');
+      await client.query('DELETE FROM vat_returns');
+      await client.query('DELETE FROM financial_years');
+      await client.query('DELETE FROM backup_runs');
+      await client.query('DELETE FROM signed_tokens');
+      await client.query('DELETE FROM storage_monitoring');
+
+      // 3. Reset company settings to a blank slate
+      await client.query('DELETE FROM company_settings');
+      await client.query(`INSERT INTO company_settings (company_name) VALUES ('')`);
+
+      await client.query('COMMIT');
+
+      writeAuditLog({
+        actor: req.user!.id,
+        actorName: req.user!.username,
+        targetId: 'system',
+        targetType: 'system',
+        action: 'FACTORY_RESET',
+        details: 'All business data wiped via factory reset',
+      });
+
+      res.json({ ok: true, message: 'Factory reset complete. All business data has been wiped.' });
+    } catch (error: any) {
+      await client.query('ROLLBACK').catch(() => {});
+      console.error('Factory reset failed:', error);
+      res.status(500).json({ error: 'Factory reset failed', details: error.message });
+    } finally {
+      client.release();
+    }
+  });
+
   app.get('/api/books', requireAuth(), async (req, res) => {
     try {
       const years = await db.select().from(financialYears).orderBy(desc(financialYears.year));
