@@ -48,30 +48,30 @@ test.describe('Phase 11 — Cleanup', () => {
     expect(combined.length).toBeGreaterThan(0);
   });
 
-  test('products list has 0 e2e_test records after cleanup', async () => {
-    test.info().annotations.push({ type: 'action', description: 'GET /api/products; assert 0 items with dataSource=e2e_test' });
+  test('products list has 0 e2e_test records after cleanup (verify all gone)', async () => {
+    test.info().annotations.push({ type: 'action', description: 'GET /api/products; assert 0 records with dataSource=e2e_test remain' });
     const raw = await (await fetch(`${BASE_URL}/api/products`, { headers: { Cookie: cookie } })).json() as EntityWithDataSource[] | { products?: EntityWithDataSource[] };
     const prods = Array.isArray(raw) ? raw : (raw.products ?? []);
     const e2eProds = prods.filter((p) => (p.dataSource ?? p.data_source) === 'e2e_test');
-    test.info().annotations.push({ type: 'result', description: `Total products: ${prods.length}; e2e_test: ${e2eProds.length}` });
+    test.info().annotations.push({ type: 'result', description: `Total products: ${prods.length}; e2e_test remaining: ${e2eProds.length}` });
     expect(e2eProds.length).toBe(0);
   });
 
-  test('customers list has 0 e2e_test records after cleanup', async () => {
-    test.info().annotations.push({ type: 'action', description: 'GET /api/customers; assert 0 items with dataSource=e2e_test' });
+  test('customers list has 0 e2e_test records after cleanup (verify all gone)', async () => {
+    test.info().annotations.push({ type: 'action', description: 'GET /api/customers; assert 0 records with dataSource=e2e_test remain' });
     const raw = await (await fetch(`${BASE_URL}/api/customers`, { headers: { Cookie: cookie } })).json() as EntityWithDataSource[] | { customers?: EntityWithDataSource[] };
     const custs = Array.isArray(raw) ? raw : (raw.customers ?? []);
     const e2eCusts = custs.filter((c) => (c.dataSource ?? c.data_source) === 'e2e_test');
-    test.info().annotations.push({ type: 'result', description: `Total customers: ${custs.length}; e2e_test: ${e2eCusts.length}` });
+    test.info().annotations.push({ type: 'result', description: `Total customers: ${custs.length}; e2e_test remaining: ${e2eCusts.length}` });
     expect(e2eCusts.length).toBe(0);
   });
 
-  test('brands list has 0 e2e_test records after cleanup', async () => {
-    test.info().annotations.push({ type: 'action', description: 'GET /api/brands; assert 0 items with dataSource=e2e_test' });
+  test('brands list has 0 e2e_test records after cleanup (verify all gone)', async () => {
+    test.info().annotations.push({ type: 'action', description: 'GET /api/brands; assert 0 records with dataSource=e2e_test remain' });
     const raw = await (await fetch(`${BASE_URL}/api/brands`, { headers: { Cookie: cookie } })).json() as EntityWithDataSource[] | { brands?: EntityWithDataSource[] };
     const brnds = Array.isArray(raw) ? raw : (raw.brands ?? []);
     const e2eBrands = brnds.filter((b) => (b.dataSource ?? b.data_source) === 'e2e_test');
-    test.info().annotations.push({ type: 'result', description: `Total brands: ${brnds.length}; e2e_test: ${e2eBrands.length}` });
+    test.info().annotations.push({ type: 'result', description: `Total brands: ${brnds.length}; e2e_test remaining: ${e2eBrands.length}` });
     expect(e2eBrands.length).toBe(0);
   });
 

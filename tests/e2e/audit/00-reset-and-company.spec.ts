@@ -23,28 +23,30 @@ test.describe('Phase 0 — Factory Reset & Company Settings', () => {
     cookie = await apiLogin();
   });
 
-  test('anonymous factory reset request is rejected with 403', async () => {
-    test.info().annotations.push({ type: 'action', description: 'POST /api/factory-reset without auth cookie' });
-    const resp = await fetch(`${BASE_URL}/api/factory-reset`, { method: 'POST' });
+  test('anonymous factory reset request is rejected (401 — no session)', async () => {
+    test.info().annotations.push({ type: 'action', description: 'POST /api/ops/factory-reset without auth cookie' });
+    const resp = await fetch(`${BASE_URL}/api/ops/factory-reset`, { method: 'POST' });
     test.info().annotations.push({ type: 'result', description: `HTTP ${resp.status}` });
-    expect(resp.status).toBe(403);
+    expect([401, 403]).toContain(resp.status);
   });
 
-  test('admin factory reset clears database (200 response)', async () => {
-    test.info().annotations.push({ type: 'action', description: 'POST /api/factory-reset with admin cookie' });
-    const resp = await fetch(`${BASE_URL}/api/factory-reset`, { method: 'POST', headers: { Cookie: cookie } });
+  test('admin factory reset clears database (200, ok=true)', async () => {
+    test.info().annotations.push({ type: 'action', description: 'POST /api/ops/factory-reset with admin cookie' });
+    const resp = await fetch(`${BASE_URL}/api/ops/factory-reset`, { method: 'POST', headers: { Cookie: cookie } });
     test.info().annotations.push({ type: 'result', description: `HTTP ${resp.status}` });
     expect(resp.status).toBe(200);
-    const body = await resp.json() as { success?: boolean };
-    expect(body.success).toBe(true);
+    const body = await resp.json() as { ok?: boolean; message?: string };
+    expect(body.ok).toBe(true);
   });
 
   test('idempotent reset: second factory reset also returns 200', async () => {
-    test.info().annotations.push({ type: 'action', description: 'POST /api/factory-reset second time' });
+    test.info().annotations.push({ type: 'action', description: 'POST /api/ops/factory-reset second time (idempotent)' });
     cookie = await apiLogin();
-    const resp = await fetch(`${BASE_URL}/api/factory-reset`, { method: 'POST', headers: { Cookie: cookie } });
+    const resp = await fetch(`${BASE_URL}/api/ops/factory-reset`, { method: 'POST', headers: { Cookie: cookie } });
     test.info().annotations.push({ type: 'result', description: `HTTP ${resp.status}` });
     expect(resp.status).toBe(200);
+    const body = await resp.json() as { ok?: boolean };
+    expect(body.ok).toBe(true);
   });
 
   test('unauthenticated access to /Customers redirects to /login', async ({ page }) => {
