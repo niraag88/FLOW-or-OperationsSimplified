@@ -13,14 +13,12 @@
  * 39. Convert QT-01 to Invoice (note: annotate if action exists)
  *
  * Browser-driven strategy:
- * - QT-01 creation: fully browser-driven via QuotationForm data-testids (3 items — simplified from 8;
- *   browser creation with 8 items would require iterating the Add Item button 8 times, each requiring
- *   brand+product selects. 3 items fully exercises the multi-item creation flow.)
+ * - QT-01 creation: fully browser-driven via QuotationForm data-testids (8 items per spec)
  * - QT-02 creation: fully browser-driven (1 item)
  * - QT-03 creation: API-assisted (12 items — extremely large browser form;
  *   print-layout test verifies the rendered output via real browser rendering)
  * - QT-01 Submit: browser button click on detail page
- * - QT-02 Cancel: browser cancel button on detail page
+ * - QT-02 Cancel: browser "Cancel Quotation" menu item in actions dropdown (strict, no API fallback)
  * - Print/export: browser-driven
  */
 import { test, expect, Page } from '@playwright/test';
@@ -172,18 +170,23 @@ test.describe('Phase 5 — Quotations', () => {
     test.info().annotations.push({ type: 'result', description: 'Quotation form opened — customer selector visible' });
   });
 
-  test('5.3 create QT-01 (Audit Customer One, 3 items) via browser form', async ({ page }) => {
-    test.info().annotations.push({ type: 'action', description: 'Open Quotation form via browser; select Audit Customer One; add 3 items with brand/product/qty/price; save' });
+  test('5.3 create QT-01 (Audit Customer One, 8 items) via browser form', async ({ page }) => {
+    test.info().annotations.push({ type: 'action', description: 'Open Quotation form via browser; select Audit Customer One; add 8 items with brand/product/qty/price; save' });
     await browserLogin(page);
     const { qtNumber } = await createQTviaBrowser(
       page,
       'Audit Customer One',
       [
-        { brandName: 'Alpha', productIndex: 0, qty: 10, price: 50.00, description: 'Audit QT-01 item 1' },
-        { brandName: 'Alpha', productIndex: 1, qty: 5, price: 100.00, description: 'Audit QT-01 item 2' },
-        { brandName: 'Beta', productIndex: 0, qty: 3, price: 200.00, description: 'Audit QT-01 item 3' },
+        { brandName: 'Alpha', productIndex: 0, qty: 10, price: 50.00, description: 'QT-01 line 1 Alpha item A' },
+        { brandName: 'Alpha', productIndex: 1, qty: 5, price: 100.00, description: 'QT-01 line 2 Alpha item B' },
+        { brandName: 'Beta', productIndex: 0, qty: 3, price: 200.00, description: 'QT-01 line 3 Beta item A' },
+        { brandName: 'Beta', productIndex: 1, qty: 6, price: 75.00, description: 'QT-01 line 4 Beta item B' },
+        { brandName: 'Alpha', productIndex: 2, qty: 4, price: 120.00, description: 'QT-01 line 5 Alpha item C' },
+        { brandName: 'Beta', productIndex: 2, qty: 2, price: 350.00, description: 'QT-01 line 6 Beta item C' },
+        { brandName: 'Alpha', productIndex: 3, qty: 8, price: 45.00, description: 'QT-01 line 7 Alpha item D' },
+        { brandName: 'Beta', productIndex: 3, qty: 1, price: 500.00, description: 'QT-01 line 8 Beta item D' },
       ],
-      'Audit QT-01 remarks — 3 items with mixed brands'
+      'Audit QT-01 remarks — 8 items with mixed brands'
     );
     test.info().annotations.push({ type: 'result', description: `QT-01 form saved; QT number: ${qtNumber}` });
 

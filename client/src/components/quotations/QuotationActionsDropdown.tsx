@@ -98,12 +98,15 @@ export default function QuotationActionsDropdown({ quotation, canEdit, canCreate
 
   const handleCancel = async () => {
     try {
-      await fetch(`/api/quotations/${quotation.id}`, {
+      const resp = await fetch(`/api/quotations/${quotation.id}`, {
         method: 'PUT',
         headers: { 'Content-Type': 'application/json' },
         credentials: 'include',
         body: JSON.stringify({ status: 'cancelled' }),
       });
+      if (!resp.ok) {
+        throw new Error(`Server returned ${resp.status}`);
+      }
       toast({
         title: 'Quotation Cancelled',
         description: `${quotation.quotation_number || quotation.quoteNumber} has been cancelled.`,

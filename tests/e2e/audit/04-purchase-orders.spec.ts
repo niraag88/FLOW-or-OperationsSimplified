@@ -190,8 +190,8 @@ test.describe('Phase 4 — Purchase Orders', () => {
     test.info().annotations.push({ type: 'result', description: 'PO creation form opened — brand combobox visible' });
   });
 
-  test('4.3 create PO-01 (Alpha Brand, GBP, 2 items) via browser form; status=draft', async ({ page }) => {
-    test.info().annotations.push({ type: 'action', description: 'Open PO form; select Alpha Brand; add 2 items; set GBP; save → assert row in list with draft status' });
+  test('4.3 create PO-01 (Alpha Brand, GBP, 5 items) via browser form; status=draft', async ({ page }) => {
+    test.info().annotations.push({ type: 'action', description: 'Open PO form; select Alpha Brand; add 5 items; set GBP; save → assert row in list with draft status' });
     await browserLogin(page);
     const { poNumber } = await createPOviaBrowser(
       page,
@@ -200,9 +200,12 @@ test.describe('Phase 4 — Purchase Orders', () => {
       [
         { productIndex: 0, qty: 10, price: 12.50 },
         { productIndex: 1, qty: 5, price: 25.00 },
+        { productIndex: 2, qty: 8, price: 18.00 },
+        { productIndex: 3, qty: 3, price: 45.00 },
+        { productIndex: 4, qty: 12, price: 8.75 },
       ],
       'draft',
-      'Audit PO-01 Alpha GBP'
+      'Audit PO-01 Alpha GBP — 5 items'
     );
     po01Number = poNumber;
     test.info().annotations.push({ type: 'result', description: `PO form submitted; PO number captured: ${po01Number}` });
@@ -297,8 +300,8 @@ test.describe('Phase 4 — Purchase Orders', () => {
     saveState({ poIds: { po01: po01Id, po02: po02Id, po03: 0 } });
   });
 
-  test('4.7 create PO-03 (Gamma Brand, 2 items, draft) via browser; then cancel via actions menu', async ({ page }) => {
-    test.info().annotations.push({ type: 'action', description: 'Open PO form; select Gamma Brand; add 2 items; save as draft; then cancel via actions menu' });
+  test('4.7 create PO-03 (Gamma Brand, 3 items, draft) via browser; then cancel via actions menu', async ({ page }) => {
+    test.info().annotations.push({ type: 'action', description: 'Open PO form; select Gamma Brand; add 3 items; save as draft; then cancel via actions menu' });
     await browserLogin(page);
     const { poNumber } = await createPOviaBrowser(
       page,
@@ -307,9 +310,10 @@ test.describe('Phase 4 — Purchase Orders', () => {
       [
         { productIndex: 0, qty: 3, price: 15.00 },
         { productIndex: 1, qty: 3, price: 15.00 },
+        { productIndex: 2, qty: 5, price: 22.00 },
       ],
       'draft',
-      'Audit PO-03 to be cancelled'
+      'Audit PO-03 to be cancelled — 3 items'
     );
     test.info().annotations.push({ type: 'result', description: `PO-03 form submitted; PO number: ${poNumber}` });
 

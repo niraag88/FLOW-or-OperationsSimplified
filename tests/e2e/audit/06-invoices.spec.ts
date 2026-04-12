@@ -16,10 +16,9 @@
  * 51. Payments Ledger: INV-01 and INV-02 appear paid; INV-03 outstanding
  *
  * Browser-driven strategy:
- * - INV-01 creation: fully browser-driven via InvoiceForm data-testids (3 items — simplified;
- *   fully exercises multi-item invoice creation flow)
+ * - INV-01 creation: fully browser-driven via InvoiceForm data-testids (6 items per spec)
  * - INV-02 creation: fully browser-driven (1 item)
- * - INV-04 creation: browser-driven (2 items; will be cancelled)
+ * - INV-04 creation: browser-driven (3 items per spec; will be cancelled)
  * - INV-03 creation: API-assisted (10 items — print test verifies browser rendering of all 10 lines)
  * - INV-01 Submit: browser button click on detail page
  * - INV-04 Cancel: browser actions dropdown (Cancel Invoice → Yes, Cancel Invoice)
@@ -160,8 +159,8 @@ test.describe('Phase 6 — Invoices', () => {
     test.info().annotations.push({ type: 'result', description: 'New Invoice + Create from Existing buttons both visible' });
   });
 
-  test('6.2 create INV-01 (Audit Customer One, 3 items with remarks) via browser form', async ({ page }) => {
-    test.info().annotations.push({ type: 'action', description: 'Open Invoice form via browser; select Audit Customer One; add 3 items with brand/product/qty/price; save' });
+  test('6.2 create INV-01 (Audit Customer One, 6 items with remarks) via browser form', async ({ page }) => {
+    test.info().annotations.push({ type: 'action', description: 'Open Invoice form via browser; select Audit Customer One; add 6 items with brand/product/qty/price; save' });
     await browserLogin(page);
     const { invNumber } = await createInvoiceViaBrowser(
       page,
@@ -170,8 +169,11 @@ test.describe('Phase 6 — Invoices', () => {
         { brandName: 'Alpha', productIndex: 0, qty: 6, price: 25.00 },
         { brandName: 'Alpha', productIndex: 1, qty: 4, price: 50.00 },
         { brandName: 'Beta', productIndex: 0, qty: 2, price: 100.00 },
+        { brandName: 'Beta', productIndex: 1, qty: 3, price: 80.00 },
+        { brandName: 'Alpha', productIndex: 2, qty: 5, price: 35.00 },
+        { brandName: 'Beta', productIndex: 2, qty: 1, price: 250.00 },
       ],
-      'Audit INV-01 overall remarks'
+      'Audit INV-01 overall remarks — 6 items with mixed brands'
     );
     test.info().annotations.push({ type: 'result', description: `INV-01 form saved; invoice number: ${invNumber}` });
 
@@ -231,8 +233,8 @@ test.describe('Phase 6 — Invoices', () => {
     expect((detail.items ?? []).length).toBe(10);
   });
 
-  test('6.5 create INV-04 (Audit Customer One, 2 items) via browser form — will be cancelled', async ({ page }) => {
-    test.info().annotations.push({ type: 'action', description: 'Open Invoice form via browser; select Audit Customer One; add 2 items; save — will cancel this invoice' });
+  test('6.5 create INV-04 (Audit Customer One, 3 items) via browser form — will be cancelled', async ({ page }) => {
+    test.info().annotations.push({ type: 'action', description: 'Open Invoice form via browser; select Audit Customer One; add 3 items; save — will cancel this invoice' });
     await browserLogin(page);
     const { invNumber } = await createInvoiceViaBrowser(
       page,
@@ -240,6 +242,7 @@ test.describe('Phase 6 — Invoices', () => {
       [
         { brandName: 'Gamma', productIndex: 0, qty: 3, price: 40.00 },
         { brandName: 'Gamma', productIndex: 1, qty: 2, price: 60.00 },
+        { brandName: 'Gamma', productIndex: 2, qty: 4, price: 20.00 },
       ]
     );
     test.info().annotations.push({ type: 'result', description: `INV-04 form saved; invoice number: ${invNumber}` });

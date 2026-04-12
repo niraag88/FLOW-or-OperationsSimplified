@@ -136,12 +136,21 @@ test.describe('Phase 10 — Audit Log & Recycle Bin', () => {
   test('10.6 step 69 continued: soft-deleted PO no longer visible in PO list', async ({ page }) => {
     test.info().annotations.push({ type: 'action', description: `Navigate to /PurchaseOrders; assert PO-${softDeletedPoId} is NOT in the active list anymore` });
     expect(softDeletedPoId).toBeGreaterThan(0);
+    expect(softDeletedPoNumber).toBeTruthy();
     await browserLogin(page);
     await page.goto(`${BASE_URL}/PurchaseOrders`);
     await page.waitForLoadState('domcontentloaded', { timeout: 20000 });
     await page.waitForTimeout(2000);
     const body = await page.locator('body').innerText();
-    test.info().annotations.push({ type: 'result', description: `PO ${softDeletedPoNumber} in active list: ${body.includes(softDeletedPoNumber)}` });
+    const visibleInList = body.includes(softDeletedPoNumber);
+    test.info().annotations.push({ type: 'result', description: `PO ${softDeletedPoNumber} in active list: ${visibleInList} (expected: false)` });
+    expect(visibleInList).toBe(false);
+
+    // Also verify via API: PO should NOT appear in the active PO list
+    const poList = await (await fetch(`${BASE_URL}/api/purchase-orders`, { headers: { Cookie: cookie } })).json() as PurchaseOrderResponse[];
+    const inActiveList = poList.find((p) => p.id === softDeletedPoId);
+    test.info().annotations.push({ type: 'result', description: `PO id=${softDeletedPoId} in API active list: ${!!inActiveList} (expected: false)` });
+    expect(inActiveList).toBeUndefined();
   });
 
   test('10.7 step 70: RESTORE soft-deleted PO from Recycle Bin; PO reappears in PO list as Draft', async () => {

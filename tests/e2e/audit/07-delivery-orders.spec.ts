@@ -217,8 +217,8 @@ test.describe('Phase 7 — Delivery Orders', () => {
     expect(do01Id).toBeGreaterThan(0);
   });
 
-  test('7.4 DO-02 creation via browser "New Delivery Order" form (Audit Customer Two, 2 items)', async ({ page }) => {
-    test.info().annotations.push({ type: 'action', description: 'Click New Delivery Order; select Audit Customer Two; add 2 items via DOForm data-testids; save' });
+  test('7.4 DO-02 creation via browser "New Delivery Order" form (Audit Customer Two, 3 items)', async ({ page }) => {
+    test.info().annotations.push({ type: 'action', description: 'Click New Delivery Order; select Audit Customer Two; add 3 items via DOForm data-testids; save' });
     await browserLogin(page);
     const { doNumber } = await createDOviaBrowser(
       page,
@@ -226,9 +226,10 @@ test.describe('Phase 7 — Delivery Orders', () => {
       [
         { brandName: 'Beta', productIndex: 0, qty: 2, price: 30.00 },
         { brandName: 'Beta', productIndex: 1, qty: 3, price: 45.00 },
+        { brandName: 'Beta', productIndex: 2, qty: 1, price: 60.00 },
       ],
       'draft',
-      'DO-02 manual delivery — to be cancelled'
+      'DO-02 manual delivery — 3 items, to be cancelled'
     );
     test.info().annotations.push({ type: 'result', description: `DO-02 form saved; DO number: ${doNumber}` });
 
