@@ -203,10 +203,10 @@ function buildStatementHtml({ type, entity, companySettings, records, dateFrom, 
 
   const headerRow = type === "invoices"
     ? `<th style="${thStyle}">Invoice #</th><th style="${thC}">Date</th><th style="${thR}">Subtotal</th><th style="${thR}">VAT</th><th style="${thR}">Total (AED)</th><th style="${thC}">Status</th><th style="${thC}">Received</th>`
-    : `<th style="${thStyle}">PO #</th><th style="${thC}">Date</th><th style="${thR}">Amount</th><th style="${thR}">Amount (AED)</th><th style="${thC}">Status</th><th style="${thC}">Payment Date</th>`;
+    : `<th style="${thStyle}">GRN #</th><th style="${thStyle}">PO #</th><th style="${thC}">Receipt Date</th><th style="${thStyle}">Reference No.</th><th style="${thR}">Amount</th><th style="${thR}">Amount (AED)</th><th style="${thC}">Status</th><th style="${thC}">Payment Date</th>`;
 
   const dataRows = records.length === 0
-    ? `<tr><td colspan="${type === "invoices" ? 8 : 7}" style="text-align:center;padding:16px;color:#9ca3af">No records</td></tr>`
+    ? `<tr><td colspan="${type === "invoices" ? 8 : 9}" style="text-align:center;padding:16px;color:#9ca3af">No records</td></tr>`
     : records.map((r: any, i: any) => {
         const statusBg    = r._paymentStatus === "paid" ? "#dcfce7" : "#fef3c7";
         const statusColor = r._paymentStatus === "paid" ? "#166534" : "#92400e";
@@ -224,11 +224,16 @@ function buildStatementHtml({ type, entity, companySettings, records, dateFrom, 
             <td style="${tdC}">${esc(fmtDate(r._paymentDate))}</td>
           </tr>`;
         }
+        const amtDisplay = r._currency && r._currency !== "AED"
+          ? `${esc(r._currency)} ${esc(fmt(r._origAmount))}`
+          : `AED ${esc(fmt(r._origAmount))}`;
         return `<tr>
           <td style="${tdC}">${i + 1}</td>
           <td style="${tdStyle}color:#7e22ce;font-weight:500">${esc(r._ref)}</td>
+          <td style="${tdStyle}color:#6b7280;font-size:9px">${esc(r._poRef || "")}</td>
           <td style="${tdC}">${esc(fmtDate(r._date))}</td>
-          <td style="${tdR}">${esc(r._currency)} ${esc(fmt(r._origAmount))}</td>
+          <td style="${tdStyle}color:#6b7280;font-size:9px">${esc(r._refNo || "—")}</td>
+          <td style="${tdR}">${amtDisplay}</td>
           <td style="${tdR}font-weight:600">AED ${esc(fmt(r._aed))}</td>
           <td style="${tdC}">${badge}</td>
           <td style="${tdC}">${esc(fmtDate(r._paymentDate))}</td>
@@ -420,8 +425,10 @@ function StatementLayout({ type, entity, companySettings, records, dateFrom, dat
                   </>
                 ) : (
                   <>
+                    <th className="p-2 font-bold text-emerald-900 text-left">GRN #</th>
                     <th className="p-2 font-bold text-emerald-900 text-left">PO #</th>
-                    <th className="text-center p-2 font-bold text-emerald-900">Date</th>
+                    <th className="text-center p-2 font-bold text-emerald-900">Receipt Date</th>
+                    <th className="p-2 font-bold text-emerald-900 text-left">Reference No.</th>
                     <th className="text-right p-2 font-bold text-emerald-900">Amount</th>
                     <th className="text-right p-2 font-bold text-emerald-900">Amount (AED)</th>
                     <th className="text-center p-2 font-bold text-emerald-900">Status</th>
@@ -432,7 +439,7 @@ function StatementLayout({ type, entity, companySettings, records, dateFrom, dat
             </thead>
             <tbody>
               {records.length === 0 ? (
-                <tr><td colSpan={type === "invoices" ? 8 : 7} className="text-center py-6 text-gray-400">No records</td></tr>
+                <tr><td colSpan={type === "invoices" ? 8 : 10} className="text-center py-6 text-gray-400">No records</td></tr>
               ) : records.map((r: any, i: any) => (
                 <tr key={r.id || i} className="border-b border-gray-100">
                   <td className="text-center p-2 text-gray-500">{i + 1}</td>
@@ -449,8 +456,12 @@ function StatementLayout({ type, entity, companySettings, records, dateFrom, dat
                   ) : (
                     <>
                       <td className="p-2 font-medium text-purple-700">{r._ref}</td>
+                      <td className="p-2 text-gray-500 text-[10px]">{r._poRef}</td>
                       <td className="text-center p-2 text-gray-600">{fmtDate(r._date)}</td>
-                      <td className="text-right p-2">{r._currency} {fmt(r._origAmount)}</td>
+                      <td className="p-2 text-gray-500 text-[10px]">{r._refNo || "—"}</td>
+                      <td className="text-right p-2">
+                        {r._currency && r._currency !== "AED" ? `${r._currency} ${fmt(r._origAmount)}` : `AED ${fmt(r._origAmount)}`}
+                      </td>
                       <td className="text-right p-2 font-semibold">AED {fmt(r._aed)}</td>
                       <td className="text-center p-2"><StatusBadge status={r._paymentStatus} /></td>
                       <td className="text-center p-2 text-gray-600">{fmtDate(r._paymentDate)}</td>
@@ -769,9 +780,9 @@ function InvoicesSection({ invoices, customers, companySettings }: { invoices: R
   );
 }
 
-/* ── Purchase Orders section ────────────────────────────────────────────── */
+/* ── Purchase GRNs section (one row per GRN, using GRN payment status) ──── */
 
-function PurchaseOrdersSection({ purchaseOrders, companySettings }: { purchaseOrders: Record<string, any>[]; companySettings: Record<string, any> | null }) {
+function PurchaseOrdersSection({ goodsReceipts, companySettings }: { goodsReceipts: Record<string, any>[]; companySettings: Record<string, any> | null }) {
   const [selectedBrandId, setSelectedBrandId] = useState("");
   const [statusFilter, setStatusFilter] = useState<any>("all");
   const [dateFrom, setDateFrom] = useState("");
@@ -785,13 +796,13 @@ function PurchaseOrdersSection({ purchaseOrders, companySettings }: { purchaseOr
 
   const eligibleBrands = useMemo(() => {
     const brandMap = new Map();
-    purchaseOrders.forEach((po: any) => {
-      const id = po.brandId || po.brand_id;
-      const name = po.brandName || po.brand_name;
+    goodsReceipts.forEach((grn: any) => {
+      const id = grn.poBrandId;
+      const name = grn.poBrandName;
       if (id && name) brandMap.set(String(id), { id: String(id), name });
     });
     return Array.from(brandMap.values()).sort((a: any, b: any) => a.name.localeCompare(b.name));
-  }, [purchaseOrders]);
+  }, [goodsReceipts]);
 
   const selectedBrand = useMemo(() => {
     const base = eligibleBrands.find((b) => b.id === selectedBrandId) || null;
@@ -801,28 +812,33 @@ function PurchaseOrdersSection({ purchaseOrders, companySettings }: { purchaseOr
   }, [eligibleBrands, selectedBrandId, allBrands]);
 
   const enriched = useMemo(() => {
-    return purchaseOrders.map((po: any) => {
-      const origAmt = parseFloat(po.totalAmount || po.total_amount || 0);
-      const currency = po.currency || "AED";
-      const storedRate = parseFloat(po.fxRateToAed || po.fx_rate_to_aed);
-      const rate = !isNaN(storedRate) && storedRate > 0 ? storedRate : getRateToAed(currency, companySettings);
-      const aed = currency === "AED" ? origAmt : origAmt * rate;
-      const ps = (po.paymentStatus || po.payment_status || "outstanding").toLowerCase();
-      return {
-        ...po,
-        _origAmount: origAmt,
-        _currency: currency,
-        _aed: aed,
-        _paymentStatus: ps,
-        _ref: po.poNumber || po.po_number || "",
-        _brand: po.brandName || po.brand_name || "",
-        _brandId: String(po.brandId || po.brand_id || ""),
-        _date: po.orderDate || po.order_date || "",
-        _paymentDate: po.paymentMadeDate || po.payment_made_date || "",
-        _remarks: po.paymentRemarks || po.payment_remarks || "",
-      };
-    });
-  }, [purchaseOrders, companySettings]);
+    return goodsReceipts
+      .filter((grn: any) => grn.poId)
+      .map((grn: any) => {
+        const origAmt = parseFloat(grn.referenceAmount || 0);
+        const currency = grn.poCurrency || "AED";
+        const storedRate = parseFloat(grn.poFxRateToAed);
+        const rate = !isNaN(storedRate) && storedRate > 0 ? storedRate : getRateToAed(currency, companySettings);
+        const aed = currency === "AED" ? origAmt : origAmt * rate;
+        const ps = (grn.paymentStatus || "outstanding").toLowerCase();
+        return {
+          ...grn,
+          _origAmount: origAmt,
+          _currency: currency,
+          _aed: aed,
+          _paymentStatus: ps,
+          _ref: grn.receiptNumber || "",
+          _poRef: grn.poNumber || "",
+          _brand: grn.poBrandName || "",
+          _brandId: String(grn.poBrandId || ""),
+          _date: grn.receivedDate || grn.createdAt || "",
+          _refNo: grn.referenceNumber || "",
+          _refDate: grn.referenceDate || "",
+          _paymentDate: grn.paymentMadeDate || "",
+          _remarks: grn.paymentRemarks || "",
+        };
+      });
+  }, [goodsReceipts, companySettings]);
 
   const filtered = useMemo(() => {
     if (!selectedBrandId) return [];
@@ -850,19 +866,22 @@ function PurchaseOrdersSection({ purchaseOrders, companySettings }: { purchaseOr
   };
 
   const exportData = filtered.map((r: any) => ({
-    po_number: r._ref,
+    grn_number: r._ref,
+    po_number: r._poRef,
     brand: r._brand,
-    order_date: fmtDate(r._date),
-    amount_orig: `${r._currency} ${fmt(r._origAmount)}`,
+    receipt_date: fmtDate(r._date),
+    reference_no: r._refNo || "—",
+    reference_date: fmtDate(r._refDate),
+    amount_orig: r._currency !== "AED" ? `${r._currency} ${fmt(r._origAmount)}` : `AED ${fmt(r._origAmount)}`,
     amount_aed: `AED ${fmt(r._aed)}`,
     payment_status: r._paymentStatus === "paid" ? "Paid" : "Outstanding",
     payment_date: fmtDate(r._paymentDate),
-    remarks: r._remarks,
+    remarks: r._remarks || "",
   }));
 
   const exportFilename = selectedBrand
-    ? `SOA_${(selectedBrand.name || "brand").replace(/\s+/g, "_")}`
-    : "SOA";
+    ? `SOA_GRN_${(selectedBrand.name || "brand").replace(/\s+/g, "_")}`
+    : "SOA_GRN";
 
   const hasActiveFilters = selectedBrandId || statusFilter !== "all" || dateFrom || dateTo;
 
@@ -912,7 +931,7 @@ function PurchaseOrdersSection({ purchaseOrders, companySettings }: { purchaseOr
 
         <div className="ml-auto flex items-end gap-2">
           <Button
-                        size="sm"
+            size="sm"
             disabled={!selectedBrandId}
             onClick={() => setShowStatement(true)}
             className="bg-emerald-700 hover:bg-emerald-800 text-white disabled:opacity-50"
@@ -922,12 +941,15 @@ function PurchaseOrdersSection({ purchaseOrders, companySettings }: { purchaseOr
           </Button>
           <ExportDropdown
             data={exportData}
-            type="PO Statement"
+            type="GRN Statement"
             filename={exportFilename}
             columns={{
+              grn_number: "GRN #",
               po_number: "PO #",
               brand: "Brand",
-              order_date: "Order Date",
+              receipt_date: "Receipt Date",
+              reference_no: "Reference No.",
+              reference_date: "Reference Date",
               amount_orig: "Amount",
               amount_aed: "Amount (AED)",
               payment_status: "Payment Status",
@@ -944,10 +966,11 @@ function PurchaseOrdersSection({ purchaseOrders, companySettings }: { purchaseOr
         <Table>
           <TableHeader>
             <TableRow className="bg-gray-50">
+              <TableHead className="font-semibold">GRN #</TableHead>
               <TableHead className="font-semibold">PO #</TableHead>
               <TableHead className="font-semibold">Brand</TableHead>
-              <TableHead className="font-semibold">Date</TableHead>
-              <TableHead className="font-semibold">Currency</TableHead>
+              <TableHead className="font-semibold">Receipt Date</TableHead>
+              <TableHead className="font-semibold">Reference No.</TableHead>
               <TableHead className="font-semibold text-right">Amount</TableHead>
               <TableHead className="font-semibold text-right">Amount (AED)</TableHead>
               <TableHead className="font-semibold">Status</TableHead>
@@ -958,28 +981,29 @@ function PurchaseOrdersSection({ purchaseOrders, companySettings }: { purchaseOr
           <TableBody>
             {filtered.length === 0 ? (
               <TableRow>
-                <TableCell colSpan={9} className="text-center py-10 text-gray-400">
+                <TableCell colSpan={10} className="text-center py-10 text-gray-400">
                   {selectedBrandId
-                    ? "No purchase orders match the current filters"
+                    ? "No goods receipts match the current filters"
                     : eligibleBrands.length === 0
-                      ? "No brands with purchase orders found"
-                      : "Search and select a brand to view their purchase orders"}
+                      ? "No brands with goods receipts found"
+                      : "Search and select a brand to view their statement"}
                 </TableCell>
               </TableRow>
             ) : (
               filtered.map((r: any) => (
                 <TableRow key={r.id} className="hover:bg-gray-50">
                   <TableCell className="font-medium text-purple-700">{r._ref}</TableCell>
+                  <TableCell className="text-gray-600 text-xs">{r._poRef}</TableCell>
                   <TableCell>{r._brand}</TableCell>
                   <TableCell className="text-gray-600">{fmtDate(r._date)}</TableCell>
-                  <TableCell>
-                    <Badge variant="outline" className="text-xs">{r._currency}</Badge>
+                  <TableCell className="text-gray-600 text-xs">{r._refNo || "—"}</TableCell>
+                  <TableCell className="text-right font-medium">
+                    {r._currency !== "AED" ? `${r._currency} ${fmt(r._origAmount)}` : `AED ${fmt(r._origAmount)}`}
                   </TableCell>
-                  <TableCell className="text-right font-medium">{r._currency} {fmt(r._origAmount)}</TableCell>
                   <TableCell className="text-right font-medium">AED {fmt(r._aed)}</TableCell>
                   <TableCell><StatusBadge status={r._paymentStatus} /></TableCell>
                   <TableCell className="text-gray-600">{fmtDate(r._paymentDate)}</TableCell>
-                  <TableCell className="text-gray-500 max-w-40 truncate" title={r._remarks}>{r._remarks || "—"}</TableCell>
+                  <TableCell className="text-gray-500 max-w-36 truncate" title={r._remarks}>{r._remarks || "—"}</TableCell>
                 </TableRow>
               ))
             )}
@@ -1008,17 +1032,18 @@ function PurchaseOrdersSection({ purchaseOrders, companySettings }: { purchaseOr
 interface StatementsTabProps {
   invoices: any[];
   purchaseOrders: any[];
+  goodsReceipts: any[];
   customers: any[];
   companySettings: Record<string, any> | null;
   suppliers: any[];
   books: any[];
 }
 
-export default function StatementsTab({ invoices, purchaseOrders, customers, companySettings, suppliers, books }: StatementsTabProps) {
+export default function StatementsTab({ invoices, purchaseOrders, goodsReceipts, customers, companySettings, suppliers, books }: StatementsTabProps) {
   return (
     <div className="space-y-4">
       <p className="text-sm text-gray-500">
-        Generate statements of account for customers (invoices) and brands (purchase orders).
+        Generate statements of account for customers (invoices) and brands (goods receipts).
         Search and select an entity, apply filters, then click{" "}
         <strong>Generate Statement</strong> to preview and print.
       </p>
@@ -1031,9 +1056,9 @@ export default function StatementsTab({ invoices, purchaseOrders, customers, com
         />
       </CollapsibleSection>
 
-      <CollapsibleSection title="Purchase Orders" icon={TrendingDown} iconColor="bg-purple-50 text-purple-600">
+      <CollapsibleSection title="Goods Receipts (Brand Payables)" icon={TrendingDown} iconColor="bg-purple-50 text-purple-600">
         <PurchaseOrdersSection
-          purchaseOrders={purchaseOrders || []}
+          goodsReceipts={goodsReceipts || []}
           companySettings={companySettings}
         />
       </CollapsibleSection>

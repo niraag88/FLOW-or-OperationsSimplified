@@ -1,5 +1,5 @@
 import type { Express } from "express";
-import { goodsReceipts, goodsReceiptItems, purchaseOrders, purchaseOrderItems, stockCounts, stockCountItems, products, suppliers, storageObjects } from "@shared/schema";
+import { goodsReceipts, goodsReceiptItems, purchaseOrders, purchaseOrderItems, stockCounts, stockCountItems, products, suppliers, brands, storageObjects } from "@shared/schema";
 import { db } from "../db";
 import { eq, desc, sql, inArray, and } from "drizzle-orm";
 import { businessStorage } from "../businessStorage";
@@ -169,6 +169,10 @@ export function registerGoodsReceiptRoutes(app: Express) {
         paymentRemarks: goodsReceipts.paymentRemarks,
         createdAt: goodsReceipts.createdAt,
         poNumber: purchaseOrders.poNumber,
+        poBrandId: purchaseOrders.brandId,
+        poBrandName: sql<string>`(SELECT b.name FROM brands b WHERE b.id = ${purchaseOrders.brandId})`.as('po_brand_name'),
+        poCurrency: purchaseOrders.currency,
+        poFxRateToAed: purchaseOrders.fxRateToAed,
         supplierName: suppliers.name,
         referenceAmount: sql<number>`COALESCE((
           SELECT SUM(gri.received_quantity * gri.unit_price::numeric)
@@ -431,6 +435,34 @@ export function registerGoodsReceiptRoutes(app: Express) {
       const [po] = await db.select().from(purchaseOrders).where(eq(purchaseOrders.id, poId));
       if (!po) {
         return res.status(404).json({ error: 'Purchase order not found' });
+      }
+
+      const existingPoItems = await db.select({
+        id: purchaseOrderItems.id,
+        quantity: purchaseOrderItems.quantity,
+        receivedQuantity: purchaseOrderItems.receivedQuantity,
+      }).from(purchaseOrderItems).where(eq(purchaseOrderItems.poId, poId));
+
+      const poItemMap = new Map(existingPoItems.map(i => [i.id, i]));
+
+      const overReceiveErrors: string[] = [];
+      for (const item of items) {
+        if (item.receivedQuantity <= 0) continue;
+        const existing = poItemMap.get(item.poItemId);
+        if (!existing) continue;
+        const remaining = existing.quantity - (existing.receivedQuantity ?? 0);
+        if (item.receivedQuantity > remaining) {
+          overReceiveErrors.push(
+            `Product ID ${item.productId}: receiving ${item.receivedQuantity} but only ${remaining} remaining (ordered ${existing.quantity}, already received ${existing.receivedQuantity ?? 0})`
+          );
+        }
+      }
+
+      if (overReceiveErrors.length > 0) {
+        return res.status(400).json({
+          error: 'Over-receive not allowed',
+          details: overReceiveErrors
+        });
       }
 
       const receiptNumber = await businessStorage.generateGrnNumber();

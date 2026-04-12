@@ -242,6 +242,7 @@ export default function Reports() {
           <StatementsTab
             invoices={data.invoices}
             purchaseOrders={data.purchaseOrders}
+            goodsReceipts={data.goodsReceipts}
             customers={data.customers}
             suppliers={data.suppliers}
             companySettings={data.companySettings}
