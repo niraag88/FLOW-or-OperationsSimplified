@@ -23,95 +23,46 @@
 
 import pkg from 'pg';
 const { Pool } = pkg;
+import { FACTORY_RESET_TABLES, executeFactoryReset } from '../server/factoryReset.js';
 
 const pool = new Pool({ connectionString: process.env.DATABASE_URL });
 const DRY_RUN = process.argv.includes('--dry-run');
 const ALL_USER_DATA = process.argv.includes('--all-user-data');
 
+export { executeFactoryReset };
+
 /**
- * executeFactoryReset — shared reset logic used by both this CLI script and
- * the POST /api/ops/factory-reset HTTP endpoint.
+ * CLI wrapper around executeFactoryReset that supports --dry-run.
  *
- * Deletes all business data in FK-safe order and re-inserts a blank
- * company_settings row.  Runs inside a single pg transaction.
+ * Dry-run mode: counts rows in each table (using FACTORY_RESET_TABLES from the
+ * shared server module) and prints the plan, but rolls back without deleting.
+ * Live mode: delegates to executeFactoryReset() directly (single source of truth).
  *
  * @param client - a connected pg PoolClient (caller must release it)
  * @param dryRun - if true, prints what would be deleted but rolls back
  */
-export async function executeFactoryReset(
+async function runCliFactoryReset(
   client: pkg.PoolClient,
   dryRun = false,
 ): Promise<{ tablesCleared: string[]; rowsDeleted: number }> {
+  if (!dryRun) {
+    return executeFactoryReset(client, { id: 'cli', name: 'CLI:delete-dummy-data' });
+  }
+
+  // Dry-run: count rows without deleting; use shared table list for consistency
   const tablesCleared: string[] = [];
   let rowsDeleted = 0;
 
-  const wipe = async (table: string) => {
-    const count = await client.query(`SELECT COUNT(*) AS n FROM ${table}`);
-    const n = parseInt(count.rows[0].n, 10);
-    if (!dryRun) {
-      await client.query(`DELETE FROM ${table}`);
-    }
+  for (const table of FACTORY_RESET_TABLES) {
+    const r = await client.query(`SELECT COUNT(*) AS n FROM ${table}`);
+    const n = parseInt(r.rows[0].n, 10);
     if (n > 0) {
       tablesCleared.push(table);
       rowsDeleted += n;
     }
-    console.log(`  ${dryRun ? '[dry]' : 'DEL '} ${table.padEnd(30)} ${n} rows`);
-  };
-
-  await client.query('BEGIN');
-  try {
-    // Children before parents — mirrors HTTP route order
-    await wipe('stock_movements');
-    await wipe('stock_count_items');
-    await wipe('stock_counts');
-    await wipe('goods_receipt_items');
-    await wipe('goods_receipts');
-    await wipe('purchase_order_items');
-    await wipe('purchase_orders');
-    await wipe('invoice_line_items');
-    await wipe('invoices');
-    await wipe('delivery_order_items');
-    await wipe('delivery_orders');
-    await wipe('quotation_items');
-    await wipe('quotations');
-    await wipe('products');
-    await wipe('customers');
-    await wipe('suppliers');
-    await wipe('brands');
-    await wipe('recycle_bin');
-    await wipe('storage_objects');
-    await wipe('audit_log');
-    await wipe('vat_returns');
-    await wipe('financial_years');
-    await wipe('backup_runs');
-    await wipe('signed_tokens');
-    await wipe('storage_monitoring');
-
-    if (!dryRun) {
-      await client.query('DELETE FROM company_settings');
-      await client.query(`INSERT INTO company_settings (company_name) VALUES ('')`);
-      console.log(`  RESET company_settings (blank row inserted)`);
-
-      // Audit log entry — inside the transaction for reliability
-      await client.query(
-        `INSERT INTO audit_log (actor, actor_name, target_id, target_type, action, details, timestamp)
-         VALUES ($1, $2, $3, $4, $5, $6, NOW())`,
-        ['cli', 'CLI:delete-dummy-data', 'system', 'system', 'FACTORY_RESET',
-         'All business data wiped via delete-dummy-data --all-user-data'],
-      );
-    } else {
-      console.log(`  [dry] company_settings would be reset to blank row`);
-    }
-
-    if (dryRun) {
-      await client.query('ROLLBACK');
-    } else {
-      await client.query('COMMIT');
-    }
-  } catch (err) {
-    await client.query('ROLLBACK').catch(() => {});
-    throw err;
+    console.log(`  [dry] ${table.padEnd(30)} ${n} rows`);
   }
+  console.log(`  [dry] company_settings would be reset to blank row`);
 
   return { tablesCleared, rowsDeleted };
 }
@@ -155,7 +106,7 @@ async function main() {
     }
     const client = await pool.connect();
     try {
-      const { rowsDeleted } = await executeFactoryReset(client, DRY_RUN);
+      const { rowsDeleted } = await runCliFactoryReset(client, DRY_RUN);
       console.log(`\n${DRY_RUN ? '[DRY RUN] Would have deleted' : 'Deleted'} ${rowsDeleted} rows total.`);
       if (!DRY_RUN) {
         console.log('\n✓ Factory reset complete. All business data removed; blank company_settings inserted.');

@@ -65,6 +65,7 @@ test.describe('UI Flows — page loads, dialogs, navigation', () => {
   });
 
   test('DO "Create from Existing" dialog: select submitted invoice and verify form pre-population', async ({ page }) => {
+    test.skip(!testInvoiceId, 'Requires a submitted invoice — skipped when DB is empty (no products available)');
     // Full browser flow: open dialog → switch to invoice tab → select invoice → confirm → verify form shown
     await login(page);
 

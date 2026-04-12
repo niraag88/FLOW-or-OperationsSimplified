@@ -1,6 +1,7 @@
 import type { Express } from "express";
 import { auditLog, recycleBin, storageObjects, invoices, deliveryOrders, quotations, purchaseOrders, invoiceLineItems, deliveryOrderItems, quotationItems, purchaseOrderItems, products, brands, suppliers, customers, financialYears, backupRuns, restoreRuns, users } from "@shared/schema";
 import { db, pool } from "../db";
+import { executeFactoryReset } from "../factoryReset";
 import { eq, desc, sum, inArray } from "drizzle-orm";
 import { Readable } from 'stream';
 import { execSync } from 'child_process';
@@ -994,60 +995,12 @@ export function registerSystemRoutes(app: Express) {
   app.post('/api/ops/factory-reset', requireRole('Admin'), async (req: AuthenticatedRequest, res) => {
     const client = await pool.connect();
     try {
-      await client.query('BEGIN');
-
-      // 1. Children of leaf tables first
-      await client.query('DELETE FROM stock_movements');
-      await client.query('DELETE FROM stock_count_items');
-      await client.query('DELETE FROM stock_counts');
-      await client.query('DELETE FROM goods_receipt_items');
-      await client.query('DELETE FROM goods_receipts');
-      await client.query('DELETE FROM purchase_order_items');
-      await client.query('DELETE FROM purchase_orders');
-      await client.query('DELETE FROM invoice_line_items');
-      await client.query('DELETE FROM invoices');
-      await client.query('DELETE FROM delivery_order_items');
-      await client.query('DELETE FROM delivery_orders');
-      await client.query('DELETE FROM quotation_items');
-      await client.query('DELETE FROM quotations');
-      await client.query('DELETE FROM products');
-      await client.query('DELETE FROM customers');
-      await client.query('DELETE FROM suppliers');
-      await client.query('DELETE FROM brands');
-
-      // 2. Support tables
-      await client.query('DELETE FROM recycle_bin');
-      await client.query('DELETE FROM storage_objects');
-      await client.query('DELETE FROM audit_log');
-      await client.query('DELETE FROM vat_returns');
-      await client.query('DELETE FROM financial_years');
-      await client.query('DELETE FROM backup_runs');
-      await client.query('DELETE FROM signed_tokens');
-      await client.query('DELETE FROM storage_monitoring');
-
-      // 3. Reset company settings to a blank slate
-      await client.query('DELETE FROM company_settings');
-      await client.query(`INSERT INTO company_settings (company_name) VALUES ('')`);
-
-      // 4. Insert audit entry inside the transaction so it is guaranteed to persist
-      await client.query(
-        `INSERT INTO audit_log (actor, actor_name, target_id, target_type, action, details, timestamp)
-         VALUES ($1, $2, $3, $4, $5, $6, NOW())`,
-        [
-          req.user!.id,
-          req.user!.username,
-          'system',
-          'system',
-          'FACTORY_RESET',
-          'All business data wiped via factory reset',
-        ],
-      );
-
-      await client.query('COMMIT');
-
+      await executeFactoryReset(client, {
+        id: String(req.user!.id),
+        name: req.user!.username,
+      });
       res.json({ ok: true, message: 'Factory reset complete. All business data has been wiped.' });
     } catch (error: any) {
-      await client.query('ROLLBACK').catch(() => {});
       console.error('Factory reset failed:', error);
       res.status(500).json({ error: 'Factory reset failed', details: error.message });
     } finally {
