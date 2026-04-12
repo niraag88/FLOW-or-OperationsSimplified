@@ -29,6 +29,12 @@ export function registerProductRoutes(app: Express) {
       if (error instanceof ZodError) {
         return res.status(400).json({ error: 'Validation failed', details: error.errors });
       }
+      const isObj = typeof error === 'object' && error !== null;
+      const causeObj = isObj && 'cause' in error && typeof (error as { cause: unknown }).cause === 'object' && (error as { cause: unknown }).cause !== null ? (error as { cause: Record<string, unknown> }).cause : null;
+      const errCode = (isObj && 'code' in error ? String((error as { code: unknown }).code) : '') || (causeObj && 'code' in causeObj ? String(causeObj.code) : '');
+      if (errCode === '23505') {
+        return res.status(409).json({ error: 'A brand with that name already exists.' });
+      }
       console.error('Error creating brand:', error);
       res.status(500).json({ error: 'Failed to create brand' });
     }

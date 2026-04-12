@@ -65,10 +65,12 @@ export function registerSupplierRoutes(app: Express) {
       await businessStorage.deleteSupplier(supplierId);
       writeAuditLog({ actor: req.user!.id, actorName: req.user?.username || String(req.user!.id), targetId: String(supplierId), targetType: 'supplier', action: 'DELETE', details: `Supplier '${supplierToDelete.name}' moved to recycle bin` });
       res.json({ success: true });
-    } catch (error: any) {
+    } catch (error: unknown) {
       console.error('Error deleting supplier:', error);
-      const errCode = error?.code ?? error?.cause?.code;
-      const errMsg = String(error?.message ?? '');
+      const isObj = typeof error === 'object' && error !== null;
+      const causeObj = isObj && 'cause' in error && typeof (error as { cause: unknown }).cause === 'object' && (error as { cause: unknown }).cause !== null ? (error as { cause: Record<string, unknown> }).cause : null;
+      const errCode = (isObj && 'code' in error ? String((error as { code: unknown }).code) : '') || (causeObj && 'code' in causeObj ? String(causeObj.code) : '');
+      const errMsg = isObj && 'message' in error ? String((error as { message: unknown }).message) : '';
       if (errCode === '23503' || errMsg.includes('foreign key') || errMsg.includes('violates foreign key')) {
         return res.status(400).json({ error: 'Cannot delete supplier — it is referenced by one or more purchase orders. Delete or reassign those orders first.' });
       }

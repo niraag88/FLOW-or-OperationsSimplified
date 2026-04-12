@@ -416,6 +416,15 @@ test.describe('Brands', () => {
     expect(status).toBe(400);
   });
 
+  test('POST /api/brands with duplicate name → 409 or 400 (unique constraint)', async () => {
+    const { status } = await api('POST', '/api/brands', adminCookie, {
+      name: 'AuditBrand_Primary',
+      dataSource: 'e2e_test',
+    });
+    note(`Duplicate brand name → ${status}`);
+    expect([400, 409]).toContain(status);
+  });
+
   test('GET /api/brands list → 200 array, < 500ms', async () => {
     const { status, data, ms } = await api('GET', '/api/brands', adminCookie);
     expect(status).toBe(200);
@@ -501,9 +510,10 @@ test.describe('Products', () => {
   });
 
   test('POST /api/products by Viewer (Staff) → 403 (Admin/Manager only)', async () => {
-    expect(viewerCookie).toBeTruthy();
     expect(IDs.brand).toBeGreaterThan(0);
-    const { status } = await api('POST', '/api/products', viewerCookie, {
+    const localViewerCookie = viewerCookie || await loginAs('viewer_audit_test', 'Viewer123!').catch(() => '');
+    expect(localViewerCookie, 'viewer_audit_test login must succeed (created in Users tests)').toBeTruthy();
+    const { status } = await api('POST', '/api/products', localViewerCookie, {
       sku: 'AUDIT-VIEWER-SKU',
       name: 'Viewer Product',
       brandId: IDs.brand,
@@ -645,10 +655,10 @@ test.describe('Customers', () => {
       phone: '+971501234567',
       billingAddress: '123 Test St, Dubai, UAE',
       vatNumber: 'TRN999888777666555',
-      vatTreatment: 'Local',
+      vatTreatment: 'standard',
       dataSource: 'e2e_test',
     });
-    expect(status).toBe(201);
+    expect(status, `Customer create got ${status}: ${JSON.stringify(data)}`).toBe(201);
     IDs.customer = (data as { id: number }).id;
     expect(IDs.customer).toBeGreaterThan(0);
   });
@@ -754,7 +764,9 @@ test.describe('Purchase Orders', () => {
   });
 
   test('POST /api/purchase-orders create with items → 201', async () => {
-    if (!IDs.supplier || !IDs.product || !IDs.brand) return;
+    expect(IDs.supplier).toBeGreaterThan(0);
+    expect(IDs.product).toBeGreaterThan(0);
+    expect(IDs.brand).toBeGreaterThan(0);
     const { status, data } = await api('POST', '/api/purchase-orders', adminCookie, {
       supplierId: IDs.supplier,
       brandId: IDs.brand,
@@ -775,6 +787,16 @@ test.describe('Purchase Orders', () => {
     expect(status).toBe(201);
     IDs.po = (data as { id: number }).id;
     expect(IDs.po).toBeGreaterThan(0);
+  });
+
+  test('POST /api/purchase-orders missing brandId → 400 (validation)', async () => {
+    expect(IDs.supplier).toBeGreaterThan(0);
+    const { status } = await api('POST', '/api/purchase-orders', adminCookie, {
+      supplierId: IDs.supplier,
+      currency: 'AED',
+      items: [],
+    });
+    expect(status).toBe(400);
   });
 
   test('POST /api/purchase-orders by Viewer (Staff) → 403', async () => {
@@ -1040,10 +1062,12 @@ test.describe('Quotations', () => {
 
   test.beforeAll(async () => {
     adminCookie = await loginAs('admin', 'admin123');
+    console.log('[Quotations beforeAll] IDs state:', JSON.stringify(IDs));
   });
 
   test('POST /api/quotations create with items → 201', async () => {
-    if (!IDs.customer || !IDs.product) return;
+    expect(IDs.customer).toBeGreaterThan(0);
+    expect(IDs.product).toBeGreaterThan(0);
     const { status, data } = await api('POST', '/api/quotations', adminCookie, {
       customerId: IDs.customer,
       customerName: 'Audit Customer LLC Updated',
@@ -1141,7 +1165,8 @@ test.describe('Invoices', () => {
   });
 
   test('POST /api/invoices create with items → 201', async () => {
-    if (!IDs.customer || !IDs.product) return;
+    expect(IDs.customer).toBeGreaterThan(0);
+    expect(IDs.product).toBeGreaterThan(0);
     const { status, data } = await api('POST', '/api/invoices', adminCookie, {
       customer_id: IDs.customer,
       invoice_date: '2026-04-12',
@@ -1183,12 +1208,28 @@ test.describe('Invoices', () => {
   });
 
   test('GET /api/invoices/:id → 200 with invoice_number and items', async () => {
-    if (!IDs.invoice) return;
+    expect(IDs.invoice).toBeGreaterThan(0);
     const { status, data } = await api('GET', `/api/invoices/${IDs.invoice}`, adminCookie);
     expect(status).toBe(200);
-    const inv = data as { invoice_number?: string; items?: unknown[] };
+    const inv = data as { invoice_number?: string; status?: string; items?: unknown[] };
     expect(inv.invoice_number).toBeTruthy();
+    expect(inv.status).toBe('draft');
     expect(Array.isArray(inv.items)).toBe(true);
+  });
+
+  test('PUT /api/invoices/:id draft→submitted status transition → 200', async () => {
+    expect(IDs.invoice).toBeGreaterThan(0);
+    expect(IDs.customer).toBeGreaterThan(0);
+    const { status, data } = await api('PUT', `/api/invoices/${IDs.invoice}`, adminCookie, {
+      customer_id: IDs.customer,
+      status: 'submitted',
+      total_amount: 519.75,
+      tax_amount: 24.75,
+      items: [],
+    });
+    expect(status).toBe(200);
+    const updated = data as { status?: string };
+    expect(updated.status).toBe('submitted');
   });
 
   test('GET /api/invoices without auth → 401', async () => {
@@ -1196,15 +1237,8 @@ test.describe('Invoices', () => {
     expect(status).toBe(401);
   });
 
-  test('PATCH /api/invoices/:id/payment paid + paymentReceivedDate → 200', async () => {
-    if (!IDs.invoice) return;
-    await api('PUT', `/api/invoices/${IDs.invoice}`, adminCookie, {
-      customer_id: IDs.customer,
-      status: 'submitted',
-      total_amount: 519.75,
-      tax_amount: 24.75,
-      items: [],
-    });
+  test('PATCH /api/invoices/:id/payment submitted→paid + paymentReceivedDate → 200', async () => {
+    expect(IDs.invoice).toBeGreaterThan(0);
     const { status, data } = await api('PATCH', `/api/invoices/${IDs.invoice}/payment`, adminCookie, {
       paymentStatus: 'paid',
       paymentReceivedDate: '2026-04-12',
@@ -1216,7 +1250,7 @@ test.describe('Invoices', () => {
   });
 
   test('PATCH /api/invoices/:id/payment invalid paymentStatus → 400', async () => {
-    if (!IDs.invoice) return;
+    expect(IDs.invoice).toBeGreaterThan(0);
     const { status } = await api('PATCH', `/api/invoices/${IDs.invoice}/payment`, adminCookie, {
       paymentStatus: 'partially_paid',
     });
@@ -1224,7 +1258,7 @@ test.describe('Invoices', () => {
   });
 
   test('PATCH /api/invoices/:id/payment paid without date → 400', async () => {
-    if (!IDs.invoice) return;
+    expect(IDs.invoice).toBeGreaterThan(0);
     const { status } = await api('PATCH', `/api/invoices/${IDs.invoice}/payment`, adminCookie, {
       paymentStatus: 'paid',
     });
@@ -1232,15 +1266,15 @@ test.describe('Invoices', () => {
   });
 
   test('PATCH /api/invoices/:id/scan-key attach key → 200', async () => {
-    if (!IDs.invoice) return;
+    expect(IDs.invoice).toBeGreaterThan(0);
     const { status } = await api('PATCH', `/api/invoices/${IDs.invoice}/scan-key`, adminCookie, {
       scanKey: 'invoices/2026/test-audit-scan.pdf',
     });
     expect(status).toBe(200);
   });
 
-  test('PATCH /api/invoices/:id/cancel Admin → 200 (status transitions to cancelled)', async () => {
-    if (!IDs.invoice) return;
+  test('PATCH /api/invoices/:id/cancel paid→cancelled status transition → 200', async () => {
+    expect(IDs.invoice).toBeGreaterThan(0);
     const { status, data } = await api('PATCH', `/api/invoices/${IDs.invoice}/cancel`, adminCookie);
     expect(status).toBe(200);
     const inv = data as { status?: string };
@@ -1248,7 +1282,7 @@ test.describe('Invoices', () => {
   });
 
   test('PATCH /api/invoices/:id/cancel already cancelled → 409', async () => {
-    if (!IDs.invoice) return;
+    expect(IDs.invoice).toBeGreaterThan(0);
     const { status } = await api('PATCH', `/api/invoices/${IDs.invoice}/cancel`, adminCookie);
     expect(status).toBe(409);
   });
@@ -1463,8 +1497,9 @@ test.describe('Reports & Exports', () => {
     }
   });
 
-  test('GET /api/export/invoice?invoiceId=:id → 200 with invoice data JSON', async () => {
-    if (!IDs.customer || !IDs.product) return;
+  test('GET /api/export/invoice?invoiceId=:id → 200 JSON with invoice_number', async () => {
+    expect(IDs.customer).toBeGreaterThan(0);
+    expect(IDs.product).toBeGreaterThan(0);
     const createResp = await api('POST', '/api/invoices', adminCookie, {
       customer_id: IDs.customer,
       invoice_date: '2026-04-12',
@@ -1474,11 +1509,13 @@ test.describe('Reports & Exports', () => {
       currency: 'AED',
       items: [{ product_id: IDs.product, product_name: 'Audit Test Product', product_code: 'AUDIT-SKU-001', description: 'Export test', quantity: 1, unit_price: 100, line_total: 100 }],
     });
-    if (createResp.status !== 201) return;
+    expect(createResp.status).toBe(201);
     const freshInvoiceId = (createResp.data as { id: number }).id;
-    const { status, data } = await api('GET', `/api/export/invoice?invoiceId=${freshInvoiceId}`, adminCookie);
-    expect(status).toBe(200);
-    const result = data as { success?: boolean; data?: { invoice_number?: string } };
+    expect(freshInvoiceId).toBeGreaterThan(0);
+    const resp = await fetch(`${BASE_URL}/api/export/invoice?invoiceId=${freshInvoiceId}`, { headers: { Cookie: adminCookie } });
+    expect(resp.status).toBe(200);
+    expect(resp.headers.get('content-type')).toContain('application/json');
+    const result = await resp.json() as { success?: boolean; data?: { invoice_number?: string } };
     expect(result.success).toBe(true);
     expect(result.data?.invoice_number).toBeTruthy();
     await api('DELETE', `/api/invoices/${freshInvoiceId}`, adminCookie);
@@ -1489,16 +1526,18 @@ test.describe('Reports & Exports', () => {
     expect(status).toBe(400);
   });
 
-  test('GET /api/export/po?poId=:id → 200 with PO data JSON', async () => {
-    if (!IDs.po) return;
-    const { status, data } = await api('GET', `/api/export/po?poId=${IDs.po}`, adminCookie);
-    expect(status).toBe(200);
-    const result = data as { success?: boolean };
+  test('GET /api/export/po?poId=:id → 200 JSON with success:true', async () => {
+    expect(IDs.po).toBeGreaterThan(0);
+    const resp = await fetch(`${BASE_URL}/api/export/po?poId=${IDs.po}`, { headers: { Cookie: adminCookie } });
+    expect(resp.status).toBe(200);
+    expect(resp.headers.get('content-type')).toContain('application/json');
+    const result = await resp.json() as { success?: boolean };
     expect(result.success).toBe(true);
   });
 
-  test('GET /api/export/quotation with fresh quotation → 200', async () => {
-    if (!IDs.customer || !IDs.product) return;
+  test('GET /api/export/quotation with fresh quotation → 200 JSON', async () => {
+    expect(IDs.customer).toBeGreaterThan(0);
+    expect(IDs.product).toBeGreaterThan(0);
     const createResp = await api('POST', '/api/quotations', adminCookie, {
       customerId: IDs.customer,
       quoteDate: '2026-04-12',
@@ -1507,11 +1546,12 @@ test.describe('Reports & Exports', () => {
         { productId: IDs.product, quantity: 1, unitPrice: '99.00', discount: 0, vatRate: '0.05', lineTotal: '99.00' },
       ],
     });
-    if (createResp.status !== 201) return;
+    expect(createResp.status).toBe(201);
     const tempQtId = (createResp.data as { id: number }).id;
-    if (!tempQtId) return;
-    const { status } = await api('GET', `/api/export/quotation?quotationId=${tempQtId}`, adminCookie);
-    expect(status).toBe(200);
+    expect(tempQtId).toBeGreaterThan(0);
+    const resp = await fetch(`${BASE_URL}/api/export/quotation?quotationId=${tempQtId}`, { headers: { Cookie: adminCookie } });
+    expect(resp.status).toBe(200);
+    expect(resp.headers.get('content-type')).toContain('application/json');
     await api('DELETE', `/api/quotations/${tempQtId}`, adminCookie);
   });
 });
