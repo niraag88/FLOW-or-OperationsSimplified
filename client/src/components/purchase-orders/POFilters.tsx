@@ -157,7 +157,7 @@ export default function POFilters({ filters, onFiltersChange, onFilterChange }: 
           <PopoverContent className="w-auto p-4" align="start">
             <div className="space-y-4">
               <div className="text-sm font-medium">Select Date Range</div>
-              <div className="grid grid-cols-2 gap-4">
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                 <div>
                   <div className="text-xs text-gray-500 mb-2">Start Date</div>
                   <Calendar

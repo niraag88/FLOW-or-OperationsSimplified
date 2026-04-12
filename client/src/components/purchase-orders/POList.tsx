@@ -112,11 +112,11 @@ export default function POList({ purchaseOrders, totalCount, loading, canEdit, c
                 <TableRow>
                   <TableHead>PO Number</TableHead>
                   <TableHead>Brand</TableHead>
-                  <TableHead>Order Date</TableHead>
-                  <TableHead className="text-right">Total</TableHead>
-                  <TableHead className="text-right">Total (AED)</TableHead>
+                  <TableHead className="hidden sm:table-cell">Order Date</TableHead>
+                  <TableHead className="hidden md:table-cell text-right">Total</TableHead>
+                  <TableHead className="hidden sm:table-cell text-right">Total (AED)</TableHead>
                   <TableHead>Status</TableHead>
-                  <TableHead>Payment</TableHead>
+                  <TableHead className="hidden md:table-cell">Payment</TableHead>
                   <TableHead>Actions</TableHead>
                 </TableRow>
               </TableHeader>
@@ -162,11 +162,11 @@ export default function POList({ purchaseOrders, totalCount, loading, canEdit, c
                         </div>
                       </TableCell>
                       <TableCell>{getBrandName(po)}</TableCell>
-                      <TableCell>{formatDate(po.orderDate)}</TableCell>
-                      <TableCell className="text-right">
+                      <TableCell className="hidden sm:table-cell">{formatDate(po.orderDate)}</TableCell>
+                      <TableCell className="hidden md:table-cell text-right">
                         {formatCurrency(po.totalAmount || 0, currency)}
                       </TableCell>
-                      <TableCell className="text-right text-gray-600">
+                      <TableCell className="hidden sm:table-cell text-right text-gray-600">
                         {formatCurrency(aedTotal, 'AED')}
                       </TableCell>
                       <TableCell>
@@ -174,7 +174,7 @@ export default function POList({ purchaseOrders, totalCount, loading, canEdit, c
                           {po.status?.replace(/_/g, ' ').toUpperCase()}
                         </Badge>
                       </TableCell>
-                      <TableCell>
+                      <TableCell className="hidden md:table-cell">
                         {ps === 'paid' ? (
                           <div className="flex items-center gap-1.5">
                             <Popover>

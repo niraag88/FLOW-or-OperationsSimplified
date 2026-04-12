@@ -270,7 +270,7 @@ export default function PurchaseOrders() {
           <p className="text-gray-600">Manage purchase orders and goods receipts</p>
         </div>
         
-        <div className="flex items-center gap-3">
+        <div className="flex flex-wrap items-center gap-3">
           <ExportDropdown 
             data={activeTab === 'purchase-orders' ? visiblePOs : getGoodsReceiptsExportData()}
             fetchAllData={activeTab === 'purchase-orders' ? fetchAllForExport : null}
@@ -351,7 +351,7 @@ export default function PurchaseOrders() {
           {!loading && activeTab === "purchase-orders" && totalCount > 0 && (
             <div className="flex items-center justify-between mt-6 pt-4 border-t">
               <div className="flex items-center gap-2">
-                <span className="text-sm text-gray-700">
+                <span className="hidden sm:block text-sm text-gray-700">
                   Showing {startIndexPos + 1} to {startIndexPos + visiblePOs.length} of {totalCount} purchase orders
                 </span>
               </div>
@@ -379,14 +379,17 @@ export default function PurchaseOrders() {
                   <div className="flex items-center gap-2">
                     <Button
                       variant="outline"
-                      
                       onClick={() => setCurrentPage(prev => Math.max(1, prev - 1))}
                       disabled={currentPage === 1}
                     >
                       Previous
                     </Button>
                     
-                    <div className="flex items-center gap-1">
+                    <span className="sm:hidden text-sm text-gray-700">
+                      {currentPage} / {totalPagesPos}
+                    </span>
+                    
+                    <div className="hidden sm:flex items-center gap-1">
                       {Array.from({ length: Math.min(5, totalPagesPos) }, (_, i) => {
                         let pageNumber;
                         if (totalPagesPos <= 5) {
@@ -403,7 +406,6 @@ export default function PurchaseOrders() {
                           <Button
                             key={pageNumber}
                             variant={currentPage === pageNumber ? "default" : "outline"}
-                            
                             className="w-8 h-8 p-0"
                             onClick={() => setCurrentPage(pageNumber)}
                           >
@@ -415,7 +417,6 @@ export default function PurchaseOrders() {
                     
                     <Button
                       variant="outline"
-                      
                       onClick={() => setCurrentPage(prev => Math.min(totalPagesPos, prev + 1))}
                       disabled={currentPage === totalPagesPos}
                     >

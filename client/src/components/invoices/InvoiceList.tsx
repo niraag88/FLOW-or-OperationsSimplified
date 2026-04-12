@@ -127,13 +127,13 @@ export default function InvoiceList({ invoices, totalCount, loading, canEdit, ca
                 <TableRow>
                   <TableHead>Invoice Number</TableHead>
                   <TableHead>Customer</TableHead>
-                  <TableHead>Invoice Date</TableHead>
-                  <TableHead>Reference</TableHead>
-                  <TableHead className="text-right">Subtotal</TableHead>
-                  <TableHead className="text-right">VAT</TableHead>
-                  <TableHead className="text-right">Total</TableHead>
+                  <TableHead className="hidden sm:table-cell">Invoice Date</TableHead>
+                  <TableHead className="hidden md:table-cell">Reference</TableHead>
+                  <TableHead className="hidden lg:table-cell text-right">Subtotal</TableHead>
+                  <TableHead className="hidden lg:table-cell text-right">VAT</TableHead>
+                  <TableHead className="hidden sm:table-cell text-right">Total</TableHead>
                   <TableHead>Status</TableHead>
-                  <TableHead>Payment</TableHead>
+                  <TableHead className="hidden md:table-cell">Payment</TableHead>
                   <TableHead>Actions</TableHead>
                 </TableRow>
               </TableHeader>
@@ -161,9 +161,9 @@ export default function InvoiceList({ invoices, totalCount, loading, canEdit, ca
                         </div>
                       </TableCell>
                       <TableCell>{getCustomerName(invoice)}</TableCell>
-                      <TableCell>{formatShortDate(invoice.invoiceDate || invoice.createdAt)}</TableCell>
-                      <TableCell>{invoice.reference || '-'}</TableCell>
-                      <TableCell className="text-right">
+                      <TableCell className="hidden sm:table-cell">{formatShortDate(invoice.invoiceDate || invoice.createdAt)}</TableCell>
+                      <TableCell className="hidden md:table-cell">{invoice.reference || '-'}</TableCell>
+                      <TableCell className="hidden lg:table-cell text-right">
                         {(() => {
                           const total = parseFloat(String(invoice.amount ?? 0)) || 0;
                           const tax = parseFloat(String(invoice.vatAmount ?? 0)) || 0;
@@ -171,13 +171,13 @@ export default function InvoiceList({ invoices, totalCount, loading, canEdit, ca
                           return formatCurrency(subtotal, invoice.currency ?? 'AED');
                         })()}
                       </TableCell>
-                      <TableCell className="text-right">
+                      <TableCell className="hidden lg:table-cell text-right">
                         {(() => {
                           const tax = parseFloat(String(invoice.vatAmount ?? 0)) || 0;
                           return formatCurrency(tax, invoice.currency ?? 'AED');
                         })()}
                       </TableCell>
-                      <TableCell className="text-right">
+                      <TableCell className="hidden sm:table-cell text-right">
                         {formatCurrency(invoice.amount || 0, invoice.currency ?? 'AED')}
                       </TableCell>
                       <TableCell>
@@ -185,7 +185,7 @@ export default function InvoiceList({ invoices, totalCount, loading, canEdit, ca
                           {invoice.status?.toUpperCase()}
                         </Badge>
                       </TableCell>
-                      <TableCell>
+                      <TableCell className="hidden md:table-cell">
                         {isCancelled ? (
                           <span className="text-gray-400">—</span>
                         ) : ps === 'paid' ? (

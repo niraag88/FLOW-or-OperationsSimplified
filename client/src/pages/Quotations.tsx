@@ -293,7 +293,7 @@ export default function Quotations() {
       {!loading && totalCount > 0 && (
         <div className="flex items-center justify-between mt-6 pt-4 border-t">
           <div className="flex items-center gap-2">
-            <span className="text-sm text-gray-700">
+            <span className="hidden sm:block text-sm text-gray-700">
               Showing {startIndex + 1} to {startIndex + visibleQuotations.length} of {totalCount} quotations
             </span>
           </div>
@@ -323,14 +323,17 @@ export default function Quotations() {
               <div className="flex items-center gap-2">
                 <Button
                   variant="outline"
-                  
                   onClick={() => setCurrentPage(prev => Math.max(1, prev - 1))}
                   disabled={currentPage === 1}
                 >
                   Previous
                 </Button>
                 
-                <div className="flex items-center gap-1">
+                <span className="sm:hidden text-sm text-gray-700">
+                  {currentPage} / {totalPages}
+                </span>
+                
+                <div className="hidden sm:flex items-center gap-1">
                   {Array.from({ length: Math.min(5, totalPages) }, (_, i) => {
                     let pageNumber;
                     if (totalPages <= 5) {
@@ -347,7 +350,6 @@ export default function Quotations() {
                       <Button
                         key={pageNumber}
                         variant={currentPage === pageNumber ? "default" : "outline"}
-                        
                         className="w-8 h-8 p-0"
                         onClick={() => setCurrentPage(pageNumber)}
                       >
@@ -359,7 +361,6 @@ export default function Quotations() {
                 
                 <Button
                   variant="outline"
-                  
                   onClick={() => setCurrentPage(prev => Math.min(totalPages, prev + 1))}
                   disabled={currentPage === totalPages}
                 >

@@ -102,11 +102,11 @@ export default function DOList({ deliveryOrders, totalCount, loading, canEdit, c
               <TableRow>
                 <TableHead>DO Number</TableHead>
                 <TableHead>Customer</TableHead>
-                <TableHead>Order Date</TableHead>
-                <TableHead>Reference</TableHead>
-                <TableHead className="text-right">Subtotal</TableHead>
-                <TableHead className="text-right">VAT</TableHead>
-                <TableHead className="text-right">Total</TableHead>
+                <TableHead className="hidden sm:table-cell">Order Date</TableHead>
+                <TableHead className="hidden md:table-cell">Reference</TableHead>
+                <TableHead className="hidden lg:table-cell text-right">Subtotal</TableHead>
+                <TableHead className="hidden lg:table-cell text-right">VAT</TableHead>
+                <TableHead className="hidden sm:table-cell text-right">Total</TableHead>
                 <TableHead>Status</TableHead>
                 <TableHead>Actions</TableHead>
               </TableRow>
@@ -128,15 +128,15 @@ export default function DOList({ deliveryOrders, totalCount, loading, canEdit, c
                     </span>
                   </TableCell>
                   <TableCell>{getCustomerName(doOrder)}</TableCell>
-                  <TableCell>{formatDate(doOrder.orderDate)}</TableCell>
-                  <TableCell>{doOrder.reference || '-'}</TableCell>
-                  <TableCell className="text-right">
+                  <TableCell className="hidden sm:table-cell">{formatDate(doOrder.orderDate)}</TableCell>
+                  <TableCell className="hidden md:table-cell">{doOrder.reference || '-'}</TableCell>
+                  <TableCell className="hidden lg:table-cell text-right">
                     {formatCurrency(doOrder.subtotal || 0, doOrder.currency ?? 'AED')}
                   </TableCell>
-                  <TableCell className="text-right">
+                  <TableCell className="hidden lg:table-cell text-right">
                     {formatCurrency(doOrder.taxAmount || 0, doOrder.currency ?? 'AED')}
                   </TableCell>
-                  <TableCell className="text-right">
+                  <TableCell className="hidden sm:table-cell text-right">
                     {formatCurrency(doOrder.totalAmount || 0, doOrder.currency ?? 'AED')}
                   </TableCell>
                   <TableCell>

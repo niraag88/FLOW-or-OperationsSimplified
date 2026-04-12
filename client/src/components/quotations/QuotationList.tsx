@@ -114,11 +114,11 @@ export default function QuotationList({ quotations, totalCount, loading, canEdit
                 <TableRow>
                   <TableHead>Quotation Number</TableHead>
                   <TableHead>Customer</TableHead>
-                  <TableHead>Quotation Date</TableHead>
-                  <TableHead>Reference</TableHead>
-                  <TableHead className="text-right">Subtotal</TableHead>
-                  <TableHead className="text-right">VAT</TableHead>
-                  <TableHead className="text-right">Total</TableHead>
+                  <TableHead className="hidden sm:table-cell">Quotation Date</TableHead>
+                  <TableHead className="hidden md:table-cell">Reference</TableHead>
+                  <TableHead className="hidden lg:table-cell text-right">Subtotal</TableHead>
+                  <TableHead className="hidden lg:table-cell text-right">VAT</TableHead>
+                  <TableHead className="hidden sm:table-cell text-right">Total</TableHead>
                   <TableHead>Status</TableHead>
                   <TableHead>Actions</TableHead>
                 </TableRow>
@@ -135,15 +135,15 @@ export default function QuotationList({ quotations, totalCount, loading, canEdit
                       </button>
                     </TableCell>
                     <TableCell>{getCustomerName(quotation)}</TableCell>
-                    <TableCell>{formatDate(quotation.quoteDate)}</TableCell>
-                    <TableCell>{quotation.reference || '-'}</TableCell>
-                    <TableCell className="text-right">
+                    <TableCell className="hidden sm:table-cell">{formatDate(quotation.quoteDate)}</TableCell>
+                    <TableCell className="hidden md:table-cell">{quotation.reference || '-'}</TableCell>
+                    <TableCell className="hidden lg:table-cell text-right">
                       {formatCurrency(quotation.totalAmount || 0, quotation.currency)}
                     </TableCell>
-                    <TableCell className="text-right">
+                    <TableCell className="hidden lg:table-cell text-right">
                       {formatCurrency(quotation.vatAmount || 0, quotation.currency)}
                     </TableCell>
-                    <TableCell className="text-right">
+                    <TableCell className="hidden sm:table-cell text-right">
                       {formatCurrency(quotation.grandTotal || 0, quotation.currency)}
                     </TableCell>
                     <TableCell>
