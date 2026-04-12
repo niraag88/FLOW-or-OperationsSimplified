@@ -164,6 +164,9 @@ export function registerGoodsReceiptRoutes(app: Express) {
         scanKey1: goodsReceipts.scanKey1,
         scanKey2: goodsReceipts.scanKey2,
         scanKey3: goodsReceipts.scanKey3,
+        paymentStatus: goodsReceipts.paymentStatus,
+        paymentMadeDate: goodsReceipts.paymentMadeDate,
+        paymentRemarks: goodsReceipts.paymentRemarks,
         createdAt: goodsReceipts.createdAt,
         poNumber: purchaseOrders.poNumber,
         supplierName: suppliers.name,
@@ -368,6 +371,52 @@ export function registerGoodsReceiptRoutes(app: Express) {
     } catch (error) {
       console.error('Error updating GRN reference:', error);
       res.status(500).json({ error: 'Failed to update reference' });
+    }
+  });
+
+  app.patch('/api/goods-receipts/:id/payment', requireAuth(), async (req: AuthenticatedRequest, res) => {
+    try {
+      const id = parseInt(req.params.id);
+      if (isNaN(id)) return res.status(400).json({ error: 'Invalid ID' });
+      const { paymentStatus, paymentMadeDate, paymentRemarks } = req.body;
+
+      if (paymentStatus && !['outstanding', 'paid'].includes(paymentStatus)) {
+        return res.status(400).json({ error: 'paymentStatus must be outstanding or paid' });
+      }
+
+      const [current] = await db.select({
+        id: goodsReceipts.id,
+        receiptNumber: goodsReceipts.receiptNumber,
+        paymentStatus: goodsReceipts.paymentStatus,
+        paymentMadeDate: goodsReceipts.paymentMadeDate,
+        paymentRemarks: goodsReceipts.paymentRemarks,
+      }).from(goodsReceipts).where(eq(goodsReceipts.id, id));
+      if (!current) return res.status(404).json({ error: 'Goods receipt not found' });
+
+      const [updated] = await db
+        .update(goodsReceipts)
+        .set({
+          paymentStatus: paymentStatus || current.paymentStatus,
+          paymentMadeDate: paymentMadeDate !== undefined ? (paymentMadeDate || null) : current.paymentMadeDate,
+          paymentRemarks: paymentRemarks !== undefined ? (paymentRemarks || null) : current.paymentRemarks,
+          updatedAt: new Date(),
+        })
+        .where(eq(goodsReceipts.id, id))
+        .returning();
+
+      writeAuditLog({
+        actor: req.user!.id,
+        actorName: req.user?.username || String(req.user!.id),
+        targetId: String(id),
+        targetType: 'goods_receipt',
+        action: 'UPDATE',
+        details: `GRN ${current.receiptNumber} payment updated: status="${paymentStatus || current.paymentStatus}" date="${paymentMadeDate || ''}" (was status="${current.paymentStatus}" date="${current.paymentMadeDate || ''}")`,
+      });
+
+      res.json(updated);
+    } catch (error) {
+      console.error('Error updating GRN payment:', error);
+      res.status(500).json({ error: 'Failed to update payment' });
     }
   });
 

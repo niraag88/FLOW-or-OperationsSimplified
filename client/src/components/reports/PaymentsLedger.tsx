@@ -1,14 +1,19 @@
-import React, { useState, useMemo } from "react";
+import React, { useState, useMemo, useCallback } from "react";
 import { format } from "date-fns";
 import { Card, CardContent } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
+import { Textarea } from "@/components/ui/textarea";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
-import { ChevronDown, ChevronRight, CreditCard, TrendingUp, TrendingDown, Search } from "lucide-react";
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog";
+import { ChevronDown, ChevronRight, CreditCard, TrendingUp, TrendingDown, Search, Pencil, Check } from "lucide-react";
 import ExportDropdown from "../common/ExportDropdown";
 import { getRateToAed } from "@/utils/currency";
+import { apiRequest, queryClient } from "@/lib/queryClient";
+import { useToast } from "@/hooks/use-toast";
 
 const fmt = (v: any) => new Intl.NumberFormat("en-US", { minimumFractionDigits: 2, maximumFractionDigits: 2 }).format(v);
 
@@ -329,10 +334,17 @@ function SalesPaymentsSection({ invoices, companySettings, canExport }: { invoic
 }
 
 function PurchasesPaymentsSection({ purchaseOrders, goodsReceipts, suppliers, companySettings, canExport }: { purchaseOrders: Record<string, any>[]; goodsReceipts: Record<string, any>[]; suppliers: Record<string, any>[]; companySettings: Record<string, any> | null; canExport: boolean }) {
+  const { toast } = useToast();
   const [paymentFilter, setPaymentFilter] = useState<any>("all");
   const [dateFrom, setDateFrom] = useState("");
   const [dateTo, setDateTo] = useState("");
   const [search, setSearch] = useState("");
+
+  const [dialogOpen, setDialogOpen] = useState(false);
+  const [dialogGrn, setDialogGrn] = useState<any>(null);
+  const [dialogDate, setDialogDate] = useState("");
+  const [dialogRemarks, setDialogRemarks] = useState("");
+  const [saving, setSaving] = useState(false);
 
   const getSupplierName = (supplierId: any) => {
     const s = (suppliers || []).find((s: any) => s.id === supplierId || s.id === Number(supplierId));
@@ -362,8 +374,20 @@ function PurchasesPaymentsSection({ purchaseOrders, goodsReceipts, suppliers, co
         const rate = po ? getFxRate(po) : 1;
         const refAmt = parseFloat(grn.referenceAmount || 0);
         const refAed = currency === "AED" ? refAmt : refAmt * rate;
-        const ps = (po?.paymentStatus || po?.payment_status || "outstanding").toLowerCase();
         const supplierName = po?.brandName || po?.supplierName || getSupplierName(po?.supplierId || po?.supplier_id || grn.supplierId || grn.supplier_id);
+
+        const grnPs = grn.paymentStatus || grn.payment_status;
+        const poPs = po?.paymentStatus || po?.payment_status;
+        const ps = (grnPs || poPs || "outstanding").toLowerCase();
+
+        const grnPayDate = grn.paymentMadeDate || grn.payment_made_date;
+        const poPayDate = po?.paymentMadeDate || po?.payment_made_date;
+        const payDate = grnPayDate || (ps === "paid" ? poPayDate : "") || "";
+
+        const grnRemarks = grn.paymentRemarks || grn.payment_remarks;
+        const poRemarks = po?.paymentRemarks || po?.payment_remarks;
+        const remarks = grnRemarks || (ps === "paid" ? poRemarks : "") || "";
+
         return {
           ...grn,
           _poNumber: po?.poNumber || po?.po_number || `PO-${poId}`,
@@ -371,12 +395,13 @@ function PurchasesPaymentsSection({ purchaseOrders, goodsReceipts, suppliers, co
           _origAmount: refAmt,
           _aed: refAed,
           _paymentStatus: ps,
+          _ownStatus: !!grnPs,
           _supplier: supplierName,
           _date: grn.receivedDate || grn.received_date || "",
           _refNumber: grn.referenceNumber || grn.reference_number || "",
           _refDate: grn.referenceDate || grn.reference_date || "",
-          _paymentDate: po?.paymentMadeDate || po?.payment_made_date || "",
-          _remarks: po?.paymentRemarks || po?.payment_remarks || "",
+          _paymentDate: payDate,
+          _remarks: remarks,
         };
       });
   }, [goodsReceipts, poMap, suppliers, companySettings]);
@@ -401,6 +426,32 @@ function PurchasesPaymentsSection({ purchaseOrders, goodsReceipts, suppliers, co
       return true;
     });
   }, [enriched, paymentFilter, dateFrom, dateTo, search]);
+
+  const openPayDialog = useCallback((grn: any) => {
+    setDialogGrn(grn);
+    setDialogDate(grn._paymentDate || "");
+    setDialogRemarks(grn._remarks || "");
+    setDialogOpen(true);
+  }, []);
+
+  const handleSavePayment = useCallback(async (markPaid: boolean) => {
+    if (!dialogGrn) return;
+    setSaving(true);
+    try {
+      await apiRequest("PATCH", `/api/goods-receipts/${dialogGrn.id}/payment`, {
+        paymentStatus: markPaid ? "paid" : "outstanding",
+        paymentMadeDate: markPaid ? (dialogDate || null) : null,
+        paymentRemarks: dialogRemarks || null,
+      });
+      await queryClient.invalidateQueries({ queryKey: ['/api/goods-receipts'] });
+      toast({ title: markPaid ? "Marked as Paid" : "Marked as Outstanding", description: `${dialogGrn.receiptNumber || dialogGrn.receipt_number} payment updated.` });
+      setDialogOpen(false);
+    } catch {
+      toast({ title: "Error", description: "Failed to update payment.", variant: "destructive" });
+    } finally {
+      setSaving(false);
+    }
+  }, [dialogGrn, dialogDate, dialogRemarks]);
 
   const exportData = filtered.map((r: any) => ({
     grn_number: r.receiptNumber || r.receipt_number || "",
@@ -467,12 +518,13 @@ function PurchasesPaymentsSection({ purchaseOrders, goodsReceipts, suppliers, co
               <TableHead className="font-semibold">Payment Status</TableHead>
               <TableHead className="font-semibold">Payment Date</TableHead>
               <TableHead className="font-semibold">Remarks</TableHead>
+              <TableHead className="w-10"></TableHead>
             </TableRow>
           </TableHeader>
           <TableBody>
             {filtered.length === 0 ? (
               <TableRow>
-                <TableCell colSpan={10} className="text-center py-10 text-gray-400">
+                <TableCell colSpan={11} className="text-center py-10 text-gray-400">
                   No goods receipts match the current filters
                 </TableCell>
               </TableRow>
@@ -490,9 +542,37 @@ function PurchasesPaymentsSection({ purchaseOrders, goodsReceipts, suppliers, co
                       <span title={`${r._currency} ${fmt(r._origAmount)}`}>AED {fmt(r._aed)}</span>
                     ) : "—"}
                   </TableCell>
-                  <TableCell><PaymentStatusBadge status={r._paymentStatus} /></TableCell>
-                  <TableCell className="text-gray-600">{fmtDate(r._paymentDate)}</TableCell>
-                  <TableCell className="text-gray-500 max-w-48 truncate" title={r._remarks}>{r._remarks || "—"}</TableCell>
+                  <TableCell>
+                    <div className="flex items-center gap-1.5">
+                      <PaymentStatusBadge status={r._paymentStatus} />
+                      {r._paymentStatus === "paid" && r._paymentDate && (
+                        <span className="text-xs text-gray-500">{fmtDate(r._paymentDate)}</span>
+                      )}
+                    </div>
+                  </TableCell>
+                  <TableCell className="text-gray-600">{r._paymentDate ? fmtDate(r._paymentDate) : "—"}</TableCell>
+                  <TableCell className="text-gray-500 max-w-36 truncate" title={r._remarks}>{r._remarks || "—"}</TableCell>
+                  <TableCell>
+                    {r._paymentStatus === "paid" ? (
+                      <button
+                        onClick={() => openPayDialog(r)}
+                        className="p-1 text-gray-400 hover:text-blue-600 transition-colors"
+                        title="Edit payment details"
+                      >
+                        <Pencil className="w-3.5 h-3.5" />
+                      </button>
+                    ) : (
+                      <Button
+                        size="sm"
+                        variant="outline"
+                        className="h-7 px-2 text-xs text-green-700 border-green-300 hover:bg-green-50"
+                        onClick={() => openPayDialog(r)}
+                      >
+                        <Check className="w-3 h-3 mr-1" />
+                        Pay
+                      </Button>
+                    )}
+                  </TableCell>
                 </TableRow>
               ))
             )}
@@ -500,6 +580,57 @@ function PurchasesPaymentsSection({ purchaseOrders, goodsReceipts, suppliers, co
         </Table>
       </div>
       <p className="text-xs text-gray-400 mt-2">{filtered.length} record{filtered.length !== 1 ? "s" : ""}</p>
+
+      <Dialog open={dialogOpen} onOpenChange={(v) => !saving && setDialogOpen(v)}>
+        <DialogContent className="max-w-sm">
+          <DialogHeader>
+            <DialogTitle>
+              {dialogGrn?._paymentStatus === "paid" ? "Edit Payment" : "Mark as Paid"} — {dialogGrn?.receiptNumber || dialogGrn?.receipt_number}
+            </DialogTitle>
+          </DialogHeader>
+          <div className="space-y-4 py-2">
+            <div className="space-y-1.5">
+              <Label htmlFor="pay-date">Payment Date</Label>
+              <Input
+                id="pay-date"
+                type="date"
+                value={dialogDate}
+                onChange={(e) => setDialogDate(e.target.value)}
+              />
+            </div>
+            <div className="space-y-1.5">
+              <Label htmlFor="pay-remarks">Remarks (optional)</Label>
+              <Textarea
+                id="pay-remarks"
+                value={dialogRemarks}
+                onChange={(e) => setDialogRemarks(e.target.value)}
+                placeholder="e.g. Paid via bank transfer"
+                rows={2}
+              />
+            </div>
+          </div>
+          <DialogFooter className="gap-2">
+            {dialogGrn?._paymentStatus === "paid" && (
+              <Button
+                variant="outline"
+                className="text-amber-700 border-amber-300 hover:bg-amber-50"
+                onClick={() => handleSavePayment(false)}
+                disabled={saving}
+              >
+                Mark Outstanding
+              </Button>
+            )}
+            <Button variant="outline" onClick={() => setDialogOpen(false)} disabled={saving}>Cancel</Button>
+            <Button
+              className="bg-green-600 hover:bg-green-700 text-white"
+              onClick={() => handleSavePayment(true)}
+              disabled={saving}
+            >
+              {saving ? "Saving…" : "Mark as Paid"}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </>
   );
 }
