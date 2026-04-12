@@ -408,7 +408,7 @@ export default function POQuickViewModal({ poId, open, onClose }: POQuickViewMod
                               </div>
                             ) : (grn.referenceNumber || grn.referenceDate) ? (
                               <div className="mt-1 flex items-center gap-3 text-xs text-gray-600">
-                                {grn.referenceNumber && <span>Reference No. <span className="font-medium">{grn.referenceNumber}</span></span>}
+                                {grn.referenceNumber && <span>Reference Number: <span className="font-medium">{grn.referenceNumber}</span></span>}
                                 {grn.referenceDate && <span>Reference Date: <span className="font-medium">{formatDate(grn.referenceDate)}</span></span>}
                               </div>
                             ) : null}
@@ -515,7 +515,7 @@ export default function POQuickViewModal({ poId, open, onClose }: POQuickViewMod
                           <span>
                             {grn.receiptNumber || `GRN-${grn.id}`}
                             {grn.receivedDate ? ` — received ${formatDate(grn.receivedDate)}` : ""}
-                            {grn.referenceNumber ? ` — Reference No. ${grn.referenceNumber}` : ""}
+                            {grn.referenceNumber ? ` — Reference Number: ${grn.referenceNumber}` : ""}
                             {grn.referenceDate ? ` (${formatDate(grn.referenceDate)})` : ""}
                             {grn.notes ? ` — ${grn.notes}` : ""}
                           </span>

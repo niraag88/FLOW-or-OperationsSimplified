@@ -142,7 +142,8 @@ export default function GoodsReceiptsTab({
   const uploadGrnDocToStorage = async (grnId: number, slot: number, file: File) => {
     const extMap = { 'application/pdf': 'pdf', 'image/png': 'png', 'image/jpeg': 'jpg', 'image/jpg': 'jpg' };
     const ext = extMap[file.type as keyof typeof extMap] || 'pdf';
-    const storageKey = `goods-receipts/${new Date().getFullYear()}/${grnId}-doc${slot}.${ext}`;
+    const safeName = file.name.replace(/\.[^.]+$/, '').replace(/[^a-zA-Z0-9._-]/g, '-').replace(/-+/g, '-').substring(0, 80);
+    const storageKey = `goods-receipts/${new Date().getFullYear()}/${Date.now()}-${safeName}.${ext}`;
     const formData = new FormData();
     formData.append('file', file);
     const uploadResp = await fetch('/api/storage/upload-scan', {
@@ -1246,22 +1247,22 @@ export default function GoodsReceiptsTab({
 
             <div className="space-y-2 border-t pt-3">
               <Label>Attach Delivery Documents (optional)</Label>
-              <p className="text-xs text-gray-500">Up to 3 documents — PDF, JPG, PNG, max 2 MB each. Slot 1 is the supplier invoice for this delivery. Attached automatically after saving.</p>
+              <p className="text-xs text-gray-500">Up to 3 documents — PDF, JPG, PNG, max 2 MB each. Attached automatically after saving.</p>
               <div className="flex gap-2 flex-wrap">
                 {[0, 1, 2].map((idx: number) => {
-                  const slotLabel = idx === 0 ? 'Supplier Invoice' : `Supporting Doc ${idx + 1}`;
+                  const slotLabel = `Supporting Documentation ${idx + 1}`;
                   return (
                     <div key={idx} className="flex-1 min-w-[160px]">
                       {pendingDocs[idx] ? (
-                        <div className={`flex items-center gap-2 p-2 rounded text-xs border ${idx === 0 ? 'bg-green-50 border-green-200' : 'bg-blue-50 border-blue-200'}`}>
-                          <FileText className={`w-4 h-4 flex-shrink-0 ${idx === 0 ? 'text-green-600' : 'text-blue-600'}`} />
-                          <span className={`flex-1 truncate ${idx === 0 ? 'text-green-800' : 'text-blue-800'}`}>{pendingDocs[idx].name}</span>
+                        <div className="flex items-center gap-2 p-2 rounded text-xs border bg-blue-50 border-blue-200">
+                          <FileText className="w-4 h-4 flex-shrink-0 text-blue-600" />
+                          <span className="flex-1 truncate text-blue-800">{pendingDocs[idx].name}</span>
                           <button type="button" onClick={() => updatePendingDoc(idx, null)} className="text-gray-400 hover:text-red-500">
                             <X className="w-3.5 h-3.5" />
                           </button>
                         </div>
                       ) : (
-                        <label className={`flex items-center gap-2 p-2 border border-dashed rounded text-xs cursor-pointer transition-colors ${idx === 0 ? 'border-green-300 hover:border-green-500 hover:bg-green-50 text-green-700' : 'border-gray-300 hover:border-blue-400 hover:bg-blue-50 text-gray-500'}`}>
+                        <label className="flex items-center gap-2 p-2 border border-dashed rounded text-xs cursor-pointer transition-colors border-gray-300 hover:border-blue-400 hover:bg-blue-50 text-gray-500">
                           <Paperclip className="w-3.5 h-3.5 flex-shrink-0" />
                           <span>{slotLabel}</span>
                           <input
