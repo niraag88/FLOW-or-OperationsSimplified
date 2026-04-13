@@ -314,7 +314,7 @@ export default function DOForm({ open, onClose, editingDO, currentUser, onSucces
     }
   };
 
-  const isEditable = !['delivered', 'cancelled'].includes(formData.status);
+  const isEditable = !['cancelled'].includes(formData.status);
 
   return (
     <Dialog open={open} onOpenChange={onClose}>
