@@ -63,6 +63,7 @@ export default function UserManagement() {
   const { toast } = useToast();
   const isAdmin = hasRole(['Admin']);
   const canViewLogs = hasRole(['Admin', 'Manager']);
+  const [activeTab, setActiveTab] = useState('users');
   const [isCreateDialogOpen, setIsCreateDialogOpen] = useState(false);
   const [editingUser, setEditingUser] = useState<User | null>(null);
   const [editPassword, setEditPassword] = useState('');
@@ -232,7 +233,7 @@ export default function UserManagement() {
           <p className="text-gray-600 dark:text-gray-400">Manage user accounts and view audit logs</p>
         </div>
 
-        {isAdmin && (
+        {isAdmin && activeTab === 'users' && (
           <Dialog open={isCreateDialogOpen} onOpenChange={setIsCreateDialogOpen}>
             <DialogTrigger asChild>
               <Button data-testid="button-create-user">
@@ -361,7 +362,7 @@ export default function UserManagement() {
         )}
       </div>
 
-      <Tabs defaultValue="users">
+      <Tabs value={activeTab} onValueChange={setActiveTab}>
         <TabsList className={`grid w-full ${isAdmin ? 'grid-cols-3' : 'grid-cols-2'}`}>
           <TabsTrigger value="users" className="flex items-center gap-2">
             <Users className="h-4 w-4" />
