@@ -12,7 +12,9 @@
  *   executeFactoryReset  — full transactional reset including company_settings
  *                          reset and audit log entry; used directly by HTTP route.
  *
- * The users table and ops schema (restore_runs) are intentionally preserved.
+ * The users table is partially preserved: only users with role = 'Admin' are kept.
+ * All non-Admin user accounts are deleted as part of the reset.
+ * The ops schema (restore_runs) is intentionally preserved.
  */
 
 import type { PoolClient } from 'pg';
@@ -90,11 +92,14 @@ export async function executeFactoryReset(
     await client.query('DELETE FROM company_settings');
     await client.query(`INSERT INTO company_settings (company_name) VALUES ('')`);
 
+    // Delete all non-Admin user accounts — only Admin role users are preserved
+    await client.query(`DELETE FROM users WHERE role != 'Admin'`);
+
     await client.query(
       `INSERT INTO audit_log (actor, actor_name, target_id, target_type, action, details, timestamp)
        VALUES ($1, $2, $3, $4, $5, $6, NOW())`,
       [actor.id, actor.name, 'system', 'system', 'FACTORY_RESET',
-       'All business data wiped via factory reset'],
+       'All business data wiped via factory reset; non-Admin user accounts deleted'],
     );
 
     await client.query('COMMIT');

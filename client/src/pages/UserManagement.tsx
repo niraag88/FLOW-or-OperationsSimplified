@@ -12,7 +12,7 @@ import { Alert, AlertDescription } from '@/components/ui/alert';
 import { Switch } from '@/components/ui/switch';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { Tabs, TabsList, TabsTrigger, TabsContent } from '@/components/ui/tabs';
-import { UserPlus, Edit, Trash2, Shield, Users, CheckCircle, XCircle, ClipboardList } from 'lucide-react';
+import { UserPlus, Edit, Trash2, Shield, Users, CheckCircle, XCircle, ClipboardList, AlertTriangle, RotateCcw } from 'lucide-react';
 import { formatDate } from '@/utils/dateUtils';
 import { apiRequest } from '@/lib/queryClient';
 import { useToast } from '@/hooks/use-toast';
@@ -58,7 +58,7 @@ const getServerError = (error: Error, fallback: string): string => {
 };
 
 export default function UserManagement() {
-  const { user, hasRole } = useAuth();
+  const { user, hasRole, logout } = useAuth();
   const queryClient = useQueryClient();
   const { toast } = useToast();
   const isAdmin = hasRole(['Admin']);
@@ -66,6 +66,8 @@ export default function UserManagement() {
   const [isCreateDialogOpen, setIsCreateDialogOpen] = useState(false);
   const [editingUser, setEditingUser] = useState<User | null>(null);
   const [editPassword, setEditPassword] = useState('');
+  const [showResetConfirm, setShowResetConfirm] = useState(false);
+  const [isResetting, setIsResetting] = useState(false);
   const [createForm, setCreateForm] = useState<CreateUserData>({
     username: '',
     password: '',
@@ -182,6 +184,32 @@ export default function UserManagement() {
   const handleDeleteUser = async (userId: string, username: string) => {
     if (confirm(`Are you sure you want to delete user "${username}"? This action cannot be undone.`)) {
       await deleteUserMutation.mutateAsync(userId);
+    }
+  };
+
+  const handleFactoryReset = async () => {
+    setIsResetting(true);
+    try {
+      const res = await fetch('/api/ops/factory-reset', {
+        method: 'POST',
+        credentials: 'include',
+      });
+      if (!res.ok) {
+        const body = await res.json().catch(() => ({}));
+        throw new Error(body.error || 'Factory reset failed');
+      }
+      setShowResetConfirm(false);
+      toast({ title: 'Reset complete', description: 'All data has been wiped. Logging out…' });
+      await logout();
+      window.location.href = '/';
+    } catch (err: unknown) {
+      toast({
+        title: 'Reset failed',
+        description: err instanceof Error ? err.message : 'Could not complete the factory reset.',
+        variant: 'destructive',
+      });
+    } finally {
+      setIsResetting(false);
     }
   };
 
@@ -334,7 +362,7 @@ export default function UserManagement() {
       </div>
 
       <Tabs defaultValue="users">
-        <TabsList className="grid grid-cols-2 w-full">
+        <TabsList className="grid grid-cols-3 w-full">
           <TabsTrigger value="users" className="flex items-center gap-2">
             <Users className="h-4 w-4" />
             Users
@@ -343,6 +371,12 @@ export default function UserManagement() {
             <ClipboardList className="h-4 w-4" />
             Audit Logs
           </TabsTrigger>
+          {isAdmin && (
+            <TabsTrigger value="reset" className="flex items-center gap-2">
+              <RotateCcw className="h-4 w-4" />
+              Reset
+            </TabsTrigger>
+          )}
         </TabsList>
 
         <TabsContent value="users" className="space-y-6 mt-4">
@@ -493,7 +527,98 @@ export default function UserManagement() {
             </CardContent>
           </Card>
         </TabsContent>
+
+        {isAdmin && (
+          <TabsContent value="reset" className="mt-4">
+            <Card className="border-red-200">
+              <CardHeader>
+                <CardTitle className="flex items-center gap-2 text-red-700">
+                  <AlertTriangle className="h-5 w-5" />
+                  Factory Reset
+                </CardTitle>
+                <CardDescription>
+                  Permanently wipe all business data and restore the system to a clean slate.
+                </CardDescription>
+              </CardHeader>
+              <CardContent className="space-y-6">
+                <div className="rounded-lg border border-red-200 bg-red-50 p-4 space-y-3">
+                  <p className="font-semibold text-red-800 text-sm">
+                    What will be deleted:
+                  </p>
+                  <ul className="list-disc list-inside text-sm text-red-700 space-y-1">
+                    <li>All products, brands, suppliers, and customers</li>
+                    <li>All purchase orders, goods receipts, and payments</li>
+                    <li>All quotations, invoices, and delivery orders</li>
+                    <li>All inventory records and stock movements</li>
+                    <li>All audit logs and financial year data</li>
+                    <li>All non-Admin user accounts</li>
+                  </ul>
+                  <p className="font-semibold text-red-800 text-sm mt-3">
+                    What will be kept:
+                  </p>
+                  <ul className="list-disc list-inside text-sm text-green-700 space-y-1">
+                    <li>Admin username and password — you can still log back in</li>
+                  </ul>
+                </div>
+
+                <p className="text-sm text-gray-600">
+                  This action is <strong>permanent and cannot be undone</strong>. The system will log you out immediately after the reset completes.
+                </p>
+
+                <Button
+                  variant="destructive"
+                  className="flex items-center gap-2"
+                  onClick={() => setShowResetConfirm(true)}
+                >
+                  <RotateCcw className="h-4 w-4" />
+                  Factory Reset
+                </Button>
+              </CardContent>
+            </Card>
+          </TabsContent>
+        )}
       </Tabs>
+
+      {/* Factory Reset Confirmation Dialog */}
+      <Dialog open={showResetConfirm} onOpenChange={(open) => { if (!open && !isResetting) setShowResetConfirm(false); }}>
+        <DialogContent className="max-w-md">
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2 text-red-700">
+              <AlertTriangle className="h-5 w-5" />
+              Are you absolutely sure?
+            </DialogTitle>
+            <DialogDescription className="pt-2 text-base">
+              This will permanently delete <strong>all</strong> data — products, customers, orders, invoices, receipts, audit logs, and all user accounts except the admin.
+              <br /><br />
+              <span className="font-semibold text-gray-900">This cannot be undone.</span> You will be logged out immediately after the reset.
+            </DialogDescription>
+          </DialogHeader>
+          <DialogFooter className="flex flex-col-reverse sm:flex-row gap-2 pt-2">
+            <Button
+              variant="outline"
+              onClick={() => setShowResetConfirm(false)}
+              disabled={isResetting}
+            >
+              No, cancel
+            </Button>
+            <Button
+              variant="destructive"
+              onClick={handleFactoryReset}
+              disabled={isResetting}
+              className="flex items-center gap-2"
+            >
+              {isResetting ? (
+                <>Resetting…</>
+              ) : (
+                <>
+                  <AlertTriangle className="h-4 w-4" />
+                  Yes, wipe everything
+                </>
+              )}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
 
       {/* Edit User Dialog */}
       {editingUser && (
