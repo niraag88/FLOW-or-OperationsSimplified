@@ -217,7 +217,7 @@ export default function POQuickViewModal({ poId, open, onClose }: POQuickViewMod
             <Section title="Purchase Order Details">
               <div className="grid grid-cols-2 gap-x-8 gap-y-2 text-sm">
                 <div className="flex gap-2">
-                  <span className="text-gray-500 w-28 shrink-0">Supplier</span>
+                  <span className="text-gray-500 w-28 shrink-0">Brand</span>
                   <span className="font-medium">{detail.supplierName || "—"}</span>
                 </div>
                 <div className="flex gap-2">

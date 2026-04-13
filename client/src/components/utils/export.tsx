@@ -531,7 +531,7 @@ export const exportPurchaseOrderToPDF = async (purchaseOrder: any) => {
     
     // Fetch supplier/brand information 
     let supplierInfo = {
-      name: purchaseOrder.supplierName || 'Unknown Supplier',
+      name: purchaseOrder.supplierName || 'Unknown Brand',
       address: '',
       phone: '',
       email: '',
@@ -874,7 +874,7 @@ export const printPOGRNSummary = async (poId: any) => {
   <div class="section section-compact">
     <h2 class="section-title">Purchase Order Details</h2>
     <table class="info-table">
-      <tr><th>Supplier</th><td>${d.supplierName || '—'}</td></tr>
+      <tr><th>Brand</th><td>${d.supplierName || '—'}</td></tr>
       <tr><th>Currency</th><td>${currency}</td></tr>
       <tr><th>Order Date</th><td>${fmtDate(d.orderDate)}</td></tr>
       ${d.expectedDelivery ? `<tr><th>Expected Delivery</th><td>${fmtDate(d.expectedDelivery)}</td></tr>` : ''}
@@ -939,7 +939,7 @@ export const exportPODetailToXLSX = async (poId: any, poNumber: any) => {
   if (company?.email) rows.push([`Email: ${company.email}`, '', '', '']);
   rows.push([]);
   rows.push(['PO Number:', d.poNumber || '', '', '']);
-  rows.push(['Supplier:', d.supplierName || '', '', '']);
+  rows.push(['Brand:', d.supplierName || '', '', '']);
   rows.push(['Currency:', currency, '', '']);
   rows.push(['Order Date:', fmtDate(d.orderDate), '', '']);
   if (d.expectedDelivery) rows.push(['Expected Delivery:', fmtDate(d.expectedDelivery), '', '']);

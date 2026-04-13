@@ -685,7 +685,7 @@ export default function GoodsReceiptsTab({
   // Open section export columns (matches on-screen columns)
   const openExportColumns = {
     poNumber: "PO Number",
-    supplierName: { label: "Supplier", transform: (v: unknown, row: Record<string, unknown>) => String(v || row?.brandName || '') },
+    supplierName: { label: "Brand", transform: (v: unknown, row: Record<string, unknown>) => String(v || row?.brandName || '') },
     orderDate: { label: "Order Date", transform: dateTransform },
     totalAmount: { label: "Total", transform: totalTransform },
     grandTotal: { label: "Total (AED)", transform: aedTransform },
@@ -698,7 +698,7 @@ export default function GoodsReceiptsTab({
   // Closed section export columns (matches on-screen columns)
   const closedExportColumns = {
     poNumber: "PO Number",
-    supplierName: { label: "Supplier", transform: (v: unknown, row: Record<string, unknown>) => String(v || row?.brandName || '') },
+    supplierName: { label: "Brand", transform: (v: unknown, row: Record<string, unknown>) => String(v || row?.brandName || '') },
     orderDate: { label: "Order Date", transform: dateTransform },
     totalAmount: { label: "Total", transform: totalTransform },
     grandTotal: { label: "Total (AED)", transform: aedTransform },
@@ -712,7 +712,7 @@ export default function GoodsReceiptsTab({
   // Combined column set for when both sections are visible: superset of open + closed columns
   const combinedExportColumns = {
     poNumber: "PO Number",
-    supplierName: { label: "Supplier", transform: (v: unknown, row: Record<string, unknown>) => String(v || row?.brandName || '') },
+    supplierName: { label: "Brand", transform: (v: unknown, row: Record<string, unknown>) => String(v || row?.brandName || '') },
     orderDate: { label: "Order Date", transform: dateTransform },
     totalAmount: { label: "Total", transform: totalTransform },
     grandTotal: { label: "Total (AED)", transform: aedTransform },
@@ -793,10 +793,10 @@ export default function GoodsReceiptsTab({
                 <div className="mb-3 flex flex-wrap items-center gap-2">
                   <Select value={openSupplier} onValueChange={setOpenSupplier}>
                     <SelectTrigger className="h-8 w-44 text-sm">
-                      <SelectValue placeholder="All Suppliers" />
+                      <SelectValue placeholder="All Brands" />
                     </SelectTrigger>
                     <SelectContent>
-                      <SelectItem value="all">All Suppliers</SelectItem>
+                      <SelectItem value="all">All Brands</SelectItem>
                       {(openSupplierOptions as string[]).map((s) => (
                         <SelectItem key={s} value={s}>{s}</SelectItem>
                       ))}
@@ -925,10 +925,10 @@ export default function GoodsReceiptsTab({
                 <div className="flex flex-wrap items-center gap-2 mb-3">
                   <Select value={closedSupplier} onValueChange={setClosedSupplier}>
                     <SelectTrigger className="h-8 w-44 text-sm">
-                      <SelectValue placeholder="All Suppliers" />
+                      <SelectValue placeholder="All Brands" />
                     </SelectTrigger>
                     <SelectContent>
-                      <SelectItem value="all">All Suppliers</SelectItem>
+                      <SelectItem value="all">All Brands</SelectItem>
                       {(closedSupplierOptions as string[]).map((s) => (
                         <SelectItem key={s} value={s}>{s}</SelectItem>
                       ))}

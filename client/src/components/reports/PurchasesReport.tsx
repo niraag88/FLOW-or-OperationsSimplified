@@ -57,7 +57,7 @@ export default function PurchasesReport({ purchaseOrders, suppliers, companySett
     const supplier = (suppliers || []).find(
       (s: any) => s.id === supplierId || s.id === Number(supplierId)
     );
-    return supplier?.name || "Unknown Supplier";
+    return supplier?.name || "Unknown Brand";
   };
 
   const getFxRate = (po: any) => {

@@ -547,7 +547,7 @@ export default function UserManagement() {
                     What will be deleted:
                   </p>
                   <ul className="list-disc list-inside text-sm text-red-700 space-y-1">
-                    <li>All products, brands, suppliers, and customers</li>
+                    <li>All products, brands, and customers</li>
                     <li>All purchase orders, goods receipts, and payments</li>
                     <li>All quotations, invoices, and delivery orders</li>
                     <li>All inventory records and stock movements</li>

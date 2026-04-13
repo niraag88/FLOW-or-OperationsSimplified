@@ -784,7 +784,7 @@ export default function POForm({ open, onClose, editingPO, currentUser, onSucces
                     className="w-full flex items-center gap-2 px-4 py-3 text-left hover:bg-blue-100/40 transition-colors rounded-lg"
                   >
                     <Paperclip className="w-4 h-4 text-blue-600 flex-shrink-0" />
-                    <span className="text-sm font-semibold text-blue-800 flex-1">Supplier Documents</span>
+                    <span className="text-sm font-semibold text-blue-800 flex-1">Brand Documents</span>
                     <span className="text-xs text-blue-500 mr-2">Per-delivery invoices &amp; supporting files</span>
                     {supplierDocsOpen ? (
                       <ChevronDown className="w-4 h-4 text-blue-500 flex-shrink-0" />

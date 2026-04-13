@@ -44,7 +44,7 @@ export default function PoGrnReport({ purchaseOrders, goodsReceipts, suppliers =
   // Shared utilities
   const getSupplierName = (supplierId: any) => {
     const supplier = suppliers.find((s: any) => s.id === supplierId || s.id === Number(supplierId));
-    return supplier?.name || 'Unknown Supplier';
+    return supplier?.name || 'Unknown Brand';
   };
 
   const formatCurrency = (amount: any, currency: any) => {

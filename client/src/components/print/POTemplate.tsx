@@ -49,7 +49,7 @@ export default function POTemplate({ data, brand, settings }: POTemplateProps) {
       {/* Supplier/Brand and PO Details */}
       <section className="grid grid-cols-2 gap-8 mb-10">
         <div>
-          <h3 className="text-sm font-semibold text-gray-500 uppercase mb-2">Supplier/Brand</h3>
+          <h3 className="text-sm font-semibold text-gray-500 uppercase mb-2">Brand</h3>
           <div className="text-gray-700">
             <p className="font-semibold text-lg">{brand?.name || 'Unknown Brand'}</p>
             {brand?.contact_person && <p>Contact: {brand.contact_person}</p>}
@@ -91,7 +91,7 @@ export default function POTemplate({ data, brand, settings }: POTemplateProps) {
 
       <SignatureSection
         leftSignatureLabel={`For ${settings?.company_name || ''}`}
-        rightSignatureLabel={`For ${brand?.name || 'Supplier'}`}
+        rightSignatureLabel={`For ${brand?.name || 'Brand'}`}
       />
     </PrintPage>
   );
