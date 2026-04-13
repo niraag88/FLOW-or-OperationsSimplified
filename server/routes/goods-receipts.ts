@@ -5,6 +5,32 @@ import { eq, desc, sql, inArray, and } from "drizzle-orm";
 import { businessStorage } from "../businessStorage";
 import { requireAuth, writeAuditLog, updateProductStock, objectStorageClient, type AuthenticatedRequest } from "../middleware";
 
+async function recalculatePOPaymentStatus(poId: number): Promise<void> {
+  const grns = await db.select({
+    paymentStatus: goodsReceipts.paymentStatus,
+  }).from(goodsReceipts).where(
+    and(eq(goodsReceipts.poId, poId), eq(goodsReceipts.status, 'confirmed'))
+  );
+
+  let derived: 'outstanding' | 'partially_paid' | 'paid';
+  if (grns.length === 0) {
+    derived = 'outstanding';
+  } else {
+    const paidCount = grns.filter(g => g.paymentStatus === 'paid').length;
+    if (paidCount === 0) {
+      derived = 'outstanding';
+    } else if (paidCount === grns.length) {
+      derived = 'paid';
+    } else {
+      derived = 'partially_paid';
+    }
+  }
+
+  await db.update(purchaseOrders)
+    .set({ paymentStatus: derived })
+    .where(eq(purchaseOrders.id, poId));
+}
+
 class OverReceiveError extends Error {
   readonly details: string[];
   constructor(details: string[]) {
@@ -399,6 +425,7 @@ export function registerGoodsReceiptRoutes(app: Express) {
 
       const [current] = await db.select({
         id: goodsReceipts.id,
+        poId: goodsReceipts.poId,
         receiptNumber: goodsReceipts.receiptNumber,
         paymentStatus: goodsReceipts.paymentStatus,
         paymentMadeDate: goodsReceipts.paymentMadeDate,
@@ -416,6 +443,11 @@ export function registerGoodsReceiptRoutes(app: Express) {
         })
         .where(eq(goodsReceipts.id, id))
         .returning();
+
+      // Derive and persist PO payment status from all linked GRNs
+      if (current.poId) {
+        await recalculatePOPaymentStatus(current.poId);
+      }
 
       writeAuditLog({
         actor: req.user!.id,
@@ -553,6 +585,9 @@ export function registerGoodsReceiptRoutes(app: Express) {
             .where(eq(purchaseOrders.id, poId));
         }
       });
+
+      // Recalculate PO payment status now that a new GRN exists
+      await recalculatePOPaymentStatus(poId);
 
       const refDetail = referenceNumber ? ` ref="${referenceNumber}"${referenceDate ? ` date="${referenceDate}"` : ''}` : '';
       writeAuditLog({ actor: req.user!.id, actorName: req.user?.username || String(req.user!.id), targetId: String(receipt.id), targetType: 'goods_receipt', action: 'CREATE', details: `Goods receipt ${receipt.receiptNumber} from PO #${po.poNumber}${refDetail}` });

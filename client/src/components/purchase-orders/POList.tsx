@@ -1,15 +1,11 @@
-import React, { useState } from "react";
-import { format } from "date-fns";
+import React from "react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Badge } from "@/components/ui/badge";
-import { Button } from "@/components/ui/button";
-import { ShoppingCart, Info, Pencil, Paperclip, AlertTriangle } from "lucide-react";
+import { ShoppingCart, Paperclip, AlertTriangle } from "lucide-react";
 import { Skeleton } from "@/components/ui/skeleton";
 import { formatDate } from "@/utils/dateUtils";
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
-import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
-import MarkPOPaidDialog from "./MarkPOPaidDialog";
 import POActionsDropdown from "./POActionsDropdown";
 import { formatCurrency } from "@/utils/currency";
 import type { PurchaseOrder } from "@shared/schema";
@@ -25,10 +21,18 @@ interface POListProps {
   onQuickView: (id: number) => void;
 }
 
-export default function POList({ purchaseOrders, totalCount, loading, canEdit, currentUser, onEdit, onRefresh, onQuickView }: POListProps) {
-  const [showEditPaymentDialog, setShowEditPaymentDialog] = useState(false);
-  const [editPaymentPO, setEditPaymentPO] = useState<any>(null);
+function getPaymentBadge(ps: string) {
+  switch (ps) {
+    case 'paid':
+      return <Badge className="bg-green-100 text-green-800 border border-green-200">PAID</Badge>;
+    case 'partially_paid':
+      return <Badge className="bg-orange-100 text-orange-800 border border-orange-200">PARTIALLY PAID</Badge>;
+    default:
+      return <Badge className="bg-gray-100 text-gray-700 border border-gray-200">OUTSTANDING</Badge>;
+  }
+}
 
+export default function POList({ purchaseOrders, totalCount, loading, canEdit, currentUser, onEdit, onRefresh, onQuickView }: POListProps) {
   const getBrandName = (po: any) => po.brandName || po.supplierName || '';
 
   const getStatusColor = (status: any) => {
@@ -52,20 +56,6 @@ export default function POList({ purchaseOrders, totalCount, loading, canEdit, c
     const ordered = Number(po.orderedQty) || 0;
     const received = Number(po.receivedQty) || 0;
     return ordered > 0 && received > 0 && received < ordered;
-  };
-
-  const handleEditPayment = (po: any) => {
-    setEditPaymentPO(po);
-    setShowEditPaymentDialog(true);
-  };
-
-  const formatPaymentDate = (dateVal: any) => {
-    if (!dateVal) return null;
-    try {
-      return format(new Date(dateVal), 'dd/MM/yy');
-    } catch {
-      return null;
-    }
   };
 
   const isInitialLoad = loading && (!purchaseOrders || purchaseOrders.length === 0);
@@ -97,179 +87,105 @@ export default function POList({ purchaseOrders, totalCount, loading, canEdit, c
   }
 
   return (
-    <>
-      <Card className={`border-0 shadow-lg transition-opacity duration-200 ${loading ? 'opacity-60' : 'opacity-100'}`}>
-        <CardHeader>
-          <CardTitle className="flex items-center gap-2">
-            <ShoppingCart className="w-5 h-5" />
-            Purchase Orders ({totalCount || purchaseOrders.length})
-          </CardTitle>
-        </CardHeader>
-        <CardContent>
-          <div className="w-full overflow-x-auto">
-            <Table>
-              <TableHeader>
-                <TableRow>
-                  <TableHead>PO Number</TableHead>
-                  <TableHead>Brand</TableHead>
-                  <TableHead className="hidden sm:table-cell">Order Date</TableHead>
-                  <TableHead className="hidden md:table-cell text-right">Total</TableHead>
-                  <TableHead className="hidden sm:table-cell text-right">Total (AED)</TableHead>
-                  <TableHead>Status</TableHead>
-                  <TableHead className="hidden md:table-cell">Payment</TableHead>
-                  <TableHead>Actions</TableHead>
-                </TableRow>
-              </TableHeader>
-              <TableBody>
-                {purchaseOrders.map((po: any) => {
-                  const currency = po.currency || 'GBP';
-                  const aedTotal = getAedEquivalent(po);
-                  const ps = po.paymentStatus || po.payment_status || 'outstanding';
-                  const paidDate = po.paymentMadeDate || po.payment_made_date;
-                  const remarks = po.paymentRemarks || po.payment_remarks;
-                  const formattedDate = formatPaymentDate(paidDate);
+    <Card className={`border-0 shadow-lg transition-opacity duration-200 ${loading ? 'opacity-60' : 'opacity-100'}`}>
+      <CardHeader>
+        <CardTitle className="flex items-center gap-2">
+          <ShoppingCart className="w-5 h-5" />
+          Purchase Orders ({totalCount || purchaseOrders.length})
+        </CardTitle>
+      </CardHeader>
+      <CardContent>
+        <div className="w-full overflow-x-auto">
+          <Table>
+            <TableHeader>
+              <TableRow>
+                <TableHead>PO Number</TableHead>
+                <TableHead>Brand</TableHead>
+                <TableHead className="hidden sm:table-cell">Order Date</TableHead>
+                <TableHead className="hidden md:table-cell text-right">Total</TableHead>
+                <TableHead className="hidden sm:table-cell text-right">Total (AED)</TableHead>
+                <TableHead>Status</TableHead>
+                <TableHead className="hidden md:table-cell">Payment</TableHead>
+                <TableHead>Actions</TableHead>
+              </TableRow>
+            </TableHeader>
+            <TableBody>
+              {purchaseOrders.map((po: any) => {
+                const currency = po.currency || 'GBP';
+                const aedTotal = getAedEquivalent(po);
+                const ps = po.paymentStatus || po.payment_status || 'outstanding';
 
-                  return (
-                    <TableRow key={po.id} className="hover:bg-gray-50">
-                      <TableCell className="font-medium">
-                        <div className="flex items-center gap-1.5">
-                          <button
-                            onClick={() => onQuickView && onQuickView(po.id)}
-                            className="text-blue-600 hover:text-blue-800 hover:underline font-medium text-left transition-colors"
-                          >
-                            {po.poNumber}
-                          </button>
-                          {(po.supplierScanKey || po.hasGrnAttachment) && (
-                            <Tooltip>
-                              <TooltipTrigger asChild>
-                                <Paperclip className="w-3.5 h-3.5 text-blue-500 shrink-0" />
-                              </TooltipTrigger>
-                              <TooltipContent side="top">
-                                <p className="text-xs">Documents attached — open PO to view</p>
-                              </TooltipContent>
-                            </Tooltip>
-                          )}
-                          {isShortDelivered(po) && (
-                            <Tooltip>
-                              <TooltipTrigger asChild>
-                                <AlertTriangle className="w-3.5 h-3.5 text-amber-500 shrink-0" />
-                              </TooltipTrigger>
-                              <TooltipContent side="top">
-                                <p className="text-xs">Short delivery: {po.receivedQty}/{po.orderedQty} units received</p>
-                              </TooltipContent>
-                            </Tooltip>
-                          )}
-                        </div>
-                      </TableCell>
-                      <TableCell>{getBrandName(po)}</TableCell>
-                      <TableCell className="hidden sm:table-cell">{formatDate(po.orderDate)}</TableCell>
-                      <TableCell className="hidden md:table-cell text-right">
-                        {formatCurrency(po.totalAmount || 0, currency)}
-                      </TableCell>
-                      <TableCell className="hidden sm:table-cell text-right text-gray-600">
-                        {formatCurrency(aedTotal, 'AED')}
-                      </TableCell>
-                      <TableCell>
-                        <Badge className={`${getStatusColor(po.status)} border`}>
-                          {po.status?.replace(/_/g, ' ').toUpperCase()}
-                        </Badge>
-                      </TableCell>
-                      <TableCell className="hidden md:table-cell">
-                        {ps === 'paid' ? (
-                          <div className="flex items-center gap-1.5">
-                            <Popover>
-                              <PopoverTrigger asChild>
-                                <button className="flex items-center gap-1.5 hover:opacity-75 transition-opacity cursor-pointer">
-                                  <Badge className="bg-green-100 text-green-800 border border-green-200">PAID</Badge>
-                                  {formattedDate && (
-                                    <span className="text-xs text-gray-600 whitespace-nowrap">{formattedDate}</span>
-                                  )}
-                                </button>
-                              </PopoverTrigger>
-                              <PopoverContent className="w-64 p-3" align="start">
-                                <p className="text-sm font-semibold text-gray-900 mb-2">Payment Details</p>
-                                <div className="space-y-1.5 text-xs text-gray-700 mb-3">
-                                  {formattedDate && (
-                                    <div className="flex gap-1">
-                                      <span className="font-medium w-16 shrink-0">Date:</span>
-                                      <span>{formattedDate}</span>
-                                    </div>
-                                  )}
-                                  {remarks && (
-                                    <div className="flex gap-1">
-                                      <span className="font-medium w-16 shrink-0">Remarks:</span>
-                                      <span className="break-words">{remarks}</span>
-                                    </div>
-                                  )}
-                                  {!formattedDate && !remarks && (
-                                    <span className="text-gray-400 italic">No details recorded</span>
-                                  )}
-                                </div>
-                                {canEdit && (
-                                  <Button
-                                    size="sm"
-                                    variant="outline"
-                                    className="w-full text-xs h-7"
-                                    onClick={() => handleEditPayment(po)}
-                                  >
-                                    <Pencil className="w-3 h-3 mr-1" />
-                                    Edit Payment Details
-                                  </Button>
-                                )}
-                              </PopoverContent>
-                            </Popover>
-                            {remarks && (
-                              <Tooltip>
-                                <TooltipTrigger asChild>
-                                  <Info className="w-3.5 h-3.5 text-gray-400 cursor-help shrink-0" />
-                                </TooltipTrigger>
-                                <TooltipContent side="top" className="max-w-xs">
-                                  <p className="text-xs">{remarks}</p>
-                                </TooltipContent>
-                              </Tooltip>
-                            )}
-                          </div>
-                        ) : (
-                          <Badge className="bg-amber-100 text-amber-800 border border-amber-200">OUTSTANDING</Badge>
+                return (
+                  <TableRow key={po.id} className="hover:bg-gray-50">
+                    <TableCell className="font-medium">
+                      <div className="flex items-center gap-1.5">
+                        <button
+                          onClick={() => onQuickView && onQuickView(po.id)}
+                          className="text-blue-600 hover:text-blue-800 hover:underline font-medium text-left transition-colors"
+                        >
+                          {po.poNumber}
+                        </button>
+                        {(po.supplierScanKey || po.hasGrnAttachment) && (
+                          <Tooltip>
+                            <TooltipTrigger asChild>
+                              <Paperclip className="w-3.5 h-3.5 text-blue-500 shrink-0" />
+                            </TooltipTrigger>
+                            <TooltipContent side="top">
+                              <p className="text-xs">Documents attached — open PO to view</p>
+                            </TooltipContent>
+                          </Tooltip>
                         )}
-                      </TableCell>
-                      <TableCell>
-                        <POActionsDropdown
-                          po={po}
-                          canEdit={canEdit}
-                          onEdit={onEdit}
-                          onRefresh={onRefresh}
-                          currentUser={currentUser}
-                        />
-                      </TableCell>
-                    </TableRow>
-                  );
-                })}
-              </TableBody>
-            </Table>
+                        {isShortDelivered(po) && (
+                          <Tooltip>
+                            <TooltipTrigger asChild>
+                              <AlertTriangle className="w-3.5 h-3.5 text-amber-500 shrink-0" />
+                            </TooltipTrigger>
+                            <TooltipContent side="top">
+                              <p className="text-xs">Short delivery: {po.receivedQty}/{po.orderedQty} units received</p>
+                            </TooltipContent>
+                          </Tooltip>
+                        )}
+                      </div>
+                    </TableCell>
+                    <TableCell>{getBrandName(po)}</TableCell>
+                    <TableCell className="hidden sm:table-cell">{formatDate(po.orderDate)}</TableCell>
+                    <TableCell className="hidden md:table-cell text-right">
+                      {formatCurrency(po.totalAmount || 0, currency)}
+                    </TableCell>
+                    <TableCell className="hidden sm:table-cell text-right text-gray-600">
+                      {formatCurrency(aedTotal, 'AED')}
+                    </TableCell>
+                    <TableCell>
+                      <Badge className={`${getStatusColor(po.status)} border`}>
+                        {po.status?.replace(/_/g, ' ').toUpperCase()}
+                      </Badge>
+                    </TableCell>
+                    <TableCell className="hidden md:table-cell">
+                      {getPaymentBadge(ps)}
+                    </TableCell>
+                    <TableCell>
+                      <POActionsDropdown
+                        po={po}
+                        canEdit={canEdit}
+                        onEdit={onEdit}
+                        onRefresh={onRefresh}
+                        currentUser={currentUser}
+                      />
+                    </TableCell>
+                  </TableRow>
+                );
+              })}
+            </TableBody>
+          </Table>
+        </div>
+
+        {purchaseOrders.length === 0 && (
+          <div className="text-center py-12 text-gray-500">
+            <ShoppingCart className="w-12 h-12 mx-auto mb-4 opacity-50" />
+            <p>No purchase orders found</p>
           </div>
-
-          {purchaseOrders.length === 0 && (
-            <div className="text-center py-12 text-gray-500">
-              <ShoppingCart className="w-12 h-12 mx-auto mb-4 opacity-50" />
-              <p>No purchase orders found</p>
-            </div>
-          )}
-        </CardContent>
-      </Card>
-
-      {showEditPaymentDialog && editPaymentPO && (
-        <MarkPOPaidDialog
-          open={showEditPaymentDialog}
-          onClose={() => { setShowEditPaymentDialog(false); setEditPaymentPO(null); }}
-          po={editPaymentPO}
-          onSuccess={() => {
-            setShowEditPaymentDialog(false);
-            setEditPaymentPO(null);
-            onRefresh();
-          }}
-        />
-      )}
-    </>
+        )}
+      </CardContent>
+    </Card>
   );
 }

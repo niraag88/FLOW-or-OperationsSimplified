@@ -13,6 +13,7 @@ import { useToast } from "@/hooks/use-toast";
 import { exportDeliveryOrderToXLSX } from "../utils/export";
 import { format, isValid, parseISO } from 'date-fns';
 import SimpleConfirmDialog from "../common/SimpleConfirmDialog";
+import CancelWithStockDialog, { type StockLineItem } from "../common/CancelWithStockDialog";
 import { DeliveryOrder as DOEntity } from "@/api/entities";
 import UploadFileDialog from "../common/UploadFileDialog";
 import type { DeliveryOrder } from "@shared/schema";
@@ -31,6 +32,8 @@ export default function DOActionsDropdown({ doOrder, canEdit, onEdit, onRefresh,
   const [showCancelDialog, setShowCancelDialog] = useState(false);
   const [showUploadDialog, setShowUploadDialog] = useState(false);
   const [showRemoveFileDialog, setShowRemoveFileDialog] = useState(false);
+  const [cancelItems, setCancelItems] = useState<StockLineItem[]>([]);
+  const [cancelLoading, setCancelLoading] = useState(false);
 
   const handleExportXLSX = async () => {
     try {
@@ -77,11 +80,37 @@ export default function DOActionsDropdown({ doOrder, canEdit, onEdit, onRefresh,
     }
   };
 
-  const handleCancel = async () => {
+  const handleCancelClick = async () => {
+    // For delivered DOs, fetch line items and show the stock-choice dialog
+    try {
+      const res = await fetch(`/api/delivery-orders/${doOrder.id}`, { credentials: 'include' });
+      if (!res.ok) throw new Error('Failed to fetch delivery order details');
+      const fullDO = await res.json();
+      const items: StockLineItem[] = (fullDO.items || []).map((item: any) => ({
+        id: item.id,
+        productId: item.product_id ?? item.productId,
+        description: item.description || item.product_name || `Product ${item.product_id ?? item.productId}`,
+        quantity: item.quantity,
+      }));
+      setCancelItems(items);
+      setShowCancelDialog(true);
+    } catch {
+      toast({
+        title: 'Error',
+        description: 'Could not load delivery order details. Please try again.',
+        variant: 'destructive',
+      });
+    }
+  };
+
+  const handleCancel = async (productIdsToReverse: number[]) => {
+    setCancelLoading(true);
     try {
       const res = await fetch(`/api/delivery-orders/${doOrder.id}/cancel`, {
         method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
         credentials: 'include',
+        body: JSON.stringify({ productIdsToReverse }),
       });
       if (!res.ok) {
         const data = await res.json().catch(() => ({}));
@@ -89,7 +118,9 @@ export default function DOActionsDropdown({ doOrder, canEdit, onEdit, onRefresh,
       }
       toast({
         title: 'Delivery Order Cancelled',
-        description: `${doOrder.orderNumber} has been cancelled and any stock movements reversed.`,
+        description: productIdsToReverse.length > 0
+          ? `${doOrder.orderNumber} cancelled. ${productIdsToReverse.length} item(s) returned to stock.`
+          : `${doOrder.orderNumber} cancelled. No stock was returned.`,
       });
       setShowCancelDialog(false);
       onRefresh();
@@ -100,6 +131,8 @@ export default function DOActionsDropdown({ doOrder, canEdit, onEdit, onRefresh,
         description: error instanceof Error ? error.message : 'Failed to cancel the delivery order. Please try again.',
         variant: 'destructive',
       });
+    } finally {
+      setCancelLoading(false);
     }
   };
 
@@ -214,12 +247,12 @@ export default function DOActionsDropdown({ doOrder, canEdit, onEdit, onRefresh,
               </DropdownMenuItem>
             </>
           )}
-          {canDelete && (
+          {canDelete && !isCancelled && (
             <>
               <DropdownMenuSeparator />
               {isDelivered ? (
                 <DropdownMenuItem
-                  onClick={() => setShowCancelDialog(true)}
+                  onClick={handleCancelClick}
                   className="text-orange-600 focus:text-orange-600"
                 >
                   <Ban className="w-4 h-4 mr-2" />
@@ -248,14 +281,14 @@ export default function DOActionsDropdown({ doOrder, canEdit, onEdit, onRefresh,
         confirmText="Yes, Delete"
         confirmVariant="destructive"
       />
-      <SimpleConfirmDialog
+      <CancelWithStockDialog
         open={showCancelDialog}
         onClose={() => setShowCancelDialog(false)}
         onConfirm={handleCancel}
-        title="Cancel Delivery Order"
-        description={`Cancel Delivery Order "${doNumber}"? This will change its status to Cancelled and reverse any stock movements made when it was delivered.`}
-        confirmText="Yes, Cancel Order"
-        confirmVariant="destructive"
+        documentType="Delivery Order"
+        documentNumber={doNumber}
+        items={cancelItems}
+        isLoading={cancelLoading}
       />
       <SimpleConfirmDialog
         open={showRemoveFileDialog}

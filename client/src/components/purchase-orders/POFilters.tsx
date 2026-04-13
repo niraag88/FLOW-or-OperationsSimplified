@@ -107,6 +107,7 @@ export default function POFilters({ filters, onFiltersChange, onFilterChange }: 
         <SelectContent>
           <SelectItem value="all">All Payments</SelectItem>
           <SelectItem value="outstanding">Outstanding</SelectItem>
+          <SelectItem value="partially_paid">Partially Paid</SelectItem>
           <SelectItem value="paid">Paid</SelectItem>
         </SelectContent>
       </Select>

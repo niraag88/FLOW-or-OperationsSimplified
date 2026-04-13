@@ -290,7 +290,7 @@ export default function PurchaseOrders() {
                 return `AED ${aed.toFixed(2)}`;
               }},
               status: { label: 'Status', transform: (val: unknown) => val && typeof val === 'string' ? val.toUpperCase() : '' },
-              paymentStatus: { label: 'Payment Status', transform: (val: unknown) => val && typeof val === 'string' ? val.charAt(0).toUpperCase() + val.slice(1) : 'Outstanding' },
+              paymentStatus: { label: 'Payment Status', transform: (val: unknown) => val && typeof val === 'string' ? val.replace(/_/g, ' ').replace(/\b\w/g, c => c.toUpperCase()) : 'Outstanding' },
               paymentMadeDate: { label: 'Payment Date', transform: (val: unknown) => val ? format(new Date(String(val)), 'dd/MM/yy') : '' },
               paymentRemarks: { label: 'Payment Remarks', transform: (val: unknown) => val || '' }
             } : goodsReceiptsColumns}

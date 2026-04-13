@@ -20,6 +20,7 @@ import { Customer as CustomerEntity } from "@/api/entities";
 import { Brand as BrandEntity } from "@/api/entities";
 import type { DeliveryOrder, Customer, Brand, Product } from "@shared/schema";
 import { Card } from "@/components/ui/card";
+import { useToast } from "@/hooks/use-toast";
 
 const toNum = (v: unknown): number => parseFloat(String(v)) || 0;
 
@@ -70,6 +71,7 @@ interface DOFormProps {
 }
 
 export default function DOForm({ open, onClose, editingDO, currentUser, onSuccess }: DOFormProps) {
+  const { toast } = useToast();
   const [loading, setLoading] = useState(false);
   const [customers, setCustomers] = useState<Customer[]>([]);
   const [products, setProducts] = useState<Product[]>([]);
@@ -285,6 +287,15 @@ export default function DOForm({ open, onClose, editingDO, currentUser, onSucces
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!formData.customer_id || !formData.do_number) return;
+
+    if (!formData.items || formData.items.length === 0) {
+      toast({
+        title: "Line Item Required",
+        description: "Please add at least one product line item before saving.",
+        variant: "destructive",
+      });
+      return;
+    }
 
     setLoading(true);
     try {

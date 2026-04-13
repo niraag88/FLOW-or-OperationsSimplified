@@ -42,6 +42,9 @@ export function registerPurchaseOrderRoutes(app: Express) {
     if (!req.body.brandId) {
       return res.status(400).json({ error: 'brandId is required' });
     }
+    if (!req.body.items || !Array.isArray(req.body.items) || req.body.items.length === 0) {
+      return res.status(400).json({ error: 'At least one line item is required to save a purchase order' });
+    }
     if (Array.isArray(req.body.items)) {
       for (const item of req.body.items) {
         if (item.unitPrice !== undefined && parseFloat(item.unitPrice) < 0) {
@@ -201,6 +204,9 @@ export function registerPurchaseOrderRoutes(app: Express) {
       const [po] = await db.select().from(purchaseOrders).where(eq(purchaseOrders.id, poId));
       if (!po) {
         return res.status(404).json({ error: 'Purchase order not found' });
+      }
+      if (po.status === 'cancelled') {
+        return res.status(400).json({ error: 'Cancelled purchase orders cannot be deleted. The document is retained for audit purposes.' });
       }
       const [grnCount] = await db.select({ count: sql<number>`count(*)::int` })
         .from(goodsReceipts)
@@ -424,32 +430,12 @@ export function registerPurchaseOrderRoutes(app: Express) {
     }
   });
 
-  app.patch('/api/purchase-orders/:id/payment', requireAuth(['Admin', 'Manager', 'Staff']), async (req: AuthenticatedRequest, res) => {
-    try {
-      const id = parseInt(req.params.id);
-      const { paymentStatus, paymentMadeDate, paymentRemarks } = req.body;
-      if (!paymentStatus || !['outstanding', 'paid'].includes(paymentStatus)) {
-        return res.status(400).json({ error: 'paymentStatus must be "outstanding" or "paid"' });
-      }
-      if (paymentStatus === 'paid' && !paymentMadeDate) {
-        return res.status(400).json({ error: 'paymentMadeDate is required when marking as paid' });
-      }
-      const updateData: Record<string, any> = { paymentStatus, updatedAt: new Date() };
-      if (paymentStatus === 'paid') {
-        updateData.paymentMadeDate = paymentMadeDate || null;
-        updateData.paymentRemarks = paymentRemarks || null;
-      } else {
-        updateData.paymentMadeDate = null;
-        updateData.paymentRemarks = null;
-      }
-      const [updated] = await db.update(purchaseOrders).set(updateData).where(eq(purchaseOrders.id, id)).returning();
-      if (!updated) return res.status(404).json({ error: 'Purchase order not found' });
-      writeAuditLog({ actor: req.user!.id, actorName: req.user?.username || String(req.user!.id), targetId: String(id), targetType: 'purchase_order', action: 'UPDATE', details: `Payment status set to ${paymentStatus} on PO #${updated.poNumber}` });
-      res.json(updated);
-    } catch (error) {
-      console.error('Error updating PO payment status:', error);
-      res.status(500).json({ error: 'Failed to update payment status' });
-    }
+  // PO payment status is now derived automatically from linked GRN payments.
+  // Manual marking is no longer supported — this endpoint returns 405.
+  app.patch('/api/purchase-orders/:id/payment', requireAuth(), (req, res) => {
+    res.status(405).json({
+      error: 'PO payment status is derived automatically from linked purchase invoices (GRNs). Mark individual GRNs as paid in the Payments tab instead.',
+    });
   });
 
   app.patch('/api/purchase-orders/:id/status', requireAuth(['Admin', 'Manager']), async (req: AuthenticatedRequest, res) => {

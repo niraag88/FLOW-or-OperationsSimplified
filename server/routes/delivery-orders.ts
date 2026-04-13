@@ -156,6 +156,9 @@ export function registerDeliveryOrderRoutes(app: Express) {
   });
 
   app.post('/api/delivery-orders', requireAuth(), async (req: AuthenticatedRequest, res) => {
+    if (!req.body.items || !Array.isArray(req.body.items) || req.body.items.length === 0) {
+      return res.status(400).json({ error: 'At least one line item is required to save a delivery order' });
+    }
     try {
       const { companySettings } = await import('@shared/schema');
       const [nextNumber, doSettingsRow] = await Promise.all([
@@ -401,6 +404,13 @@ export function registerDeliveryOrderRoutes(app: Express) {
       }
 
       // Reverse stock movements and mark as cancelled atomically
+      // Optional: array of product IDs whose stock should be reversed.
+      // If omitted (or empty), all stock movements are reversed (default behaviour).
+      // If provided, only movements for those product IDs are reversed.
+      const productIdsToReverse: number[] | undefined = Array.isArray(req.body?.productIdsToReverse)
+        ? req.body.productIdsToReverse.map(Number).filter((n: number) => !isNaN(n))
+        : undefined;
+
       await db.transaction(async (tx) => {
         if (doRecord.status === 'delivered') {
           const doMovements = await tx.select().from(stockMovements)
@@ -410,6 +420,9 @@ export function registerDeliveryOrderRoutes(app: Express) {
             ));
 
           for (const movement of doMovements) {
+            if (productIdsToReverse !== undefined && !productIdsToReverse.includes(movement.productId)) {
+              continue;
+            }
             await updateProductStock(
               movement.productId,
               -movement.quantity,
@@ -429,13 +442,17 @@ export function registerDeliveryOrderRoutes(app: Express) {
 
       const [updated] = await db.select().from(deliveryOrders).where(eq(deliveryOrders.id, id));
 
+      const stockNote = doRecord.status === 'delivered'
+        ? (productIdsToReverse !== undefined ? ` — partial stock reversal (${productIdsToReverse.length} item(s))` : ' — stock reversed')
+        : '';
+
       writeAuditLog({
         actor: req.user!.id,
         actorName: req.user?.username || String(req.user!.id),
         targetId: String(id),
         targetType: 'delivery_order',
         action: 'UPDATE',
-        details: `DO #${doRecord.orderNumber} cancelled${doRecord.status === 'delivered' ? ' — stock reversed' : ''}`,
+        details: `DO #${doRecord.orderNumber} cancelled${stockNote}`,
       });
 
       res.json({ ...updated, do_number: updated.orderNumber });
@@ -503,6 +520,9 @@ export function registerDeliveryOrderRoutes(app: Express) {
       // Delivered DOs must be cancelled first, not deleted directly
       if (doHeader.status === 'delivered') {
         return res.status(400).json({ error: 'Delivered orders cannot be deleted. Use Cancel instead.' });
+      }
+      if (doHeader.status === 'cancelled') {
+        return res.status(400).json({ error: 'Cancelled orders cannot be deleted. The document is retained for audit purposes.' });
       }
 
       const lineItems = await db.select().from(deliveryOrderItems).where(eq(deliveryOrderItems.doId, id));

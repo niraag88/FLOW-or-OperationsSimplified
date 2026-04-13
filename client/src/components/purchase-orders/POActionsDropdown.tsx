@@ -8,13 +8,11 @@ import {
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
 import { Button } from "@/components/ui/button";
-import { MoreHorizontal, Edit2, Download, Trash2, Eye, CheckCircle, RotateCcw, Upload, Printer } from "lucide-react";
+import { MoreHorizontal, Edit2, Download, Trash2, Eye, Upload, Printer } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import { exportPODetailToXLSX, printPOGRNSummary } from "../utils/export";
 import SimpleConfirmDialog from "../common/SimpleConfirmDialog";
-import MarkPOPaidDialog from "./MarkPOPaidDialog";
 import UploadFileDialog from "../common/UploadFileDialog";
-import type { PurchaseOrder } from "@shared/schema";
 
 interface POActionsDropdownProps {
   po: Record<string, any>;
@@ -27,7 +25,6 @@ interface POActionsDropdownProps {
 export default function POActionsDropdown({ po, canEdit, onEdit, onRefresh, currentUser }: POActionsDropdownProps) {
   const { toast } = useToast();
   const [showDeleteDialog, setShowDeleteDialog] = useState(false);
-  const [showMarkPaidDialog, setShowMarkPaidDialog] = useState(false);
   const [showUploadDialog, setShowUploadDialog] = useState(false);
 
   const handleExportXLSX = async () => {
@@ -76,22 +73,6 @@ export default function POActionsDropdown({ po, canEdit, onEdit, onRefresh, curr
         description: error.message || 'Failed to delete the purchase order. Please try again.',
         variant: 'destructive'
       });
-    }
-  };
-
-  const handleMarkOutstanding = async () => {
-    try {
-      const res = await fetch(`/api/purchase-orders/${po.id}/payment`, {
-        method: 'PATCH',
-        headers: { 'Content-Type': 'application/json' },
-        credentials: 'include',
-        body: JSON.stringify({ paymentStatus: 'outstanding' }),
-      });
-      if (!res.ok) throw new Error('Failed to update payment status');
-      toast({ title: 'Updated', description: `PO ${po.poNumber} marked as outstanding.` });
-      onRefresh();
-    } catch (error: any) {
-      toast({ title: 'Error', description: error.message, variant: 'destructive' });
     }
   };
 
@@ -150,39 +131,25 @@ export default function POActionsDropdown({ po, canEdit, onEdit, onRefresh, curr
             Export to XLSX
           </DropdownMenuItem>
           <DropdownMenuSeparator />
-          {po.paymentStatus !== 'paid' && po.payment_status !== 'paid' ? (
-            <DropdownMenuItem onClick={() => setShowMarkPaidDialog(true)} className="text-green-700 focus:text-green-700">
-              <CheckCircle className="w-4 h-4 mr-2" />
-              Mark as Paid
-            </DropdownMenuItem>
-          ) : (
-            <DropdownMenuItem onClick={handleMarkOutstanding} className="text-amber-700 focus:text-amber-700">
-              <RotateCcw className="w-4 h-4 mr-2" />
-              Mark as Outstanding
-            </DropdownMenuItem>
-          )}
-          <DropdownMenuSeparator />
           <DropdownMenuItem onClick={() => setShowUploadDialog(true)}>
             <Upload className="w-4 h-4 mr-2" />
             Upload Document
           </DropdownMenuItem>
-          <DropdownMenuSeparator />
-          <DropdownMenuItem 
-            onClick={() => setShowDeleteDialog(true)}
-            className="text-red-600 focus:text-red-600"
-          >
-            <Trash2 className="w-4 h-4 mr-2" />
-            Delete
-          </DropdownMenuItem>
+          {po.status !== 'cancelled' && (
+            <>
+              <DropdownMenuSeparator />
+              <DropdownMenuItem 
+                onClick={() => setShowDeleteDialog(true)}
+                className="text-red-600 focus:text-red-600"
+              >
+                <Trash2 className="w-4 h-4 mr-2" />
+                Delete
+              </DropdownMenuItem>
+            </>
+          )}
         </DropdownMenuContent>
       </DropdownMenu>
 
-      <MarkPOPaidDialog
-        open={showMarkPaidDialog}
-        onClose={() => setShowMarkPaidDialog(false)}
-        po={po}
-        onSuccess={onRefresh}
-      />
       <SimpleConfirmDialog
         open={showDeleteDialog}
         onClose={() => setShowDeleteDialog(false)}

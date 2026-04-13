@@ -659,7 +659,7 @@ export const insertPurchaseOrderSchema = createInsertSchema(purchaseOrders).pick
   createdBy: true,
 }).extend({
   supplierId: z.number().nullable().optional(),
-  paymentStatus: z.enum(['outstanding', 'paid']).optional(),
+  paymentStatus: z.enum(['outstanding', 'partially_paid', 'paid']).optional(),
   paymentMadeDate: z.string().nullable().optional(),
   paymentRemarks: z.string().nullable().optional(),
 });

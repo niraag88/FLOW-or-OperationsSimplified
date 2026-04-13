@@ -353,6 +353,15 @@ export default function InvoiceForm({ open, onClose, editingInvoice, currentUser
       return;
     }
 
+    if (!formData.items || formData.items.length === 0) {
+      toast({
+        title: "Line Item Required",
+        description: "Please add at least one product line item before saving.",
+        variant: "destructive",
+      });
+      return;
+    }
+
     setLoading(true);
     try {
       const invoiceData = {

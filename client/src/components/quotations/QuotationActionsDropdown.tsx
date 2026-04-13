@@ -162,7 +162,7 @@ export default function QuotationActionsDropdown({ quotation, canEdit, canCreate
               </DropdownMenuItem>
             </>
           )}
-          {canEdit && (
+          {canEdit && quotation.status !== 'cancelled' && (
             <>
               <DropdownMenuSeparator />
               <DropdownMenuItem 

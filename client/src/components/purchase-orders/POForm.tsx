@@ -327,6 +327,16 @@ export default function POForm({ open, onClose, editingPO, currentUser, onSucces
 
   const handleSubmit = async (e: React.FormEvent<HTMLFormElement>) => {
     e.preventDefault();
+
+    if (!formData.items || formData.items.length === 0) {
+      toast({
+        title: "Line Item Required",
+        description: "Please add at least one product line item before saving.",
+        variant: "destructive",
+      });
+      return;
+    }
+
     setLoading(true);
 
     try {

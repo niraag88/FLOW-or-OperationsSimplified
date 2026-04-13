@@ -15,6 +15,7 @@ import { format } from 'date-fns';
 import { Invoice as InvoiceEntity } from "@/api/entities";
 import MarkPaidDialog from "./MarkPaidDialog";
 import SimpleConfirmDialog from "../common/SimpleConfirmDialog";
+import CancelWithStockDialog, { type StockLineItem } from "../common/CancelWithStockDialog";
 import UploadFileDialog from "../common/UploadFileDialog";
 import type { Invoice } from "@shared/schema";
 
@@ -34,8 +35,12 @@ export default function InvoiceActionsDropdown({ invoice, canEdit, canOverride, 
   const [showUploadDialog, setShowUploadDialog] = useState(false);
   const [showRemoveFileDialog, setShowRemoveFileDialog] = useState(false);
   const [showCancelDialog, setShowCancelDialog] = useState(false);
+  const [showStockCancelDialog, setShowStockCancelDialog] = useState(false);
+  const [cancelItems, setCancelItems] = useState<StockLineItem[]>([]);
+  const [cancelLoading, setCancelLoading] = useState(false);
 
   const isCancelled = invoice.status === 'cancelled';
+  const isDelivered = invoice.status === 'delivered';
 
   const handleExportXLSX = async () => {
     try {
@@ -83,21 +88,54 @@ export default function InvoiceActionsDropdown({ invoice, canEdit, canOverride, 
     }
   };
 
-  const handleCancelInvoice = async () => {
+  const handleCancelClick = async () => {
+    if (isDelivered) {
+      // Fetch line items so user can choose which to return to stock
+      try {
+        const res = await fetch(`/api/invoices/${invoice.id}`, { credentials: 'include' });
+        if (!res.ok) throw new Error('Failed to fetch invoice details');
+        const fullInvoice = await res.json();
+        const items: StockLineItem[] = (fullInvoice.items || []).map((item: any) => ({
+          id: item.id,
+          productId: item.product_id ?? item.productId,
+          description: item.description || item.product_name || `Product ${item.product_id ?? item.productId}`,
+          quantity: item.quantity,
+        })).filter((i: StockLineItem) => i.productId);
+        setCancelItems(items);
+        setShowStockCancelDialog(true);
+      } catch {
+        toast({ title: 'Error', description: 'Could not load invoice details. Please try again.', variant: 'destructive' });
+      }
+    } else {
+      setShowCancelDialog(true);
+    }
+  };
+
+  const handleCancelInvoice = async (productIdsToReverse?: number[]) => {
+    setCancelLoading(true);
     try {
+      const body: Record<string, unknown> = {};
+      if (productIdsToReverse !== undefined) {
+        body.productIdsToReverse = productIdsToReverse;
+      }
       const res = await fetch(`/api/invoices/${invoice.id}/cancel`, {
         method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
         credentials: 'include',
+        body: JSON.stringify(body),
       });
       if (!res.ok) {
         const data = await res.json().catch(() => ({}));
         throw new Error(data.error || 'Failed to cancel invoice');
       }
-      toast({
-        title: 'Invoice Cancelled',
-        description: `Invoice ${invoiceNumber} has been cancelled.`,
-      });
+      const desc = productIdsToReverse !== undefined
+        ? (productIdsToReverse.length > 0
+            ? `Invoice ${invoiceNumber} cancelled. ${productIdsToReverse.length} item(s) returned to stock.`
+            : `Invoice ${invoiceNumber} cancelled. No stock was returned.`)
+        : `Invoice ${invoiceNumber} has been cancelled.`;
+      toast({ title: 'Invoice Cancelled', description: desc });
       setShowCancelDialog(false);
+      setShowStockCancelDialog(false);
       onRefresh();
     } catch (error: unknown) {
       console.error('Error cancelling invoice:', error);
@@ -106,6 +144,8 @@ export default function InvoiceActionsDropdown({ invoice, canEdit, canOverride, 
         description: error instanceof Error ? error.message : 'Failed to cancel the invoice. Please try again.',
         variant: 'destructive',
       });
+    } finally {
+      setCancelLoading(false);
     }
   };
 
@@ -254,20 +294,22 @@ export default function InvoiceActionsDropdown({ invoice, canEdit, canOverride, 
           <DropdownMenuSeparator />
           {canEdit && !isCancelled && (
             <DropdownMenuItem
-              onClick={() => setShowCancelDialog(true)}
+              onClick={handleCancelClick}
               className="text-orange-700 focus:text-orange-700"
             >
               <Ban className="w-4 h-4 mr-2" />
               Cancel Invoice
             </DropdownMenuItem>
           )}
-          <DropdownMenuItem 
-            onClick={() => setShowDeleteDialog(true)}
-            className="text-red-600 focus:text-red-600"
-          >
-            <Trash2 className="w-4 h-4 mr-2" />
-            Delete
-          </DropdownMenuItem>
+          {!isCancelled && (
+            <DropdownMenuItem 
+              onClick={() => setShowDeleteDialog(true)}
+              className="text-red-600 focus:text-red-600"
+            >
+              <Trash2 className="w-4 h-4 mr-2" />
+              Delete
+            </DropdownMenuItem>
+          )}
         </DropdownMenuContent>
       </DropdownMenu>
 
@@ -298,11 +340,20 @@ export default function InvoiceActionsDropdown({ invoice, canEdit, canOverride, 
       <SimpleConfirmDialog
         open={showCancelDialog}
         onClose={() => setShowCancelDialog(false)}
-        onConfirm={handleCancelInvoice}
+        onConfirm={() => handleCancelInvoice()}
         title="Cancel Invoice"
         description={`Are you sure you want to cancel Invoice "${invoiceNumber}"? This cannot be undone. The invoice will remain on record but will be marked as cancelled.`}
         confirmText="Yes, Cancel Invoice"
         confirmVariant="destructive"
+      />
+      <CancelWithStockDialog
+        open={showStockCancelDialog}
+        onClose={() => setShowStockCancelDialog(false)}
+        onConfirm={handleCancelInvoice}
+        documentType="Invoice"
+        documentNumber={invoiceNumber}
+        items={cancelItems}
+        isLoading={cancelLoading}
       />
       <UploadFileDialog
         open={showUploadDialog}

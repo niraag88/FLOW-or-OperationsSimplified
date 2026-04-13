@@ -31,6 +31,9 @@ export function registerQuotationRoutes(app: Express) {
     if (!req.body.customerId) {
       return res.status(400).json({ error: 'customerId is required' });
     }
+    if (!req.body.items || !Array.isArray(req.body.items) || req.body.items.length === 0) {
+      return res.status(400).json({ error: 'At least one line item is required to save a quotation' });
+    }
     try {
       const [quoteNumber, quoteSettingsRow] = await Promise.all([
         businessStorage.generateQuotationNumber(),
@@ -221,6 +224,9 @@ export function registerQuotationRoutes(app: Express) {
       const [quoteHeader] = await db.select().from(quotations).where(eq(quotations.id, id));
       if (!quoteHeader) {
         return res.status(404).json({ error: 'Quotation not found' });
+      }
+      if (quoteHeader.status === 'cancelled') {
+        return res.status(400).json({ error: 'Cancelled quotations cannot be deleted. The document is retained for audit purposes.' });
       }
       const lineItems = await db.select().from(quotationItems).where(eq(quotationItems.quoteId, id));
       const header = quoteHeader;

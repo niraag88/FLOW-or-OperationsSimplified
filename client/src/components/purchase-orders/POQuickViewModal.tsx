@@ -31,7 +31,8 @@ const STATUS_COLORS = {
 
 const PAYMENT_COLORS = {
   paid: "bg-green-100 text-green-800 border-green-200",
-  outstanding: "bg-amber-100 text-amber-800 border-amber-200",
+  partially_paid: "bg-orange-100 text-orange-800 border-orange-200",
+  outstanding: "bg-gray-100 text-gray-700 border-gray-200",
 };
 
 function Section({ title, children }: { title: string; children: React.ReactNode }) {
@@ -195,7 +196,7 @@ export default function POQuickViewModal({ poId, open, onClose }: POQuickViewMod
                 )}
                 {detail?.paymentStatus && (
                   <Badge className={`${PAYMENT_COLORS[detail.paymentStatus as keyof typeof PAYMENT_COLORS] || PAYMENT_COLORS.outstanding} border text-xs`}>
-                    {detail.paymentStatus.toUpperCase()}
+                    {detail.paymentStatus.replace(/_/g, ' ').toUpperCase()}
                   </Badge>
                 )}
               </>

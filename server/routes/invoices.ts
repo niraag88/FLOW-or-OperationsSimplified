@@ -251,9 +251,8 @@ export function registerInvoiceRoutes(app: Express) {
         logo: invSettingsRow[0].logo,
       } : null;
 
-      const submittableStatuses = ['submitted', 'paid', 'delivered'];
-      if (submittableStatuses.includes(body.status) && (!body.items || !Array.isArray(body.items) || body.items.length === 0)) {
-        return res.status(400).json({ error: 'At least one item is required to submit an invoice' });
+      if (!body.items || !Array.isArray(body.items) || body.items.length === 0) {
+        return res.status(400).json({ error: 'At least one line item is required to save an invoice' });
       }
 
       const invoiceData: InsertInvoice = {
@@ -592,6 +591,12 @@ export function registerInvoiceRoutes(app: Express) {
         return res.status(409).json({ error: 'Invoice is already cancelled' });
       }
 
+      // Optional: product IDs whose stock should be reversed.
+      // If omitted, all stock is reversed (default). If provided, only those products are reversed.
+      const productIdsToReverse: number[] | undefined = Array.isArray(req.body?.productIdsToReverse)
+        ? req.body.productIdsToReverse.map(Number).filter((n: number) => !isNaN(n))
+        : undefined;
+
       await db.transaction(async (tx) => {
         await tx.update(invoices).set({ status: 'cancelled' }).where(eq(invoices.id, id));
 
@@ -599,6 +604,9 @@ export function registerInvoiceRoutes(app: Express) {
           const items = await tx.select().from(invoiceLineItems).where(eq(invoiceLineItems.invoiceId, id));
           for (const item of items) {
             if (!item.productId) continue;
+            if (productIdsToReverse !== undefined && !productIdsToReverse.includes(item.productId)) {
+              continue;
+            }
             await updateProductStock(
               item.productId,
               item.quantity,
@@ -615,13 +623,17 @@ export function registerInvoiceRoutes(app: Express) {
         }
       });
 
+      const stockNote = invoice.stockDeducted
+        ? (productIdsToReverse !== undefined ? ` — partial stock reversal (${productIdsToReverse.length} item(s))` : ' — stock reversed')
+        : '';
+
       writeAuditLog({
         actor: req.user!.id,
         actorName: req.user?.username || String(req.user!.id),
         targetId: String(id),
         targetType: 'invoice',
         action: 'UPDATE',
-        details: `Invoice #${invoice.invoiceNumber} cancelled${invoice.stockDeducted ? ' — stock reversed' : ''}`,
+        details: `Invoice #${invoice.invoiceNumber} cancelled${stockNote}`,
       });
 
       const [updated] = await db.select().from(invoices).where(eq(invoices.id, id));
@@ -641,6 +653,9 @@ export function registerInvoiceRoutes(app: Express) {
       const [invoiceHeader] = await db.select().from(invoices).where(eq(invoices.id, id));
       if (!invoiceHeader) {
         return res.status(404).json({ error: 'Invoice not found' });
+      }
+      if (invoiceHeader.status === 'cancelled') {
+        return res.status(400).json({ error: 'Cancelled invoices cannot be deleted. The document is retained for audit purposes.' });
       }
       const lineItems = await db.select().from(invoiceLineItems).where(eq(invoiceLineItems.invoiceId, id));
 
