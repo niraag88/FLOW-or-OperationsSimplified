@@ -170,6 +170,19 @@ export function registerQuotationRoutes(app: Express) {
       if (existing.status === 'converted') {
         return res.status(400).json({ error: 'Converted quotations cannot be modified' });
       }
+      const newStatus = req.body.status;
+      if (newStatus && newStatus !== existing.status) {
+        const ALLOWED_TRANSITIONS: Record<string, string[]> = {
+          draft:     ['submitted', 'cancelled'],
+          submitted: ['accepted', 'rejected', 'cancelled'],
+          accepted:  ['cancelled'],
+          rejected:  ['cancelled'],
+        };
+        const allowed = ALLOWED_TRANSITIONS[existing.status] ?? [];
+        if (!allowed.includes(newStatus)) {
+          return res.status(400).json({ error: `Cannot transition quotation from '${existing.status}' to '${newStatus}'` });
+        }
+      }
 
       const { companySnapshot: _ignoredQUOSnapshot, ...bodyWithoutSnapshot } = req.body;
       const processedData = {

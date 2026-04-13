@@ -1179,6 +1179,28 @@ test.describe('Quotations', () => {
     expect(status).toBe(200);
   });
 
+  test('PUT /api/quotations/:id submitted→draft → 400 (disallowed transition)', async () => {
+    // Create quotation directly in submitted status, then try to downgrade
+    if (!IDs.customer || !IDs.product) return;
+    const { data: created } = await api('POST', '/api/quotations', adminCookie, {
+      customerId: IDs.customer,
+      customerName: 'Audit Customer LLC Updated',
+      quoteDate: '2026-04-13',
+      validUntil: '2026-05-13',
+      status: 'submitted',
+      subtotal: '100.00',
+      taxAmount: '5.00',
+      totalAmount: '105.00',
+      items: [{ product_id: IDs.product, quantity: 1, unit_price: 100, discount: 0, vat_rate: 0.05, line_total: 100 }],
+    });
+    const qId = (created as { id: number }).id;
+    expect(qId).toBeGreaterThan(0);
+    const { status: downgradeStatus } = await api('PUT', `/api/quotations/${qId}`, adminCookie, { status: 'draft' });
+    note('PUT /api/quotations/:id: submitted→draft returns 400 — not in allowed transition map');
+    expect(downgradeStatus).toBe(400);
+    await api('DELETE', `/api/quotations/${qId}`, adminCookie);
+  });
+
   test('PUT /api/quotations/:id cancelled→submitted → 400 (terminal state)', async () => {
     if (!IDs.quotation) return;
     const { status } = await api('PUT', `/api/quotations/${IDs.quotation}`, adminCookie, {
