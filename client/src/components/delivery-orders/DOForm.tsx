@@ -358,7 +358,7 @@ export default function DOForm({ open, onClose, editingDO, currentUser, onSucces
             </div>
             <div className="space-y-2">
               <Label htmlFor="status">Status</Label>
-              <Select value={formData.status} onValueChange={(value) => handleInputChange('status', value)} disabled={!isEditable}>
+              <Select value={formData.status} onValueChange={(value) => handleInputChange('status', value)} disabled={!isEditable || formData.status === 'delivered'}>
                 <SelectTrigger id="status">
                   <SelectValue />
                 </SelectTrigger>

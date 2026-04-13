@@ -276,6 +276,11 @@ export function registerDeliveryOrderRoutes(app: Express) {
 
       const newStatus = body.status || 'draft';
 
+      // Block status downgrades from 'delivered' — use the cancel endpoint instead
+      if (existingDO.status === 'delivered' && newStatus !== 'delivered') {
+        return res.status(400).json({ error: 'Cannot change status of a delivered order. Use the Cancel action to cancel it.' });
+      }
+
       await db.update(deliveryOrders).set({
         customerName,
         customerId: customerId || null,

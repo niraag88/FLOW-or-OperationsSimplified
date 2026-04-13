@@ -1406,6 +1406,22 @@ test.describe('Delivery Orders', () => {
     expect(delStatus).toBe(200);
   });
 
+  test('PUT /api/delivery-orders/:id status downgrade from delivered → 400', async () => {
+    if (!IDs.customer) return;
+    const { data: created } = await api('POST', '/api/delivery-orders', adminCookie, {
+      customer_id: IDs.customer, status: 'delivered', total_amount: 100, items: [],
+    });
+    const doId = (created as { id: number }).id;
+    const { status: downgradeStatus } = await api('PUT', `/api/delivery-orders/${doId}`, adminCookie, {
+      customer_id: IDs.customer, status: 'submitted', total_amount: 100, items: [],
+    });
+    note('PUT /api/delivery-orders/:id: status downgrade from delivered → 400 (must cancel first)');
+    expect(downgradeStatus).toBe(400);
+    // Clean up
+    await api('PATCH', `/api/delivery-orders/${doId}/cancel`, adminCookie);
+    await api('DELETE', `/api/delivery-orders/${doId}`, adminCookie);
+  });
+
   test('GET /api/delivery-orders → 200', async () => {
     const { status } = await api('GET', '/api/delivery-orders', adminCookie);
     expect(status).toBe(200);
