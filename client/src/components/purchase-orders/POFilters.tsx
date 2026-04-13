@@ -114,7 +114,7 @@ export default function POFilters({ filters, onFiltersChange, onFilterChange }: 
 
       <Select value={filters.supplier} onValueChange={(value) => handleFilterChange('supplier', value)}>
         <SelectTrigger className="w-48">
-          <SelectValue placeholder="Brand/Supplier" /> {/* Changed placeholder */}
+          <SelectValue placeholder="Brand" />
         </SelectTrigger>
         <SelectContent>
           <SelectItem value="all">All Brands</SelectItem> {/* Changed text */}

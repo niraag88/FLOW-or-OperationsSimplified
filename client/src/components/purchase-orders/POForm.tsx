@@ -825,7 +825,7 @@ export default function POForm({ open, onClose, editingPO, currentUser, onSucces
                                   <div className="flex-1 min-w-0">
                                     <p className="text-xs font-medium text-gray-800 truncate">{grn.receiptNumber}</p>
                                     <p className="text-xs text-gray-500">
-                                      {grn.receivedDate ? format(new Date(grn.receivedDate), 'dd/MM/yy') : '—'} · Supplier Invoice
+                                      {grn.receivedDate ? format(new Date(grn.receivedDate), 'dd/MM/yy') : '—'} · Brand Invoice
                                     </p>
                                   </div>
                                   <Button

@@ -235,7 +235,7 @@ export default function GoodsReceipts() {
                   <SelectContent>
                     {purchaseOrders.map((po: any) => (
                       <SelectItem key={po.id} value={po.id.toString()}>
-                        {po.poNumber} - {po.supplierName} ({format(new Date(po.orderDate), 'dd/MM/yy')})
+                        {po.poNumber} - {po.brandName || po.supplierName} ({format(new Date(po.orderDate), 'dd/MM/yy')})
                       </SelectItem>
                     ))}
                   </SelectContent>

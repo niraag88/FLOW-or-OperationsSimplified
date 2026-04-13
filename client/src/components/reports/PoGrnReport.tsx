@@ -507,7 +507,7 @@ export default function PoGrnReport({ purchaseOrders, goodsReceipts, suppliers =
                 const supplier = suppliers.find((s: any) => s.id === supplierId);
                 return (
                   <Badge key={supplierId} variant="secondary" className="gap-1">
-                    Supplier: {supplier?.name}
+                    Brand: {supplier?.name}
                     <X className="h-3 w-3 cursor-pointer" onClick={() => { setPoSelectedSuppliers(prev => prev.filter((id) => id !== supplierId)); setCurrentPage(1); }} />
                   </Badge>
                 );
@@ -633,7 +633,7 @@ export default function PoGrnReport({ purchaseOrders, goodsReceipts, suppliers =
                 const supplier = suppliers.find((s: any) => s.id === supplierId);
                 return (
                   <Badge key={supplierId} variant="secondary" className="gap-1">
-                    Supplier: {supplier?.name}
+                    Brand: {supplier?.name}
                     <X className="h-3 w-3 cursor-pointer" onClick={() => { setGrnSelectedSuppliers(prev => prev.filter((id) => id !== supplierId)); setGrnCurrentPage(1); }} />
                   </Badge>
                 );

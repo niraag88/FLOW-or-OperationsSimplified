@@ -209,7 +209,7 @@ export default function GRNPaymentsLedger({ canEdit }: GRNPaymentsLedgerProps) {
                   <tr className="border-b bg-muted/50">
                     <th className="h-10 px-3 text-left align-middle font-medium text-muted-foreground" style={{ width: "110px" }}>GRN #</th>
                     <th className="h-10 px-3 text-left align-middle font-medium text-muted-foreground" style={{ width: "110px" }}>PO #</th>
-                    <th className="h-10 px-3 text-left align-middle font-medium text-muted-foreground" style={{ width: "130px" }}>Supplier / Brand</th>
+                    <th className="h-10 px-3 text-left align-middle font-medium text-muted-foreground" style={{ width: "130px" }}>Brand</th>
                     <th className="h-10 px-3 text-left align-middle font-medium text-muted-foreground" style={{ width: "95px" }}>Received</th>
                     <th className="h-10 px-3 text-left align-middle font-medium text-muted-foreground" style={{ width: "110px" }}>Reference #</th>
                     <th className="h-10 px-3 text-right align-middle font-medium text-muted-foreground" style={{ width: "110px" }}>Amount</th>
@@ -308,7 +308,7 @@ export default function GRNPaymentsLedger({ canEdit }: GRNPaymentsLedgerProps) {
                   <span className="font-medium">{paymentDialogGrn.poNumber || `#${paymentDialogGrn.poId}`}</span>
                 </div>
                 <div className="flex justify-between">
-                  <span>Supplier / Brand</span>
+                  <span>Brand</span>
                   <span className="font-medium">{paymentDialogGrn.supplierName || paymentDialogGrn.poBrandName || "—"}</span>
                 </div>
                 {Number(paymentDialogGrn.referenceAmount) > 0 && (
