@@ -137,11 +137,9 @@ export const exportQuotationToXLSX = async (quotation: any) => {
       const response = await fetch(`/api/quotations/${quotation.id}`, { credentials: 'include' });
       if (response.ok) {
         fullQuotation = await response.json();
-      } else {
-        console.warn('Could not fetch complete quotation, using base quotation data');
       }
-    } catch (err: any) {
-      console.warn('Error fetching complete quotation:', err);
+    } catch {
+      // fall back to base quotation data
     }
     
     // Get company info — use snapshot captured at creation time; fall back to live settings for older quotations
@@ -183,8 +181,8 @@ export const exportQuotationToXLSX = async (quotation: any) => {
             };
           }
         }
-      } catch (err: any) {
-        console.warn('Could not fetch company settings, using defaults:', err);
+      } catch {
+        // fall back to empty company info defaults
       }
     }
 
@@ -574,8 +572,8 @@ export const exportPurchaseOrderToPDF = async (purchaseOrder: any) => {
         }
       }
       
-    } catch (err: any) {
-      console.warn('Could not fetch company/supplier settings, using defaults');
+    } catch {
+      // fall back to empty company/supplier settings defaults
     }
 
     const doc = new jsPDF();

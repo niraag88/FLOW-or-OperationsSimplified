@@ -6,6 +6,7 @@ import { Toaster } from "@/components/ui/toaster";
 import { TooltipProvider } from "@/components/ui/tooltip";
 import { AuthProvider, useAuth } from "@/hooks/useAuth";
 import { ProtectedRoute } from "@/components/ProtectedRoute";
+import { ErrorBoundary } from "@/components/ErrorBoundary";
 
 import LoginPage from "@/pages/LoginPage";
 import Layout from "@/pages/Layout";
@@ -62,6 +63,7 @@ function PagesContent() {
   }
 
   return (
+    <ErrorBoundary>
     <Suspense fallback={<PageSpinner />}>
       <Routes>
         <Route path="/login" element={<Navigate to="/" replace />} />
@@ -187,8 +189,21 @@ function PagesContent() {
             <DOPrintView />
           </ProtectedRoute>
         } />
+        <Route path="*" element={
+          <Layout currentPageName="Not Found">
+            <div className="flex flex-col items-center justify-center min-h-[60vh] text-center px-4">
+              <p className="text-6xl font-bold text-gray-200 dark:text-gray-700 mb-4">404</p>
+              <h1 className="text-2xl font-semibold text-gray-800 dark:text-gray-200 mb-2">Page not found</h1>
+              <p className="text-gray-500 dark:text-gray-400 mb-6">The page you're looking for doesn't exist or has been moved.</p>
+              <a href="/dashboard" className="inline-flex items-center px-4 py-2 bg-blue-600 text-white rounded-md hover:bg-blue-700 transition-colors text-sm font-medium">
+                Go to Dashboard
+              </a>
+            </div>
+          </Layout>
+        } />
       </Routes>
     </Suspense>
+    </ErrorBoundary>
   );
 }
 

@@ -22,7 +22,7 @@ export default function QuotationPrintView() {
 
     const loadData = async () => {
       try {
-        const quotationResponse = await fetch(`/api/export/quotation?quotationId=${quotationId}`);
+        const quotationResponse = await fetch(`/api/export/quotation?quotationId=${quotationId}`, { credentials: 'include' });
         const quotationResult = await quotationResponse.json();
         
         if (quotationResult.success) {
@@ -32,7 +32,7 @@ export default function QuotationPrintView() {
           if (quotationData.companySnapshot) {
             setCompanySettings(quotationData.companySnapshot);
           } else {
-            const companyResponse = await fetch('/api/company-settings');
+            const companyResponse = await fetch('/api/company-settings', { credentials: 'include' });
             setCompanySettings(await companyResponse.json());
           }
         } else {

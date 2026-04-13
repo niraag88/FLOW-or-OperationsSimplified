@@ -169,16 +169,12 @@ export default function Invoices() {
       const quotationId = sourceQuotationId;
       setSourceQuotationId(null);
       try {
-        const res = await fetch(`/api/quotations/${quotationId}/convert`, {
+        await fetch(`/api/quotations/${quotationId}/convert`, {
           method: 'PATCH',
           credentials: 'include',
         });
-        if (!res.ok) {
-          const body = await res.json().catch(() => ({}));
-          console.warn(`Could not mark quotation #${quotationId} as converted (HTTP ${res.status}):`, body?.error || body);
-        }
-      } catch (err: unknown) {
-        console.warn(`Could not mark quotation #${quotationId} as converted (network error):`, err);
+      } catch {
+        // non-critical: quotation conversion status is best-effort
       }
     }
   };

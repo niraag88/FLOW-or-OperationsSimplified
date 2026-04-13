@@ -1,6 +1,6 @@
 
 import React, { useState } from "react";
-import { Link, useLocation } from "react-router-dom";
+import { Link, useLocation, useNavigate } from "react-router-dom";
 import { createPageUrl } from "@/utils";
 import { useAuth } from "@/hooks/useAuth";
 import { 
@@ -119,6 +119,7 @@ interface LayoutProps {
 
 export default function Layout({ children, currentPageName = "" }: LayoutProps) {
   const location = useLocation();
+  const navigate = useNavigate();
   const { user, logout } = useAuth();
   const [mobileMenuOpen, setMobileMenuOpen] = React.useState(false);
 
@@ -270,7 +271,7 @@ export default function Layout({ children, currentPageName = "" }: LayoutProps) 
                     <p className="text-xs text-gray-500 capitalize">Role: {currentUser?.role}</p>
                   </div>
                   <DropdownMenuSeparator />
-                  <DropdownMenuItem onClick={() => window.location.href = createPageUrl('Settings')}>
+                  <DropdownMenuItem onClick={() => navigate('/settings')}>
                     <Settings className="w-4 h-4 mr-2" />
                     Settings
                   </DropdownMenuItem>

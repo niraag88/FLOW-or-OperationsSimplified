@@ -23,7 +23,7 @@ export default function POPrintView() {
 
   const loadPrintData = async (poId: any) => {
     try {
-      const poResponse = await fetch(`/api/export/po?poId=${poId}`);
+      const poResponse = await fetch(`/api/export/po?poId=${poId}`, { credentials: 'include' });
       const poResult = await poResponse.json();
 
       if (poResult.success) {
@@ -33,7 +33,7 @@ export default function POPrintView() {
         if (poData.companySnapshot) {
           setCompanyData(poData.companySnapshot);
         } else {
-          const companyResponse = await fetch('/api/company-settings');
+          const companyResponse = await fetch('/api/company-settings', { credentials: 'include' });
           setCompanyData(await companyResponse.json());
         }
       } else {

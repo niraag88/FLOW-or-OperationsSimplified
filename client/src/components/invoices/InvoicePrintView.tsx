@@ -18,7 +18,7 @@ export default function InvoicePrintView() {
 
     const loadData = async () => {
       try {
-        const invoiceResponse = await fetch(`/api/export/invoice?invoiceId=${id}`);
+        const invoiceResponse = await fetch(`/api/export/invoice?invoiceId=${id}`, { credentials: 'include' });
         const invoiceResult = await invoiceResponse.json();
         
         if (invoiceResult.success) {
@@ -28,7 +28,7 @@ export default function InvoicePrintView() {
           if (invoiceData.companySnapshot) {
             setCompanySettings(invoiceData.companySnapshot);
           } else {
-            const companyResponse = await fetch('/api/company-settings');
+            const companyResponse = await fetch('/api/company-settings', { credentials: 'include' });
             setCompanySettings(await companyResponse.json());
           }
         } else {

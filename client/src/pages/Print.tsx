@@ -47,8 +47,8 @@ export default function Print() {
             if (doc.supplier_id) {
               try {
                 related.brand = await Brand.getById(doc.supplier_id);
-              } catch (err: any) {
-                console.warn('Could not load brand for PO:', err);
+              } catch {
+                // non-critical: brand info is optional for print
               }
             }
             break;
@@ -57,8 +57,8 @@ export default function Print() {
             if (doc.customer_id) {
               try {
                 related.customer = await Customer.getById(doc.customer_id);
-              } catch (err: any) {
-                console.warn('Could not load customer for invoice:', err);
+              } catch {
+                // non-critical: customer info is optional for print
               }
             }
             break;
@@ -67,8 +67,8 @@ export default function Print() {
             if (doc.customer_id) {
               try {
                 related.customer = await Customer.getById(doc.customer_id);
-              } catch (err: any) {
-                console.warn('Could not load customer for DO:', err);
+              } catch {
+                // non-critical: customer info is optional for print
               }
             }
             break;
@@ -77,8 +77,8 @@ export default function Print() {
             if (doc.customer_id) {
               try {
                 related.customer = await Customer.getById(doc.customer_id);
-              } catch (err: any) {
-                console.warn('Could not load customer for quotation:', err);
+              } catch {
+                // non-critical: customer info is optional for print
               }
             }
             break;
@@ -104,8 +104,7 @@ export default function Print() {
           try {
             const settingsList = await CompanySettings.list();
             setSettings(settingsList[0] || {});
-          } catch (err: any) {
-            console.warn('Could not load company settings:', err);
+          } catch {
             setSettings({});
           }
         }
