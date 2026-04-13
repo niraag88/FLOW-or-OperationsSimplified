@@ -172,8 +172,11 @@ export function registerQuotationRoutes(app: Express) {
       }
       const newStatus = req.body.status;
       if (newStatus && newStatus !== existing.status) {
+        // Allowed status transition map (one-way flow enforcement)
+        // 'sent' is treated as a legacy alias for 'submitted'
         const ALLOWED_TRANSITIONS: Record<string, string[]> = {
-          draft:     ['submitted', 'cancelled'],
+          draft:     ['submitted', 'sent', 'cancelled'],
+          sent:      ['submitted', 'accepted', 'rejected', 'cancelled'],
           submitted: ['accepted', 'rejected', 'cancelled'],
           accepted:  ['cancelled'],
           rejected:  ['cancelled'],

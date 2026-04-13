@@ -1203,11 +1203,12 @@ test.describe('Quotations', () => {
 
   test('PUT /api/quotations/:id cancelled→submitted → 400 (terminal state)', async () => {
     if (!IDs.quotation) return;
-    const { status } = await api('PUT', `/api/quotations/${IDs.quotation}`, adminCookie, {
+    const { status, data } = await api('PUT', `/api/quotations/${IDs.quotation}`, adminCookie, {
       status: 'submitted',
     });
     note('PUT /api/quotations/:id: cancelled→submitted returns 400 — cancelled is a terminal state');
     expect(status).toBe(400);
+    expect((data as { error: string }).error).toBe('Cancelled quotations cannot be reactivated');
   });
 
   test('PUT /api/quotations/:id converted→draft → 400 (converted is terminal)', async () => {
@@ -1227,9 +1228,10 @@ test.describe('Quotations', () => {
     const qId = (created as { id: number }).id;
     const { status: convertStatus } = await api('PATCH', `/api/quotations/${qId}/convert`, adminCookie);
     expect(convertStatus).toBe(200); // confirm convert succeeded
-    const { status: downgradeStatus } = await api('PUT', `/api/quotations/${qId}`, adminCookie, { status: 'draft' });
+    const { status: downgradeStatus, data: downgradeData } = await api('PUT', `/api/quotations/${qId}`, adminCookie, { status: 'draft' });
     note('PUT /api/quotations/:id: converted→draft returns 400 — converted is a terminal state');
     expect(downgradeStatus).toBe(400);
+    expect((downgradeData as { error: string }).error).toBe('Converted quotations cannot be modified');
     // Clean up (delete the converted quotation — moves to recycle bin)
     await api('DELETE', `/api/quotations/${qId}`, adminCookie);
   });
