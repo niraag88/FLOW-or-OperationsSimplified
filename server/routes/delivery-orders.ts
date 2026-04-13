@@ -395,29 +395,33 @@ export function registerDeliveryOrderRoutes(app: Express) {
         return res.status(400).json({ error: 'Draft delivery orders should be deleted, not cancelled' });
       }
 
-      // Reverse stock movements if the DO was delivered
-      if (doRecord.status === 'delivered') {
-        const doMovements = await db.select().from(stockMovements)
-          .where(and(
-            eq(stockMovements.referenceType, 'delivery_order'),
-            eq(stockMovements.referenceId, id),
-          ));
+      // Reverse stock movements and mark as cancelled atomically
+      await db.transaction(async (tx) => {
+        if (doRecord.status === 'delivered') {
+          const doMovements = await tx.select().from(stockMovements)
+            .where(and(
+              eq(stockMovements.referenceType, 'delivery_order'),
+              eq(stockMovements.referenceId, id),
+            ));
 
-        for (const movement of doMovements) {
-          await updateProductStock(
-            movement.productId,
-            -movement.quantity,
-            'adjustment',
-            id,
-            'delivery_order_cancel',
-            0,
-            `Stock reversed: DO #${doRecord.orderNumber} cancelled`,
-            req.user!.id,
-          );
+          for (const movement of doMovements) {
+            await updateProductStock(
+              movement.productId,
+              -movement.quantity,
+              'adjustment',
+              id,
+              'delivery_order_cancel',
+              0,
+              `Stock reversed: DO #${doRecord.orderNumber} cancelled`,
+              req.user!.id,
+              tx,
+            );
+          }
         }
-      }
 
-      await db.update(deliveryOrders).set({ status: 'cancelled' }).where(eq(deliveryOrders.id, id));
+        await tx.update(deliveryOrders).set({ status: 'cancelled' }).where(eq(deliveryOrders.id, id));
+      });
+
       const [updated] = await db.select().from(deliveryOrders).where(eq(deliveryOrders.id, id));
 
       writeAuditLog({
