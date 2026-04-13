@@ -28,6 +28,9 @@ export function registerQuotationRoutes(app: Express) {
   });
 
   app.post('/api/quotations', requireAuth(['Admin', 'Manager', 'Staff']), async (req: AuthenticatedRequest, res) => {
+    if (!req.body.customerId) {
+      return res.status(400).json({ error: 'customerId is required' });
+    }
     try {
       const [quoteNumber, quoteSettingsRow] = await Promise.all([
         businessStorage.generateQuotationNumber(),

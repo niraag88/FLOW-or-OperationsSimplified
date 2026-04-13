@@ -251,6 +251,11 @@ export function registerInvoiceRoutes(app: Express) {
         logo: invSettingsRow[0].logo,
       } : null;
 
+      const submittableStatuses = ['submitted', 'paid', 'delivered'];
+      if (submittableStatuses.includes(body.status) && (!body.items || !Array.isArray(body.items) || body.items.length === 0)) {
+        return res.status(400).json({ error: 'At least one item is required to submit an invoice' });
+      }
+
       const invoiceData: InsertInvoice = {
         invoiceNumber: nextNumber,
         customerName,
@@ -355,6 +360,21 @@ export function registerInvoiceRoutes(app: Express) {
       }
 
       const newStatus = body.status || 'draft';
+
+      const submittableStatuses2 = ['submitted', 'paid', 'delivered'];
+      if (submittableStatuses2.includes(newStatus)) {
+        const hasBodyItems = Array.isArray(body.items) && body.items.length > 0;
+        if (!hasBodyItems) {
+          const [firstExisting] = await db.select({ id: invoiceLineItems.id })
+            .from(invoiceLineItems)
+            .where(eq(invoiceLineItems.invoiceId, id))
+            .limit(1);
+          if (!firstExisting) {
+            return res.status(400).json({ error: 'At least one item is required to submit an invoice' });
+          }
+        }
+      }
+
       const becomingDelivered = newStatus === 'delivered' && existingInvoice?.status !== 'delivered';
       const needsStockDeduction = becomingDelivered && !existingInvoice?.stockDeducted;
 

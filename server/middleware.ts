@@ -240,9 +240,13 @@ export async function comparePassword(password: string, hash: string): Promise<b
   return await bcrypt.compare(password, hash);
 }
 
+export const loggedOutSessionIds = new Set<string>();
+
 export const requireAuth = (allowedRoles: Array<"Admin" | "Manager" | "Staff"> = ["Admin", "Manager", "Staff"]) => {
   return async (req: AuthenticatedRequest, res: Response, next: NextFunction) => {
-    if (!req.session?.userId) {
+    const sid = req.session?.id;
+    const inBlacklist = sid ? loggedOutSessionIds.has(sid) : false;
+    if (!req.session?.userId || inBlacklist) {
       return res.status(401).json({ error: 'Authentication required' });
     }
     try {

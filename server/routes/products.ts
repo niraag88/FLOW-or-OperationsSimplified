@@ -53,6 +53,19 @@ export function registerProductRoutes(app: Express) {
     }
   });
 
+  app.get('/api/brands/:id', requireAuth(), async (req: AuthenticatedRequest, res) => {
+    try {
+      const brandId = parseInt(req.params.id);
+      if (isNaN(brandId)) return res.status(400).json({ error: 'Invalid ID' });
+      const brand = await businessStorage.getBrandById(brandId);
+      if (!brand) return res.status(404).json({ error: 'Brand not found' });
+      res.json(brand);
+    } catch (error) {
+      console.error('Error fetching brand:', error);
+      res.status(500).json({ error: 'Failed to fetch brand' });
+    }
+  });
+
   app.delete('/api/brands/:id', requireAuth(), async (req: AuthenticatedRequest, res) => {
     try {
       const brandId = parseInt(req.params.id);
@@ -280,7 +293,7 @@ export function registerProductRoutes(app: Express) {
           failed.push({ row: rowNum, sku, message: `Purchase currency must be one of: ${validCurrencies.join(', ')}` });
           continue;
         }
-        const skuPattern = /^[A-Za-z0-9]{1,50}$/;
+        const skuPattern = /^[A-Za-z0-9-]{1,50}$/;
         if (!skuPattern.test(sku)) {
           failed.push({ row: rowNum, sku, message: 'Product code must be 1–50 letters and numbers only' });
           continue;

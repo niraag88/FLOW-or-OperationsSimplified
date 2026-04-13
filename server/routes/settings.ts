@@ -136,7 +136,7 @@ export function registerSettingsRoutes(app: Express) {
 
       const [existingUser] = await db.select().from(users).where(eq(users.username, username));
       if (existingUser) {
-        return res.status(400).json({ error: 'Username already exists' });
+        return res.status(409).json({ error: 'Username already exists' });
       }
 
       const hashedPassword = await hashPassword(password);
@@ -180,7 +180,7 @@ export function registerSettingsRoutes(app: Express) {
           .from(users)
           .where(eq(users.username, username));
         if (existing && existing.id !== userId) {
-          return res.status(400).json({ error: 'Username already taken' });
+          return res.status(409).json({ error: 'Username already taken' });
         }
       }
 

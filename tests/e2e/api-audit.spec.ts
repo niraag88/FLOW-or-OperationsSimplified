@@ -836,15 +836,15 @@ test.describe('Purchase Orders', () => {
     expect(IDs.po).toBeGreaterThan(0);
   });
 
-  test('POST /api/purchase-orders missing brandId → 201 (brandId is optional in schema)', async () => {
+  test('POST /api/purchase-orders missing brandId → 400 (brandId is required)', async () => {
     expect(IDs.supplier).toBeGreaterThan(0);
     const { status } = await api('POST', '/api/purchase-orders', adminCookie, {
       supplierId: IDs.supplier,
       currency: 'AED',
       items: [],
     });
-    note(`POST /api/purchase-orders missing brandId → ${status} (brandId is optional — no validation enforced)`);
-    expect(status).toBe(201);
+    note(`POST /api/purchase-orders missing brandId → ${status} (brandId is required — validation enforced)`);
+    expect(status).toBe(400);
   });
 
   test('POST /api/purchase-orders by Viewer (Staff) → 403', async () => {

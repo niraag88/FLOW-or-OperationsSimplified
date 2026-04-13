@@ -68,6 +68,10 @@ export async function registerRoutes(app: Express): Promise<Server> {
   registerInventoryRoutes(app);
   registerSettingsRoutes(app);
 
+  app.use('/api/*', (_req, res) => {
+    res.status(404).json({ error: 'Not found' });
+  });
+
   const httpServer = createServer(app);
   return httpServer;
 }

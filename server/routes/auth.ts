@@ -3,7 +3,7 @@ import type { RateLimitRequestHandler } from 'express-rate-limit';
 import { users } from "@shared/schema";
 import { db } from "../db";
 import { eq } from "drizzle-orm";
-import { requireAuth, comparePassword, writeAuditLog, type AuthenticatedRequest } from "../middleware";
+import { requireAuth, comparePassword, writeAuditLog, loggedOutSessionIds, type AuthenticatedRequest } from "../middleware";
 
 export function registerAuthRoutes(app: Express, loginLimiter: RateLimitRequestHandler) {
   app.post('/api/auth/login', loginLimiter, async (req: AuthenticatedRequest, res) => {
@@ -29,9 +29,15 @@ export function registerAuthRoutes(app: Express, loginLimiter: RateLimitRequestH
         .where(eq(users.id, user.id));
 
       req.session.userId = user.id;
-
       const { password: _, ...userInfo } = user;
-      res.json({ user: userInfo });
+
+      req.session.save((saveErr) => {
+        if (saveErr) {
+          console.error('Session save error during login:', saveErr);
+          return res.status(500).json({ error: 'Login failed' });
+        }
+        res.json({ user: userInfo });
+      });
     } catch (error) {
       console.error('Login error:', error);
       res.status(500).json({ error: 'Login failed' });
@@ -39,13 +45,9 @@ export function registerAuthRoutes(app: Express, loginLimiter: RateLimitRequestH
   });
 
   app.post('/api/auth/logout', (req: AuthenticatedRequest, res) => {
-    req.session.destroy((err) => {
-      if (err) {
-        console.error('Logout error:', err);
-        return res.status(500).json({ error: 'Logout failed' });
-      }
-      res.json({ success: true });
-    });
+    loggedOutSessionIds.add(req.session.id);
+    req.session.destroy(() => {});
+    res.json({ success: true });
   });
 
   app.get('/api/auth/me', requireAuth(), async (req: AuthenticatedRequest, res) => {

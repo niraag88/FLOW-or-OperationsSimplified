@@ -39,6 +39,16 @@ export function registerPurchaseOrderRoutes(app: Express) {
   });
 
   app.post('/api/purchase-orders', requireAuth(['Admin', 'Manager']), async (req: AuthenticatedRequest, res) => {
+    if (!req.body.brandId) {
+      return res.status(400).json({ error: 'brandId is required' });
+    }
+    if (Array.isArray(req.body.items)) {
+      for (const item of req.body.items) {
+        if (item.unitPrice !== undefined && parseFloat(item.unitPrice) < 0) {
+          return res.status(400).json({ error: 'Unit price cannot be negative' });
+        }
+      }
+    }
     try {
       const { companySettings } = await import('@shared/schema');
       const [poNumber, settingsRow] = await Promise.all([
