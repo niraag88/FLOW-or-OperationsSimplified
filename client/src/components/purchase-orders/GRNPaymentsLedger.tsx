@@ -274,7 +274,7 @@ export default function GRNPaymentsLedger({ canEdit }: GRNPaymentsLedgerProps) {
                               }
                               onClick={() => openPaymentDialog(grn)}
                             >
-                              {isPaid ? "Edit" : "Record"}
+                              {isPaid ? "Edit" : "Record Payment"}
                             </Button>
                           </td>
                         )}
