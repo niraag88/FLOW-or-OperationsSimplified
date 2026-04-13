@@ -8,7 +8,7 @@ import {
   DropdownMenuSeparator,
 } from "@/components/ui/dropdown-menu";
 import { Button } from "@/components/ui/button";
-import { MoreHorizontal, Edit2, Download, Trash2, Eye, Upload, Paperclip, X } from "lucide-react";
+import { MoreHorizontal, Edit2, Download, Trash2, Eye, Upload, Paperclip, X, Ban } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import { exportDeliveryOrderToXLSX } from "../utils/export";
 import { format, isValid, parseISO } from 'date-fns';
@@ -28,6 +28,7 @@ interface DOActionsDropdownProps {
 export default function DOActionsDropdown({ doOrder, canEdit, onEdit, onRefresh, currentUser }: DOActionsDropdownProps) {
   const { toast } = useToast();
   const [showDeleteDialog, setShowDeleteDialog] = useState(false);
+  const [showCancelDialog, setShowCancelDialog] = useState(false);
   const [showUploadDialog, setShowUploadDialog] = useState(false);
   const [showRemoveFileDialog, setShowRemoveFileDialog] = useState(false);
 
@@ -72,6 +73,32 @@ export default function DOActionsDropdown({ doOrder, canEdit, onEdit, onRefresh,
         title: 'Delete Failed',
         description: 'Failed to delete the delivery order. Please try again.',
         variant: 'destructive'
+      });
+    }
+  };
+
+  const handleCancel = async () => {
+    try {
+      const res = await fetch(`/api/delivery-orders/${doOrder.id}/cancel`, {
+        method: 'PATCH',
+        credentials: 'include',
+      });
+      if (!res.ok) {
+        const data = await res.json().catch(() => ({}));
+        throw new Error(data.error || 'Failed to cancel delivery order');
+      }
+      toast({
+        title: 'Delivery Order Cancelled',
+        description: `${doOrder.orderNumber} has been cancelled and any stock movements reversed.`,
+      });
+      setShowCancelDialog(false);
+      onRefresh();
+    } catch (error: unknown) {
+      console.error('Error cancelling delivery order:', error instanceof Error ? error.message : error);
+      toast({
+        title: 'Cancel Failed',
+        description: error instanceof Error ? error.message : 'Failed to cancel the delivery order. Please try again.',
+        variant: 'destructive',
       });
     }
   };
@@ -141,6 +168,8 @@ export default function DOActionsDropdown({ doOrder, canEdit, onEdit, onRefresh,
   const hasScanKey = !!(doOrder.scanKey);
   const doNumber = doOrder.orderNumber || `do-${doOrder.id}`;
   const canDelete = ['Admin', 'Manager'].includes(currentUser?.role ?? '');
+  const isDelivered = doOrder.status === 'delivered';
+  const isCancelled = doOrder.status === 'cancelled';
 
   return (
     <>
@@ -151,7 +180,7 @@ export default function DOActionsDropdown({ doOrder, canEdit, onEdit, onRefresh,
           </Button>
         </DropdownMenuTrigger>
         <DropdownMenuContent align="end">
-          {canEdit && !['delivered', 'cancelled'].includes(doOrder.status) && (
+          {canEdit && !isCancelled && (
             <DropdownMenuItem onClick={() => onEdit(doOrder)}>
               <Edit2 className="w-4 h-4 mr-2" />
               Edit
@@ -188,13 +217,23 @@ export default function DOActionsDropdown({ doOrder, canEdit, onEdit, onRefresh,
           {canDelete && (
             <>
               <DropdownMenuSeparator />
-              <DropdownMenuItem 
-                onClick={() => setShowDeleteDialog(true)}
-                className="text-red-600 focus:text-red-600"
-              >
-                <Trash2 className="w-4 h-4 mr-2" />
-                Delete
-              </DropdownMenuItem>
+              {isDelivered ? (
+                <DropdownMenuItem
+                  onClick={() => setShowCancelDialog(true)}
+                  className="text-orange-600 focus:text-orange-600"
+                >
+                  <Ban className="w-4 h-4 mr-2" />
+                  Cancel Order
+                </DropdownMenuItem>
+              ) : (
+                <DropdownMenuItem
+                  onClick={() => setShowDeleteDialog(true)}
+                  className="text-red-600 focus:text-red-600"
+                >
+                  <Trash2 className="w-4 h-4 mr-2" />
+                  Delete
+                </DropdownMenuItem>
+              )}
             </>
           )}
         </DropdownMenuContent>
@@ -207,6 +246,15 @@ export default function DOActionsDropdown({ doOrder, canEdit, onEdit, onRefresh,
         title="Confirm Deletion"
         description={`Do you wish to confirm deleting Delivery Order "${doNumber}"? It will be moved to the recycle bin.`}
         confirmText="Yes, Delete"
+        confirmVariant="destructive"
+      />
+      <SimpleConfirmDialog
+        open={showCancelDialog}
+        onClose={() => setShowCancelDialog(false)}
+        onConfirm={handleCancel}
+        title="Cancel Delivery Order"
+        description={`Cancel Delivery Order "${doNumber}"? This will change its status to Cancelled and reverse any stock movements made when it was delivered.`}
+        confirmText="Yes, Cancel Order"
         confirmVariant="destructive"
       />
       <SimpleConfirmDialog

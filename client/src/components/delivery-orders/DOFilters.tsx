@@ -53,6 +53,7 @@ export default function DOFilters({ selectedStatuses, setSelectedStatuses, selec
     { value: 'draft', label: 'Draft' },
     { value: 'submitted', label: 'Submitted' },
     { value: 'delivered', label: 'Delivered' },
+    { value: 'cancelled', label: 'Cancelled' },
   ];
   const uniqueTaxTreatments = [
     { value: 'StandardRated', label: 'Standard Rated (5%)' },

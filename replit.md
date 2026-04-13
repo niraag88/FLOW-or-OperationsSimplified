@@ -42,6 +42,7 @@ The project uses a monorepo layout with distinct directories for client, server,
 - **Backup and Restore System**: Robust backup system with timestamped filenames, `backup_runs` table, and API endpoints for running, listing, and downloading backups. Full restore capability from stored backups or uploaded files, tracked in a `restore_runs` table, including factory reset functionality.
 - **Goods Receipt Enhancements (GRN)**: `reference_number`, `reference_date`, `payment_status`, `payment_made_date`, `payment_remarks` added to `goods_receipts` table. APIs for managing and tracking GRN references and payments. Payments ledger restructured to GRN-level tracking.
 - **Code Hygiene**: Streamlined codebase by removing duplicate files, legacy scripts, and unnecessary `db:push` command from `package.json`.
+- **Delivery Order Cancellation Workflow**: Delivered DOs cannot be deleted directly (API returns 400 with clear message). New `PATCH /api/delivery-orders/:id/cancel` endpoint sets status to `cancelled` and reverses stock movements. Cancelled DOs can be deleted. Stock is deducted when a DO transitions to `delivered`, and reconciled when a delivered DO's quantities are edited. Frontend shows Cancel action (instead of Delete) for delivered DOs, with a cancelled status badge and filter option.
 
 # External Dependencies
 

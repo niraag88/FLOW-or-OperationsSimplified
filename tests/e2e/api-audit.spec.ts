@@ -1391,11 +1391,18 @@ test.describe('Delivery Orders', () => {
     const doId = (data as { id: number }).id;
     expect(doId).toBeGreaterThan(0);
 
-    // Advance through lifecycle then delete
+    // Advance through lifecycle
     await api('PUT', `/api/delivery-orders/${doId}`, adminCookie, { customer_id: IDs.customer, status: 'submitted', total_amount: 495.0, items: [] });
     await api('PUT', `/api/delivery-orders/${doId}`, adminCookie, { customer_id: IDs.customer, status: 'delivered', total_amount: 495.0, items: [] });
+    // Delivered DOs cannot be deleted directly — must cancel first
+    const { status: delDeliveredStatus } = await api('DELETE', `/api/delivery-orders/${doId}`, adminCookie);
+    note('DELETE /api/delivery-orders/:id on a delivered DO → 400 (must cancel first)');
+    expect(delDeliveredStatus).toBe(400);
+    // Cancel the DO, then delete
+    const { status: cancelStatus } = await api('PATCH', `/api/delivery-orders/${doId}/cancel`, adminCookie);
+    expect(cancelStatus).toBe(200);
     const { status: delStatus } = await api('DELETE', `/api/delivery-orders/${doId}`, adminCookie);
-    note('DELETE /api/delivery-orders/:id: no status restriction — delivered DOs can be moved to recycle bin');
+    note('DELETE /api/delivery-orders/:id on a cancelled DO → 200 (allowed)');
     expect(delStatus).toBe(200);
   });
 

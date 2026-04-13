@@ -1,9 +1,9 @@
 import type { Express } from "express";
-import { deliveryOrders, deliveryOrderItems, customers, brands, products, recycleBin, storageObjects } from "@shared/schema";
+import { deliveryOrders, deliveryOrderItems, customers, brands, products, recycleBin, storageObjects, stockMovements } from "@shared/schema";
 import { db } from "../db";
-import { eq } from "drizzle-orm";
+import { and, eq } from "drizzle-orm";
 import { businessStorage } from "../businessStorage";
-import { requireAuth, writeAuditLog, objectStorageClient, type AuthenticatedRequest } from "../middleware";
+import { requireAuth, writeAuditLog, objectStorageClient, updateProductStock, type AuthenticatedRequest } from "../middleware";
 
 export function registerDeliveryOrderRoutes(app: Express) {
   app.get('/api/delivery-orders', requireAuth(), async (req: AuthenticatedRequest, res) => {
@@ -183,12 +183,13 @@ export function registerDeliveryOrderRoutes(app: Express) {
         }
       }
 
+      const newStatus = body.status || 'draft';
       const [doRecord] = await db.insert(deliveryOrders).values({
         orderNumber: body.do_number || nextNumber,
         customerName,
         customerId: customerId || null,
         deliveryAddress: '',
-        status: body.status || 'draft',
+        status: newStatus,
         orderDate: body.order_date || null,
         reference: body.reference || null,
         referenceDate: body.reference_date || null,
@@ -202,6 +203,7 @@ export function registerDeliveryOrderRoutes(app: Express) {
         companySnapshot: doCompanySnapshot,
       }).returning();
 
+      const insertedItems: Array<{ productId: number | null; quantity: number }> = [];
       if (body.items && Array.isArray(body.items) && body.items.length > 0) {
         for (const item of body.items) {
           if (Number(item.quantity) > 0 && Number(item.unit_price) >= 0) {
@@ -215,11 +217,30 @@ export function registerDeliveryOrderRoutes(app: Express) {
               unitPrice: item.unit_price.toString(),
               lineTotal: item.line_total.toString(),
             });
+            insertedItems.push({ productId: item.product_id ? parseInt(item.product_id) : null, quantity: Number(item.quantity) });
           }
         }
       }
 
-      writeAuditLog({ actor: req.user!.id, actorName: req.user?.username || String(req.user!.id), targetId: String(doRecord.id), targetType: 'delivery_order', action: 'CREATE', details: `DO #${doRecord.orderNumber} created for ${customerName}` });
+      // Deduct stock if creating directly as delivered
+      if (newStatus === 'delivered') {
+        for (const item of insertedItems) {
+          if (item.productId) {
+            await updateProductStock(
+              item.productId,
+              -item.quantity,
+              'sale',
+              doRecord.id,
+              'delivery_order',
+              0,
+              `Stock deducted: DO #${doRecord.orderNumber} delivered`,
+              req.user!.id,
+            );
+          }
+        }
+      }
+
+      writeAuditLog({ actor: req.user!.id, actorName: req.user?.username || String(req.user!.id), targetId: String(doRecord.id), targetType: 'delivery_order', action: 'CREATE', details: `DO #${doRecord.orderNumber} created for ${customerName}${newStatus === 'delivered' ? ' — stock deducted' : ''}` });
       res.status(201).json({ ...doRecord, do_number: doRecord.orderNumber, items: body.items || [] });
     } catch (error) {
       console.error('Error creating delivery order:', error);
@@ -237,6 +258,12 @@ export function registerDeliveryOrderRoutes(app: Express) {
       if (isNaN(id)) return res.status(400).json({ error: 'Invalid ID' });
       const body = req.body;
 
+      // Fetch existing DO and items before any changes
+      const [existingDO] = await db.select().from(deliveryOrders).where(eq(deliveryOrders.id, id));
+      if (!existingDO) return res.status(404).json({ error: 'Delivery order not found' });
+
+      const oldItems = await db.select().from(deliveryOrderItems).where(eq(deliveryOrderItems.doId, id));
+
       let customerName = body.customer_name || 'Unknown Customer';
       let customerId: number | undefined = undefined;
       if (body.customer_id) {
@@ -247,10 +274,12 @@ export function registerDeliveryOrderRoutes(app: Express) {
         }
       }
 
+      const newStatus = body.status || 'draft';
+
       await db.update(deliveryOrders).set({
         customerName,
         customerId: customerId || null,
-        status: body.status || 'draft',
+        status: newStatus,
         orderDate: body.order_date || null,
         reference: body.reference || null,
         referenceDate: body.reference_date || null,
@@ -264,6 +293,8 @@ export function registerDeliveryOrderRoutes(app: Express) {
       }).where(eq(deliveryOrders.id, id));
 
       await db.delete(deliveryOrderItems).where(eq(deliveryOrderItems.doId, id));
+
+      const newItems: Array<{ productId: number | null; quantity: number }> = [];
       if (body.items && Array.isArray(body.items) && body.items.length > 0) {
         for (const item of body.items) {
           if (Number(item.quantity) > 0 && Number(item.unit_price) >= 0) {
@@ -277,12 +308,67 @@ export function registerDeliveryOrderRoutes(app: Express) {
               unitPrice: item.unit_price.toString(),
               lineTotal: item.line_total.toString(),
             });
+            newItems.push({ productId: item.product_id ? parseInt(item.product_id) : null, quantity: Number(item.quantity) });
+          }
+        }
+      }
+
+      // Stock movement logic based on status transitions
+      const becomingDelivered = newStatus === 'delivered' && existingDO.status !== 'delivered';
+      const remainingDelivered = newStatus === 'delivered' && existingDO.status === 'delivered';
+
+      if (becomingDelivered) {
+        // Deduct stock for all items with a product ID
+        for (const item of newItems) {
+          if (item.productId) {
+            await updateProductStock(
+              item.productId,
+              -item.quantity,
+              'sale',
+              id,
+              'delivery_order',
+              0,
+              `Stock deducted: DO #${existingDO.orderNumber} delivered`,
+              req.user!.id,
+            );
+          }
+        }
+      } else if (remainingDelivered) {
+        // Reconcile stock: compare old vs new quantities per product
+        const oldQtyMap = new Map<number, number>();
+        for (const item of oldItems) {
+          if (item.productId) {
+            oldQtyMap.set(item.productId, (oldQtyMap.get(item.productId) || 0) + Number(item.quantity));
+          }
+        }
+        const newQtyMap = new Map<number, number>();
+        for (const item of newItems) {
+          if (item.productId) {
+            newQtyMap.set(item.productId, (newQtyMap.get(item.productId) || 0) + item.quantity);
+          }
+        }
+        const allProductIds = new Set([...oldQtyMap.keys(), ...newQtyMap.keys()]);
+        for (const productId of allProductIds) {
+          const oldQty = oldQtyMap.get(productId) || 0;
+          const newQty = newQtyMap.get(productId) || 0;
+          const delta = oldQty - newQty; // positive = returned stock, negative = more deducted
+          if (delta !== 0) {
+            await updateProductStock(
+              productId,
+              delta,
+              'adjustment',
+              id,
+              'delivery_order',
+              0,
+              `Stock adjusted: DO #${existingDO.orderNumber} edited while delivered`,
+              req.user!.id,
+            );
           }
         }
       }
 
       const [updated] = await db.select().from(deliveryOrders).where(eq(deliveryOrders.id, id));
-      writeAuditLog({ actor: req.user!.id, actorName: req.user?.username || String(req.user!.id), targetId: String(id), targetType: 'delivery_order', action: 'UPDATE', details: `DO #${updated.orderNumber} updated (status: ${updated.status})` });
+      writeAuditLog({ actor: req.user!.id, actorName: req.user?.username || String(req.user!.id), targetId: String(id), targetType: 'delivery_order', action: 'UPDATE', details: `DO #${updated.orderNumber} updated (status: ${updated.status})${becomingDelivered ? ' — stock deducted' : ''}` });
       res.json({ ...updated, do_number: updated.orderNumber, items: body.items || [] });
     } catch (error) {
       console.error('Error updating delivery order:', error);
@@ -291,6 +377,62 @@ export function registerDeliveryOrderRoutes(app: Express) {
       } else {
         res.status(500).json({ error: 'Failed to update delivery order' });
       }
+    }
+  });
+
+  app.patch('/api/delivery-orders/:id/cancel', requireAuth(['Admin', 'Manager']), async (req: AuthenticatedRequest, res) => {
+    try {
+      const id = parseInt(req.params.id);
+      if (isNaN(id)) return res.status(400).json({ error: 'Invalid ID' });
+
+      const [doRecord] = await db.select().from(deliveryOrders).where(eq(deliveryOrders.id, id));
+      if (!doRecord) return res.status(404).json({ error: 'Delivery order not found' });
+
+      if (doRecord.status === 'cancelled') {
+        return res.status(400).json({ error: 'Delivery order is already cancelled' });
+      }
+      if (doRecord.status === 'draft') {
+        return res.status(400).json({ error: 'Draft delivery orders should be deleted, not cancelled' });
+      }
+
+      // Reverse stock movements if the DO was delivered
+      if (doRecord.status === 'delivered') {
+        const doMovements = await db.select().from(stockMovements)
+          .where(and(
+            eq(stockMovements.referenceType, 'delivery_order'),
+            eq(stockMovements.referenceId, id),
+          ));
+
+        for (const movement of doMovements) {
+          await updateProductStock(
+            movement.productId,
+            -movement.quantity,
+            'adjustment',
+            id,
+            'delivery_order_cancel',
+            0,
+            `Stock reversed: DO #${doRecord.orderNumber} cancelled`,
+            req.user!.id,
+          );
+        }
+      }
+
+      await db.update(deliveryOrders).set({ status: 'cancelled' }).where(eq(deliveryOrders.id, id));
+      const [updated] = await db.select().from(deliveryOrders).where(eq(deliveryOrders.id, id));
+
+      writeAuditLog({
+        actor: req.user!.id,
+        actorName: req.user?.username || String(req.user!.id),
+        targetId: String(id),
+        targetType: 'delivery_order',
+        action: 'UPDATE',
+        details: `DO #${doRecord.orderNumber} cancelled${doRecord.status === 'delivered' ? ' — stock reversed' : ''}`,
+      });
+
+      res.json({ ...updated, do_number: updated.orderNumber });
+    } catch (error) {
+      console.error('Error cancelling delivery order:', error);
+      res.status(500).json({ error: 'Failed to cancel delivery order' });
     }
   });
 
@@ -348,6 +490,12 @@ export function registerDeliveryOrderRoutes(app: Express) {
       if (!doHeader) {
         return res.status(404).json({ error: 'Delivery order not found' });
       }
+
+      // Delivered DOs must be cancelled first, not deleted directly
+      if (doHeader.status === 'delivered') {
+        return res.status(400).json({ error: 'Delivered orders cannot be deleted. Use Cancel instead.' });
+      }
+
       const lineItems = await db.select().from(deliveryOrderItems).where(eq(deliveryOrderItems.doId, id));
 
       await db.transaction(async (tx) => {
