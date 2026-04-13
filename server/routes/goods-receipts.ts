@@ -366,6 +366,8 @@ export function registerGoodsReceiptRoutes(app: Express) {
           .where(eq(purchaseOrders.id, grn.poId));
       });
 
+      await recalculatePOPaymentStatus(grn.poId);
+
       res.json({ success: true, grnId });
     } catch (error) {
       console.error('Error deleting goods receipt:', error);
@@ -373,7 +375,7 @@ export function registerGoodsReceiptRoutes(app: Express) {
     }
   });
 
-  app.patch('/api/goods-receipts/:id/reference', requireAuth(), async (req: AuthenticatedRequest, res) => {
+  app.patch('/api/goods-receipts/:id/reference', requireAuth(['Admin', 'Manager']), async (req: AuthenticatedRequest, res) => {
     try {
       const id = parseInt(req.params.id);
       if (isNaN(id)) return res.status(400).json({ error: 'Invalid ID' });
@@ -413,7 +415,7 @@ export function registerGoodsReceiptRoutes(app: Express) {
     }
   });
 
-  app.patch('/api/goods-receipts/:id/payment', requireAuth(), async (req: AuthenticatedRequest, res) => {
+  app.patch('/api/goods-receipts/:id/payment', requireAuth(['Admin', 'Manager']), async (req: AuthenticatedRequest, res) => {
     try {
       const id = parseInt(req.params.id);
       if (isNaN(id)) return res.status(400).json({ error: 'Invalid ID' });
