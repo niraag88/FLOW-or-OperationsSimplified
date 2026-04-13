@@ -5,6 +5,7 @@ import { queryClient } from "@/lib/queryClient";
 import { useNavigate } from "react-router-dom";
 import { createPageUrl } from "@/utils";
 import { useAuth } from "@/hooks/useAuth";
+import { useToast } from "@/hooks/use-toast";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Button } from "@/components/ui/button";
 import {
@@ -23,6 +24,7 @@ const STALE_3MIN = 3 * 60 * 1000;
 
 export default function Inventory() {
   const navigate = useNavigate();
+  const { toast } = useToast();
   const [uniqueBrands, setUniqueBrands] = useState<string[]>([]);
   const [uniqueSizes, setUniqueSizes] = useState<string[]>([]);
   const [searchTerm, setSearchTerm] = useState("");
@@ -56,7 +58,9 @@ export default function Inventory() {
         setUniqueBrands(data.brands || []);
         setUniqueSizes(data.sizes || []);
       })
-      .catch(() => {});
+      .catch(() => {
+        toast({ title: 'Could not load filter options', description: 'Brand and size filters may be unavailable.', variant: 'destructive' });
+      });
 
     fetch('/api/company-settings', { credentials: 'include' })
       .then(r => r.ok ? r.json() : null)
@@ -69,7 +73,9 @@ export default function Inventory() {
           inrToAed: parseFloat(data.fxInrToAed) || 0.044,
         });
       })
-      .catch(() => {});
+      .catch(() => {
+        toast({ title: 'Could not load company settings', description: 'Default thresholds and FX rates will be used.', variant: 'destructive' });
+      });
   }, []);
 
   // Load products with server-side pagination, search, and brand/size filters

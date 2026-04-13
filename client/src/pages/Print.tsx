@@ -46,7 +46,6 @@ export default function Print() {
             doc = await PurchaseOrder.getById(id);
             if (doc.supplier_id) {
               try {
-                // supplier_id in PO actually refers to brand_id
                 related.brand = await Brand.getById(doc.supplier_id);
               } catch (err: any) {
                 console.warn('Could not load brand for PO:', err);

@@ -506,7 +506,7 @@ export function registerDeliveryOrderRoutes(app: Express) {
     }
   });
 
-  app.delete('/api/delivery-orders/:id', requireAuth(['Admin', 'Manager']), async (req: AuthenticatedRequest, res) => {
+  app.delete('/api/delivery-orders/:id', requireAuth(), async (req: AuthenticatedRequest, res) => {
     try {
       const id = parseInt(req.params.id);
       if (isNaN(id)) return res.status(400).json({ error: 'Invalid ID' });

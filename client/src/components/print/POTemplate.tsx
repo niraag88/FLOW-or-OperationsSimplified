@@ -46,7 +46,7 @@ export default function POTemplate({ data, brand, settings }: POTemplateProps) {
         companyTrn={settings?.taxNumber}
       />
 
-      {/* Supplier/Brand and PO Details */}
+      {/* Brand and PO Details */}
       <section className="grid grid-cols-2 gap-8 mb-10">
         <div>
           <h3 className="text-sm font-semibold text-gray-500 uppercase mb-2">Brand</h3>

@@ -408,7 +408,7 @@ export default function BulkAddProduct() {
                     </td>
                     <td className="px-3 py-2 text-gray-600">{row.size || "—"}</td>
                     <td className="px-3 py-2 text-right text-gray-600">
-                      {row.purchasePrice ? `${row.purchasePrice} ${row.purchasePriceCurrency}` : "—"}
+                      {row.purchasePrice ? `${row.purchasePriceCurrency} ${row.purchasePrice}` : "—"}
                     </td>
                     <td className="px-3 py-2 text-right">
                       <span className={row.errors.some((e: any) => e.includes("Sale")) ? "text-red-600 font-medium" : "font-medium"}>

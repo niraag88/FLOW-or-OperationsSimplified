@@ -649,17 +649,17 @@ export default function InvoiceForm({ open, onClose, editingInvoice, currentUser
             <div className="space-y-2 max-w-sm ml-auto">
               <div className="flex justify-between">
                 <span className="text-gray-600">Subtotal:</span>
-                <span className="font-semibold">{(formData.subtotal || 0).toFixed(2)} AED</span>
+                <span className="font-semibold">AED {(formData.subtotal || 0).toFixed(2)}</span>
               </div>
               {(formData.tax_amount || 0) > 0 && (
                 <div className="flex justify-between">
                   <span className="text-gray-600">VAT ({((formData.tax_rate || 0) * 100).toFixed(1)}%):</span>
-                  <span className="font-semibold">{(formData.tax_amount || 0).toFixed(2)} AED</span>
+                  <span className="font-semibold">AED {(formData.tax_amount || 0).toFixed(2)}</span>
                 </div>
               )}
               <div className="flex justify-between border-t pt-2">
                 <span className="font-bold">Total:</span>
-                <span className="font-bold text-purple-600">{(formData.total_amount || 0).toFixed(2)} AED</span>
+                <span className="font-bold text-purple-600">AED {(formData.total_amount || 0).toFixed(2)}</span>
               </div>
             </div>
           </div>

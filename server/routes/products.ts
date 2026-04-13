@@ -301,7 +301,7 @@ export function registerProductRoutes(app: Express) {
     }
   });
 
-  app.post('/api/products', requireAuth(['Admin', 'Manager']), async (req: AuthenticatedRequest, res) => {
+  app.post('/api/products', requireAuth(), async (req: AuthenticatedRequest, res) => {
     try {
       const validatedData = insertProductSchema.parse(req.body);
       const product = await businessStorage.createProduct(validatedData);
