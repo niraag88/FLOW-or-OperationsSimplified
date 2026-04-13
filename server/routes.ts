@@ -5,6 +5,9 @@ import session from 'express-session';
 import { sessionStore } from "./middleware";
 
 import { registerAuthRoutes } from "./routes/auth";
+import { registerBrandRoutes } from "./routes/brands";
+import { registerCustomerRoutes } from "./routes/customers";
+import { registerExportRoutes } from "./routes/exports";
 import { registerProductRoutes } from "./routes/products";
 import { registerSupplierRoutes } from "./routes/suppliers";
 import { registerPurchaseOrderRoutes } from "./routes/purchase-orders";
@@ -58,6 +61,9 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
   registerSystemRoutes(app);
   registerAuthRoutes(app, loginLimiter);
+  registerBrandRoutes(app);
+  registerCustomerRoutes(app);
+  registerExportRoutes(app);
   registerProductRoutes(app);
   registerSupplierRoutes(app);
   registerPurchaseOrderRoutes(app);

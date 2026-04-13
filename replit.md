@@ -43,6 +43,8 @@ The project uses a monorepo layout with distinct directories for client, server,
 - **Goods Receipt Enhancements (GRN)**: `reference_number`, `reference_date`, `payment_status`, `payment_made_date`, `payment_remarks` added to `goods_receipts` table. APIs for managing and tracking GRN references and payments. Payments ledger restructured to GRN-level tracking.
 - **Code Hygiene**: Streamlined codebase by removing duplicate files, legacy scripts, and unnecessary `db:push` command from `package.json`.
 - **Delivery Order Cancellation Workflow**: Delivered DOs cannot be deleted directly (API returns 400 with clear message). New `PATCH /api/delivery-orders/:id/cancel` endpoint sets status to `cancelled` and reverses stock movements. Cancelled DOs can be deleted. Stock is deducted when a DO transitions to `delivered`, and reconciled when a delivered DO's quantities are edited. Frontend shows Cancel action (instead of Delete) for delivered DOs, with a cancelled status badge and filter option.
+- **Quotation Status Enforcement**: `PUT /api/quotations/:id` enforces a one-way status machine. Terminal states (`cancelled`, `converted`) block all updates. Non-terminal transitions are validated against an explicit allowed-transitions map.
+- **Server Route Reorganisation**: Customer routes moved to `server/routes/customers.ts`, brand routes to `server/routes/brands.ts`, and document export routes (`/api/export/*`) to `server/routes/exports.ts`. Each file has its own `registerXxxRoutes(app)` function registered in `server/routes.ts`.
 
 # External Dependencies
 
