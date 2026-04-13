@@ -247,7 +247,7 @@ export default function BulkAddProduct() {
         </div>
         <p className="text-sm text-gray-600">
           The template has the correct columns and includes dropdown lists for Brand Name and Currency where possible.
-          Fill it in and save it as XLSX or CSV.
+          Fill it in and save it as XLSX.
         </p>
         <Button onClick={downloadTemplate} variant="outline" className="gap-2">
           <Download className="w-4 h-4" />
@@ -280,12 +280,12 @@ export default function BulkAddProduct() {
           <p className="text-sm font-medium text-gray-700">
             {fileName ? fileName : "Drag & drop your file here, or click to browse"}
           </p>
-          <p className="text-xs text-gray-500 mt-1">Accepts XLSX and CSV files</p>
+          <p className="text-xs text-gray-500 mt-1">Accepts XLSX files</p>
         </div>
         <input
           ref={fileInputRef}
           type="file"
-          accept=".xlsx,.xls,.csv"
+          accept=".xlsx,.xls"
           className="hidden"
           onChange={handleFileChange}
         />
