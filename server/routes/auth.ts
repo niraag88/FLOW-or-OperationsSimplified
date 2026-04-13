@@ -48,6 +48,7 @@ export function registerAuthRoutes(app: Express, loginLimiter: RateLimitRequestH
     req.session.destroy((err) => {
       if (err) {
         console.error('Session destroy error during logout:', err);
+        return res.status(500).json({ error: 'Logout failed' });
       }
       res.json({ success: true });
     });
