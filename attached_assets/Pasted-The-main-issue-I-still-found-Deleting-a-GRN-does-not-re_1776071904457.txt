@@ -1,0 +1,93 @@
+The main issue I still found
+Deleting a GRN does not recalculate the parent PO payment status
+
+File: server/routes/goods-receipts.ts
+
+You already recalculate PO payment status when:
+
+a GRN payment is updated
+a new GRN is created
+
+But in the GRN delete route, after deleting the GRN and adjusting PO delivery status, the code does not call recalculatePOPaymentStatus(grn.poId).
+
+That means this can still happen:
+
+PO has 2 GRNs
+one GRN is paid, one outstanding
+PO payment status is therefore partially_paid
+later one of those GRNs is deleted
+PO delivery status is updated
+but PO payment status may remain stale
+
+So the app can drift again, just through a different path.
+
+Why this matters
+
+This is exactly the kind of subtle business inconsistency that causes later confusion:
+
+PO list says one thing
+reports say another
+payment state no longer truly reflects the surviving GRNs
+Fix
+
+After the GRN delete transaction succeeds, call:
+
+await recalculatePOPaymentStatus(grn.poId)
+
+or do the equivalent inside the transaction if you want it fully atomic.
+
+This is the one meaningful issue I would still fix.
+
+Another thing I want to flag
+GRN payment/reference edits are still open to any authenticated user
+
+Files:
+
+server/routes/goods-receipts.ts
+
+These routes use requireAuth() only:
+
+PATCH /api/goods-receipts/:id/reference
+PATCH /api/goods-receipts/:id/payment
+
+That means any logged-in user can change:
+
+reference number/date
+payment status/date/remarks
+
+I cannot tell from your business rules whether that is intentional.
+But these are financially sensitive fields.
+
+So I would treat this as a policy question, not a confirmed bug:
+
+if Staff should be allowed to do this, fine
+if only Admin/Manager should do it, tighten the role guard now
+
+I would at least review that before rollout.
+
+Lower-priority observations
+
+These are not blockers.
+
+1. Old PO payment UI leftovers still exist
+
+There is still leftover dead-path cleanup like:
+
+old PO payment dialog/component files
+the disabled endpoint still being present
+
+This is not harmful now because the route is blocked, but it is still cleanup debt.
+
+2. Runtime logs still exist
+
+There are still a fair number of console.error and some operational logs.
+
+I do not think that blocks implementation, especially internally.
+But your earlier instinct was right: production noise should gradually be cleaned up.
+
+3. Dependency warnings still exist
+
+Install still shows deprecated packages, and previous package-level risk discussion still stands.
+
+I would not block rollout on that for internal use, especially given your reasoning on jsPDF and the practical limits around xlsx.
+But it should remain on the medium-term hygiene list.
