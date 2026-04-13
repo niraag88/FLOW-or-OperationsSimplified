@@ -147,14 +147,9 @@ export default function StockTab({ products, loading, onStockSubTabChange, canEd
     }
   };
 
-  const getCostInAed = (cost: number | string, currency: string | null | undefined): number => {
-    const amount = parseFloat(String(cost ?? 0)) || 0;
-    const c = String(currency || 'GBP').toUpperCase();
-    if (c === 'AED') return amount;
-    if (c === 'USD') return amount * (companySettings?.fxUsdToAed ?? 3.6725);
-    if (c === 'INR') return amount * (companySettings?.fxInrToAed ?? 0.044);
-    return amount * (companySettings?.fxGbpToAed ?? 4.85);
-  };
+  // Note: per-product AED cost conversion is handled server-side in /api/products/stock-analysis
+  // using all three rates (GBP/USD/INR) from company settings. The stockSummary.totalValue
+  // is already in AED. All three rates are stored here for any future client-side cost display.
 
   const loadStockData = async (threshold: number) => {
     setLoadingStock(true);
