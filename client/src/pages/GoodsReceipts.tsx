@@ -279,7 +279,7 @@ export default function GoodsReceipts() {
                               />
                             </TableCell>
                             <TableCell>
-                              ${parseFloat(item.unitPrice).toFixed(2)}
+                              {parseFloat(item.unitPrice).toFixed(2)}
                             </TableCell>
                           </TableRow>
                         ))}

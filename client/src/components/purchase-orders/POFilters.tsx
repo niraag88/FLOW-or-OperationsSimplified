@@ -5,7 +5,7 @@ import { Button } from "@/components/ui/button";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { Calendar } from "@/components/ui/calendar";
 import { Filter, X, Calendar as CalendarIcon } from "lucide-react";
-import { Brand } from "@/api/entities"; // Changed from Supplier
+import { Brand } from "@/api/entities";
 import { format } from "date-fns";
 import { cn } from "@/lib/utils";
 
@@ -16,21 +16,21 @@ interface POFiltersProps {
 }
 
 export default function POFilters({ filters, onFiltersChange, onFilterChange }: POFiltersProps) {
-  const [brands, setBrands] = useState<any[]>([]); // Changed from suppliers
+  const [brands, setBrands] = useState<any[]>([]);
   const [dateRangeOpen, setDateRangeOpen] = useState(false);
   const [customStartDate, setCustomStartDate] = useState<any>(null);
   const [customEndDate, setCustomEndDate] = useState<any>(null);
 
   useEffect(() => {
-    loadBrands(); // Changed from loadSuppliers
+    loadBrands();
   }, []);
 
-  const loadBrands = async () => { // Changed from loadSuppliers
+  const loadBrands = async () => {
     try {
-      const brandsData = await Brand.list(); // Changed to Brand
-      setBrands(brandsData); // Changed to setBrands
+      const brandsData = await Brand.list();
+      setBrands(brandsData);
     } catch (error: any) {
-      console.error("Error loading brands:", error); // Changed error message
+      console.error("Error loading brands:", error);
     }
   };
 
@@ -117,8 +117,8 @@ export default function POFilters({ filters, onFiltersChange, onFilterChange }: 
           <SelectValue placeholder="Brand" />
         </SelectTrigger>
         <SelectContent>
-          <SelectItem value="all">All Brands</SelectItem> {/* Changed text */}
-          {brands.map((brand: any) => ( // Changed from suppliers to brands
+          <SelectItem value="all">All Brands</SelectItem>
+          {brands.map((brand: any) => (
             <SelectItem key={brand.id} value={brand.id}>
               {brand.name}
             </SelectItem>

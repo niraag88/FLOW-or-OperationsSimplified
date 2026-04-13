@@ -18,13 +18,13 @@ export default function CompanySettingsComponent() {
 
   const [settings, setSettings] = useState({
     companyName: "",
-    logo: "", // Changed from company_logo_url to match schema
-    address: "", // Changed from company_address to match schema
-    phone: "", // Changed from company_phone to match schema
-    email: "", // Changed from company_email to match schema
-    taxNumber: "", // TRN (Tax Registration Number) stored in tax_number column
-    defaultVatRate: 0.05, // Changed to camelCase to match schema
-    currency: "AED", // Changed from default_currency to match schema
+    logo: "",
+    address: "",
+    phone: "",
+    email: "",
+    taxNumber: "",
+    defaultVatRate: 0.05,
+    currency: "AED",
     fxGbpToAed: 4.85,
     fxUsdToAed: 3.6725,
     fxInrToAed: 0.0440,

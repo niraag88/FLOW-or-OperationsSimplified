@@ -5,7 +5,7 @@ import { Invoice } from '@/api/entities';
 import { DeliveryOrder } from '@/api/entities';
 import { Quotation } from '@/api/entities';
 import { StockCount } from '@/api/entities';
-import { Brand } from '@/api/entities'; // Changed from Supplier to Brand
+import { Brand } from '@/api/entities';
 import { Customer } from '@/api/entities';
 import { CompanySettings } from '@/api/entities';
 

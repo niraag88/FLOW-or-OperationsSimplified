@@ -26,7 +26,7 @@ export default function RecentActivity({ data }: RecentActivityProps) {
           type: 'Purchase Order',
           icon: ShoppingCart,
           docNumber: po.poNumber,
-          party: po.supplierName || po.brandName || '—',
+          party: po.brandName || po.supplierName || '—',
           amount: totalAmt > 0 ? `AED ${totalAmt.toFixed(2)}` : null,
           status: po.status,
           date,

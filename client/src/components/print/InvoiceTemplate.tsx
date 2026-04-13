@@ -35,7 +35,7 @@ export default function InvoiceTemplate({ data, customer, settings }: InvoiceTem
           }
           .invoice-container {
             width: 100%;
-            height: 100%; /* Changed from min-height: 100vh for better print control */
+            height: 100%;
             margin: 0;
             padding: 0;
             box-shadow: none;

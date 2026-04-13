@@ -381,7 +381,7 @@ export default function EditProduct() {
                   </span>
                 </div>
                 <p className="text-xs text-emerald-600 mt-1">
-                  Est. Profit: {(parseFloat(formData.sale_price) - parseFloat(formData.purchase_price)).toFixed(2)} {formData.sale_price_currency}
+                  Est. Profit: {formData.sale_price_currency} {(parseFloat(formData.sale_price) - parseFloat(formData.purchase_price)).toFixed(2)}
                 </p>
               </div>
             )}

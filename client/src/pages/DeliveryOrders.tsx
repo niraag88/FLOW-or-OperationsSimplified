@@ -165,10 +165,6 @@ export default function DeliveryOrders() {
     const validCustomer = rawCustomerId != null
       ? availableCustomers.find((c: CustomerEntity) => c.id === rawCustomerId)
       : null;
-    if (rawCustomerId != null && !validCustomer) {
-      console.warn(`⚠️ DO handleDocumentSelect: Customer ID ${rawCustomerId} not found in customer list.`);
-    }
-
     const vatAmount = parseFloat(String(fullQuotation['vatAmount'] || fullQuotation['vat_amount'] || 0));
     const taxTreatment = vatAmount > 0 ? 'StandardRated' : 'ZeroRated';
     const taxRate = vatAmount > 0 ? 0.05 : 0;
@@ -243,7 +239,7 @@ export default function DeliveryOrders() {
       <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
         <div>
           <h1 className="text-2xl font-bold text-gray-900">Delivery Orders</h1>
-          <p className="text-gray-600">Manage delivery orders and shipments (All amounts in AED)</p>
+          <p className="text-gray-600">Manage delivery orders and shipments</p>
         </div>
         
         <div className="flex flex-wrap items-center gap-3">
