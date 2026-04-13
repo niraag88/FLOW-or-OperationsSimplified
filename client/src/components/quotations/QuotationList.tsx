@@ -62,13 +62,13 @@ export default function QuotationList({ quotations, totalCount, loading, canEdit
   const canPerformActions = (quotation: any) => {
     if (!canCreate) return false;
     if (canOverride) return true;
-    return !['accepted', 'rejected', 'invoiced', 'converted'].includes(quotation.status);
+    return !['accepted', 'rejected', 'converted'].includes(quotation.status);
   };
 
   const canEditActions = (quotation: any) => {
     if (!canEdit) return false;
     if (canOverride) return true;
-    return !['accepted', 'rejected', 'invoiced', 'converted'].includes(quotation.status);
+    return !['accepted', 'rejected', 'converted'].includes(quotation.status);
   };
 
   const isInitialLoad = loading && (!quotations || quotations.length === 0);

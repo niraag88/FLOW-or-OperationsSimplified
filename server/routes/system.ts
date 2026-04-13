@@ -453,7 +453,7 @@ export function registerSystemRoutes(app: Express) {
     }
   });
 
-  app.post('/api/recycle-bin/:id/restore', requireAuth(), async (req: AuthenticatedRequest, res) => {
+  app.post('/api/recycle-bin/:id/restore', requireAuth(['Admin', 'Manager']), async (req: AuthenticatedRequest, res) => {
     try {
       const id = parseInt(req.params.id);
       const [item] = await db.select().from(recycleBin).where(eq(recycleBin.id, id));

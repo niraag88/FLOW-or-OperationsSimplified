@@ -83,7 +83,7 @@ export default function InvoicePrintView() {
   return (
     <div className="print-container">
       <div className="print-page">
-        {/* Header with Logo and Title - EXACT COPY from QuotationPrintView */}
+        {/* Header with Logo and Title */}
         <div className="print-header">
           <div className="header-content">
             {companySettings?.logo && (
@@ -95,7 +95,7 @@ export default function InvoicePrintView() {
           </div>
         </div>
 
-        {/* Company and Invoice Info Section - EXACT COPY from QuotationPrintView */}
+        {/* Company and Invoice Info Section */}
         <div className="print-info-section">
           {/* Left Column - Company Info */}
           <div className="print-company-info">
@@ -127,7 +127,7 @@ export default function InvoicePrintView() {
           </div>
         </div>
 
-        {/* Customer Section - EXACT COPY from QuotationPrintView */}
+        {/* Customer Section */}
         <div className="print-info-section">
           {/* Left Column - Customer Info */}
           <div className="print-company-info">
@@ -167,7 +167,7 @@ export default function InvoicePrintView() {
           </div>
         </div>
 
-        {/* Items Table - EXACT COPY from QuotationPrintView */}
+        {/* Items Table */}
         <div className="print-table-section">
           <table className="print-table">
             <thead>
@@ -195,7 +195,7 @@ export default function InvoicePrintView() {
           </table>
         </div>
 
-        {/* Totals Section - EXACT COPY from QuotationPrintView */}
+        {/* Totals Section */}
         <div className="print-totals-section">
           <div className="totals-row">
             <span className="totals-label">Subtotal</span>

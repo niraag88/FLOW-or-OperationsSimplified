@@ -1,0 +1,155 @@
+Fix before implementation
+1. Migration metadata looks out of sync
+
+You have migration files:
+
+0016_grn_payment_tracking.sql
+0017_grn_prefix_normalisation.sql
+
+But the migrations/meta snapshots appear to stop at:
+
+0015_snapshot.json
+
+That means future Drizzle migration generation may not understand the latest schema state properly.
+
+Why this matters
+
+This is not a runtime bug today.
+
+But it can affect future upgrades, which is exactly one of your biggest concerns. If metadata is stale, a future migration could generate duplicate or incorrect changes.
+
+Recommendation
+
+Regenerate or repair the Drizzle migration metadata so the SQL migrations and meta snapshots are aligned.
+
+2. Editing a PO after GRNs exist can create data inconsistency
+
+This is the biggest business-logic issue I found.
+
+In the PO form, submitted POs can still be edited unless they are closed. The server update route deletes and recreates PO items when items are submitted.
+
+It tries to preserve previously received quantity by product ID, but this can still go wrong.
+
+Risk examples
+
+If a PO already has GRNs and someone edits it:
+
+quantity can be reduced below what has already been received
+duplicate products on the same PO can confuse received quantity mapping
+unit price can change after GRN/payment value has already been established
+PO line values and GRN values can drift
+Recommendation
+
+Once a PO has any GRN, lock sensitive fields:
+
+product lines
+quantities
+unit prices
+currency
+brand
+
+Or at minimum, enforce server-side validation:
+
+new quantity must be greater than or equal to already received quantity
+received quantity must not be remapped incorrectly by product ID alone
+
+This one is worth fixing.
+
+3. Recycle Bin restore looks too permissive
+
+The destructive delete route is restricted to Admin/Manager, which is good.
+
+But restore appears to be available to any authenticated user.
+
+Why this matters
+
+Restoring deleted business records is a data-governance action. It should probably not be available to Staff.
+
+Recommendation
+
+Restrict recycle-bin restore to:
+
+Admin
+Manager
+
+Unless you specifically want Staff to restore records.
+
+Fix soon / polish but meaningful
+4. Delivery Order print/export still has currency inconsistencies
+
+The DO form now uses the record currency properly, which is good.
+
+But some print/export paths still hardcode AED labels or formatting.
+
+Examples:
+
+Delivery Order export columns such as Unit Price (AED) / Line Total (AED)
+DO print headers using AED
+totals defaulting to AED without passing the DO currency
+Why this matters
+
+If a Delivery Order is created from a GBP quotation or other non-AED source, the printed/exported document can look wrong.
+
+Recommendation
+
+For DO print/export, use the document’s actual currency consistently.
+
+5. Legacy generic Print route may use the wrong brand lookup for POs
+
+There is a legacy /print flow that appears to fetch PO brand information using supplier_id.
+
+Your main PO print route appears to be the newer /po-print flow, so this may be low-impact.
+
+But if the old generic print route is still accessible, it may fetch the wrong related brand/company details.
+
+Recommendation
+
+Either:
+
+update the legacy print route to use the proper brand field, or
+remove/retire the legacy generic print route if it is no longer used.
+Low-priority cleanup / polish
+6. Some stale developer comments remain
+
+Examples include comments like:
+
+“EXACT COPY from QuotationPrintView”
+“critical currency format”
+old refactor notes
+
+These do not affect runtime, but they make the code feel less polished and can confuse future edits.
+
+Not urgent.
+
+7. Legacy quotation status handling remains
+
+Some quotation components still contain legacy handling for invoiced.
+
+Your current system appears to use converted rather than invoiced.
+
+This is not dangerous. It is probably backward compatibility or old logic.
+But it is stale logic worth cleaning eventually.
+
+8. Likely dead / legacy files still exist
+
+These look like cleanup candidates:
+
+client/src/components/common/ConfirmDialog.tsx
+client/src/components/inventory/ProductsPrintView.tsx
+client/src/components/invoices/CreateInvoiceFromQuotationDialog.tsx
+client/src/components/utils/documentNumber.tsx
+
+I would not block rollout over these. But if you want a cleaner, productized codebase, confirm they are unused and remove them.
+
+9. Internal supplier naming remains, but mostly harmless
+
+I still see internal names like:
+
+supplierId
+supplierName
+supplier routes/entities
+supplier CSS/helper names
+
+But I did not find a major remaining user-facing “Supplier / Brand” wording issue.
+
+So I would not rename internals now. That would create unnecessary risk.

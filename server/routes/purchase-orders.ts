@@ -149,6 +149,31 @@ export function registerPurchaseOrderRoutes(app: Express) {
           receivedQtyByProduct.set(ei.productId, Math.max(existing, ei.receivedQuantity ?? 0));
         }
 
+        // Validate: no received product line may be removed or reduced below received qty
+        const incomingProductIds = new Set(
+          req.body.items
+            .filter((item: any) => item.productId && item.quantity > 0)
+            .map((item: any) => parseInt(item.productId))
+        );
+        for (const [productId, received] of receivedQtyByProduct.entries()) {
+          if (received > 0 && !incomingProductIds.has(productId)) {
+            return res.status(400).json({
+              error: `Cannot remove a product that has already been received (received qty: ${received}). Reduce the quantity to at least ${received} instead.`
+            });
+          }
+        }
+        for (const item of req.body.items) {
+          if (item.productId && item.quantity > 0) {
+            const productId = parseInt(item.productId);
+            const prevReceived = receivedQtyByProduct.get(productId) ?? 0;
+            if (item.quantity < prevReceived) {
+              return res.status(400).json({
+                error: `Cannot set quantity to ${item.quantity} — this product has already been received in quantity ${prevReceived}. The new quantity must be at least ${prevReceived}.`
+              });
+            }
+          }
+        }
+
         await db.delete(purchaseOrderItems).where(eq(purchaseOrderItems.poId, poId));
 
         let updatedComputedTotal = 0;

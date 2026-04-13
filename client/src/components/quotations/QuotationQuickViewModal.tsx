@@ -18,7 +18,6 @@ const STATUS_COLORS = {
   submitted: "bg-blue-100 text-blue-800",
   accepted: "bg-emerald-100 text-emerald-800",
   converted: "bg-purple-100 text-purple-800",
-  invoiced: "bg-purple-100 text-purple-800",
   expired: "bg-orange-100 text-orange-800",
   rejected: "bg-red-100 text-red-800",
 };
@@ -32,7 +31,7 @@ function Section({ title, children }: { title: string; children: React.ReactNode
   );
 }
 
-const NON_EDITABLE_STATUSES = ['accepted', 'rejected', 'invoiced', 'converted'];
+const NON_EDITABLE_STATUSES = ['accepted', 'rejected', 'converted'];
 
 interface QuotationQuickViewModalProps {
   quotationId: number | null;

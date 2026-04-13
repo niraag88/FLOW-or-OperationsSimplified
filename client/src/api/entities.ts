@@ -28,7 +28,10 @@ class ApiEntity {
       body: JSON.stringify(data),
       credentials: 'include'
     });
-    if (!response.ok) throw new Error(`Failed to create ${this.endpoint}`);
+    if (!response.ok) {
+      const body = await response.json().catch(() => ({})) as EntityData;
+      throw new Error((body.error as string) || `Failed to create ${this.endpoint}`);
+    }
     return await response.json() as unknown;
   }
 
@@ -39,7 +42,10 @@ class ApiEntity {
       body: JSON.stringify(data),
       credentials: 'include'
     });
-    if (!response.ok) throw new Error(`Failed to update ${this.endpoint}`);
+    if (!response.ok) {
+      const body = await response.json().catch(() => ({})) as EntityData;
+      throw new Error((body.error as string) || `Failed to update ${this.endpoint}`);
+    }
     return await response.json() as unknown;
   }
 
@@ -48,7 +54,10 @@ class ApiEntity {
       method: 'DELETE',
       credentials: 'include'
     });
-    if (!response.ok) throw new Error(`Failed to delete ${this.endpoint}`);
+    if (!response.ok) {
+      const body = await response.json().catch(() => ({})) as EntityData;
+      throw new Error((body.error as string) || `Failed to delete ${this.endpoint}`);
+    }
     return await response.json() as unknown;
   }
 
