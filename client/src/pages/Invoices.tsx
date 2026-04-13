@@ -200,7 +200,7 @@ export default function Invoices() {
       }
       setShowInvoiceForm(true);
     } catch (error: unknown) {
-      console.error("❌ Error fetching invoice details:", error);
+      console.error("Error fetching invoice details:", error);
       setEditingInvoice(invoice);
       setShowInvoiceForm(true);
     }
@@ -246,10 +246,6 @@ export default function Invoices() {
     
     // Validate customer exists in current dropdown options
     const validCustomer = availableCustomers.find((c: CustomerEntity) => c.id === rawCustomerId);
-    if (!validCustomer && rawCustomerId) {
-      console.warn(`⚠️ Customer ID ${rawCustomerId} not found in current customers. Available:`, 
-        availableCustomers.map((c: CustomerEntity) => ({ id: c.id, name: c.name || c.customer_name })));
-    }
     
     const normalizedData: Record<string, unknown> = {
       // Customer ID - only use if it exists in current dropdown options
@@ -393,7 +389,7 @@ export default function Invoices() {
       setShowInvoiceForm(true);
       
     } catch (error: unknown) {
-      console.error("❌ Error processing document selection:", error);
+      console.error("Error processing document selection:", error);
       toast({
         title: "Error",
         description: "Failed to process the selected document. Please try again.",

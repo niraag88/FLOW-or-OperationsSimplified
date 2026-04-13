@@ -610,7 +610,6 @@ export function registerSystemRoutes(app: Express) {
     };
 
     try {
-      console.log('Starting backup process...');
       // @ts-ignore
       const { uploadBackup } = await import('../../scripts/uploadBackup.js');
       // @ts-ignore
@@ -630,7 +629,6 @@ export function registerSystemRoutes(app: Express) {
       };
 
       if (success) {
-        console.log('Backup completed successfully');
         res.status(200).json(response);
       } else {
         console.error('Backup failed:', { dbResult, manifestResult });

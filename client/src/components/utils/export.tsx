@@ -22,10 +22,7 @@ const fmtShort = (dateStr: any) => {
 };
 
 export const exportToCsv = (data: any, filename: any) => {
-  if (!data || data.length === 0) {
-    console.error("No data to export.");
-    return;
-  }
+  if (!data || data.length === 0) return;
 
   const headers = Object.keys(data[0]);
   const csvRows = [
@@ -57,10 +54,7 @@ export const exportToCsv = (data: any, filename: any) => {
 };
 
 export const exportToXLSX = async (data: any, filename: any, sheetName = 'Sheet1') => {
-  if (!data || data.length === 0) {
-    console.error("No data to export.");
-    return;
-  }
+  if (!data || data.length === 0) return;
 
   const wb = new ExcelJS.Workbook();
   const ws = wb.addWorksheet(sheetName);
@@ -73,10 +67,7 @@ export const exportToXLSX = async (data: any, filename: any, sheetName = 'Sheet1
 };
 
 export const exportToPDF = (data: any, filename: any, title = 'Export', columns = null) => {
-  if (!data || data.length === 0) {
-    console.error("No data to export.");
-    return;
-  }
+  if (!data || data.length === 0) return;
 
   try {
     const doc = new jsPDF();
