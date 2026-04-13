@@ -199,7 +199,7 @@ export default function UserManagement() {
         throw new Error(body.error || 'Factory reset failed');
       }
       setShowResetConfirm(false);
-      toast({ title: 'Reset complete', description: 'All data has been wiped. Logging out…' });
+      sessionStorage.setItem('factoryResetComplete', '1');
       await logout();
       window.location.href = '/';
     } catch (err: unknown) {
@@ -362,7 +362,7 @@ export default function UserManagement() {
       </div>
 
       <Tabs defaultValue="users">
-        <TabsList className="grid grid-cols-3 w-full">
+        <TabsList className={`grid w-full ${isAdmin ? 'grid-cols-3' : 'grid-cols-2'}`}>
           <TabsTrigger value="users" className="flex items-center gap-2">
             <Users className="h-4 w-4" />
             Users

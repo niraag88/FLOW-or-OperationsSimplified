@@ -1,11 +1,11 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { useAuth } from '@/hooks/useAuth';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Alert, AlertDescription } from '@/components/ui/alert';
-import { AlertCircle, Loader2, Shield } from 'lucide-react';
+import { AlertCircle, CheckCircle2, Loader2, Shield } from 'lucide-react';
 
 export default function LoginPage() {
   const { login } = useAuth();
@@ -15,6 +15,14 @@ export default function LoginPage() {
   });
   const [error, setError] = useState<string | null>(null);
   const [isLoading, setIsLoading] = useState(false);
+  const [resetComplete, setResetComplete] = useState(false);
+
+  useEffect(() => {
+    if (sessionStorage.getItem('factoryResetComplete') === '1') {
+      sessionStorage.removeItem('factoryResetComplete');
+      setResetComplete(true);
+    }
+  }, []);
 
   const handleInputChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const { name, value } = e.target;
@@ -79,6 +87,15 @@ export default function LoginPage() {
           </CardHeader>
           <CardContent>
             <form onSubmit={handleSubmit} className="space-y-4">
+              {resetComplete && (
+                <Alert className="border-green-300 bg-green-50 text-green-800">
+                  <CheckCircle2 className="h-4 w-4 text-green-600" />
+                  <AlertDescription>
+                    Factory reset complete. All data has been wiped. Please log in with your admin credentials.
+                  </AlertDescription>
+                </Alert>
+              )}
+
               {error && (
                 <Alert variant="destructive">
                   <AlertCircle className="h-4 w-4" />
