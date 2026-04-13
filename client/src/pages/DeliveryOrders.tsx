@@ -255,9 +255,9 @@ export default function DeliveryOrders() {
               order_date: { label: 'Order Date', transform: (date: unknown) => date ? format(new Date(String(date)), 'dd/MM/yy') : '' },
               reference: 'Reference',
               status: { label: 'Status', transform: (val: unknown) => typeof val === 'string' && val.toLowerCase() === 'submitted' ? 'Submitted' : val && typeof val === 'string' ? val.charAt(0).toUpperCase() + val.slice(1) : '' },
-              subtotal: { label: 'Subtotal (AED)', transform: (val: unknown) => String(val || 0) },
-              tax_amount: { label: 'VAT (AED)', transform: (val: unknown) => String(val || 0) },
-              total_amount: { label: 'Total (AED)', transform: (val: unknown) => String(val || 0) }
+              subtotal: { label: 'Subtotal', transform: (val: unknown) => String(val || 0) },
+              tax_amount: { label: 'VAT', transform: (val: unknown) => String(val || 0) },
+              total_amount: { label: 'Total', transform: (val: unknown) => String(val || 0) }
             }}
             isLoading={loading}
           />

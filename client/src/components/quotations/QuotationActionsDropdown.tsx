@@ -123,7 +123,7 @@ export default function QuotationActionsDropdown({ quotation, canEdit, canCreate
     }
   };
 
-  const isCancellable = canEdit && quotation.status !== 'cancelled' && quotation.status !== 'paid';
+  const isCancellable = canEdit && quotation.status !== 'cancelled';
 
 
   return (

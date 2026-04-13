@@ -41,7 +41,7 @@ export default function RecentActivity({ data }: RecentActivityProps) {
           icon: Truck,
           docNumber: dod.do_number || dod.orderNumber,
           party: dod.customer_name || dod.customerName || '—',
-          amount: totalAmt > 0 ? `AED ${totalAmt.toFixed(2)}` : null,
+          amount: totalAmt > 0 ? `${dod.currency || 'AED'} ${totalAmt.toFixed(2)}` : null,
           status: dod.status,
           date,
           color: 'bg-amber-100 text-amber-700'

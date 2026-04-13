@@ -1,0 +1,101 @@
+What I found in this pass
+
+I focused on the kind of things you explicitly want caught now:
+
+visible anomalies
+wording drift
+quiet inconsistencies
+dead/legacy behavior
+polish issues that compile fine but still feel off
+1. Delivery Order form still hardcodes AED in totals
+
+This is the clearest remaining user-facing issue.
+
+In client/src/components/delivery-orders/DOForm.tsx, the line totals and summary totals still render as:
+
+AED {(item.line_total || 0).toFixed(2)}
+AED {formData.subtotal.toFixed(2)}
+AED {formData.tax_amount.toFixed(2)}
+AED {formData.total_amount.toFixed(2)}
+
+But the form state still carries a currency field, and Delivery Orders can still inherit currency from an existing document flow.
+
+So right now the form can show AED labels even when the underlying DO currency is not AED.
+
+This is a real polish/consistency bug.
+
+2. Delivery Orders export columns still say (AED)
+
+In client/src/pages/DeliveryOrders.tsx, the export column labels are still:
+
+Subtotal (AED)
+VAT (AED)
+Total (AED)
+
+That has the same issue as above: the DO system still has currency on the record, so this labeling is too specific.
+
+This is not a core logic failure, but it is definitely the kind of anomaly worth fixing.
+
+3. Dashboard Recent Activity still hardcodes AED for Delivery Orders
+
+In client/src/components/dashboard/RecentActivity.tsx, Delivery Orders still show:
+
+AED ${totalAmt.toFixed(2)}
+
+That is inconsistent with the fact that DOs carry currency.
+
+For Purchase Orders, the hardcoded AED is less clearly wrong because the component prefers grandTotal, which is effectively your AED-normalized figure. But for Delivery Orders, this is a real mismatch.
+
+4. Quotation list status handling is still not fully aligned with the rest of the system
+
+This is the main “quiet inconsistency” I still see.
+
+In client/src/components/quotations/QuotationList.tsx, the status color map only handles:
+
+draft
+sent / submitted
+converted
+cancelled
+
+But elsewhere in the app and backend, quotations still clearly support or recognize:
+
+accepted
+rejected
+expired
+converted
+cancelled
+
+You can see that in:
+
+QuotationQuickViewModal.tsx
+QuotationActionsDropdown.tsx
+server/routes/quotations.ts
+shared/schema.ts
+
+So if a quotation is in one of those other valid states, the list view can still show a generic grey badge or behave inconsistently.
+
+This is not a rollout blocker, but it is a real polish inconsistency.
+
+5. Quotation actions still contain one stale status check
+
+In client/src/components/quotations/QuotationActionsDropdown.tsx:
+
+const isCancellable = canEdit && quotation.status !== 'cancelled' && quotation.status !== 'paid';
+
+paid is not a meaningful quotation status in your current model. That looks like a leftover condition.
+
+This is minor, but it is exactly the kind of stale logic that can confuse later edits.
+
+6. Goods Receipts unit price lost currency context
+
+You fixed the earlier $ issue, which was good.
+
+But now in client/src/pages/GoodsReceipts.tsx, the unit price cell just shows:
+
+parseFloat(item.unitPrice).toFixed(2)
+
+with no currency context in the column header or the value.
+
+Since purchase orders can still be in GBP or AED, this is now less wrong than the old $ bug, but still a little ambiguous for users.
+
+I’d class this as low priority, but it is a genuine polish anomaly.
