@@ -3,7 +3,7 @@ import type { RateLimitRequestHandler } from 'express-rate-limit';
 import { users } from "@shared/schema";
 import { db } from "../db";
 import { eq } from "drizzle-orm";
-import { requireAuth, comparePassword, writeAuditLog, loggedOutSessionIds, type AuthenticatedRequest } from "../middleware";
+import { requireAuth, comparePassword, writeAuditLog, type AuthenticatedRequest } from "../middleware";
 
 export function registerAuthRoutes(app: Express, loginLimiter: RateLimitRequestHandler) {
   app.post('/api/auth/login', loginLimiter, async (req: AuthenticatedRequest, res) => {
@@ -45,9 +45,12 @@ export function registerAuthRoutes(app: Express, loginLimiter: RateLimitRequestH
   });
 
   app.post('/api/auth/logout', (req: AuthenticatedRequest, res) => {
-    loggedOutSessionIds.add(req.session.id);
-    req.session.destroy(() => {});
-    res.json({ success: true });
+    req.session.destroy((err) => {
+      if (err) {
+        console.error('Session destroy error during logout:', err);
+      }
+      res.json({ success: true });
+    });
   });
 
   app.get('/api/auth/me', requireAuth(), async (req: AuthenticatedRequest, res) => {
