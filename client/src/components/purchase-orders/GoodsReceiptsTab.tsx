@@ -28,6 +28,7 @@ import { format } from "date-fns";
 import { useToast } from "@/hooks/use-toast";
 import SimpleConfirmDialog from "../common/SimpleConfirmDialog";
 import { formatCurrency } from "@/utils/currency";
+import { queryClient } from "@/lib/queryClient";
 import type { PurchaseOrder, GoodsReceipt } from "@shared/schema";
 interface POItem {
   id: number;
@@ -530,6 +531,10 @@ export default function GoodsReceiptsTab({
       setReceiveRefNumber('');
       setReceiveRefDate('');
       
+      // Invalidate cached data so Inventory and Dashboard reflect the new stock counts immediately
+      queryClient.invalidateQueries({ queryKey: ['/api/products'] });
+      queryClient.invalidateQueries({ queryKey: ['/api/dashboard'] });
+
       // Refresh the data
       if (onRefresh) {
         onRefresh();

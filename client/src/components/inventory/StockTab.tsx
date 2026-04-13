@@ -63,6 +63,8 @@ interface StockData {
 interface CompanySettings {
   lowStockThreshold: number;
   fxGbpToAed: number;
+  fxUsdToAed: number;
+  fxInrToAed: number;
   taxNumber?: string;
   vatNumber?: string;
   company_trn?: string;
@@ -141,8 +143,17 @@ export default function StockTab({ products, loading, onStockSubTabChange, canEd
       setCompanySettings(data);
     } catch (error: unknown) {
       console.error("Error loading company settings:", error);
-      setCompanySettings({ lowStockThreshold: 6, fxGbpToAed: 4.85 });
+      setCompanySettings({ lowStockThreshold: 6, fxGbpToAed: 4.85, fxUsdToAed: 3.6725, fxInrToAed: 0.044 });
     }
+  };
+
+  const getCostInAed = (cost: number | string, currency: string | null | undefined): number => {
+    const amount = parseFloat(String(cost ?? 0)) || 0;
+    const c = String(currency || 'GBP').toUpperCase();
+    if (c === 'AED') return amount;
+    if (c === 'USD') return amount * (companySettings?.fxUsdToAed ?? 3.6725);
+    if (c === 'INR') return amount * (companySettings?.fxInrToAed ?? 0.044);
+    return amount * (companySettings?.fxGbpToAed ?? 4.85);
   };
 
   const loadStockData = async (threshold: number) => {

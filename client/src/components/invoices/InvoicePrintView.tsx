@@ -12,7 +12,7 @@ export default function InvoicePrintView() {
 
   useEffect(() => {
     if (!id) {
-      navigate('/Invoices');
+      navigate('/invoices');
       return;
     }
 
@@ -33,12 +33,12 @@ export default function InvoicePrintView() {
           }
         } else {
           console.error('Error loading invoice:', invoiceResult.error);
-          navigate('/Invoices');
+          navigate('/invoices');
         }
         
       } catch (error: any) {
         console.error('Error loading data:', error);
-        navigate('/Invoices');
+        navigate('/invoices');
       } finally {
         setLoading(false);
       }

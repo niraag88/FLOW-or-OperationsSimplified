@@ -20,7 +20,6 @@ import { Plus, Edit2, Trash2, Save, X, Users, Download } from "lucide-react";
 import { Customer } from "@/api/entities";
 import { useToast } from "@/hooks/use-toast";
 import { useAuth } from "@/hooks/useAuth";
-import { logAuditAction } from "../utils/auditLogger";
 import { exportToCsv } from "../utils/export";
 import CustomerActionsDropdown from "./CustomerActionsDropdown";
 
@@ -90,14 +89,12 @@ export default function CustomerManagement() {
 
       if (editingCustomer) {
         await Customer.update(editingCustomer.id, customerData);
-        await logAuditAction("Customer", editingCustomer.id, "update", user?.username || user?.email || "unknown", { updated_fields: Object.keys(customerData) });
         toast({
           title: "Success",
           description: "Customer updated successfully.",
         });
       } else {
-        const newCustomer = await Customer.create(customerData);
-        await logAuditAction("Customer", (newCustomer as any).id, "create", user?.username || user?.email || "unknown", { name: customerData.name });
+        await Customer.create(customerData);
         toast({
           title: "Success",
           description: "Customer created successfully.",
@@ -128,9 +125,6 @@ export default function CustomerManagement() {
   const handleToggleActive = async (customer: any) => {
     try {
       await Customer.update(customer.id, { ...customer, isActive: !customer.isActive });
-      await logAuditAction("Customer", customer.id, "status_change", user?.username || user?.email || "unknown", { 
-        status: { from: customer.isActive, to: !customer.isActive }
-      });
       loadCustomers();
     } catch (error: any) {
       console.error("Error updating customer status:", error);

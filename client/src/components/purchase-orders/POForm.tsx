@@ -371,6 +371,7 @@ export default function POForm({ open, onClose, editingPO, currentUser, onSucces
         await POEntity.create(submitData);
       }
       
+      queryClient.invalidateQueries({ queryKey: ['/api/dashboard'] });
       onSuccess?.();
       onClose();
       resetForm();

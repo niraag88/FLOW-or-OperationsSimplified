@@ -11,9 +11,8 @@ import { Checkbox } from "@/components/ui/checkbox";
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
 import { Package, Trash2, MoreHorizontal, Edit, Search, Filter, ChevronDown, X } from "lucide-react";
 import { Skeleton } from "@/components/ui/skeleton";
-import { Product, RecycleBin, AuditLog, User } from "@/api/entities";
+import { Product, RecycleBin, User } from "@/api/entities";
 import { formatCurrency } from "@/utils/currency";
-import { logAuditAction } from "../utils/auditLogger";
 import SimpleConfirmDialog from "../common/SimpleConfirmDialog";
 import type { Product as ProductType } from "@shared/schema";
 
@@ -99,20 +98,6 @@ export default function ProductsTab({
         reason: 'Deleted from UI',
         original_status: productToDelete.isActive ? 'Active' : 'Inactive',
         can_restore: true
-      });
-
-      // Log the deletion
-      await AuditLog.create({
-        entity_type: 'Product',
-        entity_id: productToDelete.id,
-        action: 'deleted',
-        user_email: (user as { email?: string })?.email || 'unknown',
-        changes: { 
-          product_name: productToDelete.name,
-          deletion_reason: 'Deleted from UI',
-          moved_to_recycle_bin: true
-        },
-        timestamp: new Date().toISOString()
       });
 
       // Delete from main table

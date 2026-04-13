@@ -17,7 +17,6 @@ import {
 import { Plus, Edit2, Trash2, Building2, ExternalLink } from "lucide-react";
 import { Brand } from "@/api/entities";
 import { useAuth } from "@/hooks/useAuth";
-import { logAuditAction } from "../utils/auditLogger";
 import { useToast } from "@/hooks/use-toast";
 import SimpleConfirmDialog from "../common/SimpleConfirmDialog";
 
@@ -85,14 +84,12 @@ export default function BrandManagement() {
       
       if (editingBrand) {
         await Brand.update(editingBrand.id, apiData);
-        await logAuditAction("Brand", editingBrand.id, "update", currentUser?.email || '', { updated_brand: formData });
         toast({
           title: "Success",
           description: "Brand updated successfully.",
         });
       } else {
-        const newBrand = await Brand.create(apiData);
-        await logAuditAction("Brand", (newBrand as any).id, "create", currentUser?.email || '', { created_brand: formData });
+        await Brand.create(apiData);
         toast({
           title: "Success",
           description: "Brand created successfully.",

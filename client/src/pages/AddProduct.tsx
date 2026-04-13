@@ -11,7 +11,6 @@ import { queryClient } from "@/lib/queryClient";
 import { Product } from "@/api/entities";
 import { Brand } from "@/api/entities"; // Added Brand import
 import { CompanySettings } from "@/api/entities"; // Import CompanySettings
-import { logAuditAction } from "../components/utils/auditLogger";
 import { createPageUrl } from "@/utils";
 import { Save, Plus, X, AlertTriangle } from "lucide-react";
 import { Alert, AlertDescription } from "@/components/ui/alert";
@@ -124,9 +123,6 @@ export default function AddProduct() {
       };
 
       const newProduct = await Product.create(productData);
-
-      // currentUser is guaranteed to be set by useEffect now
-      await logAuditAction("Product", (newProduct as any).id, "create", currentUser?.email || '', { product: newProduct });
 
       // Invalidate the products list and dashboard so counts update immediately
       queryClient.invalidateQueries({ queryKey: ['/api/products'] });

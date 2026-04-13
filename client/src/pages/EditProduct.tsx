@@ -10,7 +10,6 @@ import { queryClient } from "@/lib/queryClient";
 import { Product } from "@/api/entities";
 import { Brand } from "@/api/entities";
 import { CompanySettings } from "@/api/entities";
-import { logAuditAction } from "../components/utils/auditLogger";
 import { createPageUrl } from "@/utils";
 import { Save, X, AlertTriangle } from "lucide-react";
 import { Alert, AlertDescription } from "@/components/ui/alert";
@@ -160,11 +159,6 @@ export default function EditProduct() {
       };
 
       const updatedProduct = await Product.update(parseInt(id || ''), productData);
-
-      await logAuditAction("Product", (updatedProduct as any).id, "update", currentUser?.email || '', { 
-        before: originalProduct,
-        after: updatedProduct 
-      });
 
       // Invalidate products cache so Inventory reflects the update immediately
       queryClient.invalidateQueries({ queryKey: ['/api/products'] });
