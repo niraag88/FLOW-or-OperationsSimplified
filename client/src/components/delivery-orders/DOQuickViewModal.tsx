@@ -141,7 +141,7 @@ export default function DOQuickViewModal({ doId, open, onClose, canEdit, onEdit 
     }
   };
 
-  const isLocked = detail?.status ? ['delivered', 'cancelled'].includes(detail.status) : false;
+  const isLocked = detail?.status ? ['cancelled'].includes(detail.status) : false;
   const canActOnDO = canEdit && !isLocked;
   const subtotal = parseFloat(String(detail?.subtotal ?? 0)) || 0;
   const vatAmount = parseFloat(String(detail?.tax_amount ?? 0)) || 0;
