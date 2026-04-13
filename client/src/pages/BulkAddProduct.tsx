@@ -285,7 +285,7 @@ export default function BulkAddProduct() {
         <input
           ref={fileInputRef}
           type="file"
-          accept=".xlsx,.xls"
+          accept=".xlsx"
           className="hidden"
           onChange={handleFileChange}
         />
