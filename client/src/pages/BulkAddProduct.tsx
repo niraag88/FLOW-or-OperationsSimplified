@@ -17,7 +17,7 @@ import {
   FileSpreadsheet,
   Loader2,
 } from "lucide-react";
-import * as XLSX from "xlsx";
+import ExcelJS from "exceljs";
 import { SUPPORTED_CURRENCIES } from "@/utils/currency";
 import { useQuery } from "@tanstack/react-query";
 
@@ -34,28 +34,30 @@ const HEADERS = [
 const SKU_REGEX = /^[A-Za-z0-9]{1,50}$/;
 const STALE_3MIN = 3 * 60 * 1000;
 
-function parseSheet(workbook: any) {
-  const sheetName = workbook.SheetNames.find((n: any) => n === 'Products') || workbook.SheetNames.find((n: any) => !n.startsWith('_')) || workbook.SheetNames[0];
-  const sheet = workbook.Sheets[sheetName];
-  const raw = XLSX.utils.sheet_to_json(sheet, { header: 1, defval: "" });
+function parseSheet(workbook: ExcelJS.Workbook) {
+  const ws =
+    workbook.getWorksheet('Products') ||
+    workbook.worksheets.find((s) => !s.name.startsWith('_')) ||
+    workbook.worksheets[0];
 
   const rows: any[] = [];
-  for (let i = 0; i < raw.length; i++) {
-    const r = raw[i] as any[];
-    const brandName = String(r[0] || "").trim();
-    const productCode = String(r[1] || "").trim().toUpperCase().replace(/[^A-Z0-9]/g, "");
-    const productName = String(r[2] || "").trim();
-    const size = String(r[3] || "").trim();
-    const purchasePrice = String(r[4] || "").trim();
-    const purchasePriceCurrency = String(r[5] || "GBP").trim().toUpperCase();
-    const salePrice = String(r[6] || "").trim();
+  ws?.eachRow((excelRow, rowIndex) => {
+    // ExcelJS row.values is 1-indexed; index 0 is null
+    const r = excelRow.values as any[];
+    const brandName = String(r[1] || "").trim();
+    const productCode = String(r[2] || "").trim().toUpperCase().replace(/[^A-Z0-9]/g, "");
+    const productName = String(r[3] || "").trim();
+    const size = String(r[4] || "").trim();
+    const purchasePrice = String(r[5] || "").trim();
+    const purchasePriceCurrency = String(r[6] || "GBP").trim().toUpperCase();
+    const salePrice = String(r[7] || "").trim();
 
-    if (!brandName && !productCode && !productName && !salePrice) continue;
-    if (brandName === HEADERS[0]) continue;
-    if (productCode === "MYSKU001" && productName === "Example Product") continue;
+    if (!brandName && !productCode && !productName && !salePrice) return;
+    if (brandName === HEADERS[0]) return;
+    if (productCode === "MYSKU001" && productName === "Example Product") return;
 
-    rows.push({ brandName, productCode, productName, size, purchasePrice, purchasePriceCurrency, salePrice, _rowIndex: i });
-  }
+    rows.push({ brandName, productCode, productName, size, purchasePrice, purchasePriceCurrency, salePrice, _rowIndex: rowIndex - 1 });
+  });
   return rows;
 }
 
@@ -143,11 +145,12 @@ export default function BulkAddProduct() {
       setResult(null);
 
       const reader = new FileReader();
-      reader.onload = (e) => {
+      reader.onload = async (e) => {
         try {
-          const data = new Uint8Array((e.target as any).result);
-          const workbook = XLSX.read(data, { type: "array" });
-          const rows = parseSheet(workbook);
+          const buffer = (e.target as any).result as ArrayBuffer;
+          const wb = new ExcelJS.Workbook();
+          await wb.xlsx.load(buffer);
+          const rows = parseSheet(wb);
           const validated = validateRows(rows, brandsSet);
           setParsedRows(validated);
         } catch (err: any) {

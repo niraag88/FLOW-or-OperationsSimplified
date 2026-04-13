@@ -1,7 +1,20 @@
-import * as XLSX from 'xlsx';
+import ExcelJS from 'exceljs';
 import jsPDF from 'jspdf';
 import autoTable from 'jspdf-autotable';
 import { format } from 'date-fns';
+
+const downloadXLSX = async (wb: ExcelJS.Workbook, filename: string) => {
+  const buffer = await wb.xlsx.writeBuffer();
+  const blob = new Blob([buffer], { type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet' });
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement('a');
+  a.href = url;
+  a.download = filename;
+  document.body.appendChild(a);
+  a.click();
+  document.body.removeChild(a);
+  URL.revokeObjectURL(url);
+};
 
 const fmtShort = (dateStr: any) => {
   if (!dateStr) return '';
@@ -43,21 +56,20 @@ export const exportToCsv = (data: any, filename: any) => {
   }
 };
 
-export const exportToXLSX = (data: any, filename: any, sheetName = 'Sheet1') => {
+export const exportToXLSX = async (data: any, filename: any, sheetName = 'Sheet1') => {
   if (!data || data.length === 0) {
     console.error("No data to export.");
     return;
   }
 
-  // Create workbook and worksheet
-  const workbook = XLSX.utils.book_new();
-  const worksheet = XLSX.utils.json_to_sheet(data);
-  
-  // Add worksheet to workbook
-  XLSX.utils.book_append_sheet(workbook, worksheet, sheetName);
-  
-  // Write and download the file
-  XLSX.writeFile(workbook, `${filename}.xlsx`);
+  const wb = new ExcelJS.Workbook();
+  const ws = wb.addWorksheet(sheetName);
+  const headers = Object.keys(data[0]);
+  ws.addRow(headers);
+  for (const item of data) {
+    ws.addRow(headers.map((h: string) => item[h] ?? ''));
+  }
+  await downloadXLSX(wb, `${filename}.xlsx`);
 };
 
 export const exportToPDF = (data: any, filename: any, title = 'Export', columns = null) => {
@@ -308,28 +320,25 @@ export const exportQuotationToXLSX = async (quotation: any) => {
     exportData.push(['', '', '', '', '', 'TOTAL:', `AED ${total.toFixed(2)}`]);
     
     // Create workbook and worksheet using array of arrays (no column headers)
-    const workbook = XLSX.utils.book_new();
-    const worksheet = XLSX.utils.aoa_to_sheet(exportData);
-    
-    // Set column widths
-    worksheet['!cols'] = [
+    const wb = new ExcelJS.Workbook();
+    const ws = wb.addWorksheet('Quotation');
+    ws.columns = [
       { width: 15 }, // Product Code
       { width: 20 }, // Brand Name
       { width: 40 }, // Description
       { width: 12 }, // Size
       { width: 10 }, // Quantity
       { width: 18 }, // Unit Price
-      { width: 18 }  // Line Total
+      { width: 18 }, // Line Total
     ];
-    
-    // Add worksheet to workbook
-    XLSX.utils.book_append_sheet(workbook, worksheet, 'Quotation');
-    
+    for (const row of exportData) {
+      ws.addRow(row);
+    }
+
     // Generate filename with timestamp
     const timestampedFilename = `Quotation_${fullQuotation.quoteNumber || quotationNumber || 'Unknown'}_${new Date().toISOString().split('T')[0]}.xlsx`;
-    
-    // Write and download the file
-    XLSX.writeFile(workbook, timestampedFilename);
+
+    await downloadXLSX(wb, timestampedFilename);
     
   } catch (error: any) {
     console.error("Quotation XLSX export error:", error);
@@ -399,28 +408,25 @@ export const exportInvoiceToXLSX = async (invoice: any) => {
     exportData.push(['', '', '', '', '', 'TOTAL:', `AED ${parseFloat(invoice.total_amount || 0).toFixed(2)}`]);
     
     // Create workbook and worksheet using array of arrays
-    const workbook = XLSX.utils.book_new();
-    const worksheet = XLSX.utils.aoa_to_sheet(exportData);
-    
-    // Set column widths
-    worksheet['!cols'] = [
+    const wb = new ExcelJS.Workbook();
+    const ws = wb.addWorksheet('Invoice');
+    ws.columns = [
       { width: 15 }, // Product Code
-      { width: 20 }, // Brand Name  
+      { width: 20 }, // Brand Name
       { width: 40 }, // Description
       { width: 12 }, // Size
       { width: 10 }, // Quantity
       { width: 18 }, // Unit Price
-      { width: 18 }  // Line Total
+      { width: 18 }, // Line Total
     ];
-    
-    // Add worksheet to workbook
-    XLSX.utils.book_append_sheet(workbook, worksheet, 'Invoice');
-    
+    for (const row of exportData) {
+      ws.addRow(row);
+    }
+
     // Generate filename with timestamp
     const timestampedFilename = `Invoice_${invoice.invoice_number || 'Unknown'}_${new Date().toISOString().split('T')[0]}.xlsx`;
-    
-    // Write and download the file
-    XLSX.writeFile(workbook, timestampedFilename);
+
+    await downloadXLSX(wb, timestampedFilename);
     
   } catch (error: any) {
     console.error("Invoice XLSX export error:", error);
@@ -492,28 +498,25 @@ export const exportDeliveryOrderToXLSX = async (deliveryOrder: any) => {
     exportData.push(['', '', '', '', '', 'TOTAL:', `AED ${parseFloat(deliveryOrder.total_amount || 0).toFixed(2)}`]);
     
     // Create workbook and worksheet using array of arrays
-    const workbook = XLSX.utils.book_new();
-    const worksheet = XLSX.utils.aoa_to_sheet(exportData);
-    
-    // Set column widths
-    worksheet['!cols'] = [
+    const wb = new ExcelJS.Workbook();
+    const ws = wb.addWorksheet('Delivery Order');
+    ws.columns = [
       { width: 15 }, // Product Code
       { width: 20 }, // Brand Name
       { width: 40 }, // Description
       { width: 12 }, // Size
       { width: 10 }, // Quantity
-      { width: 18 }, // Unit Price  
-      { width: 18 }  // Line Total
+      { width: 18 }, // Unit Price
+      { width: 18 }, // Line Total
     ];
-    
-    // Add worksheet to workbook
-    XLSX.utils.book_append_sheet(workbook, worksheet, 'Delivery Order');
-    
+    for (const row of exportData) {
+      ws.addRow(row);
+    }
+
     // Generate filename with timestamp
     const timestampedFilename = `Delivery_Order_${deliveryOrder.do_number || 'Unknown'}_${new Date().toISOString().split('T')[0]}.xlsx`;
-    
-    // Write and download the file
-    XLSX.writeFile(workbook, timestampedFilename);
+
+    await downloadXLSX(wb, timestampedFilename);
     
   } catch (error: any) {
     console.error("Delivery Order XLSX export error:", error);
@@ -1015,9 +1018,9 @@ export const exportPODetailToXLSX = async (poId: any, poNumber: any) => {
     rows.push(['Payable Value:', fmtNum(recon.receivedTotal), '', '']);
   }
 
-  const workbook = XLSX.utils.book_new();
-  const worksheet = XLSX.utils.aoa_to_sheet(rows);
-  worksheet['!cols'] = [
+  const wb = new ExcelJS.Workbook();
+  const ws = wb.addWorksheet('Purchase Order');
+  ws.columns = [
     { width: 28 },
     { width: 18 },
     { width: 14 },
@@ -1025,13 +1028,15 @@ export const exportPODetailToXLSX = async (poId: any, poNumber: any) => {
     { width: 20 },
     { width: 22 },
   ];
-  XLSX.utils.book_append_sheet(workbook, worksheet, 'Purchase Order');
-  XLSX.writeFile(workbook, `PO_${d.poNumber}_${new Date().toISOString().split('T')[0]}.xlsx`);
+  for (const row of rows) {
+    ws.addRow(row);
+  }
+  await downloadXLSX(wb, `PO_${d.poNumber}_${new Date().toISOString().split('T')[0]}.xlsx`);
 };
 
 /* ── Statement of Account XLSX export ──────────────────────────────────── */
 
-export const exportStatementToXLSX = ({ type, entity, companySettings, records, dateFrom, dateTo, statusFilter }: { type: string; entity: Record<string, any> | null; companySettings: Record<string, any> | null; records: Record<string, any>[]; dateFrom: string; dateTo: string; statusFilter: string }) => {
+export const exportStatementToXLSX = async ({ type, entity, companySettings, records, dateFrom, dateTo, statusFilter }: { type: string; entity: Record<string, any> | null; companySettings: Record<string, any> | null; records: Record<string, any>[]; dateFrom: string; dateTo: string; statusFilter: string }) => {
   const fmtAmt = (v: any) => new Intl.NumberFormat("en-US", { minimumFractionDigits: 2, maximumFractionDigits: 2 }).format(v || 0);
   const fmtD   = (val: any) => {
     if (!val) return "—";
@@ -1162,15 +1167,15 @@ export const exportStatementToXLSX = ({ type, entity, companySettings, records, 
   rows.push([]);
   rows.push(["Generated on:", today]);
 
-  const workbook  = XLSX.utils.book_new();
-  const worksheet = XLSX.utils.aoa_to_sheet(rows);
-
-  worksheet["!cols"] = type === "invoices"
+  const wb = new ExcelJS.Workbook();
+  const ws = wb.addWorksheet("Statement");
+  ws.columns = type === "invoices"
     ? [{ width: 6 }, { width: 16 }, { width: 12 }, { width: 16 }, { width: 14 }, { width: 16 }, { width: 14 }, { width: 14 }]
     : [{ width: 6 }, { width: 14 }, { width: 14 }, { width: 16 }, { width: 16 }, { width: 13 }, { width: 14 }, { width: 14 }, { width: 14 }, { width: 22 }];
-
-  XLSX.utils.book_append_sheet(workbook, worksheet, "Statement");
+  for (const row of rows) {
+    ws.addRow(row);
+  }
 
   const safeName = (entity?.name || "statement").replace(/[/\\?*:|"<>]/g, "").replace(/\s+/g, "_");
-  XLSX.writeFile(workbook, `SOA_${safeName}_${format(new Date(), "dd-MM-yy")}.xlsx`);
+  await downloadXLSX(wb, `SOA_${safeName}_${format(new Date(), "dd-MM-yy")}.xlsx`);
 };

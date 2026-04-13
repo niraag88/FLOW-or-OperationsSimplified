@@ -7,7 +7,7 @@ import { Readable } from 'stream';
 import { execSync } from 'child_process';
 import { createWriteStream, createReadStream, unlink } from 'fs';
 import { tmpdir } from 'os';
-import * as XLSX from 'xlsx';
+import ExcelJS from 'exceljs';
 import { requireAuth, requireRole, writeAuditLog, objectStorageClient, validateUploadInput, validatePdfMagicBytes, validateImageMagicBytes, upload, type AuthenticatedRequest } from "../middleware";
 import crypto from 'crypto';
 
@@ -1097,9 +1097,23 @@ export function registerSystemRoutes(app: Express) {
       const fmtDate = (d: any) => d ? new Date(d).toLocaleDateString('en-GB') : '';
       const fmtNum = (n: any) => n ? parseFloat(String(n)).toFixed(2) : '0.00';
 
-      const wb = XLSX.utils.book_new();
+      const wb = new ExcelJS.Workbook();
 
-      const invRows = yearInvoices.map(r => ({
+      const addJsonSheet = (sheetName: string, rows: Record<string, any>[], fallbackNote: string) => {
+        const ws = wb.addWorksheet(sheetName);
+        if (rows.length === 0) {
+          ws.addRow(['Note']);
+          ws.addRow([fallbackNote]);
+        } else {
+          const headers = Object.keys(rows[0]);
+          ws.addRow(headers);
+          for (const row of rows) {
+            ws.addRow(headers.map(h => row[h] ?? ''));
+          }
+        }
+      };
+
+      addJsonSheet('Invoices', yearInvoices.map(r => ({
         'Invoice Number': r.invoiceNumber,
         'Customer': r.customerName,
         'Date': fmtDate(r.invoiceDate),
@@ -1109,10 +1123,9 @@ export function registerSystemRoutes(app: Express) {
         'Total (AED)': fmtNum(r.amount),
         'Reference': r.reference || '',
         'Notes': r.notes || '',
-      }));
-      XLSX.utils.book_append_sheet(wb, XLSX.utils.json_to_sheet(invRows.length ? invRows : [{ 'Note': 'No invoices in this period' }]), 'Invoices');
+      })), 'No invoices in this period');
 
-      const quoteRows = yearQuotations.map(r => ({
+      addJsonSheet('Quotations', yearQuotations.map(r => ({
         'Quote Number': r.quoteNumber,
         'Customer ID': r.customerId,
         'Date': fmtDate(r.quoteDate),
@@ -1122,10 +1135,9 @@ export function registerSystemRoutes(app: Express) {
         'Total (AED)': fmtNum(r.grandTotal),
         'Reference': r.reference || '',
         'Notes': r.notes || '',
-      }));
-      XLSX.utils.book_append_sheet(wb, XLSX.utils.json_to_sheet(quoteRows.length ? quoteRows : [{ 'Note': 'No quotations in this period' }]), 'Quotations');
+      })), 'No quotations in this period');
 
-      const poRows = yearPOs.map(r => ({
+      addJsonSheet('Purchase Orders', yearPOs.map(r => ({
         'PO Number': r.poNumber,
         'Date': fmtDate(r.orderDate),
         'Status': r.status,
@@ -1133,10 +1145,9 @@ export function registerSystemRoutes(app: Express) {
         'VAT': fmtNum(r.vatAmount),
         'Grand Total': fmtNum(r.grandTotal),
         'Notes': r.notes || '',
-      }));
-      XLSX.utils.book_append_sheet(wb, XLSX.utils.json_to_sheet(poRows.length ? poRows : [{ 'Note': 'No purchase orders in this period' }]), 'Purchase Orders');
+      })), 'No purchase orders in this period');
 
-      const doRows = yearDOs.map(r => ({
+      addJsonSheet('Delivery Orders', yearDOs.map(r => ({
         'DO Number': r.orderNumber,
         'Customer': r.customerName,
         'Date': fmtDate(r.orderDate),
@@ -1146,15 +1157,14 @@ export function registerSystemRoutes(app: Express) {
         'Total (AED)': fmtNum(r.totalAmount),
         'Reference': r.reference || '',
         'Notes': r.notes || '',
-      }));
-      XLSX.utils.book_append_sheet(wb, XLSX.utils.json_to_sheet(doRows.length ? doRows : [{ 'Note': 'No delivery orders in this period' }]), 'Delivery Orders');
+      })), 'No delivery orders in this period');
 
-      const xlsxBuffer = XLSX.write(wb, { type: 'buffer', bookType: 'xlsx' });
+      const xlsxBuffer = await wb.xlsx.writeBuffer();
       const filename = `FLOW_Year_${book.year}_Export.xlsx`;
 
       res.setHeader('Content-Type', 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet');
       res.setHeader('Content-Disposition', `attachment; filename="${filename}"`);
-      res.send(xlsxBuffer);
+      res.send(Buffer.from(xlsxBuffer));
     } catch (error) {
       console.error('Error exporting financial year:', error);
       res.status(500).json({ error: 'Failed to export financial year' });

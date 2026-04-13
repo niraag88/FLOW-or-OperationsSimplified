@@ -138,7 +138,7 @@ export default function ExportDropdown({
       const exportFilename = `${filename}-${format(new Date(), 'dd-MM-yy')}`;
 
       if (exportFormat === 'xlsx') {
-        exportToXLSX(exportData, exportFilename, type);
+        await exportToXLSX(exportData, exportFilename, type);
       } else {
         const headers = Object.values(columns).map((col: string | ColumnConfig) =>
           typeof col === 'string' ? col : col.label

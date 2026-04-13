@@ -137,7 +137,7 @@ export default function StockOnHandReport({ products }: StockOnHandReportProps) 
     setTimeout(() => URL.revokeObjectURL(url), 60000);
   };
 
-  const handleExportXLSX = () => {
+  const handleExportXLSX = async () => {
     const rows = filtered.map((p: any) => ({
       'Brand': p.brandName || '-',
       'Product Code': p.sku || '-',
@@ -146,7 +146,7 @@ export default function StockOnHandReport({ products }: StockOnHandReportProps) 
       'Qty': p.stockQuantity || 0,
       'Status': getStatus(p.stockQuantity || 0),
     }));
-    exportToXLSX(rows, `Stock_Report_${format(new Date(), 'ddMMyy')}`, 'Stock Report');
+    await exportToXLSX(rows, `Stock_Report_${format(new Date(), 'ddMMyy')}`, 'Stock Report');
   };
 
   return (

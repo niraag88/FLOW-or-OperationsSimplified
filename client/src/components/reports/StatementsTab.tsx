@@ -521,8 +521,8 @@ function StatementPreviewModal({ open, onClose, type, entity, companySettings, r
     setTimeout(() => URL.revokeObjectURL(url), 60000);
   }, [type, entity, companySettings, records, dateFrom, dateTo, statusFilter]);
 
-  const handleExportXlsx = useCallback(() => {
-    exportStatementToXLSX({ type, entity, companySettings, records, dateFrom, dateTo, statusFilter });
+  const handleExportXlsx = useCallback(async () => {
+    await exportStatementToXLSX({ type, entity, companySettings, records, dateFrom, dateTo, statusFilter });
   }, [type, entity, companySettings, records, dateFrom, dateTo, statusFilter]);
 
   const statementProps = { type, entity, companySettings, records, dateFrom, dateTo, statusFilter };

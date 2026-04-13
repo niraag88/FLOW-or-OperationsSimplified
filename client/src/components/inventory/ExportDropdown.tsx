@@ -152,7 +152,7 @@ export default function ExportDropdown({
       const filename = `products-${new Date().toISOString().split("T")[0]}`;
 
       if (exportFmt === "xlsx") {
-        exportToXLSX(buildProductRows(allProducts), filename, "Products");
+        await exportToXLSX(buildProductRows(allProducts), filename, "Products");
       } else {
         const headers = ["Brand", "Product Code", "Product Name", "Size", "Cost Price", "Sale Price (AED)", "Status"];
         writePrintContent(pw, "Products", headers, buildProductRows(allProducts), allProducts.length);
@@ -230,7 +230,7 @@ export default function ExportDropdown({
       const rows = buildCurrentStockRows(allProducts);
 
       if (exportFmt === "xlsx") {
-        exportToXLSX(rows, filename, "Current Stock");
+        await exportToXLSX(rows, filename, "Current Stock");
       } else {
         const headers = ["Brand", "Product Code", "Product Name", "Size", "Current Stock", "Status", "Cost Price", "Cost Price (AED)", "Stock Value", "Stock Value (AED)"];
         writePrintContent(pw, "Current Stock Levels", headers, rows, allProducts.length);
@@ -267,7 +267,7 @@ export default function ExportDropdown({
       const rows = buildMovementRows(stockMovements || []);
 
       if (exportFmt === "xlsx") {
-        exportToXLSX(rows, filename, "Stock Movements");
+        await exportToXLSX(rows, filename, "Stock Movements");
       } else {
         const headers = ["Date", "Product Code", "Product Name", "Movement Type", "Quantity", "Previous Stock", "New Stock", "Unit Cost", "Notes"];
         writePrintContent(pw, "Stock Movements", headers, rows, rows.length);
@@ -302,7 +302,7 @@ export default function ExportDropdown({
       const rows = buildLowStockRows(lowStockProducts || []);
 
       if (exportFmt === "xlsx") {
-        exportToXLSX(rows, filename, "Low Stock Alerts");
+        await exportToXLSX(rows, filename, "Low Stock Alerts");
       } else {
         const headers = ["Product Code", "Product Name", "Current Stock", "Cost Price", "Cost Price (AED)", "Stock Value", "Stock Value (AED)"];
         writePrintContent(pw, "Low Stock Alerts", headers, rows, rows.length);
@@ -335,7 +335,7 @@ export default function ExportDropdown({
       const rows = buildOutOfStockRows(outOfStockProducts || []);
 
       if (exportFmt === "xlsx") {
-        exportToXLSX(rows, filename, "Out of Stock");
+        await exportToXLSX(rows, filename, "Out of Stock");
       } else {
         const headers = ["Product Code", "Product Name", "Brand", "Size", "Current Stock", "Status"];
         writePrintContent(pw, "Out of Stock Products", headers, rows, rows.length);

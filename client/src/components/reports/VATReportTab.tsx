@@ -198,7 +198,7 @@ export default function VATReportTab({ invoices, customers, books, companySettin
     }
   };
 
-  const handleExportXLSX = () => {
+  const handleExportXLSX = async () => {
     const exportData = filteredInvoices.map((invoice: any) => {
       const custId = invoice.customer_id ?? invoice.customerId;
       const t = invoice.tax_treatment || invoice.taxTreatment || 'StandardRated';
@@ -213,7 +213,7 @@ export default function VATReportTab({ invoices, customers, books, companySettin
         'Total (incl VAT)': `AED ${fmt(invoice.total_amount || invoice.amount || 0)}`,
       };
     });
-    exportToXLSX(exportData, `VAT_Report_${format(new Date(), 'dd-MM-yy')}`, 'VAT Report');
+    await exportToXLSX(exportData, `VAT_Report_${format(new Date(), 'dd-MM-yy')}`, 'VAT Report');
   };
 
   const handleViewAndPrint = () => {
