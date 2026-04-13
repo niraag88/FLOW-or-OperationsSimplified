@@ -323,7 +323,7 @@ export default function PurchasesReport({ purchaseOrders, suppliers, companySett
           <CardHeader>
             <CardTitle className="flex items-center gap-2">
               <Building2 className="w-5 h-5" />
-              Top 10 Suppliers by Spend
+              Top 10 Brands by Spend
             </CardTitle>
             <p className="text-sm text-gray-500">— {periodLabel}</p>
           </CardHeader>
