@@ -1179,15 +1179,37 @@ test.describe('Quotations', () => {
     expect(status).toBe(200);
   });
 
-  test('PUT /api/quotations/:id cancelled→submitted (backwards) — documents transition enforcement', async () => {
+  test('PUT /api/quotations/:id cancelled→submitted → 400 (terminal state)', async () => {
     if (!IDs.quotation) return;
     const { status } = await api('PUT', `/api/quotations/${IDs.quotation}`, adminCookie, {
       status: 'submitted',
     });
-    if (status === 200) {
-      note('PUT /api/quotations/:id: no status transition enforcement — cancelled→submitted is allowed');
-      test.info().annotations.push({ type: 'NOTE', description: 'Quotation backwards status transitions (cancelled→submitted) are not restricted.' });
-    }
+    note('PUT /api/quotations/:id: cancelled→submitted returns 400 — cancelled is a terminal state');
+    expect(status).toBe(400);
+  });
+
+  test('PUT /api/quotations/:id converted→draft → 400 (converted is terminal)', async () => {
+    if (!IDs.customer || !IDs.product) return;
+    // Create a fresh quotation in submitted state, convert it, then attempt a backward transition
+    const { data: created } = await api('POST', '/api/quotations', adminCookie, {
+      customerId: IDs.customer,
+      customerName: 'Audit Customer LLC Updated',
+      quoteDate: '2026-04-13',
+      validUntil: '2026-05-13',
+      status: 'submitted',
+      subtotal: '100.00',
+      taxAmount: '5.00',
+      totalAmount: '105.00',
+      items: [{ product_id: IDs.product, quantity: 1, unit_price: 100, discount: 0, vat_rate: 0.05, line_total: 100 }],
+    });
+    const qId = (created as { id: number }).id;
+    const { status: convertStatus } = await api('PATCH', `/api/quotations/${qId}/convert`, adminCookie);
+    expect(convertStatus).toBe(200); // confirm convert succeeded
+    const { status: downgradeStatus } = await api('PUT', `/api/quotations/${qId}`, adminCookie, { status: 'draft' });
+    note('PUT /api/quotations/:id: converted→draft returns 400 — converted is a terminal state');
+    expect(downgradeStatus).toBe(400);
+    // Clean up (delete the converted quotation — moves to recycle bin)
+    await api('DELETE', `/api/quotations/${qId}`, adminCookie);
   });
 
   test('DELETE /api/quotations/:id → 200 (moves to recycle bin regardless of status)', async () => {

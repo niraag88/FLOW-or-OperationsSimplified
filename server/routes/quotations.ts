@@ -161,6 +161,16 @@ export function registerQuotationRoutes(app: Express) {
     try {
       const id = parseInt(req.params.id);
 
+      // Enforce status transition rules
+      const [existing] = await db.select({ status: quotations.status }).from(quotations).where(eq(quotations.id, id));
+      if (!existing) return res.status(404).json({ error: 'Quotation not found' });
+      if (existing.status === 'cancelled') {
+        return res.status(400).json({ error: 'Cancelled quotations cannot be reactivated' });
+      }
+      if (existing.status === 'converted') {
+        return res.status(400).json({ error: 'Converted quotations cannot be modified' });
+      }
+
       const { companySnapshot: _ignoredQUOSnapshot, ...bodyWithoutSnapshot } = req.body;
       const processedData = {
         ...bodyWithoutSnapshot,
