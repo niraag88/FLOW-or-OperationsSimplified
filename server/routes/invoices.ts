@@ -476,7 +476,7 @@ export function registerInvoiceRoutes(app: Express) {
           await objectStorageClient.delete(invoice.scanKey);
           await db.delete(storageObjects).where(eq(storageObjects.key, invoice.scanKey));
         } catch (storageErr) {
-          console.warn('Could not delete object from storage (clearing key anyway):', storageErr);
+          console.error('Could not delete object from storage (clearing key anyway):', storageErr);
         }
       }
       await db.update(invoices).set({ scanKey: null }).where(eq(invoices.id, id));

@@ -429,7 +429,7 @@ export function registerPurchaseOrderRoutes(app: Express) {
           await objectStorageClient.delete(po.supplierScanKey);
           await db.delete(storageObjects).where(eq(storageObjects.key, po.supplierScanKey));
         } catch (storageErr) {
-          console.warn('Could not delete object from storage (clearing key anyway):', storageErr);
+          console.error('Could not delete object from storage (clearing key anyway):', storageErr);
         }
       }
 

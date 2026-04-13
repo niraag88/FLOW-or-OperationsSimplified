@@ -300,7 +300,7 @@ export function registerGoodsReceiptRoutes(app: Express) {
           await objectStorageClient.delete(existingKey);
           await db.delete(storageObjects).where(eq(storageObjects.key, existingKey));
         } catch (delErr) {
-          console.warn('Could not delete object from storage:', delErr);
+          console.error('Could not delete object from storage:', delErr);
         }
       }
       const [updated] = await db

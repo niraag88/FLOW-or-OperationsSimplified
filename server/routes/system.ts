@@ -118,7 +118,7 @@ export function registerSystemRoutes(app: Express) {
           .values({ key: tokenData.key, sizeBytes: fileData.length })
           .onConflictDoUpdate({ target: storageObjects.key, set: { sizeBytes: fileData.length, uploadedAt: new Date() } });
       } catch (trackErr) {
-        console.warn('Could not record storage size for', tokenData.key, '— size reporting may be inaccurate:', trackErr);
+        console.error('Could not record storage size for', tokenData.key, '— size reporting may be inaccurate:', trackErr);
       }
 
       res.json({ success: true, key: tokenData.key });
@@ -175,7 +175,7 @@ export function registerSystemRoutes(app: Express) {
           .values({ key: storageKey, sizeBytes: req.file.size })
           .onConflictDoUpdate({ target: storageObjects.key, set: { sizeBytes: req.file.size, uploadedAt: new Date() } });
       } catch (trackErr) {
-        console.warn('Could not record storage size for', storageKey, '— size reporting may be inaccurate:', trackErr);
+        console.error('Could not record storage size for', storageKey, '— size reporting may be inaccurate:', trackErr);
       }
 
       res.json({ success: true, key: storageKey });
@@ -725,7 +725,7 @@ export function registerSystemRoutes(app: Express) {
       }).returning({ id: restoreRuns.id });
       preCreatedId = inserted?.id ?? null;
     } catch (preErr) {
-      console.warn('Could not pre-create ops.restore_runs record:', preErr);
+      console.error('Could not pre-create ops.restore_runs record:', preErr);
     }
 
     // Step 2: Run the restore.
@@ -754,7 +754,7 @@ export function registerSystemRoutes(app: Express) {
           })
           .where(eq(restoreRuns.id, preCreatedId));
       } catch (updateErr) {
-        console.warn('Could not update ops.restore_runs record after restore:', updateErr);
+        console.error('Could not update ops.restore_runs record after restore:', updateErr);
       }
     } else {
       // Pre-create failed — insert a new complete record now.
@@ -770,7 +770,7 @@ export function registerSystemRoutes(app: Express) {
           durationMs: result.durationMs ?? null,
         });
       } catch (retryErr) {
-        console.warn('Could not insert ops.restore_runs record after restore:', retryErr);
+        console.error('Could not insert ops.restore_runs record after restore:', retryErr);
       }
     }
 

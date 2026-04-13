@@ -493,7 +493,7 @@ export function registerDeliveryOrderRoutes(app: Express) {
           await objectStorageClient.delete(doRecord.scanKey);
           await db.delete(storageObjects).where(eq(storageObjects.key, doRecord.scanKey));
         } catch (storageErr) {
-          console.warn('Could not delete object from storage (clearing key anyway):', storageErr);
+          console.error('Could not delete object from storage (clearing key anyway):', storageErr);
         }
       }
       await db.update(deliveryOrders).set({ scanKey: null }).where(eq(deliveryOrders.id, id));
