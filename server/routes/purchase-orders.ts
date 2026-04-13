@@ -430,14 +430,6 @@ export function registerPurchaseOrderRoutes(app: Express) {
     }
   });
 
-  // PO payment status is now derived automatically from linked GRN payments.
-  // Manual marking is no longer supported — this endpoint returns 405.
-  app.patch('/api/purchase-orders/:id/payment', requireAuth(), (req, res) => {
-    res.status(405).json({
-      error: 'PO payment status is derived automatically from linked purchase invoices (GRNs). Mark individual GRNs as paid in the Payments tab instead.',
-    });
-  });
-
   app.patch('/api/purchase-orders/:id/status', requireAuth(['Admin', 'Manager']), async (req: AuthenticatedRequest, res) => {
     try {
       const id = parseInt(req.params.id);
