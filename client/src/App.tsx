@@ -1,5 +1,5 @@
 import { lazy, Suspense } from "react";
-import { BrowserRouter as Router, Route, Routes, Navigate } from 'react-router-dom';
+import { BrowserRouter as Router, Route, Routes, Navigate, Link } from 'react-router-dom';
 import { queryClient } from "./lib/queryClient";
 import { QueryClientProvider } from "@tanstack/react-query";
 import { Toaster } from "@/components/ui/toaster";
@@ -195,9 +195,9 @@ function PagesContent() {
               <p className="text-6xl font-bold text-gray-200 dark:text-gray-700 mb-4">404</p>
               <h1 className="text-2xl font-semibold text-gray-800 dark:text-gray-200 mb-2">Page not found</h1>
               <p className="text-gray-500 dark:text-gray-400 mb-6">The page you're looking for doesn't exist or has been moved.</p>
-              <a href="/dashboard" className="inline-flex items-center px-4 py-2 bg-blue-600 text-white rounded-md hover:bg-blue-700 transition-colors text-sm font-medium">
+              <Link to="/dashboard" className="inline-flex items-center px-4 py-2 bg-blue-600 text-white rounded-md hover:bg-blue-700 transition-colors text-sm font-medium">
                 Go to Dashboard
-              </a>
+              </Link>
             </div>
           </Layout>
         } />
