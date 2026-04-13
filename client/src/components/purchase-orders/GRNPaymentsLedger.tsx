@@ -58,7 +58,8 @@ function getAedAmount(grn: GRNRow): number {
   const amount = Number(grn.referenceAmount ?? 0);
   const currency = grn.poCurrency || "GBP";
   if (currency === "AED") return amount;
-  const rate = parseFloat(String(grn.poFxRateToAed || 4.85)) || 4.85;
+  const rate = parseFloat(String(grn.poFxRateToAed));
+  if (!rate) return 0;
   return amount * rate;
 }
 

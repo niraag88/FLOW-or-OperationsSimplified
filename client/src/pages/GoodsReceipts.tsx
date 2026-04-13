@@ -252,7 +252,7 @@ export default function GoodsReceipts() {
                           <TableHead>Product</TableHead>
                           <TableHead>Ordered Qty</TableHead>
                           <TableHead>Received Qty</TableHead>
-                          <TableHead>Unit Price</TableHead>
+                          <TableHead>Unit Price ({selectedPO?.currency || 'AED'})</TableHead>
                         </TableRow>
                       </TableHeader>
                       <TableBody>
@@ -279,7 +279,7 @@ export default function GoodsReceipts() {
                               />
                             </TableCell>
                             <TableCell>
-                              {parseFloat(item.unitPrice).toFixed(2)}
+                              {selectedPO?.currency || 'AED'} {parseFloat(item.unitPrice).toFixed(2)}
                             </TableCell>
                           </TableRow>
                         ))}
