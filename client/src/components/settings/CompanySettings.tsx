@@ -400,7 +400,7 @@ export default function CompanySettingsComponent() {
           <h3 className="text-lg font-semibold">Financial Settings</h3>
           <div className="space-y-3">
             <Label>Exchange Rates to AED</Label>
-            <p className="text-xs text-gray-500">Used for converting supplier costs to AED in purchase orders and reports.</p>
+            <p className="text-xs text-gray-500">Used for converting brand costs to AED in purchase orders and reports.</p>
 
             {/* AED — fixed base */}
             <div className="flex items-center gap-3 p-3 bg-gray-50 rounded-lg border">
