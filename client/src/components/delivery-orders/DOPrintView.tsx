@@ -167,8 +167,8 @@ export default function DOPrintView() {
                 <th className="col-description">Description</th>
                 <th className="col-size">Size</th>
                 <th className="col-qty">Qty</th>
-                <th className="col-price">Unit Price (AED)</th>
-                <th className="col-total">Line Total (AED)</th>
+                <th className="col-price">Unit Price ({deliveryOrder.currency || 'AED'})</th>
+                <th className="col-total">Line Total ({deliveryOrder.currency || 'AED'})</th>
               </tr>
             </thead>
             <tbody>

@@ -1,0 +1,122 @@
+1. Delivery Order currency consistency is still the clearest remaining polish issue
+
+This is the main one I would still flag.
+
+What I found
+
+In the current ZIP:
+
+client/src/components/delivery-orders/DOForm.tsx is now correct and uses:
+formData.currency for line totals and summary totals
+
+But other Delivery Order output paths still hardcode AED:
+
+client/src/components/delivery-orders/DOPrintView.tsx
+Unit Price (AED)
+Line Total (AED)
+client/src/components/utils/export.tsx
+still contains several Unit Price (AED) / Line Total (AED) labels in export builders
+Why this matters
+
+The UI form is now currency-aware, but the print/export path is not fully aligned.
+That creates the kind of subtle inconsistency you said you want caught.
+
+My judgment
+
+This is real, but not a rollout blocker.
+It is the strongest remaining polish issue I can see.
+
+2. Goods Receipts unit price is now neutral but still a little ambiguous
+
+You fixed the bad $ issue, which was good.
+
+Now the GRN page shows unit price as a plain number:
+
+no $
+but also no visible currency label
+Why this matters
+
+If users are looking at mixed-currency purchase orders, that value can be a little ambiguous in isolation.
+
+My judgment
+
+Low priority.
+Not broken, but still slightly unclear.
+
+3. Some export/report labels remain AED-specific by design
+
+I still see many Total (AED), VAT (AED), Subtotal (AED) labels across reports and exports.
+
+Examples include:
+
+server/routes/system.ts
+client/src/pages/Invoices.tsx
+client/src/pages/Quotations.tsx
+client/src/components/reports/StatementsTab.tsx
+client/src/components/reports/PaymentsLedger.tsx
+client/src/components/reports/PoGrnReport.tsx
+client/src/pages/PurchaseOrders.tsx
+My judgment
+
+Most of these appear intentional because those screens are using AED-normalized values, not original-currency values.
+
+So I am not flagging these as bugs by default.
+
+The important distinction is:
+
+where the app is showing a true AED-converted value → label is fine
+where the app is showing document-native currency → label must not say AED
+
+That is why the Delivery Order print/export inconsistency stands out more than the reports.
+
+4. Quotation status handling looks acceptable now
+
+I rechecked this area because it was a source of confusion earlier.
+
+QuotationList.tsx now handles:
+
+draft
+sent / submitted
+accepted
+converted
+expired
+rejected
+cancelled
+
+That looks reasonable and no longer stands out as a problem.
+
+I did not find a live invoiced status bug worth reopening here.
+
+5. Product estimated profit formatting is fixed
+
+The earlier “10.00 AED” issue is now corrected.
+
+Current code shows:
+
+AED 10.00 style, not reversed
+
+So that earlier polish bug is closed.
+
+6. I did not find a fresh payment-model inconsistency
+
+This was the main thing I was worried about in prior passes.
+
+In this ZIP, I did not find a new obvious drift between:
+
+GRN payment truth
+PO derived payment status
+payment-related reporting
+
+That is a big positive.
+
+7. I did not find a fresh brand/supplier user-facing drift that matters
+
+There are still internal names like:
+
+supplierId
+supplierName
+supplierScanKey
+
+But those are internal and not worth reopening.
+
+I did not see a major remaining visible “Supplier / Brand” wording problem that should delay rollout.

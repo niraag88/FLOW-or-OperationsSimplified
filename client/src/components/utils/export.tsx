@@ -237,14 +237,15 @@ export const exportQuotationToXLSX = async (quotation: any) => {
     exportData.push([]); // Empty row
     
     // Table Headers
+    const quoteCurrency = fullQuotation.currency || 'AED';
     exportData.push([
       'Product Code',
       'Brand Name',
       'Description',
       'Size',
       'Quantity',
-      'Unit Price (AED)',
-      'Line Total (AED)'
+      `Unit Price (${quoteCurrency})`,
+      `Line Total (${quoteCurrency})`
     ]);
     
     // Line Items - check both items and lineItems properties
@@ -443,7 +444,8 @@ export const exportDeliveryOrderToXLSX = async (deliveryOrder: any) => {
     exportData.push(['Customer:', deliveryOrder.customer_name || 'Unknown Customer', '', '', '', '', '']);
     exportData.push(['Reference:', deliveryOrder.reference || '', '', '', '', '', '']);
     exportData.push(['Reference Date:', fmtShort(deliveryOrder.reference_date), '', '', '', '', '']);
-    exportData.push(['Currency:', deliveryOrder.currency || 'AED', '', '', '', '', '']);
+    const doCurrency = deliveryOrder.currency || 'AED';
+    exportData.push(['Currency:', doCurrency, '', '', '', '', '']);
     const doStatusLabel = deliveryOrder.status?.toLowerCase() === 'submitted' ? 'Confirmed' : deliveryOrder.status ? deliveryOrder.status.charAt(0).toUpperCase() + deliveryOrder.status.slice(1) : '';
     exportData.push(['Status:', doStatusLabel, '', '', '', '', '']);
     
@@ -456,8 +458,8 @@ export const exportDeliveryOrderToXLSX = async (deliveryOrder: any) => {
       'Description', 
       'Size',
       'Quantity',
-      'Unit Price (AED)',
-      'Line Total (AED)'
+      `Unit Price (${doCurrency})`,
+      `Line Total (${doCurrency})`
     ]);
     
     // Line Items
@@ -552,7 +554,7 @@ export const exportPurchaseOrderToPDF = async (purchaseOrder: any) => {
             email: settings.email || companyInfo.email,
             website: settings.website || companyInfo.website,
             vatNumber: settings.vatNumber || companyInfo.vatNumber,
-            currency: 'GBP',
+            currency: purchaseOrder.currency || 'AED',
             logo: settings.logo || null
           };
         }
@@ -657,8 +659,9 @@ export const exportPurchaseOrderToPDF = async (purchaseOrder: any) => {
       parseFloat(item.line_total || 0).toFixed(2)
     ]);
 
+    const poCurrency = purchaseOrder.currency || 'AED';
     autoTable(doc, ({
-      head: [['Product\nCode', 'Description', 'Size', 'Qty', 'Unit Price\n(GBP)', 'Line Total\n(GBP)']],
+      head: [['Product\nCode', 'Description', 'Size', 'Qty', `Unit Price\n(${poCurrency})`, `Line Total\n(${poCurrency})`]],
       body: tableData,
       startY: currentY,
       theme: 'plain',
@@ -710,14 +713,14 @@ export const exportPurchaseOrderToPDF = async (purchaseOrder: any) => {
     doc.setFontSize(11);
     doc.setFont('helvetica', 'normal');
     doc.text(`Subtotal`, rightMargin - 50, currentY);
-    doc.text(`GBP ${total.toFixed(2)}`, rightMargin, currentY, { align: 'right' });
+    doc.text(`${poCurrency} ${total.toFixed(2)}`, rightMargin, currentY, { align: 'right' });
     
     currentY += 10;
     
     doc.setFontSize(11);
     doc.setFont('helvetica', 'normal');
     doc.text(`Total`, rightMargin - 50, currentY);
-    doc.text(`GBP ${total.toFixed(2)}`, rightMargin, currentY, { align: 'right' });
+    doc.text(`${poCurrency} ${total.toFixed(2)}`, rightMargin, currentY, { align: 'right' });
     
     // Footer
     doc.setFontSize(8);
@@ -740,7 +743,7 @@ export const printPOGRNSummary = async (poId: any) => {
   const res = await fetch(`/api/purchase-orders/${poId}/detail`, { credentials: 'include' });
   if (!res.ok) throw new Error('Failed to load PO detail');
   const d = await res.json();
-  const currency = d.currency || 'GBP';
+  const currency = d.currency || 'AED';
   const fmt = (n: any) => `${currency} ${parseFloat(n || 0).toFixed(2)}`;
   const fmtDate = (s: any) => fmtShort(s) || '—';
 
@@ -923,7 +926,7 @@ export const exportPODetailToXLSX = async (poId: any, poNumber: any) => {
     const companyRes = await fetch('/api/company-settings', { credentials: 'include' });
     company = companyRes.ok ? await companyRes.json() : null;
   }
-  const currency = d.currency || 'GBP';
+  const currency = d.currency || 'AED';
   const fmtDate = (s: any) => fmtShort(s);
   const fmtNum = (n: any) => parseFloat(n || 0).toFixed(2);
 
