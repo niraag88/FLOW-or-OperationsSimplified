@@ -1,0 +1,107 @@
+Ticket: Fix Stock Reconciliation When Editing Delivered Invoices
+
+Problem
+Delivered invoices currently deduct stock once, but if the invoice is edited afterward, stock is not adjusted to match the new invoice items. This can make inventory incorrect.
+
+Example:
+An invoice is delivered with 2 units of Product A, so stock decreases by 2. If the invoice is later edited to 5 units, the invoice says 5 units were sold but stock only decreased by 2.
+
+Affected Files
+
+server/routes/invoices.ts primary fix location
+server/middleware.ts use existing updateProductStock(...)
+Tests likely under tests/e2e/05-invoices.spec.ts or tests/e2e/audit/06-invoices.spec.ts
+Current Risky Behavior
+In PUT /api/invoices/:id, the server:
+
+Updates invoice header
+Deletes and reinserts line items
+Only deducts stock when invoice status first changes to delivered
+Does not reconcile stock if an already-delivered invoice is edited
+May allow delivered invoice status/item changes without reversing or adjusting previous stock movements
+Desired Correct Behavior
+If an invoice has already deducted stock, any edit to its line items must adjust stock by the difference between old items and new items.
+
+The database should always match this rule:
+
+product stock = previous stock - delivered invoice quantity changes
+
+Exact Logic Rules To Implement
+
+In PUT /api/invoices/:id, fetch the existing invoice and its existing line items before deleting/replacing line items.
+
+Treat existingInvoice.stockDeducted === true as the source of truth for whether stock has already been deducted.
+
+If invoice is not yet stock-deducted and new status becomes delivered:
+
+Existing behavior is mostly correct.
+Deduct stock for all saved line items.
+Set stockDeducted = true.
+If invoice is already stock-deducted and remains active:
+
+Compare old line items vs new submitted line items by productId.
+Sum quantities per product, not per row.
+Calculate: stockAdjustment = oldQuantity - newQuantity
+If quantity increased, this becomes negative and deducts more stock.
+If quantity decreased, this becomes positive and returns stock.
+If product was removed, return the full old quantity.
+If product was added, deduct the full new quantity.
+Call existing updateProductStock(...) for each non-zero adjustment.
+Use movementType: 'adjustment'
+Use referenceType: 'invoice'
+Use referenceId: invoice id
+Use a clear note like Stock reconciled after editing delivered Invoice #INV-123.
+All invoice update, line item replacement, stock movement creation, and stockDeducted updates must happen inside one database transaction.
+
+Do not allow changing a stock-deducted delivered invoice back to draft or submitted through the normal edit endpoint unless stock is explicitly reversed. Prefer blocking this with a clear error:
+
+“Delivered invoices cannot be reverted. Use Cancel to reverse stock.”
+If status changes to cancelled, keep using the existing cancel endpoint, not the normal update endpoint.
+
+Ignore line items without productId for stock movement, but still save them if the current invoice behavior allows that.
+
+Edge Cases
+
+Same product appears on multiple invoice lines: aggregate quantities before calculating stock adjustment.
+Quantity changed from 2 to 5: deduct 3 more.
+Quantity changed from 5 to 2: return 3.
+Product A replaced with Product B: return A quantity and deduct B quantity.
+Product removed from delivered invoice: return its quantity.
+Product added to delivered invoice: deduct its quantity.
+Edit only notes/date/customer with no item change: no stock movement should be created.
+Invoice already cancelled: keep current block, no edits.
+Invoice has stockDeducted = true but status is not delivered: handle carefully, still reconcile based on stockDeducted.
+Manual Test Steps
+
+Create Product A with stock 10.
+Create invoice with Product A quantity 2.
+Mark invoice as delivered.
+Confirm Product A stock is now 8.
+Edit same invoice and change Product A quantity to 5.
+Confirm Product A stock becomes 5.
+Edit same invoice and change Product A quantity to 3.
+Confirm Product A stock becomes 7.
+Add Product B quantity 4 to the delivered invoice.
+Confirm Product B stock decreases by 4.
+Remove Product A from the delivered invoice.
+Confirm Product A stock is returned by the previous delivered quantity.
+Check stock movement history shows clear adjustment entries.
+Try changing delivered invoice status back to draft/submitted from edit screen/API.
+Confirm it is blocked with a clear error.
+Acceptance Criteria
+
+Delivered invoice edits always reconcile inventory.
+No duplicate full stock deduction happens when editing delivered invoices.
+Stock movements are created for each actual stock difference.
+Header, line items, and stock movements are updated atomically.
+Delivered invoices cannot silently revert to non-delivered status.
+Existing invoice create, process-sale, payment status, scan upload, and cancel behavior still work.
+Existing tests pass, and at least one regression test covers editing a delivered invoice quantity.
+Avoid Changing
+
+Do not redesign invoice UI unless necessary.
+Do not change database schema unless absolutely required.
+Do not rewrite updateProductStock; reuse it.
+Do not change VAT/totals behavior in this ticket.
+Do not change delivery order or GRN stock logic in this ticket.
+Do not change backup/restore, uploads, auth, or permissions beyond what is necessary for this invoice edit fix.
