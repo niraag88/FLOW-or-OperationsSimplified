@@ -358,7 +358,23 @@ export function registerInvoiceRoutes(app: Express) {
         return res.status(409).json({ error: 'Cannot edit a cancelled invoice' });
       }
 
-      const newStatus = body.status || 'draft';
+      // Default the new status to the existing one so header-only edits don't accidentally revert it.
+      const newStatus = body.status || existingInvoice.status || 'draft';
+
+      // Cancellation must go through PATCH /api/invoices/:id/cancel — never via PUT.
+      if (newStatus === 'cancelled') {
+        return res.status(400).json({
+          error: 'Use the cancel action to cancel an invoice. The normal update endpoint cannot cancel.',
+        });
+      }
+
+      // Block reverting a stock-deducted invoice back to draft or submitted.
+      // Stock has already been moved out; reverting would silently desync inventory.
+      if (existingInvoice.stockDeducted && (newStatus === 'draft' || newStatus === 'submitted')) {
+        return res.status(400).json({
+          error: 'Delivered invoices cannot be reverted. Use Cancel to reverse stock.',
+        });
+      }
 
       const submittableStatuses2 = ['submitted', 'paid', 'delivered'];
       if (submittableStatuses2.includes(newStatus)) {
@@ -374,66 +390,154 @@ export function registerInvoiceRoutes(app: Express) {
         }
       }
 
-      const becomingDelivered = newStatus === 'delivered' && existingInvoice?.status !== 'delivered';
-      const needsStockDeduction = becomingDelivered && !existingInvoice?.stockDeducted;
+      const becomingDelivered = newStatus === 'delivered' && existingInvoice.status !== 'delivered';
+      const needsStockDeduction = becomingDelivered && !existingInvoice.stockDeducted;
+      const willReplaceItems = Array.isArray(body.items) && body.items.length > 0;
+      // Reconcile when stock has already been deducted AND the user is replacing line items.
+      // Source of truth is `stockDeducted`, not status — handles process-sale + later edit too.
+      const needsReconciliation = !!existingInvoice.stockDeducted && willReplaceItems;
 
-      await db.update(invoices).set({
-        customerName,
-        customerId: customerId || null,
-        amount: body.total_amount ? body.total_amount.toString() : '0',
-        vatAmount: body.tax_amount ? body.tax_amount.toString() : '0',
-        status: newStatus,
-        invoiceDate: body.invoice_date || null,
-        reference: body.reference || null,
-        referenceDate: body.reference_date || null,
-        notes: body.remarks || body.notes || null,
-        currency: body.currency || 'AED',
-        paymentMethod: body.payment_method || null,
-      }).where(eq(invoices.id, id));
+      const invoiceNum = existingInvoice.invoiceNumber || String(id);
+      let reconciledCount = 0;
 
-      if (body.items && Array.isArray(body.items) && body.items.length > 0) {
-        await db.delete(invoiceLineItems).where(eq(invoiceLineItems.invoiceId, id));
-        for (const item of body.items) {
-          if (Number(item.quantity) > 0 && Number(item.unit_price) >= 0) {
-            await db.insert(invoiceLineItems).values({
-              invoiceId: id,
-              productId: item.product_id ? parseInt(item.product_id) : null,
-              brandId: item.brand_id ? parseInt(item.brand_id) : null,
-              productCode: item.product_code || null,
-              description: item.description || item.product_name || '',
-              quantity: Number(item.quantity),
-              unitPrice: item.unit_price.toString(),
-              lineTotal: item.line_total.toString(),
-            });
-          }
+      // Wrap header update + line item replace + stock movements in one transaction so
+      // a failure rolls back everything and inventory never silently desyncs.
+      await db.transaction(async (tx) => {
+        // 1. Update header
+        await tx.update(invoices).set({
+          customerName,
+          customerId: customerId || null,
+          amount: body.total_amount ? body.total_amount.toString() : '0',
+          vatAmount: body.tax_amount ? body.tax_amount.toString() : '0',
+          status: newStatus,
+          invoiceDate: body.invoice_date || null,
+          reference: body.reference || null,
+          referenceDate: body.reference_date || null,
+          notes: body.remarks || body.notes || null,
+          currency: body.currency || 'AED',
+          paymentMethod: body.payment_method || null,
+        }).where(eq(invoices.id, id));
+
+        // 2. Snapshot OLD items before delete (only needed if we'll reconcile)
+        let oldItems: Array<{ productId: number | null; quantity: number; unitPrice: string }> = [];
+        if (willReplaceItems && needsReconciliation) {
+          oldItems = await tx.select({
+            productId: invoiceLineItems.productId,
+            quantity: invoiceLineItems.quantity,
+            unitPrice: invoiceLineItems.unitPrice,
+          }).from(invoiceLineItems).where(eq(invoiceLineItems.invoiceId, id));
         }
-      }
 
-      if (needsStockDeduction) {
-        await db.transaction(async (tx) => {
-          const items = await tx.select().from(invoiceLineItems).where(eq(invoiceLineItems.invoiceId, id));
-          const invoiceNum = existingInvoice?.invoiceNumber || String(id);
-          for (const item of items) {
-            if (item.productId) {
-              await updateProductStock(
-                item.productId,
-                -item.quantity,
-                'sale',
-                id,
-                'invoice',
-                parseFloat(item.unitPrice.toString()),
-                `Sale from Invoice #${invoiceNum}`,
-                req.user!.id,
-                tx
-              );
+        // 3. Replace line items if provided
+        if (willReplaceItems) {
+          await tx.delete(invoiceLineItems).where(eq(invoiceLineItems.invoiceId, id));
+          for (const item of body.items) {
+            if (Number(item.quantity) > 0 && Number(item.unit_price) >= 0) {
+              await tx.insert(invoiceLineItems).values({
+                invoiceId: id,
+                productId: item.product_id ? parseInt(item.product_id) : null,
+                brandId: item.brand_id ? parseInt(item.brand_id) : null,
+                productCode: item.product_code || null,
+                description: item.description || item.product_name || '',
+                quantity: Number(item.quantity),
+                unitPrice: item.unit_price.toString(),
+                lineTotal: item.line_total.toString(),
+              });
             }
           }
+        }
+
+        // 4a. Reconcile (already-deducted invoice with item edits): aggregate per productId,
+        //     compute oldQty - newQty per product, apply each non-zero delta as an 'adjustment'.
+        if (needsReconciliation) {
+          const oldByProduct = new Map<number, { qty: number; unitPrice: number }>();
+          for (const it of oldItems) {
+            if (it.productId == null) continue;
+            const cur = oldByProduct.get(it.productId);
+            if (cur) {
+              cur.qty += it.quantity;
+            } else {
+              oldByProduct.set(it.productId, {
+                qty: it.quantity,
+                unitPrice: parseFloat(it.unitPrice.toString()),
+              });
+            }
+          }
+
+          const newByProduct = new Map<number, { qty: number; unitPrice: number }>();
+          for (const item of body.items) {
+            const qty = Number(item.quantity);
+            const unitPrice = Number(item.unit_price);
+            if (!(qty > 0 && unitPrice >= 0)) continue;
+            if (!item.product_id) continue;
+            const pid = parseInt(item.product_id);
+            const cur = newByProduct.get(pid);
+            if (cur) {
+              cur.qty += qty;
+            } else {
+              newByProduct.set(pid, { qty, unitPrice });
+            }
+          }
+
+          const allProductIds = new Set<number>([...oldByProduct.keys(), ...newByProduct.keys()]);
+          for (const pid of allProductIds) {
+            const oldQty = oldByProduct.get(pid)?.qty ?? 0;
+            const newQty = newByProduct.get(pid)?.qty ?? 0;
+            const adjustment = oldQty - newQty; // +ve returns stock, -ve deducts more
+            if (adjustment === 0) continue;
+            const unitCost =
+              newByProduct.get(pid)?.unitPrice ??
+              oldByProduct.get(pid)?.unitPrice ??
+              0;
+            await updateProductStock(
+              pid,
+              adjustment,
+              'adjustment',
+              id,
+              'invoice',
+              unitCost,
+              `Stock reconciled after editing delivered Invoice #${invoiceNum}`,
+              req.user!.id,
+              tx
+            );
+            reconciledCount++;
+          }
+          // Do NOT touch stockDeducted — it remains true.
+        } else if (needsStockDeduction) {
+          // 4b. First-time deduction: deduct full quantities for the now-saved items.
+          const itemsToDeduct = await tx.select().from(invoiceLineItems).where(eq(invoiceLineItems.invoiceId, id));
+          for (const item of itemsToDeduct) {
+            if (!item.productId) continue;
+            await updateProductStock(
+              item.productId,
+              -item.quantity,
+              'sale',
+              id,
+              'invoice',
+              parseFloat(item.unitPrice.toString()),
+              `Sale from Invoice #${invoiceNum}`,
+              req.user!.id,
+              tx
+            );
+          }
           await tx.update(invoices).set({ stockDeducted: true }).where(eq(invoices.id, id));
-        });
-      }
+        }
+      });
 
       const [updated] = await db.select().from(invoices).where(eq(invoices.id, id));
-      writeAuditLog({ actor: req.user!.id, actorName: req.user?.username || String(req.user!.id), targetId: String(id), targetType: 'invoice', action: 'UPDATE', details: `Invoice #${updated.invoiceNumber} updated (status: ${updated.status})${needsStockDeduction ? ' — stock deducted' : ''}` });
+      const stockSuffix = needsStockDeduction
+        ? ' — stock deducted'
+        : (reconciledCount > 0
+          ? ` — stock reconciled (${reconciledCount} product${reconciledCount === 1 ? '' : 's'})`
+          : '');
+      writeAuditLog({
+        actor: req.user!.id,
+        actorName: req.user?.username || String(req.user!.id),
+        targetId: String(id),
+        targetType: 'invoice',
+        action: 'UPDATE',
+        details: `Invoice #${updated.invoiceNumber} updated (status: ${updated.status})${stockSuffix}`,
+      });
       res.json({ ...updated, items: body.items || [] });
     } catch (error) {
       console.error('Error updating invoice:', error);
