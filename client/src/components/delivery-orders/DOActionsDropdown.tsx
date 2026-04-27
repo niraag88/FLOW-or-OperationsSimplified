@@ -103,24 +103,25 @@ export default function DOActionsDropdown({ doOrder, canEdit, onEdit, onRefresh,
     }
   };
 
-  const handleCancel = async (productIdsToReverse: number[]) => {
+  const handleCancel = async () => {
     setCancelLoading(true);
     try {
       const res = await fetch(`/api/delivery-orders/${doOrder.id}/cancel`, {
         method: 'PATCH',
         headers: { 'Content-Type': 'application/json' },
         credentials: 'include',
-        body: JSON.stringify({ productIdsToReverse }),
+        body: JSON.stringify({}),
       });
       if (!res.ok) {
         const data = await res.json().catch(() => ({}));
-        throw new Error(data.error || 'Failed to cancel delivery order');
+        throw new Error(data.message || data.error || 'Failed to cancel delivery order');
       }
+      const isDelivered = doOrder.status === 'delivered';
       toast({
         title: 'Delivery Order Cancelled',
-        description: productIdsToReverse.length > 0
-          ? `${doOrder.orderNumber} cancelled. ${productIdsToReverse.length} item(s) returned to stock.`
-          : `${doOrder.orderNumber} cancelled. No stock was returned.`,
+        description: isDelivered
+          ? `${doOrder.orderNumber} cancelled. All stock has been restored.`
+          : `${doOrder.orderNumber} has been cancelled.`,
       });
       setShowCancelDialog(false);
       onRefresh();

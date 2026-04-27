@@ -676,10 +676,27 @@ export function registerInvoiceRoutes(app: Express) {
     }
   });
 
+  // PATCH /api/invoices/:id/cancel
+  // Cancellation is strictly all-or-nothing for inventory: a delivered
+  // invoice's full stock effect is reversed, exactly once per product, before
+  // the invoice flips to `cancelled`. Partial reversal is rejected at the
+  // door — partial returns / customer-kept items / goodwill cases must be
+  // handled with a separate sale, write-off, or credit note.
   app.patch('/api/invoices/:id/cancel', requireAuth(['Admin', 'Manager', 'Staff']), async (req: AuthenticatedRequest, res) => {
     try {
       const id = parseInt(req.params.id);
       if (isNaN(id)) return res.status(400).json({ error: 'Invalid ID' });
+
+      // Reject any attempt to scope reversal to a subset of products. We
+      // check for the *presence* of the field, not its value, so an empty
+      // array also fails — that prevents callers from cancelling a delivered
+      // invoice without reversing any stock.
+      if (req.body && Object.prototype.hasOwnProperty.call(req.body, 'productIdsToReverse')) {
+        return res.status(400).json({
+          error: 'partial_stock_reversal_not_allowed',
+          message: 'Invoice cancellation is all-or-nothing. To keep some items with the customer, restore stock now and record a separate sale or write-off for those items.',
+        });
+      }
 
       const [invoice] = await db.select({
         id: invoices.id,
@@ -695,41 +712,74 @@ export function registerInvoiceRoutes(app: Express) {
         return res.status(409).json({ error: 'Invoice is already cancelled' });
       }
 
-      // Optional: product IDs whose stock should be reversed.
-      // If omitted, all stock is reversed (default). If provided, only those products are reversed.
-      const productIdsToReverse: number[] | undefined = Array.isArray(req.body?.productIdsToReverse)
-        ? req.body.productIdsToReverse.map(Number).filter((n: number) => !isNaN(n))
-        : undefined;
+      let stockReversed = false;
+      const ALREADY_CANCELLED = '__invoice_already_cancelled__';
 
-      await db.transaction(async (tx) => {
-        await tx.update(invoices).set({ status: 'cancelled' }).where(eq(invoices.id, id));
-
-        if (invoice.stockDeducted) {
-          const items = await tx.select().from(invoiceLineItems).where(eq(invoiceLineItems.invoiceId, id));
-          for (const item of items) {
-            if (!item.productId) continue;
-            if (productIdsToReverse !== undefined && !productIdsToReverse.includes(item.productId)) {
-              continue;
-            }
-            await updateProductStock(
-              item.productId,
-              item.quantity,
-              'cancellation',
-              id,
-              'invoice',
-              parseFloat(item.unitPrice.toString()),
-              `Stock reversed — Invoice #${invoice.invoiceNumber} cancelled`,
-              req.user!.id,
-              tx
-            );
+      try {
+        await db.transaction(async (tx) => {
+          // Lock the invoice row so two concurrent cancellations can't both
+          // post reversal movements.
+          const [locked] = await tx.select({
+            id: invoices.id,
+            status: invoices.status,
+            stockDeducted: invoices.stockDeducted,
+          }).from(invoices).where(eq(invoices.id, id)).for('update');
+          if (!locked || locked.status === 'cancelled') {
+            // Another concurrent cancel beat us to it. Bail out of the tx
+            // and let the outer handler return 409 — do not write a
+            // misleading "cancelled — no stock to reverse" audit log.
+            throw new Error(ALREADY_CANCELLED);
           }
-          await tx.update(invoices).set({ stockDeducted: false }).where(eq(invoices.id, id));
-        }
-      });
 
-      const stockNote = invoice.stockDeducted
-        ? (productIdsToReverse !== undefined ? ` — partial stock reversal (${productIdsToReverse.length} item(s))` : ' — stock reversed')
-        : '';
+          if (locked.stockDeducted) {
+            const items = await tx.select().from(invoiceLineItems).where(eq(invoiceLineItems.invoiceId, id));
+
+            // Aggregate by productId so duplicate product lines collapse to a
+            // single reversal entry per product. Skip items with no productId
+            // (free-form lines produce no stock movement).
+            type Agg = { quantity: number; unitPrice: number };
+            const byProduct = new Map<number, Agg>();
+            for (const item of items) {
+              if (!item.productId) continue;
+              const existing = byProduct.get(item.productId);
+              const unitPrice = parseFloat(item.unitPrice.toString());
+              if (existing) {
+                existing.quantity += item.quantity;
+                // Keep the first non-zero unit price for the audit trail.
+                if (!existing.unitPrice && unitPrice) existing.unitPrice = unitPrice;
+              } else {
+                byProduct.set(item.productId, { quantity: item.quantity, unitPrice });
+              }
+            }
+
+            for (const [productId, agg] of byProduct.entries()) {
+              if (agg.quantity <= 0) continue;
+              await updateProductStock(
+                productId,
+                agg.quantity,
+                'invoice_cancellation',
+                id,
+                'invoice',
+                agg.unitPrice,
+                `Stock reversed — Invoice #${invoice.invoiceNumber} cancelled`,
+                req.user!.id,
+                tx,
+              );
+            }
+
+            await tx.update(invoices).set({ stockDeducted: false }).where(eq(invoices.id, id));
+            stockReversed = byProduct.size > 0;
+          }
+
+          // Flip status only after every reversal has succeeded.
+          await tx.update(invoices).set({ status: 'cancelled' }).where(eq(invoices.id, id));
+        });
+      } catch (txError) {
+        if (txError instanceof Error && txError.message === ALREADY_CANCELLED) {
+          return res.status(409).json({ error: 'Invoice is already cancelled' });
+        }
+        throw txError;
+      }
 
       writeAuditLog({
         actor: req.user!.id,
@@ -737,7 +787,9 @@ export function registerInvoiceRoutes(app: Express) {
         targetId: String(id),
         targetType: 'invoice',
         action: 'UPDATE',
-        details: `Invoice #${invoice.invoiceNumber} cancelled${stockNote}`,
+        details: stockReversed
+          ? `Invoice #${invoice.invoiceNumber} cancelled — full stock reversed`
+          : `Invoice #${invoice.invoiceNumber} cancelled — no stock to reverse`,
       });
 
       const [updated] = await db.select().from(invoices).where(eq(invoices.id, id));

@@ -1532,6 +1532,188 @@ test.describe('Delivery Orders', () => {
   });
 });
 
+// ── Cancellation: all-or-nothing contract (Task #296) ─────────────────────────
+
+test.describe('Cancellation all-or-nothing contract', () => {
+  let adminCookie = '';
+
+  test.beforeAll(async () => {
+    adminCookie = await loginAs('admin', 'admin123');
+    await recoverIDs(adminCookie);
+  });
+
+  async function getStock(productId: number): Promise<number> {
+    const { data } = await api('GET', `/api/products/${productId}`, adminCookie);
+    return (data as { stockQuantity?: number }).stockQuantity ?? 0;
+  }
+
+  // Count movements scoped to a single document (referenceType + referenceId).
+  // Used to prove the cancel routes don't post duplicate reversals on
+  // rejected partial-reversal calls or on double-cancel attempts.
+  async function countMovementsFor(referenceType: string, referenceId: number): Promise<number> {
+    const { data } = await api('GET', '/api/stock-movements', adminCookie);
+    const arr = Array.isArray(data) ? data : [];
+    return arr.filter((m: { referenceType?: string; referenceId?: number }) =>
+      m.referenceType === referenceType && m.referenceId === referenceId,
+    ).length;
+  }
+
+  test('PATCH /api/invoices/:id/cancel rejects productIdsToReverse → 400 partial_stock_reversal_not_allowed', async () => {
+    if (!IDs.customer || !IDs.product) return;
+    const create = await api('POST', '/api/invoices', adminCookie, {
+      customer_id: IDs.customer,
+      invoice_date: '2026-04-12',
+      status: 'draft',
+      subtotal: 50, tax_amount: 0, total_amount: 50, currency: 'AED',
+      items: [{ product_id: IDs.product, description: 'partial-guard', quantity: 1, unit_price: 50, line_total: 50 }],
+    });
+    if (create.status !== 201) return;
+    const invId = (create.data as { id: number }).id;
+
+    // Non-empty array → reject
+    const reject = await api('PATCH', `/api/invoices/${invId}/cancel`, adminCookie, {
+      productIdsToReverse: [IDs.product],
+    });
+    expect(reject.status).toBe(400);
+    expect((reject.data as { error?: string }).error).toBe('partial_stock_reversal_not_allowed');
+
+    // Empty array also rejected — caller cannot cancel a delivered invoice with zero reversal
+    const empty = await api('PATCH', `/api/invoices/${invId}/cancel`, adminCookie, { productIdsToReverse: [] });
+    expect(empty.status).toBe(400);
+    expect((empty.data as { error?: string }).error).toBe('partial_stock_reversal_not_allowed');
+
+    // Invoice must remain non-cancelled after a rejected request
+    const get = await api('GET', `/api/invoices/${invId}`, adminCookie);
+    expect((get.data as { status?: string }).status).not.toBe('cancelled');
+
+    await api('PATCH', `/api/invoices/${invId}/cancel`, adminCookie);
+    await api('DELETE', `/api/invoices/${invId}`, adminCookie);
+  });
+
+  test('PATCH /api/invoices/:id/cancel on delivered invoice restores full stock and double cancel → 409', async () => {
+    if (!IDs.customer || !IDs.product) return;
+    const startStock = await getStock(IDs.product);
+    const qty = 3;
+
+    const create = await api('POST', '/api/invoices', adminCookie, {
+      customer_id: IDs.customer,
+      invoice_date: '2026-04-12',
+      status: 'draft',
+      subtotal: 60, tax_amount: 0, total_amount: 60, currency: 'AED',
+      items: [{ product_id: IDs.product, description: 'cancel-restore', quantity: qty, unit_price: 20, line_total: 60 }],
+    });
+    if (create.status !== 201) return;
+    const invId = (create.data as { id: number }).id;
+
+    await api('PUT', `/api/invoices/${invId}`, adminCookie, {
+      customer_id: IDs.customer, status: 'submitted', total_amount: 60,
+      items: [{ product_id: IDs.product, description: 'cancel-restore', quantity: qty, unit_price: 20, line_total: 60 }],
+    });
+    await api('PUT', `/api/invoices/${invId}`, adminCookie, {
+      customer_id: IDs.customer, status: 'delivered', total_amount: 60,
+      items: [{ product_id: IDs.product, description: 'cancel-restore', quantity: qty, unit_price: 20, line_total: 60 }],
+    });
+
+    const afterDelivered = await getStock(IDs.product);
+    expect(afterDelivered).toBe(startStock - qty);
+
+    const cancel = await api('PATCH', `/api/invoices/${invId}/cancel`, adminCookie);
+    expect(cancel.status).toBe(200);
+    expect((cancel.data as { status?: string }).status).toBe('cancelled');
+    expect((cancel.data as { stockDeducted?: boolean }).stockDeducted).toBe(false);
+
+    const afterCancel = await getStock(IDs.product);
+    expect(afterCancel).toBe(startStock);
+
+    // Snapshot stock-movement count for this invoice — double-cancel must
+    // not append any new reversal rows.
+    const movementsAfterCancel = await countMovementsFor('invoice', invId);
+
+    // Double-cancel must 409 and must NOT post extra reversal movements
+    const dup = await api('PATCH', `/api/invoices/${invId}/cancel`, adminCookie);
+    expect(dup.status).toBe(409);
+    const afterDup = await getStock(IDs.product);
+    expect(afterDup).toBe(startStock);
+    const movementsAfterDup = await countMovementsFor('invoice', invId);
+    expect(movementsAfterDup).toBe(movementsAfterCancel);
+
+    await api('DELETE', `/api/invoices/${invId}`, adminCookie);
+  });
+
+  test('PATCH /api/delivery-orders/:id/cancel rejects productIdsToReverse → 400 partial_stock_reversal_not_allowed', async () => {
+    if (!IDs.customer || !IDs.product) return;
+    const create = await api('POST', '/api/delivery-orders', adminCookie, {
+      customer_id: IDs.customer,
+      status: 'draft',
+      total_amount: 0,
+      items: [{ product_id: IDs.product, description: 'do-guard', quantity: 1, unit_price: 0, line_total: 0 }],
+    });
+    if (create.status !== 201) return;
+    const doId = (create.data as { id: number }).id;
+    await api('PUT', `/api/delivery-orders/${doId}`, adminCookie, {
+      customer_id: IDs.customer, status: 'submitted', total_amount: 0, items: [],
+    });
+
+    const reject = await api('PATCH', `/api/delivery-orders/${doId}/cancel`, adminCookie, {
+      productIdsToReverse: [IDs.product],
+    });
+    expect(reject.status).toBe(400);
+    expect((reject.data as { error?: string }).error).toBe('partial_stock_reversal_not_allowed');
+
+    const empty = await api('PATCH', `/api/delivery-orders/${doId}/cancel`, adminCookie, { productIdsToReverse: [] });
+    expect(empty.status).toBe(400);
+    expect((empty.data as { error?: string }).error).toBe('partial_stock_reversal_not_allowed');
+
+    const get = await api('GET', `/api/delivery-orders/${doId}`, adminCookie);
+    expect((get.data as { status?: string }).status).not.toBe('cancelled');
+
+    await api('PATCH', `/api/delivery-orders/${doId}/cancel`, adminCookie);
+    await api('DELETE', `/api/delivery-orders/${doId}`, adminCookie);
+  });
+
+  test('PATCH /api/delivery-orders/:id/cancel on delivered DO restores full stock and double cancel → 409', async () => {
+    if (!IDs.customer || !IDs.product) return;
+    const startStock = await getStock(IDs.product);
+    const qty = 4;
+
+    const create = await api('POST', '/api/delivery-orders', adminCookie, {
+      customer_id: IDs.customer, status: 'draft', total_amount: 0,
+      items: [{ product_id: IDs.product, description: 'do-cancel-restore', quantity: qty, unit_price: 0, line_total: 0 }],
+    });
+    if (create.status !== 201) return;
+    const doId = (create.data as { id: number }).id;
+    await api('PUT', `/api/delivery-orders/${doId}`, adminCookie, {
+      customer_id: IDs.customer, status: 'submitted', total_amount: 0,
+      items: [{ product_id: IDs.product, description: 'do-cancel-restore', quantity: qty, unit_price: 0, line_total: 0 }],
+    });
+    await api('PUT', `/api/delivery-orders/${doId}`, adminCookie, {
+      customer_id: IDs.customer, status: 'delivered', total_amount: 0,
+      items: [{ product_id: IDs.product, description: 'do-cancel-restore', quantity: qty, unit_price: 0, line_total: 0 }],
+    });
+
+    const afterDelivered = await getStock(IDs.product);
+    expect(afterDelivered).toBe(startStock - qty);
+
+    const cancel = await api('PATCH', `/api/delivery-orders/${doId}/cancel`, adminCookie);
+    expect(cancel.status).toBe(200);
+
+    const afterCancel = await getStock(IDs.product);
+    expect(afterCancel).toBe(startStock);
+
+    // Movement count for this DO — must stay frozen across double-cancel.
+    const movementsAfterCancel = await countMovementsFor('delivery_order', doId);
+
+    const dup = await api('PATCH', `/api/delivery-orders/${doId}/cancel`, adminCookie);
+    expect(dup.status).toBe(409);
+    const afterDup = await getStock(IDs.product);
+    expect(afterDup).toBe(startStock);
+    const movementsAfterDup = await countMovementsFor('delivery_order', doId);
+    expect(movementsAfterDup).toBe(movementsAfterCancel);
+
+    await api('DELETE', `/api/delivery-orders/${doId}`, adminCookie);
+  });
+});
+
 // ── Inventory & Stock ──────────────────────────────────────────────────────────
 
 test.describe('Inventory', () => {

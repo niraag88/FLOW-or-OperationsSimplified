@@ -111,27 +111,21 @@ export default function InvoiceActionsDropdown({ invoice, canEdit, canOverride, 
     }
   };
 
-  const handleCancelInvoice = async (productIdsToReverse?: number[]) => {
+  const handleCancelInvoice = async () => {
     setCancelLoading(true);
     try {
-      const body: Record<string, unknown> = {};
-      if (productIdsToReverse !== undefined) {
-        body.productIdsToReverse = productIdsToReverse;
-      }
       const res = await fetch(`/api/invoices/${invoice.id}/cancel`, {
         method: 'PATCH',
         headers: { 'Content-Type': 'application/json' },
         credentials: 'include',
-        body: JSON.stringify(body),
+        body: JSON.stringify({}),
       });
       if (!res.ok) {
         const data = await res.json().catch(() => ({}));
-        throw new Error(data.error || 'Failed to cancel invoice');
+        throw new Error(data.message || data.error || 'Failed to cancel invoice');
       }
-      const desc = productIdsToReverse !== undefined
-        ? (productIdsToReverse.length > 0
-            ? `Invoice ${invoiceNumber} cancelled. ${productIdsToReverse.length} item(s) returned to stock.`
-            : `Invoice ${invoiceNumber} cancelled. No stock was returned.`)
+      const desc = isDelivered
+        ? `Invoice ${invoiceNumber} cancelled. All stock has been restored.`
         : `Invoice ${invoiceNumber} has been cancelled.`;
       toast({ title: 'Invoice Cancelled', description: desc });
       setShowCancelDialog(false);
@@ -340,7 +334,7 @@ export default function InvoiceActionsDropdown({ invoice, canEdit, canOverride, 
       <SimpleConfirmDialog
         open={showCancelDialog}
         onClose={() => setShowCancelDialog(false)}
-        onConfirm={() => handleCancelInvoice()}
+        onConfirm={handleCancelInvoice}
         title="Cancel Invoice"
         description={`Are you sure you want to cancel Invoice "${invoiceNumber}"? This cannot be undone. The invoice will remain on record but will be marked as cancelled.`}
         confirmText="Yes, Cancel Invoice"
