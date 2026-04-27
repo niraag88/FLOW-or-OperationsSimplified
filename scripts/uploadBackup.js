@@ -27,11 +27,18 @@ async function uploadBackup() {
     // --exclude-schema=ops: the ops schema holds restore_runs which must survive
     // restores; including it in the dump would cause restores to overwrite it,
     // defeating the purpose of placing it in a separate schema.
+    // --exclude-schema=drizzle: migration tracking lives outside the business
+    // dataset and must remain untouched across restore. Without this flag the
+    // dump includes `CREATE SCHEMA drizzle;` plus `__drizzle_migrations` which
+    // collide with the live schema during a transactional restore. (For older
+    // backups already in storage that still contain drizzle, the restore script
+    // strips drizzle-targeting statements on the fly — see scripts/restoreBackup.js.)
     const pgDump = spawn('pg_dump', [
       process.env.DATABASE_URL,
       '--no-owner',
       '--no-privileges',
       '--exclude-schema=ops',
+      '--exclude-schema=drizzle',
     ], {
       stdio: ['ignore', 'pipe', 'inherit']
     });

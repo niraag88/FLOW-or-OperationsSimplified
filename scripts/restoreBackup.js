@@ -78,16 +78,16 @@ async function assertLooksLikePgDump(sqlPath) {
  *      contents inside ONE psql `--single-transaction` invocation with
  *      `ON_ERROR_STOP=on`. Any failure rolls back; live data stays intact.
  *
- * The `ops` schema (restore history) is NEVER touched — it lives outside
- * the dump (pg_dump uses `--exclude-schema=ops`) so DROP/CREATE here cannot
- * affect it, and that is what allows restore_runs to survive every restore.
- *
- * Both `public` AND `drizzle` are dropped before the dump replays. The dump
- * fully recreates `drizzle.__drizzle_migrations` (schema, table, sequence,
- * data) so the post-restore migration tracking state matches the backup's
- * point-in-time — which is the only consistent answer. Without dropping
- * `drizzle`, old backups (which include `CREATE SCHEMA drizzle;` without
- * `IF NOT EXISTS`) would abort the transaction on first replay.
+ * Schemas other than `public` are NEVER touched:
+ *   - `ops` (restore history) is excluded from the dump entirely so DROP/CREATE
+ *     here cannot reach it. That is what allows restore_runs to survive every
+ *     restore, including failed ones.
+ *   - `drizzle` (migration tracking) is left alone too. New backups exclude
+ *     it via pg_dump's `--exclude-schema=drizzle`. Older backups in storage
+ *     still contain `CREATE SCHEMA drizzle;` plus the `__drizzle_migrations`
+ *     table/sequence/data; for backwards compatibility, `stripDrizzleBlocks`
+ *     filters every drizzle-targeting statement out of the decompressed dump
+ *     before psql ever sees it. The live drizzle schema is preserved as-is.
  *
  * @param {import('stream').Readable | string} input
  *   A readable stream of `.sql.gz` content, or a path to an existing
@@ -155,6 +155,13 @@ async function restoreBackup(input) {
 
     // Step 4: sanity-check decompressed content.
     await assertLooksLikePgDump(decompressedPath);
+
+    // Step 4b: filter out any drizzle-schema statements so the live
+    // drizzle schema is preserved untouched. Older backups in storage
+    // include `CREATE SCHEMA drizzle; CREATE TABLE drizzle.__drizzle_migrations; ...`
+    // which would otherwise abort the single-transaction restore against
+    // the existing drizzle schema.
+    await stripDrizzleBlocks(decompressedPath);
     console.log('[restore] Decompressed SQL passed validation. Proceeding to transactional restore.');
 
     // Step 5: single-transaction DROP + CREATE + restore.
@@ -172,6 +179,83 @@ async function restoreBackup(input) {
     return { success: false, error: error.message, durationMs };
   } finally {
     await cleanup();
+  }
+}
+
+/**
+ * Rewrites the decompressed dump in place, removing every statement that
+ * targets the `drizzle` schema. The live `drizzle` schema (migration
+ * tracking) is therefore preserved untouched across restore.
+ *
+ * Statement classes pg_dump emits for the drizzle schema today:
+ *   - `CREATE SCHEMA drizzle;`                                  (single line)
+ *   - `CREATE TABLE drizzle.<name> (...);`                      (multi-line)
+ *   - `CREATE SEQUENCE drizzle.<name> ...;`                     (multi-line)
+ *   - `ALTER SEQUENCE drizzle.<name> OWNED BY ...;`             (single line)
+ *   - `ALTER TABLE ONLY drizzle.<name> ADD CONSTRAINT ...;`     (multi-line)
+ *   - `ALTER TABLE ONLY drizzle.<name> ALTER COLUMN ... ;`      (single line)
+ *   - `COPY drizzle.<name> (...) FROM stdin;` ... data ... `\.` (multi-line block)
+ *   - `SELECT pg_catalog.setval('drizzle.<name>', ...);`        (single line)
+ *
+ * Approach: line-by-line state machine.
+ *   - When a "skip-statement-trigger" line is seen, drop lines until one ends
+ *     with `;` (which closes the statement, single- or multi-line).
+ *   - When a `COPY drizzle.` line is seen, drop lines until a line that is
+ *     exactly `\.` (the COPY terminator).
+ *
+ * @param {string} sqlPath  Path to the validated, decompressed SQL dump.
+ */
+async function stripDrizzleBlocks(sqlPath) {
+  const text = await fsp.readFile(sqlPath, 'utf8');
+  const lines = text.split('\n');
+  const out = [];
+
+  // Triggers for "skip until the line ending with ;"
+  const stmtTriggers = [
+    /^CREATE SCHEMA drizzle\b/,
+    /^CREATE TABLE drizzle\./,
+    /^CREATE SEQUENCE drizzle\./,
+    /^ALTER SEQUENCE drizzle\./,
+    /^ALTER TABLE ONLY drizzle\./,
+    /^SELECT pg_catalog\.setval\('drizzle\./,
+  ];
+  const isStmtTrigger = (line) => stmtTriggers.some((re) => re.test(line));
+  const isCopyTrigger = (line) => /^COPY drizzle\./.test(line);
+
+  let skipUntilSemicolonEol = false;
+  let skipUntilCopyEnd = false;
+  let removed = 0;
+
+  for (const line of lines) {
+    if (skipUntilCopyEnd) {
+      removed++;
+      if (line === '\\.') skipUntilCopyEnd = false;
+      continue;
+    }
+    if (skipUntilSemicolonEol) {
+      removed++;
+      // Match a trailing ; possibly followed by trailing whitespace
+      if (/;\s*$/.test(line)) skipUntilSemicolonEol = false;
+      continue;
+    }
+    if (isCopyTrigger(line)) {
+      removed++;
+      skipUntilCopyEnd = true;
+      continue;
+    }
+    if (isStmtTrigger(line)) {
+      removed++;
+      // Single-line statement (ends with ;) closes immediately; otherwise
+      // continue skipping until a line ending in ; is seen.
+      if (!/;\s*$/.test(line)) skipUntilSemicolonEol = true;
+      continue;
+    }
+    out.push(line);
+  }
+
+  if (removed > 0) {
+    console.log(`[restore] Stripped ${removed} drizzle-schema lines from dump (live drizzle schema preserved untouched).`);
+    await fsp.writeFile(sqlPath, out.join('\n'));
   }
 }
 
@@ -232,12 +316,11 @@ async function runTransactionalRestore(dbUrl, sqlFilePath) {
     });
 
     // Write DROP/CREATE preamble, then stream the decompressed dump.
-    // Both `public` and `drizzle` are dropped here; the dump recreates both.
-    // `ops` is excluded from the dump and lives in its own schema, so it is
-    // never affected by these statements.
+    // Only `public` is dropped — `ops` is excluded from the dump and `drizzle`
+    // statements have already been stripped from the SQL by stripDrizzleBlocks,
+    // so the live drizzle schema (migration tracking) is preserved untouched.
     psql.stdin.write(
       'DROP SCHEMA IF EXISTS public CASCADE;\n' +
-      'DROP SCHEMA IF EXISTS drizzle CASCADE;\n' +
       'CREATE SCHEMA public;\n'
     );
 
