@@ -45,7 +45,9 @@ test.describe('Purchase Orders', () => {
         method: 'DELETE',
         headers: { cookie },
       });
-      expect(deleteRes.ok).toBe(false);
+      expect(deleteRes.status).toBe(400);
+      const deleteBody = await deleteRes.json().catch(() => ({}));
+      expect(deleteBody.error).toBe('grn_retained_for_audit');
     }
     if (lifecyclePoId) await apiDelete(`/api/purchase-orders/${lifecyclePoId}`, cookie);
   });
