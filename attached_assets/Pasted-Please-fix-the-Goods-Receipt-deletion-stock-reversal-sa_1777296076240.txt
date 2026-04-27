@@ -1,0 +1,123 @@
+Please fix the Goods Receipt deletion / stock reversal safety issue.
+
+This is a high-priority inventory accuracy fix. Do not change unrelated parts of the app.
+
+Problem:
+Deleting a Goods Receipt currently rewrites stock directly and deletes the original goods receipt stock movement history. This is risky because it hides what actually happened. A GRN adds stock into inventory. If it later needs to be cancelled or reversed, the system should create clear reversal movements, not erase the original movements.
+
+Affected file:
+server/routes/goods-receipts.ts
+
+Possibly affected UI file only if needed:
+client/src/pages/GoodsReceipts.tsx
+
+Current risky behavior:
+The DELETE /api/goods-receipts/:id endpoint currently:
+1. Reads the GRN items.
+2. Directly reduces product stock using raw product updates.
+3. Uses GREATEST(0, stock - receivedQuantity), which can hide stock problems.
+4. Reduces PO received quantities directly.
+5. Deletes the original stock_movements for the GRN.
+6. Deletes the GRN items.
+7. Deletes the GRN itself.
+
+This destroys the audit trail and can silently hide incorrect stock.
+
+Desired behavior:
+Do not hard-delete confirmed Goods Receipts.
+Instead, cancelling/removing a confirmed GRN should:
+1. Keep the GRN record.
+2. Keep the GRN line items.
+3. Keep the original goods_receipt stock movements.
+4. Add new reversal stock movements.
+5. Mark the GRN status as cancelled.
+6. Update the linked PO received quantities.
+7. Recalculate the PO status and payment status.
+8. Write an audit log.
+
+Exact rules to implement:
+
+1. Change DELETE /api/goods-receipts/:id so confirmed GRNs are cancelled/reversed, not physically deleted.
+- It is okay to keep using the DELETE endpoint so the existing UI keeps working.
+- But internally it should behave as a cancellation/soft delete.
+- Do not delete goods_receipts.
+- Do not delete goods_receipt_items.
+- Do not delete stock_movements.
+
+2. Reverse stock using updateProductStock.
+- For each GRN item, call updateProductStock with the negative of receivedQuantity.
+- Use a clear movement type such as goods_receipt_reversal or cancellation.
+- Use referenceId = GRN id.
+- Use referenceType = goods_receipt.
+- Notes should clearly say the stock was reversed because the GRN was cancelled.
+- This creates a proper audit trail: original receipt movement remains, reversal movement is added.
+
+3. Do not use GREATEST(0, ...).
+- Do not silently clamp stock to zero.
+- If reversing the GRN would make stock negative, return a clear 400 error and do not change anything.
+- The error should list which product(s) do not have enough current stock to reverse the GRN.
+- This avoids hiding stock that may already have been sold or adjusted.
+
+4. Aggregate duplicate products before reversing.
+- If the same product appears more than once in the GRN, aggregate the reversal quantity per product.
+- This prevents double-check mistakes and makes stock validation cleaner.
+
+5. Update PO received quantities safely.
+- Subtract the GRN received quantities from purchase_order_items.receivedQuantity.
+- Do not let receivedQuantity go below zero.
+- If it would go below zero, fail the transaction with a clear error.
+
+6. Update the GRN status.
+- If the GRN is confirmed, set status to cancelled.
+- If the GRN is already cancelled, return a 409 or 400 saying it is already cancelled.
+- Do not reverse stock twice.
+
+7. Recalculate the Purchase Order status.
+- After reversal, recalculate whether the linked PO should be submitted or closed.
+- If all non-cancelled GRNs still fully receive the PO, keep/mark it closed.
+- Otherwise mark it submitted.
+- Keep the existing payment-status recalculation behavior, but make sure cancelled GRNs are not counted as paid/active receipts.
+
+8. Wrap everything in one transaction.
+- Stock reversal, PO item receivedQuantity updates, GRN status update, and PO status update must all succeed or all roll back.
+
+9. Write an audit log.
+- Log that the GRN was cancelled/reversed.
+- Include the GRN number, PO number if available, number of affected products, and total quantity reversed.
+
+Manual tests to perform:
+1. Create a PO with one product quantity 10.
+2. Create a GRN receiving quantity 10.
+3. Confirm product stock increases by 10.
+4. Cancel/delete the GRN.
+5. Confirm product stock decreases by 10.
+6. Confirm the original goods_receipt stock movement still exists.
+7. Confirm a new reversal stock movement exists.
+8. Confirm the GRN still exists with status cancelled.
+9. Confirm PO receivedQuantity goes back down.
+10. Confirm PO status changes back to submitted if it is no longer fully received.
+11. Try cancelling the same GRN again. It should fail and should not reverse stock twice.
+12. Create a case where current stock is less than the GRN quantity being reversed. The cancellation should fail with a clear error and leave all data unchanged.
+
+Acceptance criteria:
+- Confirmed GRNs are not hard-deleted.
+- GRN line items are not deleted.
+- Original goods_receipt stock movements are not deleted.
+- Reversal creates new stock movement rows.
+- Stock is never clamped to zero silently.
+- Cancellation is blocked if it would create impossible negative stock.
+- PO received quantities are corrected safely.
+- PO status is recalculated.
+- Cancelling an already-cancelled GRN does not reverse twice.
+- The whole operation is transactional.
+- Audit log records the cancellation/reversal.
+- No unrelated invoice, VAT, PDF, backup, auth, or factory reset behavior changes.
+
+Avoid changing:
+- Do not change invoice stock reconciliation.
+- Do not change delivery order logic in this ticket.
+- Do not change VAT or invoice totals.
+- Do not change PDF or export behavior.
+- Do not change backup/restore behavior.
+- Do not change database schema unless absolutely necessary.
+- Do not remove existing GRN history.
