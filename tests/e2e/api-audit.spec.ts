@@ -1767,6 +1767,297 @@ test.describe('Cancellation all-or-nothing contract', () => {
   });
 });
 
+// ── Server-side totals authority ─────────────────────────────────────────────
+
+test.describe('Server-side totals authority', () => {
+  let adminCookie = '';
+
+  test.beforeAll(async () => {
+    adminCookie = await loginAs('admin', 'admin123');
+    await recoverIDs(adminCookie);
+  });
+
+  test('POST /api/invoices ignores client-supplied subtotal/tax/total/line_total and recomputes from quantity x unit_price', async () => {
+    if (!IDs.customer || !IDs.product) return;
+
+    // Client sends wildly wrong totals on every level. Server must override
+    // them: line_total = 4*15 = 60, subtotal = 60, vat = 5% -> 3, total = 63.
+    const create = await api('POST', '/api/invoices', adminCookie, {
+      customer_id: IDs.customer,
+      invoice_date: '2026-04-12',
+      status: 'draft',
+      currency: 'AED',
+      tax_treatment: 'StandardRated',
+      tax_rate: 0.05,
+      subtotal: 999999,
+      tax_amount: 999999,
+      total_amount: 999999,
+      items: [{
+        product_id: IDs.product,
+        description: 'totals-server-auth',
+        quantity: 4,
+        unit_price: 15,
+        line_total: 999999,
+      }],
+    });
+    expect(create.status).toBe(201);
+    const invId = (create.data as { id: number }).id;
+
+    const get = await api('GET', `/api/invoices/${invId}`, adminCookie);
+    const inv = get.data as {
+      amount?: string | number;
+      vatAmount?: string | number;
+      items?: Array<{ line_total?: number; quantity?: number; unit_price?: number }>;
+    };
+    expect(parseFloat(String(inv.amount))).toBeCloseTo(63, 2);
+    expect(parseFloat(String(inv.vatAmount))).toBeCloseTo(3, 2);
+    expect(inv.items?.length).toBe(1);
+    expect(inv.items?.[0].line_total).toBeCloseTo(60, 2);
+    expect(inv.items?.[0].quantity).toBe(4);
+    expect(inv.items?.[0].unit_price).toBeCloseTo(15, 2);
+
+    await api('DELETE', `/api/invoices/${invId}`, adminCookie);
+  });
+
+  test('PUT /api/invoices/:id recomputes totals on edit and ignores client values', async () => {
+    if (!IDs.customer || !IDs.product) return;
+
+    const create = await api('POST', '/api/invoices', adminCookie, {
+      customer_id: IDs.customer,
+      invoice_date: '2026-04-12',
+      status: 'draft',
+      currency: 'AED',
+      tax_treatment: 'StandardRated',
+      items: [{ product_id: IDs.product, description: 'edit-recompute', quantity: 2, unit_price: 10, line_total: 20 }],
+    });
+    expect(create.status).toBe(201);
+    const invId = (create.data as { id: number }).id;
+
+    // Edit with new quantities + lying client totals.
+    const update = await api('PUT', `/api/invoices/${invId}`, adminCookie, {
+      customer_id: IDs.customer,
+      status: 'draft',
+      currency: 'AED',
+      tax_treatment: 'StandardRated',
+      subtotal: 0,
+      tax_amount: 0,
+      total_amount: 0,
+      items: [{ product_id: IDs.product, description: 'edit-recompute', quantity: 5, unit_price: 8, line_total: 1 }],
+    });
+    expect(update.status).toBe(200);
+
+    // Server should now hold: line_total=40, subtotal=40, vat=2, total=42.
+    const get = await api('GET', `/api/invoices/${invId}`, adminCookie);
+    const inv = get.data as { amount?: string; vatAmount?: string; items?: Array<{ line_total?: number }> };
+    expect(parseFloat(String(inv.amount))).toBeCloseTo(42, 2);
+    expect(parseFloat(String(inv.vatAmount))).toBeCloseTo(2, 2);
+    expect(inv.items?.[0].line_total).toBeCloseTo(40, 2);
+
+    await api('DELETE', `/api/invoices/${invId}`, adminCookie);
+  });
+
+  test('POST /api/delivery-orders ignores client totals and recomputes server-side', async () => {
+    if (!IDs.customer || !IDs.product) return;
+
+    const create = await api('POST', '/api/delivery-orders', adminCookie, {
+      customer_id: IDs.customer,
+      status: 'draft',
+      currency: 'AED',
+      tax_treatment: 'StandardRated',
+      tax_rate: 0.05,
+      subtotal: 0,
+      tax_amount: 0,
+      total_amount: 0,
+      items: [{
+        product_id: IDs.product,
+        description: 'do-totals-server-auth',
+        quantity: 3,
+        unit_price: 25,
+        line_total: 0,
+      }],
+    });
+    expect(create.status).toBe(201);
+    const doId = (create.data as { id: number }).id;
+
+    // Server must compute: subtotal 75, vat 3.75, total 78.75.
+    const get = await api('GET', `/api/delivery-orders/${doId}`, adminCookie);
+    const doData = get.data as {
+      subtotal?: number;
+      tax_amount?: number;
+      total_amount?: number;
+      items?: Array<{ line_total?: number }>;
+    };
+    expect(doData.subtotal).toBeCloseTo(75, 2);
+    expect(doData.tax_amount).toBeCloseTo(3.75, 2);
+    expect(doData.total_amount).toBeCloseTo(78.75, 2);
+    expect(doData.items?.[0].line_total).toBeCloseTo(75, 2);
+
+    await api('DELETE', `/api/delivery-orders/${doId}`, adminCookie);
+  });
+
+  test('ZeroRated documents force VAT to zero regardless of client tax_amount', async () => {
+    if (!IDs.customer || !IDs.product) return;
+
+    const create = await api('POST', '/api/invoices', adminCookie, {
+      customer_id: IDs.customer,
+      invoice_date: '2026-04-12',
+      status: 'draft',
+      currency: 'AED',
+      tax_treatment: 'ZeroRated',
+      tax_amount: 99,        // lying — must be ignored
+      total_amount: 199,     // lying — must be ignored
+      items: [{ product_id: IDs.product, description: 'zr', quantity: 2, unit_price: 50, line_total: 100 }],
+    });
+    expect(create.status).toBe(201);
+    const invId = (create.data as { id: number }).id;
+
+    const get = await api('GET', `/api/invoices/${invId}`, adminCookie);
+    const inv = get.data as { amount?: string; vatAmount?: string };
+    expect(parseFloat(String(inv.vatAmount))).toBeCloseTo(0, 2);
+    expect(parseFloat(String(inv.amount))).toBeCloseTo(100, 2);
+
+    await api('DELETE', `/api/invoices/${invId}`, adminCookie);
+  });
+
+  test('PUT header-only edit on a ZeroRated invoice keeps VAT zero (does not silently flip to StandardRated)', async () => {
+    if (!IDs.customer || !IDs.product) return;
+
+    const create = await api('POST', '/api/invoices', adminCookie, {
+      customer_id: IDs.customer,
+      invoice_date: '2026-04-12',
+      status: 'draft',
+      currency: 'AED',
+      tax_treatment: 'ZeroRated',
+      items: [{ product_id: IDs.product, description: 'zr-header-edit', quantity: 2, unit_price: 50, line_total: 100 }],
+    });
+    expect(create.status).toBe(201);
+    const invId = (create.data as { id: number }).id;
+
+    // Header-only edit (no items, no tax_treatment in payload). Server must
+    // fall back to the existing invoice's ZeroRated treatment, NOT default
+    // to StandardRated and add 5% VAT.
+    const update = await api('PUT', `/api/invoices/${invId}`, adminCookie, {
+      customer_id: IDs.customer,
+      status: 'submitted',
+      reference: 'header-edit-only',
+    });
+    expect(update.status).toBe(200);
+
+    const get = await api('GET', `/api/invoices/${invId}`, adminCookie);
+    const inv = get.data as { amount?: string; vatAmount?: string };
+    expect(parseFloat(String(inv.vatAmount))).toBeCloseTo(0, 2);
+    expect(parseFloat(String(inv.amount))).toBeCloseTo(100, 2);
+
+    await api('DELETE', `/api/invoices/${invId}`, adminCookie);
+  });
+
+  test('PUT header-only edit on a ZeroRated delivery order keeps VAT zero', async () => {
+    if (!IDs.customer || !IDs.product) return;
+
+    const create = await api('POST', '/api/delivery-orders', adminCookie, {
+      customer_id: IDs.customer,
+      status: 'draft',
+      currency: 'AED',
+      tax_treatment: 'ZeroRated',
+      items: [{ product_id: IDs.product, description: 'do-zr-header', quantity: 3, unit_price: 30, line_total: 90 }],
+    });
+    expect(create.status).toBe(201);
+    const doId = (create.data as { id: number }).id;
+
+    const update = await api('PUT', `/api/delivery-orders/${doId}`, adminCookie, {
+      customer_id: IDs.customer,
+      status: 'submitted',
+      reference: 'do-header-edit',
+    });
+    expect(update.status).toBe(200);
+
+    const get = await api('GET', `/api/delivery-orders/${doId}`, adminCookie);
+    const doData = get.data as { subtotal?: number; tax_amount?: number; total_amount?: number; tax_treatment?: string };
+    expect(doData.tax_treatment).toBe('ZeroRated');
+    expect(doData.tax_amount).toBeCloseTo(0, 2);
+    expect(doData.subtotal).toBeCloseTo(90, 2);
+    expect(doData.total_amount).toBeCloseTo(90, 2);
+
+    await api('DELETE', `/api/delivery-orders/${doId}`, adminCookie);
+  });
+
+  test('POST /api/invoices and /api/delivery-orders return 400 before any DB write on invalid line items', async () => {
+    if (!IDs.customer || !IDs.product) return;
+
+    // Negative quantity → invalid_line_item, no row created.
+    const badQty = await api('POST', '/api/invoices', adminCookie, {
+      customer_id: IDs.customer,
+      invoice_date: '2026-04-12',
+      status: 'draft',
+      tax_treatment: 'StandardRated',
+      items: [{ product_id: IDs.product, description: 'bad', quantity: -1, unit_price: 10, line_total: 0 }],
+    });
+    expect(badQty.status).toBe(400);
+    expect((badQty.data as { error?: string }).error).toBe('invalid_line_item');
+
+    // Negative unit_price → invalid_line_item.
+    const badPrice = await api('POST', '/api/invoices', adminCookie, {
+      customer_id: IDs.customer,
+      invoice_date: '2026-04-12',
+      status: 'draft',
+      tax_treatment: 'StandardRated',
+      items: [{ product_id: IDs.product, description: 'bad', quantity: 1, unit_price: -5, line_total: 0 }],
+    });
+    expect(badPrice.status).toBe(400);
+    expect((badPrice.data as { error?: string }).error).toBe('invalid_line_item');
+
+    // Empty items → no_line_items.
+    const noItems = await api('POST', '/api/invoices', adminCookie, {
+      customer_id: IDs.customer,
+      invoice_date: '2026-04-12',
+      status: 'draft',
+      tax_treatment: 'StandardRated',
+      items: [],
+    });
+    expect(noItems.status).toBe(400);
+    expect((noItems.data as { error?: string }).error).toBe('no_line_items');
+
+    // Same checks on the DO route.
+    const badDoQty = await api('POST', '/api/delivery-orders', adminCookie, {
+      customer_id: IDs.customer,
+      status: 'draft',
+      tax_treatment: 'StandardRated',
+      items: [{ product_id: IDs.product, description: 'bad', quantity: 0, unit_price: 10, line_total: 0 }],
+    });
+    expect(badDoQty.status).toBe(400);
+    expect((badDoQty.data as { error?: string }).error).toBe('invalid_line_item');
+
+    // PUT invoice with bad item must NOT delete the existing line items.
+    const seed = await api('POST', '/api/invoices', adminCookie, {
+      customer_id: IDs.customer,
+      invoice_date: '2026-04-12',
+      status: 'draft',
+      tax_treatment: 'StandardRated',
+      items: [{ product_id: IDs.product, description: 'preserve-on-bad-edit', quantity: 1, unit_price: 7, line_total: 7 }],
+    });
+    expect(seed.status).toBe(201);
+    const invId = (seed.data as { id: number }).id;
+
+    const badEdit = await api('PUT', `/api/invoices/${invId}`, adminCookie, {
+      customer_id: IDs.customer,
+      status: 'draft',
+      tax_treatment: 'StandardRated',
+      items: [{ product_id: IDs.product, description: 'bad-edit', quantity: -3, unit_price: 7, line_total: 0 }],
+    });
+    expect(badEdit.status).toBe(400);
+
+    // Document must still have its original line item — the failed edit
+    // cannot have run delete-then-insert.
+    const after = await api('GET', `/api/invoices/${invId}`, adminCookie);
+    const inv = after.data as { items?: Array<{ description?: string; quantity?: number }> };
+    expect(inv.items?.length).toBe(1);
+    expect(inv.items?.[0].quantity).toBe(1);
+    expect(inv.items?.[0].description).toBe('preserve-on-bad-edit');
+
+    await api('DELETE', `/api/invoices/${invId}`, adminCookie);
+  });
+});
+
 // ── Inventory & Stock ──────────────────────────────────────────────────────────
 
 test.describe('Inventory', () => {

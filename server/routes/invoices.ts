@@ -5,6 +5,7 @@ import { db } from "../db";
 import { eq } from "drizzle-orm";
 import { businessStorage } from "../businessStorage";
 import { requireAuth, writeAuditLog, updateProductStock, objectStorageClient, type AuthenticatedRequest } from "../middleware";
+import { resolveDocumentTotals, inferTaxTreatmentFromCustomer, isTotalsError } from "../utils/totals";
 
 export function registerInvoiceRoutes(app: Express) {
   app.get('/api/invoices', requireAuth(), async (req: AuthenticatedRequest, res) => {
@@ -251,17 +252,34 @@ export function registerInvoiceRoutes(app: Express) {
         logo: invSettingsRow[0].logo,
       } : null;
 
-      if (!body.items || !Array.isArray(body.items) || body.items.length === 0) {
-        return res.status(400).json({ error: 'At least one line item is required to save an invoice' });
+      // Resolve and validate all line items + totals BEFORE any DB write.
+      // Server is the source of truth for line_total / subtotal / vat / total —
+      // any client-supplied values for those fields are silently overridden.
+      const defaultVatRate = invSettingsRow[0]?.defaultVatRate
+        ? parseFloat(invSettingsRow[0].defaultVatRate)
+        : 0.05;
+      const requestedTreatment = body.tax_treatment ?? inferTaxTreatmentFromCustomer(customer.vatTreatment);
+      let resolved;
+      try {
+        resolved = resolveDocumentTotals({
+          items: body.items,
+          taxTreatment: requestedTreatment,
+          defaultVatRate,
+        });
+      } catch (err) {
+        if (isTotalsError(err)) {
+          return res.status(400).json({ error: err.code, message: err.message });
+        }
+        throw err;
       }
 
       const invoiceData: InsertInvoice = {
         invoiceNumber: nextNumber,
         customerName,
-        amount: body.total_amount ? body.total_amount.toString() : '0',
+        amount: resolved.totalAmount.toFixed(2),
         status: body.status || 'draft',
         customerId: customerId,
-        vatAmount: body.tax_amount ? body.tax_amount.toString() : undefined,
+        vatAmount: resolved.vatAmount.toFixed(2),
         invoiceDate: body.invoice_date || undefined,
         reference: body.reference || undefined,
         referenceDate: body.reference_date || undefined,
@@ -273,22 +291,21 @@ export function registerInvoiceRoutes(app: Express) {
       };
 
       const invoice = await businessStorage.createInvoice(invoiceData);
+      // Persist resolved tax treatment (column exists but is not in the
+      // InsertInvoice pick set).
+      await db.update(invoices).set({ taxTreatment: resolved.taxTreatment }).where(eq(invoices.id, invoice.id));
 
-      if (body.items && Array.isArray(body.items) && body.items.length > 0) {
-        for (const item of body.items) {
-          if (Number(item.quantity) > 0 && Number(item.unit_price) >= 0) {
-            await db.insert(invoiceLineItems).values({
-              invoiceId: invoice.id,
-              productId: item.product_id ? parseInt(item.product_id) : null,
-              brandId: item.brand_id ? parseInt(item.brand_id) : null,
-              productCode: item.product_code || null,
-              description: item.description || item.product_name || '',
-              quantity: Number(item.quantity),
-              unitPrice: item.unit_price.toString(),
-              lineTotal: item.line_total.toString(),
-            });
-          }
-        }
+      for (const item of resolved.items) {
+        await db.insert(invoiceLineItems).values({
+          invoiceId: invoice.id,
+          productId: item.product_id ? parseInt(String(item.product_id)) : null,
+          brandId: item.brand_id ? parseInt(String(item.brand_id)) : null,
+          productCode: (item.product_code as string) || null,
+          description: (item.description as string) || (item.product_name as string) || '',
+          quantity: item.quantity,
+          unitPrice: item.unit_price.toFixed(2),
+          lineTotal: item.line_total.toFixed(2),
+        });
       }
 
       if (invCompanySnapshot) {
@@ -349,6 +366,7 @@ export function registerInvoiceRoutes(app: Express) {
         status: invoices.status,
         stockDeducted: invoices.stockDeducted,
         invoiceNumber: invoices.invoiceNumber,
+        taxTreatment: invoices.taxTreatment,
       }).from(invoices).where(eq(invoices.id, id));
 
       if (!existingInvoice) {
@@ -377,22 +395,110 @@ export function registerInvoiceRoutes(app: Express) {
       }
 
       const submittableStatuses2 = ['submitted', 'paid', 'delivered'];
-      if (submittableStatuses2.includes(newStatus)) {
-        const hasBodyItems = Array.isArray(body.items) && body.items.length > 0;
-        if (!hasBodyItems) {
-          const [firstExisting] = await db.select({ id: invoiceLineItems.id })
-            .from(invoiceLineItems)
-            .where(eq(invoiceLineItems.invoiceId, id))
-            .limit(1);
-          if (!firstExisting) {
-            return res.status(400).json({ error: 'At least one item is required to submit an invoice' });
+      const willReplaceItems = Array.isArray(body.items) && body.items.length > 0;
+      if (submittableStatuses2.includes(newStatus) && !willReplaceItems) {
+        const [firstExisting] = await db.select({ id: invoiceLineItems.id })
+          .from(invoiceLineItems)
+          .where(eq(invoiceLineItems.invoiceId, id))
+          .limit(1);
+        if (!firstExisting) {
+          return res.status(400).json({ error: 'At least one item is required to submit an invoice' });
+        }
+      }
+
+      // Resolve and validate items + totals BEFORE any DB write. If items
+      // are not in the body (header-only edit), recompute totals from the
+      // existing stored line items so the saved totals always match the
+      // saved items. Either way, validation runs before delete/insert so a
+      // 400 cannot leave the document with no lines.
+      const { companySettings } = await import('@shared/schema');
+      const [putSettingsRow] = await db.select().from(companySettings).limit(1);
+      const defaultVatRate = putSettingsRow?.defaultVatRate
+        ? parseFloat(putSettingsRow.defaultVatRate)
+        : 0.05;
+
+      // Tax treatment fallback chain so a header-only edit on a ZeroRated
+      // invoice cannot silently flip to StandardRated and add VAT:
+      //   body.tax_treatment > existing invoice taxTreatment >
+      //   inferred from customer.vatTreatment > StandardRated.
+      let putCustomerVatTreatment: string | null = null;
+      if (customerId) {
+        const cust = await businessStorage.getCustomerById(customerId);
+        putCustomerVatTreatment = cust?.vatTreatment ?? null;
+      }
+      const treatmentInput =
+        body.tax_treatment
+        ?? existingInvoice.taxTreatment
+        ?? (putCustomerVatTreatment ? inferTaxTreatmentFromCustomer(putCustomerVatTreatment) : 'StandardRated');
+
+      let resolvedTreatment: 'StandardRated' | 'ZeroRated' = 'StandardRated';
+      let resolvedItems: Array<{
+        product_id: number | null;
+        brand_id: number | null;
+        product_code: string | null;
+        description: string;
+        quantity: number;
+        unit_price: number;
+        line_total: number;
+      }> = [];
+      let resolvedSubtotal = 0;
+      let resolvedVatAmount = 0;
+      let resolvedTotal = 0;
+
+      if (willReplaceItems) {
+        let resolved;
+        try {
+          resolved = resolveDocumentTotals({
+            items: body.items,
+            taxTreatment: treatmentInput,
+            defaultVatRate,
+          });
+        } catch (err) {
+          if (isTotalsError(err)) {
+            return res.status(400).json({ error: err.code, message: err.message });
           }
+          throw err;
+        }
+        resolvedTreatment = resolved.taxTreatment;
+        resolvedSubtotal = resolved.subtotal;
+        resolvedVatAmount = resolved.vatAmount;
+        resolvedTotal = resolved.totalAmount;
+        resolvedItems = resolved.items.map(it => ({
+          product_id: it.product_id ? parseInt(String(it.product_id)) : null,
+          brand_id: it.brand_id ? parseInt(String(it.brand_id)) : null,
+          product_code: (it.product_code as string) || null,
+          description: (it.description as string) || (it.product_name as string) || '',
+          quantity: it.quantity,
+          unit_price: it.unit_price,
+          line_total: it.line_total,
+        }));
+      } else {
+        // Header-only edit: recompute totals from already-stored items so
+        // the persisted totals stay consistent with the persisted lines.
+        const existingItems = await db.select().from(invoiceLineItems).where(eq(invoiceLineItems.invoiceId, id));
+        if (existingItems.length === 0) {
+          // Nothing to recompute against — keep zeros.
+          resolvedTreatment = (treatmentInput === 'ZeroRated' ? 'ZeroRated' : 'StandardRated');
+        } else {
+          const recomputeInput = existingItems.map(it => ({
+            product_id: it.productId,
+            quantity: it.quantity,
+            unit_price: parseFloat(it.unitPrice.toString()),
+          }));
+          const resolved = resolveDocumentTotals({
+            items: recomputeInput,
+            taxTreatment: treatmentInput,
+            defaultVatRate,
+          });
+          resolvedTreatment = resolved.taxTreatment;
+          resolvedSubtotal = resolved.subtotal;
+          resolvedVatAmount = resolved.vatAmount;
+          resolvedTotal = resolved.totalAmount;
         }
       }
 
       const becomingDelivered = newStatus === 'delivered' && existingInvoice.status !== 'delivered';
       const needsStockDeduction = becomingDelivered && !existingInvoice.stockDeducted;
-      const willReplaceItems = Array.isArray(body.items) && body.items.length > 0;
       // Reconcile when stock has already been deducted AND the user is replacing line items.
       // Source of truth is `stockDeducted`, not status — handles process-sale + later edit too.
       const needsReconciliation = !!existingInvoice.stockDeducted && willReplaceItems;
@@ -403,18 +509,19 @@ export function registerInvoiceRoutes(app: Express) {
       // Wrap header update + line item replace + stock movements in one transaction so
       // a failure rolls back everything and inventory never silently desyncs.
       await db.transaction(async (tx) => {
-        // 1. Update header
+        // 1. Update header — totals are server-computed; client values are ignored.
         await tx.update(invoices).set({
           customerName,
           customerId: customerId || null,
-          amount: body.total_amount ? body.total_amount.toString() : '0',
-          vatAmount: body.tax_amount ? body.tax_amount.toString() : '0',
+          amount: resolvedTotal.toFixed(2),
+          vatAmount: resolvedVatAmount.toFixed(2),
           status: newStatus,
           invoiceDate: body.invoice_date || null,
           reference: body.reference || null,
           referenceDate: body.reference_date || null,
           notes: body.remarks || body.notes || null,
           currency: body.currency || 'AED',
+          taxTreatment: resolvedTreatment,
           paymentMethod: body.payment_method || null,
         }).where(eq(invoices.id, id));
 
@@ -428,22 +535,20 @@ export function registerInvoiceRoutes(app: Express) {
           }).from(invoiceLineItems).where(eq(invoiceLineItems.invoiceId, id));
         }
 
-        // 3. Replace line items if provided
+        // 3. Replace line items if provided — using resolver-validated values.
         if (willReplaceItems) {
           await tx.delete(invoiceLineItems).where(eq(invoiceLineItems.invoiceId, id));
-          for (const item of body.items) {
-            if (Number(item.quantity) > 0 && Number(item.unit_price) >= 0) {
-              await tx.insert(invoiceLineItems).values({
-                invoiceId: id,
-                productId: item.product_id ? parseInt(item.product_id) : null,
-                brandId: item.brand_id ? parseInt(item.brand_id) : null,
-                productCode: item.product_code || null,
-                description: item.description || item.product_name || '',
-                quantity: Number(item.quantity),
-                unitPrice: item.unit_price.toString(),
-                lineTotal: item.line_total.toString(),
-              });
-            }
+          for (const item of resolvedItems) {
+            await tx.insert(invoiceLineItems).values({
+              invoiceId: id,
+              productId: item.product_id,
+              brandId: item.brand_id,
+              productCode: item.product_code,
+              description: item.description,
+              quantity: item.quantity,
+              unitPrice: item.unit_price.toFixed(2),
+              lineTotal: item.line_total.toFixed(2),
+            });
           }
         }
 
@@ -465,17 +570,13 @@ export function registerInvoiceRoutes(app: Express) {
           }
 
           const newByProduct = new Map<number, { qty: number; unitPrice: number }>();
-          for (const item of body.items) {
-            const qty = Number(item.quantity);
-            const unitPrice = Number(item.unit_price);
-            if (!(qty > 0 && unitPrice >= 0)) continue;
-            if (!item.product_id) continue;
-            const pid = parseInt(item.product_id);
-            const cur = newByProduct.get(pid);
+          for (const item of resolvedItems) {
+            if (item.product_id == null) continue;
+            const cur = newByProduct.get(item.product_id);
             if (cur) {
-              cur.qty += qty;
+              cur.qty += item.quantity;
             } else {
-              newByProduct.set(pid, { qty, unitPrice });
+              newByProduct.set(item.product_id, { qty: item.quantity, unitPrice: item.unit_price });
             }
           }
 

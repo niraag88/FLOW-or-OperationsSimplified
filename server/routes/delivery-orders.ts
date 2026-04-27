@@ -4,6 +4,7 @@ import { db } from "../db";
 import { and, eq } from "drizzle-orm";
 import { businessStorage } from "../businessStorage";
 import { requireAuth, writeAuditLog, objectStorageClient, updateProductStock, type AuthenticatedRequest } from "../middleware";
+import { resolveDocumentTotals, inferTaxTreatmentFromCustomer, isTotalsError } from "../utils/totals";
 
 export function registerDeliveryOrderRoutes(app: Express) {
   app.get('/api/delivery-orders', requireAuth(), async (req: AuthenticatedRequest, res) => {
@@ -156,9 +157,6 @@ export function registerDeliveryOrderRoutes(app: Express) {
   });
 
   app.post('/api/delivery-orders', requireAuth(), async (req: AuthenticatedRequest, res) => {
-    if (!req.body.items || !Array.isArray(req.body.items) || req.body.items.length === 0) {
-      return res.status(400).json({ error: 'At least one line item is required to save a delivery order' });
-    }
     try {
       const { companySettings } = await import('@shared/schema');
       const [nextNumber, doSettingsRow] = await Promise.all([
@@ -178,12 +176,34 @@ export function registerDeliveryOrderRoutes(app: Express) {
 
       let customerName = body.customer_name || 'Unknown Customer';
       let customerId: number | undefined = undefined;
+      let customerVatTreatment: string | null = null;
       if (body.customer_id) {
         const customer = await businessStorage.getCustomerById(parseInt(body.customer_id));
         if (customer) {
           customerName = customer.name;
           customerId = customer.id;
+          customerVatTreatment = customer.vatTreatment ?? null;
         }
+      }
+
+      // Resolve and validate items + totals BEFORE any DB write. Server is
+      // the source of truth — client subtotal / tax / total are ignored.
+      const defaultVatRate = doSettingsRow[0]?.defaultVatRate
+        ? parseFloat(doSettingsRow[0].defaultVatRate)
+        : 0.05;
+      const requestedTreatment = body.tax_treatment ?? inferTaxTreatmentFromCustomer(customerVatTreatment);
+      let resolved;
+      try {
+        resolved = resolveDocumentTotals({
+          items: body.items,
+          taxTreatment: requestedTreatment,
+          defaultVatRate,
+        });
+      } catch (err) {
+        if (isTotalsError(err)) {
+          return res.status(400).json({ error: err.code, message: err.message });
+        }
+        throw err;
       }
 
       const newStatus = body.status || 'draft';
@@ -196,33 +216,31 @@ export function registerDeliveryOrderRoutes(app: Express) {
         orderDate: body.order_date || null,
         reference: body.reference || null,
         referenceDate: body.reference_date || null,
-        subtotal: body.subtotal ? body.subtotal.toString() : '0',
-        taxAmount: body.tax_amount ? body.tax_amount.toString() : '0',
-        totalAmount: body.total_amount ? body.total_amount.toString() : '0',
+        subtotal: resolved.subtotal.toFixed(2),
+        taxAmount: resolved.vatAmount.toFixed(2),
+        totalAmount: resolved.totalAmount.toFixed(2),
         currency: body.currency || 'AED',
         notes: body.remarks || body.notes || null,
-        taxRate: body.tax_rate ? body.tax_rate.toString() : '0.05',
+        taxRate: resolved.vatRate.toFixed(4),
+        taxTreatment: resolved.taxTreatment,
         showRemarks: body.show_remarks || false,
         companySnapshot: doCompanySnapshot,
       }).returning();
 
       const insertedItems: Array<{ productId: number | null; quantity: number }> = [];
-      if (body.items && Array.isArray(body.items) && body.items.length > 0) {
-        for (const item of body.items) {
-          if (Number(item.quantity) > 0 && Number(item.unit_price) >= 0) {
-            await db.insert(deliveryOrderItems).values({
-              doId: doRecord.id,
-              productId: item.product_id ? parseInt(item.product_id) : null,
-              brandId: item.brand_id ? parseInt(item.brand_id) : null,
-              productCode: item.product_code || null,
-              description: item.description || item.product_name || '',
-              quantity: Number(item.quantity),
-              unitPrice: item.unit_price.toString(),
-              lineTotal: item.line_total.toString(),
-            });
-            insertedItems.push({ productId: item.product_id ? parseInt(item.product_id) : null, quantity: Number(item.quantity) });
-          }
-        }
+      for (const item of resolved.items) {
+        const productId = item.product_id ? parseInt(String(item.product_id)) : null;
+        await db.insert(deliveryOrderItems).values({
+          doId: doRecord.id,
+          productId,
+          brandId: item.brand_id ? parseInt(String(item.brand_id)) : null,
+          productCode: (item.product_code as string) || null,
+          description: (item.description as string) || (item.product_name as string) || '',
+          quantity: item.quantity,
+          unitPrice: item.unit_price.toFixed(2),
+          lineTotal: item.line_total.toFixed(2),
+        });
+        insertedItems.push({ productId, quantity: item.quantity });
       }
 
       // Deduct stock if creating directly as delivered
@@ -269,11 +287,13 @@ export function registerDeliveryOrderRoutes(app: Express) {
 
       let customerName = body.customer_name || 'Unknown Customer';
       let customerId: number | undefined = undefined;
+      let customerVatTreatment: string | null = null;
       if (body.customer_id) {
         const customer = await businessStorage.getCustomerById(parseInt(body.customer_id));
         if (customer) {
           customerName = customer.name;
           customerId = customer.id;
+          customerVatTreatment = customer.vatTreatment ?? null;
         }
       }
 
@@ -284,6 +304,89 @@ export function registerDeliveryOrderRoutes(app: Express) {
         return res.status(400).json({ error: 'Cannot change status of a delivered order. Use the Cancel action to cancel it.' });
       }
 
+      // Resolve and validate items + totals BEFORE any DB write. If items
+      // are not present in the body, recompute totals from the already-stored
+      // items so persisted totals always match persisted lines. Validation
+      // runs before delete/insert so a 400 cannot leave the DO without lines.
+      const { companySettings } = await import('@shared/schema');
+      const [putSettingsRow] = await db.select().from(companySettings).limit(1);
+      const defaultVatRate = putSettingsRow?.defaultVatRate
+        ? parseFloat(putSettingsRow.defaultVatRate)
+        : 0.05;
+
+      // Tax treatment fallback chain so a header-only edit on a ZeroRated DO
+      // cannot silently flip to StandardRated and add VAT:
+      //   body.tax_treatment > existing DO taxTreatment >
+      //   inferred from customer.vatTreatment > StandardRated.
+      const requestedTreatment =
+        body.tax_treatment
+        ?? existingDO.taxTreatment
+        ?? (customerVatTreatment ? inferTaxTreatmentFromCustomer(customerVatTreatment) : 'StandardRated');
+      const willReplaceItems = Array.isArray(body.items) && body.items.length > 0;
+
+      let resolvedTreatment: 'StandardRated' | 'ZeroRated' = 'StandardRated';
+      let resolvedSubtotal = 0;
+      let resolvedVatAmount = 0;
+      let resolvedTotal = 0;
+      let resolvedVatRate = 0;
+      let resolvedItems: Array<{
+        product_id: number | null;
+        brand_id: number | null;
+        product_code: string | null;
+        description: string;
+        quantity: number;
+        unit_price: number;
+        line_total: number;
+      }> = [];
+
+      if (willReplaceItems) {
+        let resolved;
+        try {
+          resolved = resolveDocumentTotals({
+            items: body.items,
+            taxTreatment: requestedTreatment,
+            defaultVatRate,
+          });
+        } catch (err) {
+          if (isTotalsError(err)) {
+            return res.status(400).json({ error: err.code, message: err.message });
+          }
+          throw err;
+        }
+        resolvedTreatment = resolved.taxTreatment;
+        resolvedSubtotal = resolved.subtotal;
+        resolvedVatAmount = resolved.vatAmount;
+        resolvedTotal = resolved.totalAmount;
+        resolvedVatRate = resolved.vatRate;
+        resolvedItems = resolved.items.map(it => ({
+          product_id: it.product_id ? parseInt(String(it.product_id)) : null,
+          brand_id: it.brand_id ? parseInt(String(it.brand_id)) : null,
+          product_code: (it.product_code as string) || null,
+          description: (it.description as string) || (it.product_name as string) || '',
+          quantity: it.quantity,
+          unit_price: it.unit_price,
+          line_total: it.line_total,
+        }));
+      } else if (oldItems.length > 0) {
+        const recomputeInput = oldItems.map(it => ({
+          product_id: it.productId,
+          quantity: it.quantity,
+          unit_price: parseFloat(it.unitPrice.toString()),
+        }));
+        const resolved = resolveDocumentTotals({
+          items: recomputeInput,
+          taxTreatment: requestedTreatment,
+          defaultVatRate,
+        });
+        resolvedTreatment = resolved.taxTreatment;
+        resolvedSubtotal = resolved.subtotal;
+        resolvedVatAmount = resolved.vatAmount;
+        resolvedTotal = resolved.totalAmount;
+        resolvedVatRate = resolved.vatRate;
+      } else {
+        resolvedTreatment = requestedTreatment === 'ZeroRated' ? 'ZeroRated' : 'StandardRated';
+      }
+
       await db.update(deliveryOrders).set({
         customerName,
         customerId: customerId || null,
@@ -291,33 +394,35 @@ export function registerDeliveryOrderRoutes(app: Express) {
         orderDate: body.order_date || null,
         reference: body.reference || null,
         referenceDate: body.reference_date || null,
-        subtotal: body.subtotal ? body.subtotal.toString() : '0',
-        taxAmount: body.tax_amount ? body.tax_amount.toString() : '0',
-        totalAmount: body.total_amount ? body.total_amount.toString() : '0',
+        subtotal: resolvedSubtotal.toFixed(2),
+        taxAmount: resolvedVatAmount.toFixed(2),
+        totalAmount: resolvedTotal.toFixed(2),
         currency: body.currency || 'AED',
         notes: body.remarks || body.notes || null,
-        taxRate: body.tax_rate ? body.tax_rate.toString() : '0.05',
+        taxRate: resolvedVatRate.toFixed(4),
+        taxTreatment: resolvedTreatment,
         showRemarks: body.show_remarks || false,
       }).where(eq(deliveryOrders.id, id));
 
-      await db.delete(deliveryOrderItems).where(eq(deliveryOrderItems.doId, id));
-
       const newItems: Array<{ productId: number | null; quantity: number }> = [];
-      if (body.items && Array.isArray(body.items) && body.items.length > 0) {
-        for (const item of body.items) {
-          if (Number(item.quantity) > 0 && Number(item.unit_price) >= 0) {
-            await db.insert(deliveryOrderItems).values({
-              doId: id,
-              productId: item.product_id ? parseInt(item.product_id) : null,
-              brandId: item.brand_id ? parseInt(item.brand_id) : null,
-              productCode: item.product_code || null,
-              description: item.description || item.product_name || '',
-              quantity: Number(item.quantity),
-              unitPrice: item.unit_price.toString(),
-              lineTotal: item.line_total.toString(),
-            });
-            newItems.push({ productId: item.product_id ? parseInt(item.product_id) : null, quantity: Number(item.quantity) });
-          }
+      if (willReplaceItems) {
+        await db.delete(deliveryOrderItems).where(eq(deliveryOrderItems.doId, id));
+        for (const item of resolvedItems) {
+          await db.insert(deliveryOrderItems).values({
+            doId: id,
+            productId: item.product_id,
+            brandId: item.brand_id,
+            productCode: item.product_code,
+            description: item.description,
+            quantity: item.quantity,
+            unitPrice: item.unit_price.toFixed(2),
+            lineTotal: item.line_total.toFixed(2),
+          });
+          newItems.push({ productId: item.product_id, quantity: item.quantity });
+        }
+      } else {
+        for (const it of oldItems) {
+          newItems.push({ productId: it.productId, quantity: Number(it.quantity) });
         }
       }
 
