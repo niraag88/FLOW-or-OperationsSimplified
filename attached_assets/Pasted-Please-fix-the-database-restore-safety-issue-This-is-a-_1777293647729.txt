@@ -1,0 +1,83 @@
+Please fix the database restore safety issue.
+
+This is a critical data-safety fix. Do not change unrelated parts of the app.
+
+Problem:
+The current restore process can damage the live database. In scripts/restoreBackup.js, the app checks only the first gzip bytes of the backup file, then drops the live public schema, then tries to restore the backup. A backup file can pass the first gzip check but still be corrupted, truncated, empty, or contain SQL that fails halfway through. If that happens, the live database may already have been wiped.
+
+Affected files:
+scripts/restoreBackup.js
+server/routes/system.ts
+
+Current risky behavior:
+The restore process currently does roughly this:
+1. Check gzip header.
+2. Drop and recreate the live public schema.
+3. Then gunzip and pipe the SQL into psql.
+
+That is unsafe because the destructive step happens before the restore has been fully proven.
+
+Desired behavior:
+The app must not touch the live public schema until the backup file has been fully validated.
+The actual destructive restore should run in one PostgreSQL transaction, so if restore fails, the old live database remains intact.
+
+Please implement these rules:
+
+1. Fully validate the backup before any destructive database action.
+- Stage the restore input to a temporary file if needed.
+- Fully decompress the .sql.gz backup into a temporary .sql file before touching the live database.
+- If decompression fails, stop and return an error.
+- If the decompressed SQL is empty or suspiciously tiny, stop and return an error.
+- Do not run DROP SCHEMA before this validation succeeds.
+
+2. Stop dropping the public schema as a separate committed step.
+- Do not run DROP SCHEMA public as a standalone psql command before restore.
+- Instead, include the DROP SCHEMA and CREATE SCHEMA statements as part of the same restore transaction.
+
+3. Run the live restore transactionally.
+- The restore should execute DROP SCHEMA public, CREATE SCHEMA public, and the backup SQL in one psql run.
+- Use psql with ON_ERROR_STOP enabled.
+- Use psql single-transaction mode if compatible with the dump.
+- If any SQL command fails, the transaction should roll back and the old live database should remain intact.
+
+4. Apply this safe restore behavior to both restore paths.
+- Restore from stored cloud backup must be safe.
+- Restore from uploaded .sql.gz file must be safe.
+- Do not fix only one path.
+
+5. Keep restore history working.
+- Keep the existing ops.restore_runs behavior.
+- Restore success and restore failure should still be recorded.
+- It is okay if public.audit_log is best-effort after restore, but ops.restore_runs must remain the reliable restore history.
+
+6. Clean up temporary files.
+- Any temporary compressed, decompressed, or combined restore files must be deleted after success or failure.
+
+Manual tests to perform:
+1. Create a normal backup, then restore it successfully.
+2. Try restoring a plain text file renamed to .sql.gz. It should fail and existing app data should remain unchanged.
+3. Try restoring a truncated gzip file. It should fail and existing app data should remain unchanged.
+4. Try restoring a gzip file containing invalid SQL. It should fail and existing app data should remain unchanged.
+5. Restore from a stored backup run and confirm it uses the same safe behavior.
+6. Check restore history after both success and failure.
+7. Confirm only Admin users can access restore actions.
+
+Acceptance criteria:
+- No restore path drops public before full gzip validation.
+- No restore path runs DROP SCHEMA public as a separate committed command.
+- Failed decompression leaves live data unchanged.
+- Failed SQL restore leaves live data unchanged.
+- Successful restore still works with existing .sql.gz backups.
+- Restore history records both success and failure.
+- Temporary files are cleaned up.
+- No unrelated app behavior changes.
+
+Avoid changing:
+- Do not change invoice logic.
+- Do not change stock logic.
+- Do not change VAT, totals, or exports.
+- Do not change PDF generation.
+- Do not change normal object upload behavior except restore staging if needed.
+- Do not change factory reset.
+- Do not change authentication or roles.
+- Do not change the backup file format unless existing backups remain restorable.
