@@ -237,7 +237,7 @@ export function registerPurchaseOrderRoutes(app: Express) {
         .from(goodsReceipts)
         .where(eq(goodsReceipts.poId, poId));
       if ((grnCount?.count ?? 0) > 0) {
-        return res.status(400).json({ error: `Cannot delete PO #${po.poNumber} — it has ${grnCount.count} goods receipt(s). Delete the GRN(s) first.` });
+        return res.status(400).json({ error: `Cannot delete PO #${po.poNumber} — it has ${grnCount.count} linked goods receipt(s) which are retained for audit. The PO must remain to preserve the GRN history.` });
       }
 
       const items = await db.select().from(purchaseOrderItems).where(eq(purchaseOrderItems.poId, poId));

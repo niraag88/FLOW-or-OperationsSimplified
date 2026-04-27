@@ -10,7 +10,7 @@ import { Textarea } from "@/components/ui/textarea";
 import { Dialog, DialogContent, DialogFooter, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
-import { PackageCheck, Save, TrendingUp, AlertTriangle, Pencil, X, Check, Ban, Trash2 } from "lucide-react";
+import { PackageCheck, Save, TrendingUp, AlertTriangle, Pencil, X, Check, Ban } from "lucide-react";
 import { Label } from "@/components/ui/label";
 import { useToast } from "@/hooks/use-toast";
 import { format } from "date-fns";
@@ -57,7 +57,6 @@ export default function GoodsReceipts() {
   const [statusFilter, setStatusFilter] = useState<StatusFilter>("all");
   const [cancelDialog, setCancelDialog] = useState<CancelDialogState>(initialCancelState);
   const [cancelling, setCancelling] = useState(false);
-  const [deletingGrnId, setDeletingGrnId] = useState<number | null>(null);
   const { toast } = useToast();
 
   const { data: goodsReceipts = [], isLoading: loadingReceipts, error: grnError } = useQuery({
@@ -209,32 +208,6 @@ export default function GoodsReceipts() {
       toast({ title: 'Cancellation failed', description: err.message || 'Please try again.', variant: 'destructive' });
     } finally {
       setCancelling(false);
-    }
-  };
-
-  const handleDeleteCancelled = async (receipt: any) => {
-    const ok = window.confirm(
-      `Permanently delete cancelled GRN ${receipt.receiptNumber}? Its line items and stock movement history (both original and reversal) will be removed. This cannot be undone.`
-    );
-    if (!ok) return;
-    setDeletingGrnId(receipt.id);
-    try {
-      const res = await fetch(`/api/goods-receipts/${receipt.id}`, {
-        method: 'DELETE',
-        credentials: 'include',
-      });
-      if (!res.ok) {
-        const data = await res.json().catch(() => ({}));
-        throw new Error(data.message || data.error || `HTTP ${res.status}`);
-      }
-      toast({ title: `GRN ${receipt.receiptNumber} deleted`, description: 'Cancelled receipt removed.' });
-      await queryClient.invalidateQueries({ queryKey: ['/api/goods-receipts'] });
-      await queryClient.invalidateQueries({ queryKey: ['/api/purchase-orders'] });
-    } catch (err: any) {
-      console.error('Failed to delete cancelled GRN:', err);
-      toast({ title: 'Delete failed', description: err.message || 'Please try again.', variant: 'destructive' });
-    } finally {
-      setDeletingGrnId(null);
     }
   };
 
@@ -635,17 +608,6 @@ export default function GoodsReceipts() {
                               data-testid={`grn-cancel-${receipt.id}`}
                             >
                               <Ban className="w-3.5 h-3.5" />
-                            </button>
-                          )}
-                          {receipt.status === 'cancelled' && (
-                            <button
-                              onClick={() => handleDeleteCancelled(receipt)}
-                              disabled={deletingGrnId === receipt.id}
-                              className="p-1 text-gray-400 hover:text-red-600 transition-colors disabled:opacity-50"
-                              title="Permanently delete cancelled GRN"
-                              data-testid={`grn-delete-${receipt.id}`}
-                            >
-                              <Trash2 className="w-3.5 h-3.5" />
                             </button>
                           )}
                         </div>

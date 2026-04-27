@@ -399,15 +399,24 @@ test.describe('Brands', () => {
       if (Array.isArray(posList)) {
         for (const po of posList) {
           if (auditBrandIds.has(po.brandId ?? 0) || (po.notes ?? '').toLowerCase().includes('audit')) {
-            // Delete GRNs for this PO first
+            // GRNs are append-only for audit. Cancel any non-cancelled GRN so
+            // stock and PO-state are reversed, but leave the receipt rows in
+            // place. The PO that owns linked GRNs will likewise be retained
+            // (the DELETE will return 400 — best-effort cleanup).
             const grnsResp = await api('GET', `/api/goods-receipts?poId=${po.id}`, adminCookie);
-            const grns = grnsResp.data as Array<{ id: number }>;
+            const grns = grnsResp.data as Array<{ id: number; status?: string }>;
             if (Array.isArray(grns)) {
               for (const grn of grns) {
-                await api('DELETE', `/api/goods-receipts/${grn.id}`, adminCookie);
+                if (grn.status !== 'cancelled') {
+                  await api('PATCH', `/api/goods-receipts/${grn.id}/cancel`, adminCookie, {
+                    confirmNegativeStock: true,
+                    acknowledgePaidGrn: true,
+                  });
+                }
               }
             }
-            // Then delete the PO
+            // POs with linked GRNs cannot be deleted (audit retention); the
+            // attempt is harmless and returns 400 — POs without GRNs delete cleanly.
             await api('DELETE', `/api/purchase-orders/${po.id}`, adminCookie);
           }
         }
@@ -1026,7 +1035,13 @@ test.describe('GRNs (Goods Receipts)', () => {
         const list = r.data as Array<{ id: number }>;
         return Array.isArray(list) ? list.find(g => g.id !== IDs.grn) : null;
       }))?.id;
-      if (grnId) await api('DELETE', `/api/goods-receipts/${grnId}`, adminCookie);
+      // GRNs are audit-retained — cancel rather than delete to undo stock side effects.
+      if (grnId) {
+        await api('PATCH', `/api/goods-receipts/${grnId}/cancel`, adminCookie, {
+          confirmNegativeStock: true,
+          acknowledgePaidGrn: true,
+        });
+      }
     } else {
       note(`POST /api/goods-receipts zero receivedQuantity → ${status} (zero-quantity validation enforced)`);
     }
@@ -1884,9 +1899,21 @@ test.describe('Cleanup', () => {
     await api('DELETE', `/api/invoices/${IDs.invoice}`, adminCookie);
   });
 
-  test('delete test GRN', async () => {
+  test('delete test GRN — refused for audit retention; cancel instead', async () => {
     if (!IDs.grn) return;
-    await api('DELETE', `/api/goods-receipts/${IDs.grn}`, adminCookie);
+    // Confirmed GRNs cannot be deleted directly.
+    const confirmedDelete = await api('DELETE', `/api/goods-receipts/${IDs.grn}`, adminCookie);
+    expect(confirmedDelete.status).toBe(400);
+    expect((confirmedDelete.data as { error?: string }).error).toBe('grn_not_cancelled');
+    // Cancelling reverses stock but retains the receipt for audit.
+    await api('PATCH', `/api/goods-receipts/${IDs.grn}/cancel`, adminCookie, {
+      confirmNegativeStock: true,
+      acknowledgePaidGrn: true,
+    });
+    // Cancelled GRNs are also retained — DELETE must continue to refuse them.
+    const cancelledDelete = await api('DELETE', `/api/goods-receipts/${IDs.grn}`, adminCookie);
+    expect(cancelledDelete.status).toBe(400);
+    expect((cancelledDelete.data as { error?: string }).error).toBe('grn_retained_for_audit');
   });
 
   test('delete test purchase order', async () => {

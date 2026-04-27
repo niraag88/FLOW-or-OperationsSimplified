@@ -30,7 +30,8 @@ test.describe('Purchase Orders', () => {
   test.afterAll(async () => {
     if (simplePOId) await apiDelete(`/api/purchase-orders/${simplePOId}`, cookie);
     if (lifecycleGrnId) {
-      // GRN must be cancelled before it can be deleted (audit-preserving workflow).
+      // Goods Receipts are audit-preserving: cancellation is the terminal
+      // state. Reverse the stock and leave the cancelled record in place.
       try {
         await fetch(`${BASE_URL}/api/goods-receipts/${lifecycleGrnId}/cancel`, {
           method: 'PATCH',
@@ -38,7 +39,13 @@ test.describe('Purchase Orders', () => {
           body: JSON.stringify({ confirmNegativeStock: true, acknowledgePaidGrn: true }),
         });
       } catch {}
-      await apiDelete(`/api/goods-receipts/${lifecycleGrnId}`, cookie);
+      // Direct delete on a cancelled GRN must still be rejected — guards
+      // against any future regression that re-enables hard delete.
+      const deleteRes = await fetch(`${BASE_URL}/api/goods-receipts/${lifecycleGrnId}`, {
+        method: 'DELETE',
+        headers: { cookie },
+      });
+      expect(deleteRes.ok).toBe(false);
     }
     if (lifecyclePoId) await apiDelete(`/api/purchase-orders/${lifecyclePoId}`, cookie);
   });

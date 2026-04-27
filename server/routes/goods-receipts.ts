@@ -641,6 +641,16 @@ export function registerGoodsReceiptRoutes(app: Express) {
     }
   });
 
+  // DELETE /api/goods-receipts/:id
+  // Goods Receipts are append-only for audit purposes. Confirmed receipts must
+  // be cancelled first via PATCH /api/goods-receipts/:id/cancel (which posts
+  // reversal stock movements while keeping the original receipt history),
+  // and cancelled receipts are then retained permanently — same policy as
+  // cancelled invoices and cancelled delivery orders.
+  // Responses:
+  //   404 { error: 'Goods receipt not found' }
+  //   400 { error: 'grn_not_cancelled', message }     // confirmed → cancel first
+  //   400 { error: 'grn_retained_for_audit', message } // cancelled → never delete
   app.delete('/api/goods-receipts/:id', requireAuth(['Admin', 'Manager']), async (req: AuthenticatedRequest, res) => {
     try {
       const grnId = parseInt(req.params.id);
@@ -648,61 +658,17 @@ export function registerGoodsReceiptRoutes(app: Express) {
       const [grn] = await db.select().from(goodsReceipts).where(eq(goodsReceipts.id, grnId));
       if (!grn) return res.status(404).json({ error: 'Goods receipt not found' });
 
-      if (grn.status !== 'cancelled') {
+      if (grn.status === 'cancelled') {
         return res.status(400).json({
-          error: 'grn_not_cancelled',
-          message: `Confirmed goods receipts cannot be deleted directly — cancel the GRN first to reverse stock, then delete the cancelled record.`,
+          error: 'grn_retained_for_audit',
+          message: 'Cancelled goods receipts are retained for audit and cannot be permanently deleted.',
         });
       }
 
-      await db.transaction(async (tx) => {
-        // Both the original goods_receipt movement and the goods_receipt_reversal
-        // movement reference this GRN; remove all of them along with the line items.
-        await tx.delete(stockMovements).where(
-          and(eq(stockMovements.referenceType, 'goods_receipt'), eq(stockMovements.referenceId, grnId)),
-        );
-        await tx.delete(goodsReceiptItems).where(eq(goodsReceiptItems.receiptId, grnId));
-        await tx.delete(goodsReceipts).where(eq(goodsReceipts.id, grnId));
-
-        // Recompute PO header status (closed/submitted) from the remaining
-        // confirmed GRNs. The cancellation step already corrected this once,
-        // but we re-check on delete to mirror the previous delete-path
-        // behaviour and to defend against any edge case (e.g. concurrent
-        // creation of a new GRN between cancel and delete).
-        const [remainingConfirmed] = await tx
-          .select({ count: sql<number>`count(*)::int` })
-          .from(goodsReceipts)
-          .where(and(eq(goodsReceipts.poId, grn.poId), eq(goodsReceipts.status, 'confirmed')));
-        const hasMoreGrns = (remainingConfirmed?.count ?? 0) > 0;
-
-        let newPoStatus: string;
-        if (hasMoreGrns) {
-          const poItems = await tx.select().from(purchaseOrderItems).where(eq(purchaseOrderItems.poId, grn.poId));
-          const allStillReceived = poItems.every(it => (it.receivedQuantity ?? 0) >= it.quantity);
-          newPoStatus = allStillReceived ? 'closed' : 'submitted';
-        } else {
-          newPoStatus = 'submitted';
-        }
-
-        await tx.update(purchaseOrders)
-          .set({ status: newPoStatus, updatedAt: new Date() })
-          .where(eq(purchaseOrders.id, grn.poId));
+      return res.status(400).json({
+        error: 'grn_not_cancelled',
+        message: 'Confirmed goods receipts cannot be deleted — cancel the GRN first to reverse stock. The cancelled receipt will be retained for audit.',
       });
-
-      // Recalculate PO payment status (the deleted GRN was already excluded from the
-      // payment helper as a cancelled record, but call again to be defensive).
-      await recalculatePOPaymentStatus(grn.poId);
-
-      writeAuditLog({
-        actor: req.user!.id,
-        actorName: req.user?.username || String(req.user!.id),
-        targetId: String(grnId),
-        targetType: 'goods_receipt',
-        action: 'DELETE',
-        details: `Cancelled GRN ${grn.receiptNumber} hard-deleted from PO #${grn.poId}`,
-      });
-
-      res.json({ success: true, grnId });
     } catch (error) {
       console.error('Error deleting goods receipt:', error);
       res.status(500).json({ error: 'Failed to delete goods receipt' });
