@@ -535,12 +535,55 @@ export class BusinessStorage {
     if (quote.status === 'converted') throw new Error(`Quotation ${quote.quoteNumber} has already been converted to an invoice`);
     if (!quote.customerId) throw new Error(`Quotation ${quote.quoteNumber} has no customer assigned`);
 
+    // Same authoritative totals + VAT rules as POST /api/invoices.
+    // The customer record wins for VAT category — converting from a
+    // quote cannot reintroduce VAT for an exempt/zero-rated customer
+    // even if the quote was somehow standard-rated.
+    const { resolveDocumentTotals, resolveAuthoritativeTaxTreatment, isTotalsError } =
+      await import('./utils/totals');
+
+    const [customer] = await db.select().from(customers).where(eq(customers.id, quote.customerId));
+    const customerVatTreatment = customer?.vatTreatment ?? null;
+
+    const [csRow] = await db.select().from(companySettings).limit(1);
+    const defaultVatRate = csRow?.defaultVatRate ? parseFloat(csRow.defaultVatRate) : 0.05;
+
+    const treatmentInput = resolveAuthoritativeTaxTreatment(
+      (quote as { taxTreatment?: string | null }).taxTreatment,
+      null,
+      customerVatTreatment,
+    );
+
+    const itemsForResolver = (quote.items ?? [])
+      .filter(it => Number(it.quantity) > 0)
+      .map(it => ({
+        product_id: it.productId ?? null,
+        product_code: it.productCode ?? null,
+        description: it.description ?? '',
+        quantity: Number(it.quantity),
+        unit_price: Number(it.unitPrice),
+      }));
+
+    let resolved;
+    try {
+      resolved = resolveDocumentTotals({
+        items: itemsForResolver,
+        taxTreatment: treatmentInput,
+        defaultVatRate,
+      });
+    } catch (err) {
+      if (isTotalsError(err)) {
+        throw new Error(`Cannot convert quotation ${quote.quoteNumber}: ${err.message}`);
+      }
+      throw err;
+    }
+
     const invoiceData: InsertInvoice = {
       invoiceNumber,
       customerId: quote.customerId,
       customerName: quote.customerName ?? 'Unknown Customer',
-      amount: quote.grandTotal ?? quote.totalAmount ?? '0',
-      vatAmount: quote.vatAmount ?? undefined,
+      amount: resolved.totalAmount.toFixed(2),
+      vatAmount: resolved.vatAmount.toFixed(2),
       status: 'draft',
       invoiceDate: new Date().toISOString().split('T')[0],
       reference: quote.quoteNumber,
@@ -549,19 +592,22 @@ export class BusinessStorage {
     };
 
     const [invoice] = await db.insert(invoices).values(invoiceData).returning();
+    // taxTreatment isn't in InsertInvoice schema; set it via direct update
+    // (mirrors POST /api/invoices). Authority is enforced above.
+    await db.update(invoices)
+      .set({ taxTreatment: resolved.taxTreatment })
+      .where(eq(invoices.id, invoice.id));
 
-    for (const item of (quote.items ?? [])) {
-      if (Number(item.quantity) > 0) {
-        await db.insert(invoiceLineItems).values({
-          invoiceId: invoice.id,
-          productId: item.productId ?? null,
-          productCode: item.productCode ?? null,
-          description: item.description ?? '',
-          quantity: Number(item.quantity),
-          unitPrice: item.unitPrice?.toString() ?? '0',
-          lineTotal: item.lineTotal?.toString() ?? '0',
-        });
-      }
+    for (const item of resolved.items) {
+      await db.insert(invoiceLineItems).values({
+        invoiceId: invoice.id,
+        productId: (item.product_id as number | null) ?? null,
+        productCode: (item.product_code as string | null) ?? null,
+        description: (item.description as string | null) ?? '',
+        quantity: item.quantity,
+        unitPrice: item.unit_price.toString(),
+        lineTotal: item.line_total.toString(),
+      });
     }
 
     await this.updateQuotation(quotationId, { status: 'converted' });

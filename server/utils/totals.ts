@@ -124,3 +124,35 @@ export function inferTaxTreatmentFromCustomer(
 ): 'StandardRated' | 'ZeroRated' {
   return normalizeTaxTreatment(customerVatTreatment);
 }
+
+// Customer is authoritative for VAT compliance: if the customer record
+// has an explicit VAT category that resolves to ZeroRated (e.g.
+// 'exempt', 'reverse_charge', 'International', 'ZeroRated'), the
+// document MUST be ZeroRated regardless of the client-supplied
+// tax_treatment. This protects against a crafted request charging VAT
+// to a customer who is exempt/zero-rated by status.
+//
+// When the customer record has no explicit treatment (or no customer
+// is attached), the function falls back through:
+//   body > existing > inferred-from-customer (still ZeroRated by
+//   default for unknown values).
+export function resolveAuthoritativeTaxTreatment(
+  bodyTreatment: unknown,
+  existingTreatment: string | null | undefined,
+  customerVatTreatment: string | null | undefined,
+): 'StandardRated' | 'ZeroRated' {
+  const customerHasExplicit =
+    typeof customerVatTreatment === 'string' && customerVatTreatment.trim() !== '';
+  if (customerHasExplicit) {
+    const customerInferred = normalizeTaxTreatment(customerVatTreatment);
+    if (customerInferred === 'ZeroRated') return 'ZeroRated';
+  }
+
+  if (bodyTreatment !== undefined && bodyTreatment !== null) {
+    return normalizeTaxTreatment(bodyTreatment);
+  }
+  if (existingTreatment !== undefined && existingTreatment !== null) {
+    return normalizeTaxTreatment(existingTreatment);
+  }
+  return normalizeTaxTreatment(customerVatTreatment);
+}

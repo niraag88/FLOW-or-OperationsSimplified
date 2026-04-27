@@ -2007,6 +2007,272 @@ test.describe('Server-side totals authority', () => {
     await api('DELETE', `/api/delivery-orders/${doId}`, adminCookie);
   });
 
+  test('Customer with vatTreatment="exempt" overrides body.tax_treatment="StandardRated" → invoice stored as ZeroRated', async () => {
+    // Create a dedicated exempt customer just for this test so we don't
+    // affect the shared IDs.customer used elsewhere.
+    const cust = await api('POST', '/api/customers', adminCookie, {
+      name: 'Exempt Customer Audit LLC',
+      email: 'exempt-audit@customer.ae',
+      vatTreatment: 'exempt',
+      dataSource: 'e2e_test',
+    });
+    expect(cust.status).toBe(201);
+    const exemptCustomerId = (cust.data as { id: number }).id;
+    if (!IDs.product) {
+      await api('DELETE', `/api/customers/${exemptCustomerId}`, adminCookie);
+      return;
+    }
+
+    // Client tries to force StandardRated on an exempt customer. The
+    // server must override and store ZeroRated with VAT 0.
+    const create = await api('POST', '/api/invoices', adminCookie, {
+      customer_id: exemptCustomerId,
+      invoice_date: '2026-04-14',
+      status: 'draft',
+      currency: 'AED',
+      tax_treatment: 'StandardRated',
+      items: [{ product_id: IDs.product, description: 'exempt-test', quantity: 1, unit_price: 500 }],
+    });
+    expect(create.status).toBe(201);
+    const invId = (create.data as { id: number }).id;
+
+    const get = await api('GET', `/api/invoices/${invId}`, adminCookie);
+    const inv = get.data as { amount?: string; vatAmount?: string; taxTreatment?: string };
+    expect(inv.taxTreatment).toBe('ZeroRated');
+    expect(parseFloat(String(inv.vatAmount))).toBeCloseTo(0, 2);
+    expect(parseFloat(String(inv.amount))).toBeCloseTo(500, 2);
+
+    // PUT also cannot reintroduce VAT for an exempt customer.
+    const update = await api('PUT', `/api/invoices/${invId}`, adminCookie, {
+      customer_id: exemptCustomerId,
+      tax_treatment: 'StandardRated',
+      items: [{ product_id: IDs.product, description: 'exempt-test-2', quantity: 2, unit_price: 500 }],
+    });
+    expect(update.status).toBe(200);
+    const get2 = await api('GET', `/api/invoices/${invId}`, adminCookie);
+    const inv2 = get2.data as { amount?: string; vatAmount?: string; taxTreatment?: string };
+    expect(inv2.taxTreatment).toBe('ZeroRated');
+    expect(parseFloat(String(inv2.vatAmount))).toBeCloseTo(0, 2);
+    expect(parseFloat(String(inv2.amount))).toBeCloseTo(1000, 2);
+
+    await api('DELETE', `/api/invoices/${invId}`, adminCookie);
+    await api('DELETE', `/api/customers/${exemptCustomerId}`, adminCookie);
+  });
+
+  test('Customer with vatTreatment="exempt" overrides body.tax_treatment="StandardRated" → delivery order stored as ZeroRated', async () => {
+    const cust = await api('POST', '/api/customers', adminCookie, {
+      name: 'Exempt Customer DO Audit LLC',
+      email: 'exempt-do-audit@customer.ae',
+      vatTreatment: 'exempt',
+      dataSource: 'e2e_test',
+    });
+    expect(cust.status).toBe(201);
+    const exemptCustomerId = (cust.data as { id: number }).id;
+    if (!IDs.product) {
+      await api('DELETE', `/api/customers/${exemptCustomerId}`, adminCookie);
+      return;
+    }
+
+    const create = await api('POST', '/api/delivery-orders', adminCookie, {
+      customer_id: exemptCustomerId,
+      status: 'draft',
+      currency: 'AED',
+      tax_treatment: 'StandardRated',
+      items: [{ product_id: IDs.product, description: 'exempt-do', quantity: 4, unit_price: 25 }],
+    });
+    expect(create.status).toBe(201);
+    const doId = (create.data as { id: number }).id;
+
+    const get = await api('GET', `/api/delivery-orders/${doId}`, adminCookie);
+    const doData = get.data as { tax_treatment?: string; tax_amount?: number; total_amount?: number };
+    expect(doData.tax_treatment).toBe('ZeroRated');
+    expect(Number(doData.tax_amount)).toBeCloseTo(0, 2);
+    expect(Number(doData.total_amount)).toBeCloseTo(100, 2);
+
+    await api('DELETE', `/api/delivery-orders/${doId}`, adminCookie);
+    await api('DELETE', `/api/customers/${exemptCustomerId}`, adminCookie);
+  });
+
+  test('PUT /api/invoices and /api/delivery-orders preserve existing customer_id when body omits it', async () => {
+    // Reproduces the bug where a header-only PUT silently nulled
+    // customer_id, which in turn broke VAT authority on subsequent edits.
+    const cust = await api('POST', '/api/customers', adminCookie, {
+      name: 'Persist Customer Audit LLC',
+      email: 'persist-audit@customer.ae',
+      vatTreatment: 'standard',
+      dataSource: 'e2e_test',
+    });
+    expect(cust.status).toBe(201);
+    const persistId = (cust.data as { id: number }).id;
+    if (!IDs.product) {
+      await api('DELETE', `/api/customers/${persistId}`, adminCookie);
+      return;
+    }
+
+    // INVOICE
+    const inv = await api('POST', '/api/invoices', adminCookie, {
+      customer_id: persistId,
+      invoice_date: '2026-04-17',
+      status: 'draft',
+      currency: 'AED',
+      items: [{ product_id: IDs.product, description: 'preserve-inv', quantity: 1, unit_price: 100 }],
+    });
+    expect(inv.status).toBe(201);
+    const invId = (inv.data as { id: number }).id;
+    // Header-only PUT (no customer_id, no items) — must not null out customer_id.
+    const putInv = await api('PUT', `/api/invoices/${invId}`, adminCookie, {
+      reference: 'header-only-edit',
+    });
+    expect(putInv.status).toBe(200);
+    const getInv = await api('GET', `/api/invoices/${invId}`, adminCookie);
+    const invData = getInv.data as { customer_id?: number | null; customer?: { id?: number } | null };
+    const persistedInvCustomer = invData.customer_id ?? invData.customer?.id ?? null;
+    expect(persistedInvCustomer).toBe(persistId);
+
+    // DELIVERY ORDER
+    const doRes = await api('POST', '/api/delivery-orders', adminCookie, {
+      customer_id: persistId,
+      status: 'draft',
+      currency: 'AED',
+      items: [{ product_id: IDs.product, description: 'preserve-do', quantity: 1, unit_price: 100 }],
+    });
+    expect(doRes.status).toBe(201);
+    const doId = (doRes.data as { id: number }).id;
+    const putDo = await api('PUT', `/api/delivery-orders/${doId}`, adminCookie, {
+      reference: 'header-only-edit',
+    });
+    expect(putDo.status).toBe(200);
+    const getDo = await api('GET', `/api/delivery-orders/${doId}`, adminCookie);
+    const doData = getDo.data as { customer_id?: number | null };
+    expect(doData.customer_id).toBe(persistId);
+
+    await api('DELETE', `/api/invoices/${invId}`, adminCookie);
+    await api('DELETE', `/api/delivery-orders/${doId}`, adminCookie);
+    await api('DELETE', `/api/customers/${persistId}`, adminCookie);
+  });
+
+  test('PUT /api/invoices for an exempt-customer invoice WITHOUT customer_id in body still forces ZeroRated', async () => {
+    // Reproduces the bug where the body omits customer_id, so the PUT handler
+    // skipped the customer lookup and lost the authoritative VAT rule.
+    const cust = await api('POST', '/api/customers', adminCookie, {
+      name: 'Exempt PUT-Without-CustomerId LLC',
+      email: 'exempt-put-noid@customer.ae',
+      vatTreatment: 'exempt',
+      dataSource: 'e2e_test',
+    });
+    expect(cust.status).toBe(201);
+    const exemptCustomerId = (cust.data as { id: number }).id;
+    if (!IDs.product) {
+      await api('DELETE', `/api/customers/${exemptCustomerId}`, adminCookie);
+      return;
+    }
+    const create = await api('POST', '/api/invoices', adminCookie, {
+      customer_id: exemptCustomerId,
+      invoice_date: '2026-04-15',
+      status: 'draft',
+      currency: 'AED',
+      items: [{ product_id: IDs.product, description: 'baseline', quantity: 1, unit_price: 200 }],
+    });
+    expect(create.status).toBe(201);
+    const invId = (create.data as { id: number }).id;
+
+    // PUT without customer_id, but with StandardRated. Customer is exempt
+    // → must still resolve to ZeroRated and VAT 0.
+    const update = await api('PUT', `/api/invoices/${invId}`, adminCookie, {
+      tax_treatment: 'StandardRated',
+      items: [{ product_id: IDs.product, description: 'put-noid', quantity: 3, unit_price: 200 }],
+    });
+    expect(update.status).toBe(200);
+    const get = await api('GET', `/api/invoices/${invId}`, adminCookie);
+    const inv = get.data as { amount?: string; vatAmount?: string; taxTreatment?: string };
+    expect(inv.taxTreatment).toBe('ZeroRated');
+    expect(parseFloat(String(inv.vatAmount))).toBeCloseTo(0, 2);
+    expect(parseFloat(String(inv.amount))).toBeCloseTo(600, 2);
+
+    await api('DELETE', `/api/invoices/${invId}`, adminCookie);
+    await api('DELETE', `/api/customers/${exemptCustomerId}`, adminCookie);
+  });
+
+  test('PUT /api/delivery-orders for an exempt-customer DO WITHOUT customer_id in body still forces ZeroRated', async () => {
+    const cust = await api('POST', '/api/customers', adminCookie, {
+      name: 'Exempt DO PUT-Without-CustomerId LLC',
+      email: 'exempt-do-put-noid@customer.ae',
+      vatTreatment: 'exempt',
+      dataSource: 'e2e_test',
+    });
+    expect(cust.status).toBe(201);
+    const exemptCustomerId = (cust.data as { id: number }).id;
+    if (!IDs.product) {
+      await api('DELETE', `/api/customers/${exemptCustomerId}`, adminCookie);
+      return;
+    }
+    const create = await api('POST', '/api/delivery-orders', adminCookie, {
+      customer_id: exemptCustomerId,
+      status: 'draft',
+      currency: 'AED',
+      items: [{ product_id: IDs.product, description: 'do-baseline', quantity: 1, unit_price: 80 }],
+    });
+    expect(create.status).toBe(201);
+    const doId = (create.data as { id: number }).id;
+
+    const update = await api('PUT', `/api/delivery-orders/${doId}`, adminCookie, {
+      tax_treatment: 'StandardRated',
+      items: [{ product_id: IDs.product, description: 'do-put-noid', quantity: 5, unit_price: 80 }],
+    });
+    expect(update.status).toBe(200);
+    const get = await api('GET', `/api/delivery-orders/${doId}`, adminCookie);
+    const doData = get.data as { tax_treatment?: string; tax_amount?: number; total_amount?: number };
+    expect(doData.tax_treatment).toBe('ZeroRated');
+    expect(Number(doData.tax_amount)).toBeCloseTo(0, 2);
+    expect(Number(doData.total_amount)).toBeCloseTo(400, 2);
+
+    await api('DELETE', `/api/delivery-orders/${doId}`, adminCookie);
+    await api('DELETE', `/api/customers/${exemptCustomerId}`, adminCookie);
+  });
+
+  test('POST /api/invoices/from-quotation for an exempt customer produces ZeroRated invoice with VAT 0', async () => {
+    const cust = await api('POST', '/api/customers', adminCookie, {
+      name: 'Exempt FromQuote LLC',
+      email: 'exempt-fromquote@customer.ae',
+      vatTreatment: 'exempt',
+      dataSource: 'e2e_test',
+    });
+    expect(cust.status).toBe(201);
+    const exemptCustomerId = (cust.data as { id: number }).id;
+    if (!IDs.product) {
+      await api('DELETE', `/api/customers/${exemptCustomerId}`, adminCookie);
+      return;
+    }
+    // Create a quote for the exempt customer
+    const quote = await api('POST', '/api/quotations', adminCookie, {
+      customerId: exemptCustomerId,
+      customerName: 'Exempt FromQuote LLC',
+      quoteDate: '2026-04-16',
+      validUntil: '2026-05-16',
+      status: 'draft',
+      items: [{ product_id: IDs.product, quantity: 4, unit_price: 250, discount: 0, vat_rate: 0.05, line_total: 1000 }],
+    });
+    expect(quote.status).toBe(201);
+    const quoteId = (quote.data as { id: number }).id;
+
+    // Convert to invoice. Even if the quote was somehow standard-rated,
+    // an exempt customer must produce a ZeroRated invoice with VAT 0.
+    const conv = await api('POST', '/api/invoices/from-quotation', adminCookie, { quotationId: quoteId });
+    expect(conv.status).toBe(201);
+    const invId = (conv.data as { id: number }).id;
+
+    const get = await api('GET', `/api/invoices/${invId}`, adminCookie);
+    const inv = get.data as { amount?: string; vatAmount?: string; taxTreatment?: string };
+    expect(inv.taxTreatment).toBe('ZeroRated');
+    expect(parseFloat(String(inv.vatAmount))).toBeCloseTo(0, 2);
+    // 4 * 250 = 1000 subtotal, 0 VAT, 1000 grand total
+    expect(parseFloat(String(inv.amount))).toBeCloseTo(1000, 2);
+
+    await api('DELETE', `/api/invoices/${invId}`, adminCookie);
+    await api('DELETE', `/api/quotations/${quoteId}`, adminCookie);
+    await api('DELETE', `/api/customers/${exemptCustomerId}`, adminCookie);
+  });
+
   test('PUT /api/delivery-orders header-only with unknown tax_treatment normalises to ZeroRated (no items branch)', async () => {
     if (!IDs.customer || !IDs.product) return;
 

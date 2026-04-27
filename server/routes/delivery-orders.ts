@@ -4,7 +4,7 @@ import { db } from "../db";
 import { and, eq } from "drizzle-orm";
 import { businessStorage } from "../businessStorage";
 import { requireAuth, writeAuditLog, objectStorageClient, updateProductStock, type AuthenticatedRequest } from "../middleware";
-import { resolveDocumentTotals, inferTaxTreatmentFromCustomer, isTotalsError, normalizeTaxTreatment } from "../utils/totals";
+import { resolveDocumentTotals, isTotalsError, normalizeTaxTreatment, resolveAuthoritativeTaxTreatment } from "../utils/totals";
 
 export function registerDeliveryOrderRoutes(app: Express) {
   app.get('/api/delivery-orders', requireAuth(), async (req: AuthenticatedRequest, res) => {
@@ -191,7 +191,14 @@ export function registerDeliveryOrderRoutes(app: Express) {
       const defaultVatRate = doSettingsRow[0]?.defaultVatRate
         ? parseFloat(doSettingsRow[0].defaultVatRate)
         : 0.05;
-      const requestedTreatment = body.tax_treatment ?? inferTaxTreatmentFromCustomer(customerVatTreatment);
+      // Customer is authoritative for VAT — a zero-rated/exempt/reverse-
+      // charge/international customer always resolves to ZeroRated, even
+      // if the client tries to force StandardRated.
+      const requestedTreatment = resolveAuthoritativeTaxTreatment(
+        body.tax_treatment,
+        null,
+        customerVatTreatment,
+      );
       let resolved;
       try {
         resolved = resolveDocumentTotals({
@@ -285,7 +292,8 @@ export function registerDeliveryOrderRoutes(app: Express) {
 
       const oldItems = await db.select().from(deliveryOrderItems).where(eq(deliveryOrderItems.doId, id));
 
-      let customerName = body.customer_name || 'Unknown Customer';
+      const bodyCustomerName: string | undefined = body.customer_name;
+      let customerName = bodyCustomerName || 'Unknown Customer';
       let customerId: number | undefined = undefined;
       let customerVatTreatment: string | null = null;
       if (body.customer_id) {
@@ -295,7 +303,20 @@ export function registerDeliveryOrderRoutes(app: Express) {
           customerId = customer.id;
           customerVatTreatment = customer.vatTreatment ?? null;
         }
+      } else if (existingDO.customerId) {
+        // Body omitted customer_id — fall back to the existing DO's
+        // customer so authoritative VAT resolution still applies (an
+        // exempt customer must never be silently switched to VAT).
+        const cust = await businessStorage.getCustomerById(existingDO.customerId);
+        customerVatTreatment = cust?.vatTreatment ?? null;
       }
+      // Preserve existing customer linkage on header-only edits so
+      // future edits retain authoritative VAT.
+      const persistCustomerId = customerId ?? existingDO.customerId ?? null;
+      const persistCustomerName =
+        bodyCustomerName
+        ?? (customerId ? customerName : existingDO.customerName)
+        ?? 'Unknown Customer';
 
       const newStatus = body.status || 'draft';
 
@@ -314,15 +335,15 @@ export function registerDeliveryOrderRoutes(app: Express) {
         ? parseFloat(putSettingsRow.defaultVatRate)
         : 0.05;
 
-      // Tax treatment fallback chain so a header-only edit on a ZeroRated DO
-      // cannot silently flip to StandardRated and add VAT:
-      //   body.tax_treatment > existing DO taxTreatment >
-      //   inferred from customer.vatTreatment > ZeroRated (conservative
-      //   default: never silently add 5% VAT when treatment is unknown).
-      const requestedTreatment =
-        body.tax_treatment
-        ?? existingDO.taxTreatment
-        ?? inferTaxTreatmentFromCustomer(customerVatTreatment);
+      // Authoritative VAT resolution. Customer wins when explicitly
+      // zero-rated/exempt/reverse-charge/international (no VAT can be
+      // added, even if the client requested StandardRated). Otherwise
+      // fall back through body > existing > customer-inferred.
+      const requestedTreatment = resolveAuthoritativeTaxTreatment(
+        body.tax_treatment,
+        existingDO.taxTreatment,
+        customerVatTreatment,
+      );
       const willReplaceItems = Array.isArray(body.items) && body.items.length > 0;
 
       let resolvedTreatment: 'StandardRated' | 'ZeroRated' = 'StandardRated';
@@ -393,8 +414,8 @@ export function registerDeliveryOrderRoutes(app: Express) {
       }
 
       await db.update(deliveryOrders).set({
-        customerName,
-        customerId: customerId || null,
+        customerName: persistCustomerName,
+        customerId: persistCustomerId,
         status: newStatus,
         orderDate: body.order_date || null,
         reference: body.reference || null,

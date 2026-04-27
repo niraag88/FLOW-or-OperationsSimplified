@@ -5,7 +5,7 @@ import { db } from "../db";
 import { eq } from "drizzle-orm";
 import { businessStorage } from "../businessStorage";
 import { requireAuth, writeAuditLog, updateProductStock, objectStorageClient, type AuthenticatedRequest } from "../middleware";
-import { resolveDocumentTotals, inferTaxTreatmentFromCustomer, isTotalsError, normalizeTaxTreatment } from "../utils/totals";
+import { resolveDocumentTotals, isTotalsError, normalizeTaxTreatment, resolveAuthoritativeTaxTreatment } from "../utils/totals";
 
 export function registerInvoiceRoutes(app: Express) {
   app.get('/api/invoices', requireAuth(), async (req: AuthenticatedRequest, res) => {
@@ -258,7 +258,14 @@ export function registerInvoiceRoutes(app: Express) {
       const defaultVatRate = invSettingsRow[0]?.defaultVatRate
         ? parseFloat(invSettingsRow[0].defaultVatRate)
         : 0.05;
-      const requestedTreatment = body.tax_treatment ?? inferTaxTreatmentFromCustomer(customer.vatTreatment);
+      // Customer is authoritative for VAT — a zero-rated/exempt/reverse-
+      // charge/international customer always resolves to ZeroRated, even
+      // if the client tries to force StandardRated.
+      const requestedTreatment = resolveAuthoritativeTaxTreatment(
+        body.tax_treatment,
+        null,
+        customer.vatTreatment,
+      );
       let resolved;
       try {
         resolved = resolveDocumentTotals({
@@ -367,6 +374,8 @@ export function registerInvoiceRoutes(app: Express) {
         stockDeducted: invoices.stockDeducted,
         invoiceNumber: invoices.invoiceNumber,
         taxTreatment: invoices.taxTreatment,
+        customerId: invoices.customerId,
+        customerName: invoices.customerName,
       }).from(invoices).where(eq(invoices.id, id));
 
       if (!existingInvoice) {
@@ -417,20 +426,23 @@ export function registerInvoiceRoutes(app: Express) {
         ? parseFloat(putSettingsRow.defaultVatRate)
         : 0.05;
 
-      // Tax treatment fallback chain so a header-only edit on a ZeroRated
-      // invoice cannot silently flip to StandardRated and add VAT:
-      //   body.tax_treatment > existing invoice taxTreatment >
-      //   inferred from customer.vatTreatment > ZeroRated (conservative
-      //   default: never silently add 5% VAT when treatment is unknown).
+      // Authoritative VAT resolution. Customer wins when explicitly
+      // zero-rated/exempt/reverse-charge/international (no VAT can be
+      // added, even if the client requested StandardRated). Otherwise
+      // fall back through body > existing > customer-inferred.
+      // CRITICAL: when the body omits customer_id, fall back to the
+      // existing invoice's customer so authority still applies.
+      const effectiveCustomerIdForVat = customerId ?? existingInvoice.customerId ?? null;
       let putCustomerVatTreatment: string | null = null;
-      if (customerId) {
-        const cust = await businessStorage.getCustomerById(customerId);
+      if (effectiveCustomerIdForVat) {
+        const cust = await businessStorage.getCustomerById(effectiveCustomerIdForVat);
         putCustomerVatTreatment = cust?.vatTreatment ?? null;
       }
-      const treatmentInput =
-        body.tax_treatment
-        ?? existingInvoice.taxTreatment
-        ?? inferTaxTreatmentFromCustomer(putCustomerVatTreatment);
+      const treatmentInput = resolveAuthoritativeTaxTreatment(
+        body.tax_treatment,
+        existingInvoice.taxTreatment,
+        putCustomerVatTreatment,
+      );
 
       let resolvedTreatment: 'StandardRated' | 'ZeroRated' = 'StandardRated';
       let resolvedItems: Array<{
@@ -511,11 +523,20 @@ export function registerInvoiceRoutes(app: Express) {
 
       // Wrap header update + line item replace + stock movements in one transaction so
       // a failure rolls back everything and inventory never silently desyncs.
+      // Preserve the existing customer linkage when the body omits
+      // customer fields. Otherwise a header-only edit would silently
+      // null out customerId and break VAT authority on the next edit.
+      const persistCustomerId = customerId ?? existingInvoice.customerId ?? null;
+      const persistCustomerName =
+        body.customer_name
+        ?? (customerId ? customerName : existingInvoice.customerName)
+        ?? 'Unknown Customer';
+
       await db.transaction(async (tx) => {
         // 1. Update header — totals are server-computed; client values are ignored.
         await tx.update(invoices).set({
-          customerName,
-          customerId: customerId || null,
+          customerName: persistCustomerName,
+          customerId: persistCustomerId,
           amount: resolvedTotal.toFixed(2),
           vatAmount: resolvedVatAmount.toFixed(2),
           status: newStatus,
