@@ -91,7 +91,7 @@ export default function DOActionsDropdown({ doOrder, canEdit, onEdit, onRefresh,
         productId: item.product_id ?? item.productId,
         description: item.description || item.product_name || `Product ${item.product_id ?? item.productId}`,
         quantity: item.quantity,
-      }));
+      })).filter((i: StockLineItem) => i.productId);
       setCancelItems(items);
       setShowCancelDialog(true);
     } catch {
