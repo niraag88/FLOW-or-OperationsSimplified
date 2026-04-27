@@ -1,0 +1,109 @@
+Please fix the partial stock reversal risk in invoice and delivery order cancellation.
+
+Problem:
+Delivered invoices and delivered delivery orders can currently be cancelled while only reversing stock for selected products. The UI uses CancelWithStockDialog to let users uncheck items, then sends productIdsToReverse to the backend. The backend then marks the whole document as cancelled even if only some stock was reversed.
+
+This is dangerous because the document status says “cancelled”, but inventory may only be partly corrected. A cancellation should mean the whole document is cancelled and all stock effects are reversed, exactly once. Partial returns, goodwill cases, credit notes, or customer-kept items should be handled later as a separate feature, not hidden inside cancellation.
+
+Affected files:
+- server/routes/invoices.ts
+- server/routes/delivery-orders.ts
+- client/src/components/common/CancelWithStockDialog.tsx
+- client/src/components/invoices/InvoiceActionsDropdown.tsx
+- client/src/components/delivery-orders/DOActionsDropdown.tsx
+- Add or update relevant tests if practical, especially invoice and delivery-order cancellation tests.
+
+Current risky behavior:
+- Invoice cancellation accepts productIdsToReverse.
+- Delivery order cancellation accepts productIdsToReverse.
+- The frontend lets users choose only some products to return to stock.
+- The backend still marks the whole invoice/DO as cancelled.
+- For invoices, stockDeducted can be set to false even after only a partial reversal.
+- For delivery orders, a delivered DO can become cancelled while only some stock movements were reversed.
+
+Desired correct behavior:
+- Cancellation must be all-or-nothing.
+- Cancelling a delivered invoice must reverse all stock deducted by that invoice.
+- Cancelling a delivered delivery order must reverse the full net stock effect of that delivery order.
+- Cancelling a non-stock-deducted invoice should only mark it cancelled.
+- Cancelling a submitted delivery order should mark it cancelled without stock movement.
+- Draft delivery orders should still be deleted, not cancelled, as the current route says.
+- No partial stock reversal should be possible through the UI or API.
+
+Exact backend rules:
+1. In both PATCH /api/invoices/:id/cancel and PATCH /api/delivery-orders/:id/cancel, reject any request body containing productIdsToReverse.
+2. Return HTTP 400 with an error like partial_stock_reversal_not_allowed.
+3. This rejection must happen before changing document status or stock.
+4. Invoice cancellation:
+   - Reject already-cancelled invoices.
+   - Use one database transaction.
+   - Lock the invoice row if practical.
+   - If stockDeducted is true, aggregate invoice line items by productId.
+   - For each product, reverse the full quantity using updateProductStock.
+   - Suggested movementType: invoice_cancellation.
+   - Suggested referenceType: invoice.
+   - Use the invoice id as referenceId.
+   - Use the line item unit price where useful for the audit trail.
+   - Only after all stock reversals succeed, set status = cancelled and stockDeducted = false.
+   - If stockDeducted is false, just set status = cancelled.
+5. Delivery order cancellation:
+   - Reject already-cancelled DOs.
+   - Reject draft DOs with the existing “delete drafts instead” behavior.
+   - Use one database transaction.
+   - Lock the delivery order row if practical.
+   - If status is delivered, load stockMovements where referenceType = delivery_order and referenceId = the DO id.
+   - Aggregate net quantity by productId.
+   - For each product where net quantity is not zero, reverse it using updateProductStock with quantity = -netQuantity.
+   - Suggested movementType: delivery_order_cancellation.
+   - Suggested referenceType: delivery_order.
+   - Use the DO id as referenceId.
+   - Only after all stock reversals succeed, set status = cancelled.
+   - If status is submitted, set status = cancelled without stock movement.
+6. Do not delete line items, original stock movements, invoice rows, or delivery order rows.
+7. Add a clear audit log entry showing the document number and whether stock was fully reversed.
+
+Frontend rules:
+1. Remove the ability to choose individual products during cancellation.
+2. The cancel dialog can still show a read-only preview of stock that will be reversed, but there must be no checkboxes, select-all, deselect-all, or “keep item” wording.
+3. InvoiceActionsDropdown must call PATCH /api/invoices/:id/cancel without productIdsToReverse.
+4. DOActionsDropdown must call PATCH /api/delivery-orders/:id/cancel without productIdsToReverse.
+5. If CancelWithStockDialog is still used, convert it into a read-only “confirm full stock reversal” dialog. Otherwise replace it with the existing SimpleConfirmDialog plus clear wording.
+6. Wording should say: cancelling this delivered document will reverse all stock for the document and cannot be undone.
+
+Edge cases:
+- Duplicate product lines must be aggregated so stock reverses once per product with the correct total quantity.
+- Items without productId should not create stock movements.
+- Already-cancelled documents must not create a second reversal.
+- If a delivered DO has prior edit adjustments, cancellation must reverse the net effect, not blindly duplicate each old movement.
+- API callers trying to pass productIdsToReverse must get 400 and no database changes.
+- If stock reversal fails halfway, the document must remain unchanged because the whole operation is inside one transaction.
+
+Manual test steps:
+1. Create a delivered invoice with two products. Confirm stock is deducted. Cancel it. Confirm both products are fully restored, invoice status is cancelled, and stockDeducted is false.
+2. Create a delivered invoice, edit quantities while delivered, then cancel it. Confirm stock returns to the correct pre-invoice level.
+3. Try PATCH /api/invoices/:id/cancel with {"productIdsToReverse":[oneProductId]}. Confirm it returns 400 and the invoice/stock are unchanged.
+4. Create a delivered delivery order with two products. Confirm stock is deducted. Cancel it. Confirm both products are fully restored and DO status is cancelled.
+5. Create a delivered DO, edit its delivered quantities, then cancel it. Confirm cancellation reverses the net stock effect correctly.
+6. Try PATCH /api/delivery-orders/:id/cancel with {"productIdsToReverse":[oneProductId]}. Confirm it returns 400 and the DO/stock are unchanged.
+7. Try cancelling an already-cancelled invoice and DO. Confirm no second stock movement is created.
+8. Confirm the UI no longer allows selecting only some products during cancellation.
+
+Acceptance criteria:
+- No UI path allows partial stock reversal during cancellation.
+- No API path allows partial stock reversal during cancellation.
+- Delivered invoice cancellation fully reverses stock and sets stockDeducted false.
+- Delivered DO cancellation fully reverses the net stock effect.
+- Submitted/non-stock documents cancel without stock movement.
+- Cancellation is transactional: stock and document status cannot get out of sync.
+- Original records and movement history remain preserved for audit.
+- Clear audit logs are written.
+
+Avoid changing:
+- Do not change VAT calculations.
+- Do not change invoice totals/export/PDF logic.
+- Do not change GRN cancellation logic.
+- Do not change backup/restore logic.
+- Do not change authentication or roles.
+- Do not add credit notes or partial returns in this ticket.
+- Do not add database schema changes or migrations.
+- Do not rewrite unrelated stock helpers unless strictly necessary.
