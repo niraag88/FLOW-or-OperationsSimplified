@@ -29,7 +29,17 @@ test.describe('Purchase Orders', () => {
 
   test.afterAll(async () => {
     if (simplePOId) await apiDelete(`/api/purchase-orders/${simplePOId}`, cookie);
-    if (lifecycleGrnId) await apiDelete(`/api/goods-receipts/${lifecycleGrnId}`, cookie);
+    if (lifecycleGrnId) {
+      // GRN must be cancelled before it can be deleted (audit-preserving workflow).
+      try {
+        await fetch(`${BASE_URL}/api/goods-receipts/${lifecycleGrnId}/cancel`, {
+          method: 'PATCH',
+          headers: { 'Content-Type': 'application/json', cookie },
+          body: JSON.stringify({ confirmNegativeStock: true, acknowledgePaidGrn: true }),
+        });
+      } catch {}
+      await apiDelete(`/api/goods-receipts/${lifecycleGrnId}`, cookie);
+    }
     if (lifecyclePoId) await apiDelete(`/api/purchase-orders/${lifecyclePoId}`, cookie);
   });
 

@@ -7,16 +7,38 @@ import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
-import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
+import { Dialog, DialogContent, DialogFooter, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
-import { PackageCheck, Save, TrendingUp, AlertTriangle, Pencil, X, Check } from "lucide-react";
+import { PackageCheck, Save, TrendingUp, AlertTriangle, Pencil, X, Check, Ban, Trash2 } from "lucide-react";
 import { Label } from "@/components/ui/label";
 import { useToast } from "@/hooks/use-toast";
 import { format } from "date-fns";
 import { formatDate } from "@/utils/dateUtils";
 
 const STALE_3MIN = 3 * 60 * 1000;
+
+type StatusFilter = "all" | "confirmed" | "cancelled";
+
+type CancelDialogState = {
+  open: boolean;
+  grn: any | null;
+  step: "initial" | "negativeStock" | "paidAck";
+  negativeStock: Array<{ productId: number; productName: string; currentStock: number; reversalQty: number; projectedStock: number }>;
+  paidMessage: string | null;
+  confirmNegativeStock: boolean;
+  acknowledgePaidGrn: boolean;
+};
+
+const initialCancelState: CancelDialogState = {
+  open: false,
+  grn: null,
+  step: "initial",
+  negativeStock: [],
+  paidMessage: null,
+  confirmNegativeStock: false,
+  acknowledgePaidGrn: false,
+};
 
 export default function GoodsReceipts() {
   const [showCreateDialog, setShowCreateDialog] = useState(false);
@@ -30,6 +52,10 @@ export default function GoodsReceipts() {
   const [editRefNumber, setEditRefNumber] = useState("");
   const [editRefDate, setEditRefDate] = useState("");
   const [savingRef, setSavingRef] = useState(false);
+  const [statusFilter, setStatusFilter] = useState<StatusFilter>("all");
+  const [cancelDialog, setCancelDialog] = useState<CancelDialogState>(initialCancelState);
+  const [cancelling, setCancelling] = useState(false);
+  const [deletingGrnId, setDeletingGrnId] = useState<number | null>(null);
   const { toast } = useToast();
 
   const { data: goodsReceipts = [], isLoading: loadingReceipts, error: grnError } = useQuery({
@@ -110,6 +136,103 @@ export default function GoodsReceipts() {
     setEditingGrnId(null);
     setEditRefNumber("");
     setEditRefDate("");
+  };
+
+  const openCancelDialog = (receipt: any) => {
+    setCancelDialog({
+      open: true,
+      grn: receipt,
+      step: "initial",
+      negativeStock: [],
+      paidMessage: null,
+      confirmNegativeStock: false,
+      acknowledgePaidGrn: receipt.paymentStatus === 'paid' ? false : true,
+    });
+  };
+
+  const closeCancelDialog = () => {
+    if (cancelling) return;
+    setCancelDialog(initialCancelState);
+  };
+
+  const submitCancel = async (overrides?: { confirmNegativeStock?: boolean; acknowledgePaidGrn?: boolean }) => {
+    if (!cancelDialog.grn) return;
+    const grn = cancelDialog.grn;
+    const body = {
+      confirmNegativeStock: overrides?.confirmNegativeStock ?? cancelDialog.confirmNegativeStock,
+      acknowledgePaidGrn: overrides?.acknowledgePaidGrn ?? cancelDialog.acknowledgePaidGrn,
+    };
+    setCancelling(true);
+    try {
+      const res = await fetch(`/api/goods-receipts/${grn.id}/cancel`, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        credentials: 'include',
+        body: JSON.stringify(body),
+      });
+      if (res.status === 409) {
+        const data = await res.json().catch(() => ({}));
+        if (data.error === 'paid_grn_requires_ack') {
+          setCancelDialog(prev => ({ ...prev, step: 'paidAck', paidMessage: data.message || 'This GRN is marked as paid.' }));
+          return;
+        }
+        if (data.error === 'negative_stock') {
+          setCancelDialog(prev => ({ ...prev, step: 'negativeStock', negativeStock: data.products || [] }));
+          return;
+        }
+        toast({ title: 'Cannot cancel GRN', description: data.error || data.message || 'Conflict', variant: 'destructive' });
+        return;
+      }
+      if (!res.ok) {
+        const data = await res.json().catch(() => ({}));
+        throw new Error(data.message || data.error || `HTTP ${res.status}`);
+      }
+      const data = await res.json();
+      const negCount = Array.isArray(data.negativeStock) ? data.negativeStock.length : 0;
+      toast({
+        title: `GRN ${grn.receiptNumber} cancelled`,
+        description: negCount > 0
+          ? `Stock reversed. WARNING: ${negCount} product(s) now show negative stock.`
+          : `Stock reversed for ${data.reversedProducts?.length || 0} product(s). Original receipt history preserved.`,
+        variant: negCount > 0 ? 'destructive' : 'default',
+      });
+      await queryClient.invalidateQueries({ queryKey: ['/api/goods-receipts'] });
+      await queryClient.invalidateQueries({ queryKey: ['/api/purchase-orders'] });
+      await queryClient.invalidateQueries({ queryKey: ['/api/products'] });
+      await queryClient.invalidateQueries({ queryKey: ['/api/dashboard'] });
+      setCancelDialog(initialCancelState);
+    } catch (err: any) {
+      console.error('Failed to cancel GRN:', err);
+      toast({ title: 'Cancellation failed', description: err.message || 'Please try again.', variant: 'destructive' });
+    } finally {
+      setCancelling(false);
+    }
+  };
+
+  const handleDeleteCancelled = async (receipt: any) => {
+    const ok = window.confirm(
+      `Permanently delete cancelled GRN ${receipt.receiptNumber}? Its line items and stock movement history (both original and reversal) will be removed. This cannot be undone.`
+    );
+    if (!ok) return;
+    setDeletingGrnId(receipt.id);
+    try {
+      const res = await fetch(`/api/goods-receipts/${receipt.id}`, {
+        method: 'DELETE',
+        credentials: 'include',
+      });
+      if (!res.ok) {
+        const data = await res.json().catch(() => ({}));
+        throw new Error(data.message || data.error || `HTTP ${res.status}`);
+      }
+      toast({ title: `GRN ${receipt.receiptNumber} deleted`, description: 'Cancelled receipt removed.' });
+      await queryClient.invalidateQueries({ queryKey: ['/api/goods-receipts'] });
+      await queryClient.invalidateQueries({ queryKey: ['/api/purchase-orders'] });
+    } catch (err: any) {
+      console.error('Failed to delete cancelled GRN:', err);
+      toast({ title: 'Delete failed', description: err.message || 'Please try again.', variant: 'destructive' });
+    } finally {
+      setDeletingGrnId(null);
+    }
   };
 
   const saveRef = async (grnId: number) => {
@@ -351,10 +474,30 @@ export default function GoodsReceipts() {
       {/* Goods Receipts Table */}
       <Card>
         <CardHeader>
-          <CardTitle className="flex items-center gap-2">
-            <PackageCheck className="w-5 h-5" />
-            Recent Goods Receipts
-          </CardTitle>
+          <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
+            <CardTitle className="flex items-center gap-2">
+              <PackageCheck className="w-5 h-5" />
+              Recent Goods Receipts
+            </CardTitle>
+            <div className="flex items-center gap-2">
+              <span className="text-xs text-gray-500">Status:</span>
+              {(["all", "confirmed", "cancelled"] as StatusFilter[]).map(opt => (
+                <button
+                  key={opt}
+                  type="button"
+                  onClick={() => setStatusFilter(opt)}
+                  className={`text-xs px-2.5 py-1 rounded-full border transition-colors ${
+                    statusFilter === opt
+                      ? 'bg-emerald-600 text-white border-emerald-600'
+                      : 'bg-white text-gray-600 border-gray-300 hover:bg-gray-50'
+                  }`}
+                  data-testid={`grn-filter-${opt}`}
+                >
+                  {opt === 'all' ? 'All' : opt.charAt(0).toUpperCase() + opt.slice(1)}
+                </button>
+              ))}
+            </div>
+          </div>
         </CardHeader>
         <CardContent>
           {loadingReceipts ? (
@@ -380,8 +523,10 @@ export default function GoodsReceipts() {
                 </TableRow>
               </TableHeader>
               <TableBody>
-                {goodsReceipts.map((receipt: any) => (
-                  <TableRow key={receipt.id}>
+                {goodsReceipts
+                  .filter((r: any) => statusFilter === 'all' ? true : r.status === statusFilter)
+                  .map((receipt: any) => (
+                  <TableRow key={receipt.id} className={receipt.status === 'cancelled' ? 'bg-red-50/40' : ''}>
                     <TableCell className="font-mono font-medium">
                       {receipt.receiptNumber}
                     </TableCell>
@@ -421,7 +566,13 @@ export default function GoodsReceipts() {
                       <div className="flex items-center gap-1.5 flex-wrap">
                         <Badge
                           variant={receipt.status === 'confirmed' ? 'default' : 'secondary'}
-                          className={receipt.status === 'confirmed' ? 'bg-green-100 text-green-800' : ''}
+                          className={
+                            receipt.status === 'confirmed'
+                              ? 'bg-green-100 text-green-800'
+                              : receipt.status === 'cancelled'
+                                ? 'bg-red-100 text-red-800 border border-red-200'
+                                : ''
+                          }
                         >
                           {receipt.status}
                         </Badge>
@@ -464,13 +615,37 @@ export default function GoodsReceipts() {
                           </button>
                         </div>
                       ) : (
-                        <button
-                          onClick={() => startEditRef(receipt)}
-                          className="p-1 text-gray-400 hover:text-blue-600 transition-colors"
-                          title="Edit reference"
-                        >
-                          <Pencil className="w-3.5 h-3.5" />
-                        </button>
+                        <div className="flex items-center gap-1">
+                          <button
+                            onClick={() => startEditRef(receipt)}
+                            className="p-1 text-gray-400 hover:text-blue-600 transition-colors"
+                            title="Edit reference"
+                            data-testid={`grn-edit-ref-${receipt.id}`}
+                          >
+                            <Pencil className="w-3.5 h-3.5" />
+                          </button>
+                          {receipt.status === 'confirmed' && (
+                            <button
+                              onClick={() => openCancelDialog(receipt)}
+                              className="p-1 text-gray-400 hover:text-orange-600 transition-colors"
+                              title="Cancel GRN (reverse stock, keep audit trail)"
+                              data-testid={`grn-cancel-${receipt.id}`}
+                            >
+                              <Ban className="w-3.5 h-3.5" />
+                            </button>
+                          )}
+                          {receipt.status === 'cancelled' && (
+                            <button
+                              onClick={() => handleDeleteCancelled(receipt)}
+                              disabled={deletingGrnId === receipt.id}
+                              className="p-1 text-gray-400 hover:text-red-600 transition-colors disabled:opacity-50"
+                              title="Permanently delete cancelled GRN"
+                              data-testid={`grn-delete-${receipt.id}`}
+                            >
+                              <Trash2 className="w-3.5 h-3.5" />
+                            </button>
+                          )}
+                        </div>
                       )}
                     </TableCell>
                   </TableRow>
@@ -503,11 +678,143 @@ export default function GoodsReceipts() {
               <div className="mt-3 text-xs text-blue-600">
                 <p>📦 PO → Goods Receipt → <strong>Stock Added</strong></p>
                 <p>📋 Invoice → Sale Processed → <strong>Stock Deducted</strong></p>
+                <p>🚫 GRN Cancelled → <strong>Stock Reversed</strong> (original receipt history preserved)</p>
               </div>
             </div>
           </div>
         </CardContent>
       </Card>
+
+      {/* Cancel GRN Dialog */}
+      <Dialog open={cancelDialog.open} onOpenChange={(open) => { if (!open) closeCancelDialog(); }}>
+        <DialogContent className="max-w-lg" data-testid="grn-cancel-dialog">
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2 text-orange-700">
+              <Ban className="w-5 h-5" />
+              Cancel Goods Receipt {cancelDialog.grn?.receiptNumber}
+            </DialogTitle>
+          </DialogHeader>
+
+          {cancelDialog.step === 'initial' && (
+            <div className="space-y-3 text-sm text-gray-700">
+              <p>
+                Cancelling this GRN will <strong>reverse the stock</strong> it added (a new reversal stock movement
+                will be recorded against each affected product) and mark the receipt as <strong>cancelled</strong>.
+              </p>
+              <p>
+                The original receipt and its stock movement history will be <strong>preserved</strong> for audit.
+                You cannot undo a cancellation.
+              </p>
+              {cancelDialog.grn?.paymentStatus === 'paid' && (
+                <p className="rounded bg-amber-50 border border-amber-200 p-2 text-amber-800 text-xs">
+                  <strong>Heads up:</strong> this GRN is marked as paid to the supplier. You'll be asked to acknowledge
+                  this on the next step.
+                </p>
+              )}
+            </div>
+          )}
+
+          {cancelDialog.step === 'paidAck' && (
+            <div className="space-y-3 text-sm">
+              <div className="rounded bg-amber-50 border border-amber-300 p-3 text-amber-900">
+                <p className="font-semibold mb-1">Paid GRN — supplier acknowledgement required</p>
+                <p className="text-xs">{cancelDialog.paidMessage}</p>
+              </div>
+              <label className="flex items-start gap-2 cursor-pointer text-xs text-gray-700">
+                <input
+                  type="checkbox"
+                  className="mt-0.5"
+                  checked={cancelDialog.acknowledgePaidGrn}
+                  onChange={(e) => setCancelDialog(prev => ({ ...prev, acknowledgePaidGrn: e.target.checked }))}
+                  data-testid="grn-cancel-ack-paid"
+                />
+                <span>I acknowledge that this GRN was paid to the supplier and cancelling it does not refund the payment. I will handle the supplier-side accounting (e.g. debit note) separately.</span>
+              </label>
+            </div>
+          )}
+
+          {cancelDialog.step === 'negativeStock' && (
+            <div className="space-y-3 text-sm">
+              <div className="rounded bg-red-50 border border-red-300 p-3 text-red-900">
+                <p className="font-semibold mb-1">Cancelling will produce negative stock</p>
+                <p className="text-xs">
+                  Stock for the products below has likely already been sold or adjusted since this GRN was confirmed.
+                  Proceeding will leave them with a negative stock count, which usually means goods were sold from this
+                  receipt that we no longer claim to have received.
+                </p>
+              </div>
+              <div className="border rounded overflow-hidden">
+                <table className="w-full text-xs">
+                  <thead className="bg-gray-50 text-gray-600">
+                    <tr>
+                      <th className="text-left px-2 py-1.5">Product</th>
+                      <th className="text-right px-2 py-1.5">Current</th>
+                      <th className="text-right px-2 py-1.5">Reverse</th>
+                      <th className="text-right px-2 py-1.5">After</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {cancelDialog.negativeStock.map((p) => (
+                      <tr key={p.productId} className="border-t">
+                        <td className="px-2 py-1.5">{p.productName}</td>
+                        <td className="px-2 py-1.5 text-right">{p.currentStock}</td>
+                        <td className="px-2 py-1.5 text-right">-{p.reversalQty}</td>
+                        <td className="px-2 py-1.5 text-right font-semibold text-red-700">{p.projectedStock}</td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+              <label className="flex items-start gap-2 cursor-pointer text-xs text-gray-700">
+                <input
+                  type="checkbox"
+                  className="mt-0.5"
+                  checked={cancelDialog.confirmNegativeStock}
+                  onChange={(e) => setCancelDialog(prev => ({ ...prev, confirmNegativeStock: e.target.checked }))}
+                  data-testid="grn-cancel-confirm-negative"
+                />
+                <span>I understand the listed products will go into negative stock and want to proceed anyway.</span>
+              </label>
+            </div>
+          )}
+
+          <DialogFooter>
+            <Button variant="outline" onClick={closeCancelDialog} disabled={cancelling}>
+              Keep GRN
+            </Button>
+            {cancelDialog.step === 'initial' && (
+              <Button
+                variant="destructive"
+                onClick={() => submitCancel()}
+                disabled={cancelling}
+                data-testid="grn-cancel-confirm"
+              >
+                {cancelling ? 'Cancelling…' : 'Cancel GRN & reverse stock'}
+              </Button>
+            )}
+            {cancelDialog.step === 'paidAck' && (
+              <Button
+                variant="destructive"
+                onClick={() => submitCancel({ acknowledgePaidGrn: true })}
+                disabled={cancelling || !cancelDialog.acknowledgePaidGrn}
+                data-testid="grn-cancel-confirm-paid"
+              >
+                {cancelling ? 'Cancelling…' : 'Acknowledge & cancel'}
+              </Button>
+            )}
+            {cancelDialog.step === 'negativeStock' && (
+              <Button
+                variant="destructive"
+                onClick={() => submitCancel({ confirmNegativeStock: true, acknowledgePaidGrn: cancelDialog.acknowledgePaidGrn || cancelDialog.grn?.paymentStatus !== 'paid' })}
+                disabled={cancelling || !cancelDialog.confirmNegativeStock}
+                data-testid="grn-cancel-confirm-negative-proceed"
+              >
+                {cancelling ? 'Cancelling…' : 'Cancel anyway'}
+              </Button>
+            )}
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }
