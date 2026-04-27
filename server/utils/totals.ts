@@ -48,8 +48,12 @@ const round2 = (n: number) => Math.round((n + Number.EPSILON) * 100) / 100;
 
 const STANDARD_TREATMENTS = new Set(['standardrated', 'standard', 'local']);
 
+// Conservative default: anything we don't explicitly recognise as
+// standard-rated (including missing/non-string values) resolves to
+// zero-rated. This avoids silently charging 5% VAT on documents whose
+// tax treatment we can't confirm.
 export function normalizeTaxTreatment(raw: unknown): 'StandardRated' | 'ZeroRated' {
-  if (typeof raw !== 'string') return 'StandardRated';
+  if (typeof raw !== 'string') return 'ZeroRated';
   const lower = raw.trim().toLowerCase();
   if (STANDARD_TREATMENTS.has(lower)) return 'StandardRated';
   return 'ZeroRated';
@@ -110,10 +114,13 @@ export function resolveDocumentTotals(input: {
   };
 }
 
+// Mirror normalizeTaxTreatment so customers stored as 'standard'/'Local'/
+// 'StandardRated' resolve to standard-rated and anything else (including
+// 'exempt', 'reverse_charge', 'International', null, or unknown values)
+// resolves to zero-rated. Conservative on missing data — never silently
+// adds 5% VAT.
 export function inferTaxTreatmentFromCustomer(
   customerVatTreatment: string | null | undefined,
 ): 'StandardRated' | 'ZeroRated' {
-  const v = (customerVatTreatment ?? '').trim();
-  if (v === 'ZeroRated' || v === 'International') return 'ZeroRated';
-  return 'StandardRated';
+  return normalizeTaxTreatment(customerVatTreatment);
 }

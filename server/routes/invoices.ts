@@ -5,7 +5,7 @@ import { db } from "../db";
 import { eq } from "drizzle-orm";
 import { businessStorage } from "../businessStorage";
 import { requireAuth, writeAuditLog, updateProductStock, objectStorageClient, type AuthenticatedRequest } from "../middleware";
-import { resolveDocumentTotals, inferTaxTreatmentFromCustomer, isTotalsError } from "../utils/totals";
+import { resolveDocumentTotals, inferTaxTreatmentFromCustomer, isTotalsError, normalizeTaxTreatment } from "../utils/totals";
 
 export function registerInvoiceRoutes(app: Express) {
   app.get('/api/invoices', requireAuth(), async (req: AuthenticatedRequest, res) => {
@@ -420,7 +420,8 @@ export function registerInvoiceRoutes(app: Express) {
       // Tax treatment fallback chain so a header-only edit on a ZeroRated
       // invoice cannot silently flip to StandardRated and add VAT:
       //   body.tax_treatment > existing invoice taxTreatment >
-      //   inferred from customer.vatTreatment > StandardRated.
+      //   inferred from customer.vatTreatment > ZeroRated (conservative
+      //   default: never silently add 5% VAT when treatment is unknown).
       let putCustomerVatTreatment: string | null = null;
       if (customerId) {
         const cust = await businessStorage.getCustomerById(customerId);
@@ -429,7 +430,7 @@ export function registerInvoiceRoutes(app: Express) {
       const treatmentInput =
         body.tax_treatment
         ?? existingInvoice.taxTreatment
-        ?? (putCustomerVatTreatment ? inferTaxTreatmentFromCustomer(putCustomerVatTreatment) : 'StandardRated');
+        ?? inferTaxTreatmentFromCustomer(putCustomerVatTreatment);
 
       let resolvedTreatment: 'StandardRated' | 'ZeroRated' = 'StandardRated';
       let resolvedItems: Array<{
@@ -477,8 +478,10 @@ export function registerInvoiceRoutes(app: Express) {
         // the persisted totals stay consistent with the persisted lines.
         const existingItems = await db.select().from(invoiceLineItems).where(eq(invoiceLineItems.invoiceId, id));
         if (existingItems.length === 0) {
-          // Nothing to recompute against — keep zeros.
-          resolvedTreatment = (treatmentInput === 'ZeroRated' ? 'ZeroRated' : 'StandardRated');
+          // Nothing to recompute against — keep zeros. Run the raw chain
+          // value through the same normaliser the resolver uses so we stay
+          // consistent with the conservative "unknown → ZeroRated" rule.
+          resolvedTreatment = normalizeTaxTreatment(treatmentInput);
         } else {
           const recomputeInput = existingItems.map(it => ({
             product_id: it.productId,

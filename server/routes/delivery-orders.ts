@@ -4,7 +4,7 @@ import { db } from "../db";
 import { and, eq } from "drizzle-orm";
 import { businessStorage } from "../businessStorage";
 import { requireAuth, writeAuditLog, objectStorageClient, updateProductStock, type AuthenticatedRequest } from "../middleware";
-import { resolveDocumentTotals, inferTaxTreatmentFromCustomer, isTotalsError } from "../utils/totals";
+import { resolveDocumentTotals, inferTaxTreatmentFromCustomer, isTotalsError, normalizeTaxTreatment } from "../utils/totals";
 
 export function registerDeliveryOrderRoutes(app: Express) {
   app.get('/api/delivery-orders', requireAuth(), async (req: AuthenticatedRequest, res) => {
@@ -317,11 +317,12 @@ export function registerDeliveryOrderRoutes(app: Express) {
       // Tax treatment fallback chain so a header-only edit on a ZeroRated DO
       // cannot silently flip to StandardRated and add VAT:
       //   body.tax_treatment > existing DO taxTreatment >
-      //   inferred from customer.vatTreatment > StandardRated.
+      //   inferred from customer.vatTreatment > ZeroRated (conservative
+      //   default: never silently add 5% VAT when treatment is unknown).
       const requestedTreatment =
         body.tax_treatment
         ?? existingDO.taxTreatment
-        ?? (customerVatTreatment ? inferTaxTreatmentFromCustomer(customerVatTreatment) : 'StandardRated');
+        ?? inferTaxTreatmentFromCustomer(customerVatTreatment);
       const willReplaceItems = Array.isArray(body.items) && body.items.length > 0;
 
       let resolvedTreatment: 'StandardRated' | 'ZeroRated' = 'StandardRated';
@@ -384,7 +385,11 @@ export function registerDeliveryOrderRoutes(app: Express) {
         resolvedTotal = resolved.totalAmount;
         resolvedVatRate = resolved.vatRate;
       } else {
-        resolvedTreatment = requestedTreatment === 'ZeroRated' ? 'ZeroRated' : 'StandardRated';
+        // No items to recompute against — keep zeros and run the raw chain
+        // value through the same normaliser the resolver uses so unknown or
+        // missing tax_treatment falls back to ZeroRated, never silently
+        // adding 5% VAT.
+        resolvedTreatment = normalizeTaxTreatment(requestedTreatment);
       }
 
       await db.update(deliveryOrders).set({

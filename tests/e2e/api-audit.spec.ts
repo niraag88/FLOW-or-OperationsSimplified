@@ -1919,6 +1919,32 @@ test.describe('Server-side totals authority', () => {
     await api('DELETE', `/api/invoices/${invId}`, adminCookie);
   });
 
+  test('POST /api/invoices with missing/unknown tax_treatment defaults to ZeroRated (no silent 5% VAT)', async () => {
+    if (!IDs.customer || !IDs.product) return;
+
+    // No tax_treatment field at all on the body. With the customer's
+    // recognised value missing/unknown, the server's conservative default
+    // must be ZeroRated — never silently add 5% VAT.
+    const create = await api('POST', '/api/invoices', adminCookie, {
+      customer_id: IDs.customer,
+      invoice_date: '2026-04-13',
+      status: 'draft',
+      currency: 'AED',
+      tax_treatment: 'totally-unknown-value-xyz',
+      items: [{ product_id: IDs.product, description: 'unknown-tt', quantity: 1, unit_price: 200 }],
+    });
+    expect(create.status).toBe(201);
+    const invId = (create.data as { id: number }).id;
+
+    const get = await api('GET', `/api/invoices/${invId}`, adminCookie);
+    const inv = get.data as { amount?: string; vatAmount?: string; taxTreatment?: string };
+    expect(inv.taxTreatment).toBe('ZeroRated');
+    expect(parseFloat(String(inv.vatAmount))).toBeCloseTo(0, 2);
+    expect(parseFloat(String(inv.amount))).toBeCloseTo(200, 2);
+
+    await api('DELETE', `/api/invoices/${invId}`, adminCookie);
+  });
+
   test('PUT header-only edit on a ZeroRated invoice keeps VAT zero (does not silently flip to StandardRated)', async () => {
     if (!IDs.customer || !IDs.product) return;
 
@@ -1977,6 +2003,39 @@ test.describe('Server-side totals authority', () => {
     expect(doData.tax_amount).toBeCloseTo(0, 2);
     expect(doData.subtotal).toBeCloseTo(90, 2);
     expect(doData.total_amount).toBeCloseTo(90, 2);
+
+    await api('DELETE', `/api/delivery-orders/${doId}`, adminCookie);
+  });
+
+  test('PUT /api/delivery-orders header-only with unknown tax_treatment normalises to ZeroRated (no items branch)', async () => {
+    if (!IDs.customer || !IDs.product) return;
+
+    // Create a draft DO with at least one item, then PUT with no items in
+    // the body and an unrecognised tax_treatment string. The DO PUT
+    // no-items branch must run the value through the normaliser and
+    // resolve to ZeroRated rather than silently storing StandardRated.
+    const create = await api('POST', '/api/delivery-orders', adminCookie, {
+      customer_id: IDs.customer,
+      status: 'draft',
+      currency: 'AED',
+      tax_treatment: 'StandardRated',
+      items: [{ product_id: IDs.product, description: 'do-norm', quantity: 1, unit_price: 100, line_total: 100 }],
+    });
+    expect(create.status).toBe(201);
+    const doId = (create.data as { id: number }).id;
+
+    const update = await api('PUT', `/api/delivery-orders/${doId}`, adminCookie, {
+      customer_id: IDs.customer,
+      status: 'draft',
+      tax_treatment: 'totally-unknown-do-value',
+      reference: 'do-norm-edit',
+    });
+    expect(update.status).toBe(200);
+
+    const get = await api('GET', `/api/delivery-orders/${doId}`, adminCookie);
+    const doData = get.data as { tax_treatment?: string; tax_amount?: number };
+    expect(doData.tax_treatment).toBe('ZeroRated');
+    expect(Number(doData.tax_amount)).toBeCloseTo(0, 2);
 
     await api('DELETE', `/api/delivery-orders/${doId}`, adminCookie);
   });
