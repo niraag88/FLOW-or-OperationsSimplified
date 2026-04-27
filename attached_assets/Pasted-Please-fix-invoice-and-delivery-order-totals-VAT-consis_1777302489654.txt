@@ -1,0 +1,100 @@
+Please fix invoice and delivery order totals/VAT consistency by making the server the source of truth.
+
+Problem:
+Right now the frontend calculates line totals, subtotal, VAT, and grand total, then sends those numbers to the backend. The backend mostly stores whatever the frontend sends. Different screens and exports then read or re-derive totals in slightly different ways.
+
+This means an invoice or delivery order could be saved with:
+- line items that add up to one amount,
+- a stored subtotal/VAT/total that says something else,
+- print/export/quick-view screens showing different numbers.
+
+This is a financial integrity issue. Totals and VAT should be calculated consistently by the backend from the saved line items.
+
+Affected files:
+- server/routes/invoices.ts
+- server/routes/delivery-orders.ts
+- server/routes/exports.ts, only if needed for consistency
+- client/src/components/invoices/InvoiceForm.tsx, only if needed for clearer error handling
+- client/src/components/delivery-orders/DOForm.tsx, only if needed for clearer error handling
+- Tests for invoice and delivery order create/update totals if practical
+
+Current risky behavior:
+- Invoice create/update trusts body.subtotal, body.tax_amount, body.total_amount, and item.line_total.
+- Delivery order create/update trusts body.subtotal, body.tax_amount, body.total_amount, and item.line_total.
+- Frontend, list view, quick view, print, and XLSX export may calculate or display totals differently.
+- A stale frontend, browser bug, or manual API call can save inconsistent money values.
+
+Desired correct behavior:
+- Backend must calculate line totals from quantity × unit price.
+- Backend must calculate subtotal from saved line totals.
+- Backend must calculate VAT from subtotal and tax treatment.
+- Backend must calculate grand total from subtotal + VAT.
+- Client-provided totals should not be trusted as final.
+- Saved database totals should always match saved line items.
+
+Exact logic rules:
+1. On invoice create and invoice update:
+   - Validate at least one valid line item.
+   - For each valid line item, calculate lineTotal = quantity × unitPrice, rounded to 2 decimals.
+   - Ignore client-provided item.line_total except possibly for mismatch warnings.
+   - Calculate subtotal as the sum of computed line totals.
+   - Determine VAT rate using existing app behavior:
+     - StandardRated = 5% unless existing settings already define a different active default VAT rate.
+     - ZeroRated / International / VAT disabled = 0%.
+   - Calculate vatAmount = subtotal × VAT rate, rounded to 2 decimals.
+   - Calculate totalAmount = subtotal + vatAmount, rounded to 2 decimals.
+   - Store those computed values in invoices.amount and invoices.vatAmount.
+   - If invoice.taxTreatment is already available in the schema, persist the resolved tax treatment too.
+
+2. On delivery order create and delivery order update:
+   - Same calculation rules as invoices.
+   - Store computed subtotal, taxAmount, totalAmount, taxRate, and taxTreatment.
+   - Ignore client-provided line_total/subtotal/tax_amount/total_amount as final values.
+
+3. Existing stock behavior must remain unchanged:
+   - Do not change invoice stock deduction/reconciliation logic.
+   - Do not change invoice cancellation logic.
+   - Do not change delivery order stock deduction/reconciliation/cancellation logic.
+   - Only make sure the money values saved alongside those documents are server-computed.
+
+4. Export/print consistency:
+   - /api/invoices/:id should return subtotal, tax_amount, and total_amount based on the stored server-computed values.
+   - /api/delivery-orders/:id should do the same.
+   - /api/export/invoice should not recalculate VAT differently from the main invoice detail route.
+   - Do not redesign PDF or XLSX layouts in this task.
+   - The same invoice/DO should show the same subtotal, VAT, and total in list, quick view, print, and XLSX.
+
+Edge cases:
+- Duplicate product lines should be summed normally.
+- Free-text lines without productId should still count financially if quantity and unit price are valid.
+- Quantity must be positive.
+- Unit price must be zero or positive.
+- Invalid numeric values should return HTTP 400, not silently save as zero.
+- Zero-rated customers should produce VAT 0.
+- Standard-rated customers should produce VAT at the configured/current 5% rule.
+- Rounding should happen consistently to 2 decimal places.
+
+Manual test steps:
+1. Create an invoice with two lines: 2 × 10 and 3 × 20. Confirm subtotal is 80, VAT is 4, total is 84 for standard VAT.
+2. Try sending wrong totals manually through the API, for example total_amount 999. Confirm the saved invoice still shows the backend-computed total.
+3. Edit that invoice and change quantities. Confirm line totals, subtotal, VAT, and total update correctly.
+4. Repeat the same tests for delivery orders.
+5. Create a zero-rated/international customer invoice. Confirm VAT is 0 in list, detail, print, and XLSX.
+6. Compare invoice list, quick view, print view, and XLSX export for the same invoice. Confirm all show the same subtotal, VAT, and total.
+7. Confirm delivered invoice stock behavior still works exactly as before.
+
+Acceptance criteria:
+- Backend is the source of truth for line totals, subtotal, VAT, and grand total.
+- Client-provided totals cannot create inconsistent saved records.
+- Invoice totals match across create, edit, list, detail, print, and XLSX.
+- Delivery order totals match across create, edit, list, detail, print, and XLSX.
+- No stock, cancellation, GRN, backup/restore, authentication, or schema migration changes unless absolutely necessary.
+
+Avoid changing:
+- Do not redesign PDFs or exports.
+- Do not change stock movement logic.
+- Do not change VAT rates globally beyond using the existing configured/default rule.
+- Do not add credit notes or write-offs.
+- Do not touch GRN cancellation.
+- Do not touch backup/restore.
+- Do not make broad UI redesigns.

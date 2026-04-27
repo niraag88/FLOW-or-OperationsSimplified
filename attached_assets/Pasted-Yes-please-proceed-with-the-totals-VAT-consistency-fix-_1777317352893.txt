@@ -1,0 +1,77 @@
+Yes, please proceed with the totals/VAT consistency fix, but keep the scope tightly backend-focused.
+
+Goal:
+Make the backend the source of truth for invoice and delivery order money totals at save time.
+
+Affected files:
+- server/routes/invoices.ts
+- server/routes/delivery-orders.ts
+- Tests if practical
+
+Do not change:
+- PDF layouts
+- XLSX exports
+- Print templates
+- Stock movement logic
+- Cancellation logic
+- GRN logic
+- Backup/restore
+- Authentication
+- Database schema or migrations
+
+Required behavior:
+1. On invoice create and invoice update, recompute all money values on the server before saving:
+   - lineTotal = round(quantity × unitPrice, 2)
+   - subtotal = sum of computed line totals
+   - VAT rate:
+     - StandardRated / standard / Local = companySettings.defaultVatRate if available, otherwise 0.05
+     - ZeroRated / International / exempt / reverse_charge = 0
+   - vatAmount = round(subtotal × VAT rate, 2)
+   - totalAmount = round(subtotal + vatAmount, 2)
+
+2. On delivery order create and delivery order update, apply the same server-side calculation rules.
+
+3. Ignore client-provided totals for persistence:
+   - Ignore item.line_total
+   - Ignore body.subtotal
+   - Ignore body.tax_amount
+   - Ignore body.total_amount
+   - Keep accepting those fields so existing frontend calls do not break, but do not trust them.
+
+4. Validate numeric inputs:
+   - quantity must be a positive number
+   - unit_price must be zero or positive
+   - reject invalid, missing, NaN, negative, or non-numeric quantity/unit_price with HTTP 400
+   - reject documents with no valid line items
+
+5. Store only server-computed values:
+   - invoice line item lineTotal must be server-computed
+   - invoice amount and vatAmount must be server-computed
+   - delivery order item lineTotal must be server-computed
+   - delivery order subtotal, taxAmount, totalAmount, taxRate, and taxTreatment must be server-computed/resolved
+
+6. Keep existing stock behavior unchanged:
+   - Stock deduction/reconciliation should continue using quantity exactly as before.
+   - Do not refactor stock helper calls.
+   - Do not change invoice/DO cancellation.
+
+7. Add small tests if practical:
+   - Invoice API payload with deliberately wrong line_total/tax_amount/total_amount saves correct server-computed values.
+   - Delivery order API payload with deliberately wrong totals saves correct server-computed values.
+   - Zero-rated/international case saves VAT as 0.
+   - Invalid negative/non-numeric quantity or unit_price returns 400.
+
+Manual test steps:
+1. Create standard-rated invoice with lines 2 × 10 and 3 × 20. Confirm saved subtotal 80, VAT 4, total 84.
+2. Send wrong client totals manually, for example total_amount 999. Confirm saved total is still 84.
+3. Edit the invoice quantities and confirm totals recompute.
+4. Repeat for delivery orders.
+5. Create a zero-rated/international customer invoice and DO. Confirm VAT is 0.
+6. Confirm delivered invoice/DO stock behavior still works as before.
+
+Acceptance criteria:
+- Server-computed totals always override client totals.
+- Saved line totals always match quantity × unit price.
+- Saved VAT always matches subtotal × resolved VAT rate.
+- Existing UI continues to work without payload changes.
+- No schema changes or export/print redesigns in this task.
