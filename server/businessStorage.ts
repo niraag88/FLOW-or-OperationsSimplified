@@ -554,15 +554,17 @@ export class BusinessStorage {
       customerVatTreatment,
     );
 
-    const itemsForResolver = (quote.items ?? [])
-      .filter(it => Number(it.quantity) > 0)
-      .map(it => ({
-        product_id: it.productId ?? null,
-        product_code: it.productCode ?? null,
-        description: it.description ?? '',
-        quantity: Number(it.quantity),
-        unit_price: Number(it.unitPrice),
-      }));
+    // Validate every quote line — do NOT silently drop invalid rows.
+    // If a quote somehow stored a zero/negative quantity or non-numeric
+    // price, conversion fails loudly with the same contract as
+    // POST /api/invoices, rather than producing a partial invoice.
+    const itemsForResolver = (quote.items ?? []).map(it => ({
+      product_id: it.productId ?? null,
+      product_code: it.productCode ?? null,
+      description: it.description ?? '',
+      quantity: Number(it.quantity),
+      unit_price: Number(it.unitPrice),
+    }));
 
     let resolved;
     try {
