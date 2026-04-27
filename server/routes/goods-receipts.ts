@@ -387,6 +387,30 @@ export function registerGoodsReceiptRoutes(app: Express) {
             .set({ status: 'cancelled', updatedAt: new Date() })
             .where(and(eq(goodsReceipts.id, grnId), eq(goodsReceipts.status, 'confirmed')));
           updatedRows = result.rowCount ?? 0;
+
+          // Recompute PO header status from the remaining confirmed GRNs so
+          // the itemless cancel path stays consistent with the normal cancel
+          // path and the delete path.
+          if (updatedRows > 0) {
+            const [remainingConfirmed] = await tx
+              .select({ count: sql<number>`count(*)::int` })
+              .from(goodsReceipts)
+              .where(and(eq(goodsReceipts.poId, grn.poId), eq(goodsReceipts.status, 'confirmed')));
+            const hasMoreGrns = (remainingConfirmed?.count ?? 0) > 0;
+
+            let newPoStatus: string;
+            if (hasMoreGrns) {
+              const poItems = await tx.select().from(purchaseOrderItems).where(eq(purchaseOrderItems.poId, grn.poId));
+              const allStillReceived = poItems.every(it => (it.receivedQuantity ?? 0) >= it.quantity);
+              newPoStatus = allStillReceived ? 'closed' : 'submitted';
+            } else {
+              newPoStatus = 'submitted';
+            }
+
+            await tx.update(purchaseOrders)
+              .set({ status: newPoStatus, updatedAt: new Date() })
+              .where(eq(purchaseOrders.id, grn.poId));
+          }
         });
         if (updatedRows === 0) {
           return res.status(409).json({ error: 'Goods receipt is already cancelled' });
@@ -415,8 +439,24 @@ export function registerGoodsReceiptRoutes(app: Express) {
       let reversedSummary: Array<{ productId: number; productName: string; previousStock: number; newStock: number; reversedQty: number }> = [];
       let negativeStock: NegativeStockEntry[] = [];
 
+      let cancelRowsAffected = 0;
       try {
         await db.transaction(async (tx) => {
+          // Re-lock the GRN row inside the transaction. Two concurrent cancel calls
+          // could each pass the pre-transaction status check; locking + a guarded
+          // WHERE clause on the final update guarantees only one of them performs
+          // the reversal.
+          const [lockedGrn] = await tx
+            .select({ id: goodsReceipts.id, status: goodsReceipts.status })
+            .from(goodsReceipts)
+            .where(eq(goodsReceipts.id, grnId))
+            .for('update');
+          if (!lockedGrn || lockedGrn.status !== 'confirmed') {
+            // Another request already cancelled this GRN — bail before any
+            // stock movement is posted.
+            return;
+          }
+
           // Lock affected product rows (FOR UPDATE) so a concurrent invoice delivery
           // cannot move stock between our check and our reversal.
           const lockedProducts = await tx
@@ -508,10 +548,17 @@ export function registerGoodsReceiptRoutes(app: Express) {
               .where(eq(purchaseOrderItems.id, poItemId));
           }
 
-          // Mark the GRN cancelled.
-          await tx.update(goodsReceipts)
+          // Mark the GRN cancelled. The status='confirmed' guard belt-and-braces the
+          // FOR UPDATE lock above: even if two cancels somehow get this far, only the
+          // first one's WHERE clause matches.
+          const updateResult = await tx.update(goodsReceipts)
             .set({ status: 'cancelled', updatedAt: new Date() })
-            .where(eq(goodsReceipts.id, grnId));
+            .where(and(eq(goodsReceipts.id, grnId), eq(goodsReceipts.status, 'confirmed')));
+          cancelRowsAffected = updateResult.rowCount ?? 0;
+          if (cancelRowsAffected === 0) {
+            // Should be unreachable thanks to the lock — surface as a tx rollback.
+            throw new Error('GRN status changed during cancellation');
+          }
 
           // Recompute PO status from non-cancelled GRNs (mirrors the previous delete-path logic).
           const [remainingConfirmed] = await tx
@@ -549,6 +596,13 @@ export function registerGoodsReceiptRoutes(app: Express) {
           });
         }
         throw txErr;
+      }
+
+      // The locked-status check inside the tx is the only way cancelRowsAffected
+      // stays at zero — that means another request cancelled the GRN first and
+      // we did not post any reversal movements.
+      if (cancelRowsAffected === 0) {
+        return res.status(409).json({ error: 'Goods receipt is already cancelled' });
       }
 
       // After-tx work: recalc PO payment status (cancelled GRNs are excluded by the helper).

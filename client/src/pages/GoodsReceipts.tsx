@@ -698,24 +698,75 @@ export default function GoodsReceipts() {
             </DialogTitle>
           </DialogHeader>
 
-          {cancelDialog.step === 'initial' && (
-            <div className="space-y-3 text-sm text-gray-700">
-              <p>
-                Cancelling this GRN will <strong>reverse the stock</strong> it added (a new reversal stock movement
-                will be recorded against each affected product) and mark the receipt as <strong>cancelled</strong>.
-              </p>
-              <p>
-                The original receipt and its stock movement history will be <strong>preserved</strong> for audit.
-                You cannot undo a cancellation.
-              </p>
-              {cancelDialog.grn?.paymentStatus === 'paid' && (
-                <p className="rounded bg-amber-50 border border-amber-200 p-2 text-amber-800 text-xs">
-                  <strong>Heads up:</strong> this GRN is marked as paid to the supplier. You'll be asked to acknowledge
-                  this on the next step.
+          {cancelDialog.step === 'initial' && (() => {
+            const items: Array<{ id: number; productId: number; productName: string | null; receivedQuantity: number }> =
+              cancelDialog.grn?.items ?? [];
+            const reversalByProduct = new Map<number, { name: string; qty: number }>();
+            for (const it of items) {
+              const qty = Number(it.receivedQuantity ?? 0);
+              if (qty <= 0) continue;
+              const existing = reversalByProduct.get(it.productId);
+              if (existing) {
+                existing.qty += qty;
+              } else {
+                reversalByProduct.set(it.productId, {
+                  name: it.productName ?? `Product #${it.productId}`,
+                  qty,
+                });
+              }
+            }
+            const reversalRows = Array.from(reversalByProduct.entries()).map(([productId, v]) => ({
+              productId,
+              name: v.name,
+              qty: v.qty,
+            }));
+
+            return (
+              <div className="space-y-3 text-sm text-gray-700">
+                <p>
+                  Cancelling this GRN will <strong>reverse the stock</strong> it added (a new reversal stock movement
+                  will be recorded against each affected product) and mark the receipt as <strong>cancelled</strong>.
                 </p>
-              )}
-            </div>
-          )}
+                {reversalRows.length > 0 ? (
+                  <div className="border rounded overflow-hidden" data-testid="grn-cancel-reversal-preview">
+                    <div className="bg-gray-50 px-2 py-1.5 text-xs font-semibold text-gray-700 border-b">
+                      Stock that will be reversed ({reversalRows.length} product{reversalRows.length === 1 ? '' : 's'})
+                    </div>
+                    <table className="w-full text-xs">
+                      <thead className="bg-gray-50 text-gray-600">
+                        <tr>
+                          <th className="text-left px-2 py-1.5">Product</th>
+                          <th className="text-right px-2 py-1.5">Reverse qty</th>
+                        </tr>
+                      </thead>
+                      <tbody>
+                        {reversalRows.map((r) => (
+                          <tr key={r.productId} className="border-t">
+                            <td className="px-2 py-1.5">{r.name}</td>
+                            <td className="px-2 py-1.5 text-right font-mono">-{r.qty}</td>
+                          </tr>
+                        ))}
+                      </tbody>
+                    </table>
+                  </div>
+                ) : (
+                  <p className="text-xs italic text-gray-500">
+                    This GRN has no positive received quantities — only the receipt status will change.
+                  </p>
+                )}
+                <p className="text-xs">
+                  The original receipt and its stock movement history will be <strong>preserved</strong> for audit.
+                  You cannot undo a cancellation.
+                </p>
+                {cancelDialog.grn?.paymentStatus === 'paid' && (
+                  <p className="rounded bg-amber-50 border border-amber-200 p-2 text-amber-800 text-xs">
+                    <strong>Heads up:</strong> this GRN is marked as paid to the supplier. You'll be asked to acknowledge
+                    this on the next step.
+                  </p>
+                )}
+              </div>
+            );
+          })()}
 
           {cancelDialog.step === 'paidAck' && (
             <div className="space-y-3 text-sm">
