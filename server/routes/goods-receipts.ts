@@ -341,6 +341,15 @@ export function registerGoodsReceiptRoutes(app: Express) {
     }
   });
 
+  // PATCH /api/goods-receipts/:id/cancel
+  // Body: { confirmNegativeStock?: boolean; acknowledgePaidGrn?: boolean }
+  // Responses:
+  //   200 { success: true, grnId, reversedProducts: [...], negativeStock: [...] }
+  //   404 { error: 'Goods receipt not found' }
+  //   409 { error: 'Goods receipt is already cancelled' }
+  //   409 { error: 'paid_grn_requires_ack', message }                       // resend with acknowledgePaidGrn: true
+  //   409 { error: 'negative_stock', message, products: [...] }             // resend with confirmNegativeStock: true
+  //   409 { error: 'po_received_quantity_underflow', message, details }
   app.patch('/api/goods-receipts/:id/cancel', requireAuth(['Admin', 'Manager']), async (req: AuthenticatedRequest, res) => {
     try {
       const grnId = parseInt(req.params.id);
