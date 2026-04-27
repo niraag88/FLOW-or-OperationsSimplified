@@ -600,6 +600,30 @@ export function registerGoodsReceiptRoutes(app: Express) {
         );
         await tx.delete(goodsReceiptItems).where(eq(goodsReceiptItems.receiptId, grnId));
         await tx.delete(goodsReceipts).where(eq(goodsReceipts.id, grnId));
+
+        // Recompute PO header status (closed/submitted) from the remaining
+        // confirmed GRNs. The cancellation step already corrected this once,
+        // but we re-check on delete to mirror the previous delete-path
+        // behaviour and to defend against any edge case (e.g. concurrent
+        // creation of a new GRN between cancel and delete).
+        const [remainingConfirmed] = await tx
+          .select({ count: sql<number>`count(*)::int` })
+          .from(goodsReceipts)
+          .where(and(eq(goodsReceipts.poId, grn.poId), eq(goodsReceipts.status, 'confirmed')));
+        const hasMoreGrns = (remainingConfirmed?.count ?? 0) > 0;
+
+        let newPoStatus: string;
+        if (hasMoreGrns) {
+          const poItems = await tx.select().from(purchaseOrderItems).where(eq(purchaseOrderItems.poId, grn.poId));
+          const allStillReceived = poItems.every(it => (it.receivedQuantity ?? 0) >= it.quantity);
+          newPoStatus = allStillReceived ? 'closed' : 'submitted';
+        } else {
+          newPoStatus = 'submitted';
+        }
+
+        await tx.update(purchaseOrders)
+          .set({ status: newPoStatus, updatedAt: new Date() })
+          .where(eq(purchaseOrders.id, grn.poId));
       });
 
       // Recalculate PO payment status (the deleted GRN was already excluded from the

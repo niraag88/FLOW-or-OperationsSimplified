@@ -25,6 +25,7 @@ type CancelDialogState = {
   grn: any | null;
   step: "initial" | "negativeStock" | "paidAck";
   negativeStock: Array<{ productId: number; productName: string; currentStock: number; reversalQty: number; projectedStock: number }>;
+  negativeStockPhrase: string;
   paidMessage: string | null;
   confirmNegativeStock: boolean;
   acknowledgePaidGrn: boolean;
@@ -35,6 +36,7 @@ const initialCancelState: CancelDialogState = {
   grn: null,
   step: "initial",
   negativeStock: [],
+  negativeStockPhrase: "",
   paidMessage: null,
   confirmNegativeStock: false,
   acknowledgePaidGrn: false,
@@ -144,6 +146,7 @@ export default function GoodsReceipts() {
       grn: receipt,
       step: "initial",
       negativeStock: [],
+      negativeStockPhrase: "",
       paidMessage: null,
       confirmNegativeStock: false,
       acknowledgePaidGrn: receipt.paymentStatus === 'paid' ? false : true,
@@ -765,16 +768,27 @@ export default function GoodsReceipts() {
                   </tbody>
                 </table>
               </div>
-              <label className="flex items-start gap-2 cursor-pointer text-xs text-gray-700">
+              <div className="text-xs text-gray-700 space-y-1.5">
+                <p>
+                  This is a destructive action. To confirm, type the phrase
+                  {' '}<span className="font-mono font-semibold text-red-700">CANCEL ANYWAY</span>{' '}
+                  exactly into the box below.
+                </p>
                 <input
-                  type="checkbox"
-                  className="mt-0.5"
-                  checked={cancelDialog.confirmNegativeStock}
-                  onChange={(e) => setCancelDialog(prev => ({ ...prev, confirmNegativeStock: e.target.checked }))}
-                  data-testid="grn-cancel-confirm-negative"
+                  type="text"
+                  className="w-full border rounded px-2 py-1.5 text-sm font-mono"
+                  placeholder="Type CANCEL ANYWAY to enable the button"
+                  value={cancelDialog.negativeStockPhrase}
+                  onChange={(e) => setCancelDialog(prev => ({
+                    ...prev,
+                    negativeStockPhrase: e.target.value,
+                    confirmNegativeStock: e.target.value.trim() === 'CANCEL ANYWAY',
+                  }))}
+                  data-testid="grn-cancel-confirm-negative-phrase"
+                  autoComplete="off"
+                  spellCheck={false}
                 />
-                <span>I understand the listed products will go into negative stock and want to proceed anyway.</span>
-              </label>
+              </div>
             </div>
           )}
 
