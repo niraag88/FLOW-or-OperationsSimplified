@@ -1712,6 +1712,59 @@ test.describe('Cancellation all-or-nothing contract', () => {
 
     await api('DELETE', `/api/delivery-orders/${doId}`, adminCookie);
   });
+
+  test('PATCH /api/invoices/:id/cancel collapses duplicate product lines into one reversal per product', async () => {
+    if (!IDs.customer || !IDs.product) return;
+    const startStock = await getStock(IDs.product);
+    const qtyA = 2;
+    const qtyB = 3; // same product, two separate line items → reversal must collapse to one entry of qty 5
+
+    const create = await api('POST', '/api/invoices', adminCookie, {
+      customer_id: IDs.customer,
+      invoice_date: '2026-04-12',
+      status: 'draft',
+      subtotal: 100, tax_amount: 0, total_amount: 100, currency: 'AED',
+      items: [
+        { product_id: IDs.product, description: 'dup-line-A', quantity: qtyA, unit_price: 20, line_total: 40 },
+        { product_id: IDs.product, description: 'dup-line-B', quantity: qtyB, unit_price: 20, line_total: 60 },
+      ],
+    });
+    if (create.status !== 201) return;
+    const invId = (create.data as { id: number }).id;
+
+    const itemsPayload = [
+      { product_id: IDs.product, description: 'dup-line-A', quantity: qtyA, unit_price: 20, line_total: 40 },
+      { product_id: IDs.product, description: 'dup-line-B', quantity: qtyB, unit_price: 20, line_total: 60 },
+    ];
+    await api('PUT', `/api/invoices/${invId}`, adminCookie, {
+      customer_id: IDs.customer, status: 'submitted', total_amount: 100, items: itemsPayload,
+    });
+    await api('PUT', `/api/invoices/${invId}`, adminCookie, {
+      customer_id: IDs.customer, status: 'delivered', total_amount: 100, items: itemsPayload,
+    });
+
+    const afterDelivered = await getStock(IDs.product);
+    expect(afterDelivered).toBe(startStock - (qtyA + qtyB));
+
+    const cancel = await api('PATCH', `/api/invoices/${invId}/cancel`, adminCookie);
+    expect(cancel.status).toBe(200);
+
+    const afterCancel = await getStock(IDs.product);
+    expect(afterCancel).toBe(startStock);
+
+    // Critical assertion: although there were TWO line items for the same
+    // product, the cancel route must collapse them into ONE reversal
+    // movement of quantity (qtyA + qtyB) — not two separate rows.
+    const { data } = await api('GET', '/api/stock-movements', adminCookie);
+    const arr = Array.isArray(data) ? data : [];
+    const reversals = arr.filter((m: { referenceType?: string; referenceId?: number; movementType?: string; productId?: number; quantity?: number }) =>
+      m.referenceType === 'invoice' && m.referenceId === invId && m.movementType === 'invoice_cancellation' && m.productId === IDs.product,
+    );
+    expect(reversals.length).toBe(1);
+    expect((reversals[0] as { quantity?: number }).quantity).toBe(qtyA + qtyB);
+
+    await api('DELETE', `/api/invoices/${invId}`, adminCookie);
+  });
 });
 
 // ── Inventory & Stock ──────────────────────────────────────────────────────────

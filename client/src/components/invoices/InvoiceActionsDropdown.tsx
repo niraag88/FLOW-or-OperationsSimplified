@@ -126,7 +126,7 @@ export default function InvoiceActionsDropdown({ invoice, canEdit, canOverride, 
       }
       const desc = isDelivered
         ? `Invoice ${invoiceNumber} cancelled. All stock has been restored.`
-        : `Invoice ${invoiceNumber} has been cancelled.`;
+        : `Invoice ${invoiceNumber} cancelled — no stock to reverse.`;
       toast({ title: 'Invoice Cancelled', description: desc });
       setShowCancelDialog(false);
       setShowStockCancelDialog(false);

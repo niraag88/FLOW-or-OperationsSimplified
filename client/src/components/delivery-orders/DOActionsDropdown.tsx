@@ -121,7 +121,7 @@ export default function DOActionsDropdown({ doOrder, canEdit, onEdit, onRefresh,
         title: 'Delivery Order Cancelled',
         description: isDelivered
           ? `${doOrder.orderNumber} cancelled. All stock has been restored.`
-          : `${doOrder.orderNumber} has been cancelled.`,
+          : `${doOrder.orderNumber} cancelled — no stock to reverse.`,
       });
       setShowCancelDialog(false);
       onRefresh();
