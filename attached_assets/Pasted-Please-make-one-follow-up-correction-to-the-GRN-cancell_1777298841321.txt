@@ -1,0 +1,70 @@
+Please make one follow-up correction to the GRN cancellation fix.
+
+The new GRN cancellation flow is mostly correct, but the hard-delete behavior for cancelled GRNs should be removed for audit safety.
+
+Problem:
+PATCH /api/goods-receipts/:id/cancel now correctly cancels a confirmed GRN, reverses stock using reversal stock movements, and keeps the original receipt history.
+
+However, DELETE /api/goods-receipts/:id now allows deleting an already-cancelled GRN. That delete removes:
+- the goods_receipt row
+- the goods_receipt_items rows
+- the original goods_receipt stock movements
+- the goods_receipt_reversal stock movements
+
+This defeats the purpose of preserving GRN audit history.
+
+Affected files:
+server/routes/goods-receipts.ts
+client/src/pages/GoodsReceipts.tsx
+
+Desired behavior:
+Cancelled GRNs should be retained for audit, like cancelled invoices and cancelled delivery orders.
+
+Please implement this:
+
+1. Keep the new PATCH /api/goods-receipts/:id/cancel endpoint.
+- Do not rewrite the cancellation logic.
+- Keep the reversal stock movement behavior.
+- Keep the paid-GRN acknowledgement.
+- Keep the negative-stock confirmation flow.
+
+2. Change DELETE /api/goods-receipts/:id so it does not hard-delete confirmed or cancelled GRNs.
+- For confirmed GRNs, return a clear error saying: cancel the GRN first to reverse stock.
+- For cancelled GRNs, return a clear error saying: cancelled GRNs are retained for audit and cannot be permanently deleted.
+- Do not delete goods_receipts.
+- Do not delete goods_receipt_items.
+- Do not delete stock_movements.
+
+3. Update the Goods Receipts UI.
+- Remove or hide the Trash/Delete action for cancelled GRNs.
+- Keep the Cancel action for confirmed GRNs.
+- Keep the cancelled status badge and status filter.
+- Do not show users a permanent delete option for cancelled GRNs.
+
+4. Keep audit history intact.
+- After cancelling a GRN, the original goods_receipt stock movements must remain.
+- The goods_receipt_reversal stock movements must remain.
+- The GRN line items must remain.
+- The GRN should remain visible with status cancelled.
+
+Manual tests:
+1. Create a PO and receive goods through a GRN.
+2. Cancel the GRN.
+3. Confirm the GRN still appears with status cancelled.
+4. Confirm original stock movement rows still exist.
+5. Confirm reversal stock movement rows still exist.
+6. Confirm GRN line items still exist.
+7. Confirm the UI does not show a Delete/Trash action for the cancelled GRN.
+8. Try calling DELETE /api/goods-receipts/:id on the cancelled GRN directly. It should fail and leave all data untouched.
+9. Try calling DELETE on a confirmed GRN directly. It should fail and tell the user to cancel first.
+10. Confirm the existing cancel flow still works.
+
+Acceptance criteria:
+- Cancelled GRNs cannot be hard-deleted through the normal app/API.
+- Confirmed GRNs cannot be hard-deleted.
+- Cancelled GRNs remain visible for audit.
+- Original and reversal stock movements are preserved.
+- GRN line items are preserved.
+- UI no longer offers permanent delete for cancelled GRNs.
+- Existing cancellation behavior is unchanged.
+- No unrelated invoice, VAT, PDF, export, backup, auth, or factory reset behavior changes.
