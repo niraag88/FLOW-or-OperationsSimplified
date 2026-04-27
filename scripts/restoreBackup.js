@@ -206,11 +206,6 @@ async function restoreBackup(input) {
  * @param {string} sqlPath  Path to the validated, decompressed SQL dump.
  */
 async function stripDrizzleBlocks(sqlPath) {
-  const text = await fsp.readFile(sqlPath, 'utf8');
-  const lines = text.split('\n');
-  const out = [];
-
-  // Triggers for "skip until the line ending with ;"
   const stmtTriggers = [
     /^CREATE SCHEMA drizzle\b/,
     /^CREATE TABLE drizzle\./,
@@ -222,40 +217,61 @@ async function stripDrizzleBlocks(sqlPath) {
   const isStmtTrigger = (line) => stmtTriggers.some((re) => re.test(line));
   const isCopyTrigger = (line) => /^COPY drizzle\./.test(line);
 
+  // Stream line-by-line through readline so memory stays bounded even for
+  // very large dumps. Write filtered output to a sibling temp file, then
+  // atomically replace the original.
+  const readline = await import('readline');
+  const tmpOut = `${sqlPath}.filtered`;
+  const input = createReadStream(sqlPath, { encoding: 'utf8' });
+  const output = createWriteStream(tmpOut, { encoding: 'utf8' });
+  const rl = readline.createInterface({ input, crlfDelay: Infinity });
+
   let skipUntilSemicolonEol = false;
   let skipUntilCopyEnd = false;
   let removed = 0;
 
-  for (const line of lines) {
-    if (skipUntilCopyEnd) {
-      removed++;
-      if (line === '\\.') skipUntilCopyEnd = false;
-      continue;
+  try {
+    for await (const line of rl) {
+      let drop = false;
+
+      if (skipUntilCopyEnd) {
+        drop = true;
+        if (line === '\\.') skipUntilCopyEnd = false;
+      } else if (skipUntilSemicolonEol) {
+        drop = true;
+        if (/;\s*$/.test(line)) skipUntilSemicolonEol = false;
+      } else if (isCopyTrigger(line)) {
+        drop = true;
+        skipUntilCopyEnd = true;
+      } else if (isStmtTrigger(line)) {
+        drop = true;
+        if (!/;\s*$/.test(line)) skipUntilSemicolonEol = true;
+      }
+
+      if (drop) {
+        removed++;
+        continue;
+      }
+      // Backpressure-aware write
+      if (!output.write(line + '\n')) {
+        await new Promise((resolve) => output.once('drain', resolve));
+      }
     }
-    if (skipUntilSemicolonEol) {
-      removed++;
-      // Match a trailing ; possibly followed by trailing whitespace
-      if (/;\s*$/.test(line)) skipUntilSemicolonEol = false;
-      continue;
-    }
-    if (isCopyTrigger(line)) {
-      removed++;
-      skipUntilCopyEnd = true;
-      continue;
-    }
-    if (isStmtTrigger(line)) {
-      removed++;
-      // Single-line statement (ends with ;) closes immediately; otherwise
-      // continue skipping until a line ending in ; is seen.
-      if (!/;\s*$/.test(line)) skipUntilSemicolonEol = true;
-      continue;
-    }
-    out.push(line);
+    await new Promise((resolve, reject) => {
+      output.end((err) => (err ? reject(err) : resolve()));
+    });
+  } catch (err) {
+    // Best-effort cleanup of the partial filtered file
+    try { await fsp.unlink(tmpOut); } catch (_) {}
+    throw err;
   }
 
   if (removed > 0) {
     console.log(`[restore] Stripped ${removed} drizzle-schema lines from dump (live drizzle schema preserved untouched).`);
-    await fsp.writeFile(sqlPath, out.join('\n'));
+    await fsp.rename(tmpOut, sqlPath);
+  } else {
+    // No drizzle content found — discard the temp copy and keep the original.
+    await fsp.unlink(tmpOut).catch(() => {});
   }
 }
 
