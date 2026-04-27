@@ -695,21 +695,26 @@ export function registerSystemRoutes(app: Express) {
    *   1. BEFORE the restore, insert a "pending" row into ops.restore_runs.
    *      The ops schema is NOT dropped by the restore (only public is), so
    *      this record is guaranteed to survive regardless of outcome.
-   *   2. RUN the restore (drops + recreates public schema).
+   *   2. RUN the restore. The new restoreBackup() validates and decompresses
+   *      the .sql.gz to a temp file BEFORE any destructive action, then
+   *      runs DROP SCHEMA public + CREATE SCHEMA public + the dump in ONE
+   *      psql --single-transaction. Any failure rolls back; live data
+   *      remains intact.
    *   3. AFTER the restore, update the pre-created row with the final result.
    *      Also best-effort write to public.audit_log (which is recreated from
    *      the backup; if the backup is very old and lacks audit_log, this fails
    *      silently — the ops record is already the definitive audit trail).
    */
   async function runRestore(opts: {
-    sqlGzStream: import('stream').Readable;
+    /** A readable .sql.gz stream OR a path to an existing .sql.gz file on disk. */
+    sqlGzInput: import('stream').Readable | string;
     triggeredBy: string;
     sourceBackupRunId?: number;
     sourceFilename?: string;
     res: import('express').Response;
     actorName: string;
   }) {
-    const { sqlGzStream, triggeredBy, sourceBackupRunId, sourceFilename, res, actorName } = opts;
+    const { sqlGzInput, triggeredBy, sourceBackupRunId, sourceFilename, res, actorName } = opts;
     const label = sourceFilename || (sourceBackupRunId ? `backup run #${sourceBackupRunId}` : 'unknown');
 
     // Step 1: Pre-create a pending record in ops.restore_runs BEFORE the restore.
@@ -733,7 +738,7 @@ export function registerSystemRoutes(app: Express) {
     try {
       // @ts-ignore
       const { restoreBackup } = await import('../../scripts/restoreBackup.js');
-      result = await restoreBackup(sqlGzStream);
+      result = await restoreBackup(sqlGzInput);
     } catch (importOrRunError: any) {
       console.error('Error during restore execution:', importOrRunError);
       result = { success: false, error: importOrRunError.message || 'Restore failed unexpectedly', durationMs: 0 };
@@ -810,7 +815,7 @@ export function registerSystemRoutes(app: Express) {
 
     const stream = objectStorageClient.downloadAsStream(run.dbStorageKey);
     return runRestore({
-      sqlGzStream: stream,
+      sqlGzInput: stream,
       triggeredBy: req.user!.id,
       actorName: req.user?.username || req.user!.id,
       sourceBackupRunId: runId,
@@ -924,8 +929,11 @@ export function registerSystemRoutes(app: Express) {
       }
 
       try {
+        // Pass the temp file path directly so restoreBackup() doesn't have to
+        // re-stage the upload; restoreBackup will read from this path, validate,
+        // and decompress to its own temp file before any destructive action.
         await runRestore({
-          sqlGzStream: createReadStream(tempPath!),
+          sqlGzInput: tempPath!,
           triggeredBy,
           actorName,
           sourceFilename,
