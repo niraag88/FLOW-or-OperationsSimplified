@@ -1,0 +1,72 @@
+Priority 6 follow-ups
+Tasks 6B and 6C
+
+Please handle the two follow-ups from Priority 6.
+
+Task 6B: Add row lock to invoice PUT edit route
+
+Problem:
+PUT /api/invoices/:id is already transactional, but it does not lock the invoice row. Two simultaneous edits to the same delivered/stock-deducted invoice could both compute stock reconciliation from a stale status/items snapshot.
+
+Affected file:
+- server/routes/invoices.ts
+
+Current behavior:
+- The route reads existingInvoice before the transaction.
+- It computes newStatus, needsStockDeduction, needsReconciliation, and sometimes recomputes totals from existing line items before the lock.
+- It then runs a transaction for header update, line replacement, and stock movement.
+- But there is no SELECT ... FOR UPDATE on the invoice row.
+
+Desired behavior:
+- Keep the route transactional.
+- Add a SELECT ... FOR UPDATE row lock inside the transaction.
+- Re-check the invoice exists and is not cancelled inside the lock.
+- Re-check the “cannot cancel through PUT” rule inside the lock.
+- Re-check the “cannot revert stock-deducted invoice to draft/submitted” rule inside the lock.
+- Use locked/current invoice state for becomingDelivered, needsStockDeduction, and needsReconciliation decisions.
+- For header-only edits, re-read existing line items inside the transaction before recomputing totals, so the recompute uses a current locked snapshot.
+- For item replacement on an already stock-deducted invoice, snapshot old line items inside the transaction before delete, as it already does.
+- Pass tx into every updateProductStock call, as it already does.
+
+Important:
+- Do not change the existing stock reconciliation formula.
+- Do not change invoice totals/VAT formulas.
+- Do not change cancellation behavior.
+- Do not touch PDFs/exports.
+- Do not make schema changes or migrations.
+- Do not touch the delivery order route unless needed for tests.
+
+Suggested implementation pattern:
+- Mirror the pattern just added to PUT /api/delivery-orders/:id.
+- Use small sentinel errors inside the transaction if needed, then map them to the same HTTP responses outside the transaction.
+- Write audit log only after the transaction succeeds.
+
+Task 6C: Fix stale delivery order scan-key e2e test
+
+Problem:
+There is a pre-existing failing e2e test for PATCH /api/delivery-orders/:id/scan-key. The test creates a delivery order with items: [], but after Priority 5B/6 hardening, empty items are correctly rejected. So the test setup is stale.
+
+Affected file:
+- tests/e2e/api-audit.spec.ts
+
+Desired behavior:
+- Update the scan-key test setup to create a valid delivery order with at least one valid line item.
+- Keep the scan-key route expectation the same: PATCH /api/delivery-orders/:id/scan-key should return 200 for a valid DO and valid scanKey.
+- Do not change production scan-key route behavior as part of this task.
+- Do not weaken the no_line_items guard.
+
+Tests to run/check:
+- Existing invoice edit/reconciliation tests still pass.
+- Existing DO atomicity tests still pass.
+- PATCH /api/delivery-orders/:id/scan-key test passes after using valid DO setup.
+- Header-only invoice PUT still works.
+- Delivered invoice item edit still reconciles stock correctly.
+
+Avoid changing:
+- No schema changes.
+- No migrations.
+- No UI changes.
+- No PDF/export changes.
+- No GRN changes.
+- No backup/restore changes.
+- No auth changes.
