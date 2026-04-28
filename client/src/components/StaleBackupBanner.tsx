@@ -72,7 +72,7 @@ export default function StaleBackupBanner() {
       <p className="flex-1">
         <strong>No successful backup{ageDaysFinal != null ? ` in ${ageDaysFinal} day${ageDaysFinal !== 1 ? "s" : ""}` : ""}.</strong>{" "}
         <Link to="/settings" className="underline hover:no-underline font-medium">
-          Open Settings → Storage to check the backup schedule
+          Open Settings → Backup to check the backup schedule
         </Link>
         .
       </p>

@@ -149,11 +149,19 @@ export default function ScheduledBackupCard() {
 
   const lastRunWasSuccess = data?.lastRunSuccess ?? null;
 
+  // Stale detection mirrors the top-app StaleBackupBanner contract:
+  // when there is no successful backup yet, only warn after the first
+  // scheduled window has elapsed plus the alert threshold — this avoids
+  // a false positive immediately after the admin enables the schedule.
   const isStale = (() => {
     if (!data?.enabled) return false;
-    if (!data.lastSuccessfulBackupAt) return true;
-    const ageMs = Date.now() - new Date(data.lastSuccessfulBackupAt).getTime();
-    return ageMs > data.alertThresholdDays * 86400_000;
+    if (data.lastSuccessfulBackupAt) {
+      const ageMs = Date.now() - new Date(data.lastSuccessfulBackupAt).getTime();
+      return ageMs > data.alertThresholdDays * 86400_000;
+    }
+    if (!data.nextDueAt) return false;
+    const graceCutoff = new Date(data.nextDueAt).getTime() + data.alertThresholdDays * 86400_000;
+    return Date.now() > graceCutoff;
   })();
 
   return (
