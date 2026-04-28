@@ -1471,19 +1471,58 @@ test.describe('Delivery Orders', () => {
   });
 
   test('PUT /api/delivery-orders/:id status downgrade from delivered → 400', async () => {
-    if (!IDs.customer) return;
-    const { data: created } = await api('POST', '/api/delivery-orders', adminCookie, {
-      customer_id: IDs.customer, status: 'delivered', total_amount: 100, items: [],
+    if (!IDs.customer || !IDs.product) return;
+
+    // Create a real draft DO with one valid line item, then transition
+    // it to delivered so the document is genuinely in the delivered
+    // state before we attempt the downgrade. (The previous version of
+    // this test POSTed with items: [], which now correctly returns 400
+    // no_line_items — leaving doId undefined and silently making the
+    // downgrade assertion pass for the wrong reason.)
+    const create = await api('POST', '/api/delivery-orders', adminCookie, {
+      customer_id: IDs.customer,
+      status: 'draft',
+      currency: 'AED',
+      tax_treatment: 'StandardRated',
+      items: [{ product_id: IDs.product, description: 'downgrade-test', quantity: 1, unit_price: 100, line_total: 100 }],
     });
-    const doId = (created as { id: number }).id;
-    const { status: downgradeStatus } = await api('PUT', `/api/delivery-orders/${doId}`, adminCookie, {
-      customer_id: IDs.customer, status: 'submitted', total_amount: 100, items: [],
+    expect(create.status).toBe(201);
+    const doId = (create.data as { id: number }).id;
+    expect(doId).toBeGreaterThan(0);
+
+    // Header-only PUT to deliver. Omit items so the no_line_items
+    // guard does not trip; the route recomputes totals from existing
+    // stored items and runs the stock-deduction path on transition.
+    const deliver = await api('PUT', `/api/delivery-orders/${doId}`, adminCookie, {
+      customer_id: IDs.customer,
+      status: 'delivered',
+    });
+    expect(deliver.status).toBe(200);
+
+    // Now exercise the actual downgrade rejection.
+    const downgrade = await api('PUT', `/api/delivery-orders/${doId}`, adminCookie, {
+      customer_id: IDs.customer,
+      status: 'submitted',
     });
     note('PUT /api/delivery-orders/:id: status downgrade from delivered → 400 (must cancel first)');
-    expect(downgradeStatus).toBe(400);
-    // Clean up
-    await api('PATCH', `/api/delivery-orders/${doId}/cancel`, adminCookie);
-    await api('DELETE', `/api/delivery-orders/${doId}`, adminCookie);
+    expect(downgrade.status).toBe(400);
+    expect((downgrade.data as { error?: string }).error).toBe('Cannot change status of a delivered order. Use the Cancel action to cancel it.');
+
+    // Confirm the DO is still delivered — the failed downgrade must
+    // not have mutated the status.
+    const after = await api('GET', `/api/delivery-orders/${doId}`, adminCookie);
+    expect((after.data as { status?: string }).status).toBe('delivered');
+
+    // Clean up: cancelling a delivered DO reverses the stock
+    // movement so inventory is restored. The cancelled record itself
+    // is intentionally retained for audit (per the documented
+    // append-only policy that mirrors invoices and goods receipts),
+    // so DELETE returns 400 — assert that contract here too.
+    const cancel = await api('PATCH', `/api/delivery-orders/${doId}/cancel`, adminCookie);
+    expect(cancel.status).toBe(200);
+    const del = await api('DELETE', `/api/delivery-orders/${doId}`, adminCookie);
+    expect(del.status).toBe(400);
+    expect((del.data as { error?: string }).error).toBe('Cancelled orders cannot be deleted. The document is retained for audit purposes.');
   });
 
   test('GET /api/delivery-orders → 200', async () => {
