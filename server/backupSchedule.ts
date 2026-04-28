@@ -145,8 +145,13 @@ export async function getBackupSchedule(): Promise<BackupScheduleView> {
     .where(eq(backupRuns.success, true))
     .orderBy(desc(backupRuns.ranAt))
     .limit(1);
+  // lastRunAt + lastRunSuccess come from the SAME row (latest run of any
+  // kind) so the status panel can never show a success badge against a
+  // mismatched timestamp. companySettings.backupScheduleLastRunAt is
+  // still maintained as the scheduler's own bookkeeping (used to drive
+  // the next-due retry decision), but it is not surfaced to the UI.
   const [latestRun] = await db
-    .select({ success: backupRuns.success })
+    .select({ ranAt: backupRuns.ranAt, success: backupRuns.success })
     .from(backupRuns)
     .orderBy(desc(backupRuns.ranAt))
     .limit(1);
@@ -160,9 +165,7 @@ export async function getBackupSchedule(): Promise<BackupScheduleView> {
     nextDueAt: settings?.backupScheduleNextDueAt
       ? new Date(settings.backupScheduleNextDueAt).toISOString()
       : null,
-    lastRunAt: settings?.backupScheduleLastRunAt
-      ? new Date(settings.backupScheduleLastRunAt).toISOString()
-      : null,
+    lastRunAt: latestRun?.ranAt ? new Date(latestRun.ranAt).toISOString() : null,
     lastSuccessfulBackupAt: latestSuccess?.ranAt
       ? new Date(latestSuccess.ranAt).toISOString()
       : null,
