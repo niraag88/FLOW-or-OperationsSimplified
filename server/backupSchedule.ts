@@ -114,9 +114,12 @@ export function computeNextDueAt(
   if (mode === "next") {
     target += periodDays * 24 * 60 * 60 * 1000;
   } else {
-    // first occurrence at-or-after from
+    // First occurrence: today's HH:MM if still upcoming, otherwise
+    // tomorrow's HH:MM — independent of frequency. Frequency stepping
+    // only kicks in after a successful run via mode="next".
+    const oneDayMs = 24 * 60 * 60 * 1000;
     while (target <= from.getTime()) {
-      target += periodDays * 24 * 60 * 60 * 1000;
+      target += oneDayMs;
     }
   }
   return new Date(target);

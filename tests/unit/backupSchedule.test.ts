@@ -77,3 +77,29 @@ test("invalid timeOfDay throws", () => {
   assert.throws(() => computeNextDueAt('daily', '9:00', REF_BEFORE, 'first'));
   assert.throws(() => computeNextDueAt('daily', 'abcd', REF_BEFORE, 'first'));
 });
+
+// ── Regression: first-occurrence must not skip days based on frequency ──
+//
+// Earlier the loop in `mode='first'` advanced by `periodDays`, so when
+// today's HH:MM had already passed it would push next-due forward by 7
+// days for `weekly` (or 2 days for `every_2_days`) instead of
+// "tomorrow at HH:MM". Frequency stepping should only apply on
+// post-success advancement (mode='next').
+
+test("weekly: today's HH:MM has passed → first occurrence is TOMORROW at HH:MM (not +7 days)", () => {
+  // 09:00 Dubai = 05:00 UTC; ref is 09:00 UTC = 13:00 Dubai (already past 09:00)
+  const r = computeNextDueAt('weekly', '09:00', REF_AFTER, 'first');
+  // Tomorrow 05:00 UTC == Jan 16
+  assert.equal(r.toISOString(), '2026-01-16T05:00:00.000Z');
+});
+
+test("every_2_days: today's HH:MM has passed → first occurrence is TOMORROW at HH:MM (not +2 days)", () => {
+  const r = computeNextDueAt('every_2_days', '09:00', REF_AFTER, 'first');
+  assert.equal(r.toISOString(), '2026-01-16T05:00:00.000Z');
+});
+
+test("weekly: today's HH:MM still upcoming → first occurrence is TODAY at HH:MM", () => {
+  // ref is 02:00 UTC = 06:00 Dubai, target 09:00 Dubai still upcoming
+  const r = computeNextDueAt('weekly', '09:00', REF_BEFORE, 'first');
+  assert.equal(r.toISOString(), '2026-01-15T05:00:00.000Z');
+});
