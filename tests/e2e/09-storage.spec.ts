@@ -284,6 +284,72 @@ test.describe('Storage: 2 MB upload cap', () => {
     expect(replay.status).toBe(401);
   });
 
+  test('multer-aborted multipart PUT to /api/storage/upload/:token consumes the signed token', async () => {
+    // 1. Sign for a small claim so the route would accept the token.
+    const key = 'invoices/test/oversize-multipart.pdf';
+    const signResp = await fetch(`${BASE_URL}/api/storage/sign-upload`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', Cookie: cookie },
+      body: JSON.stringify({ key, fileSize: 9, contentType: 'application/pdf' }),
+    });
+    expect(signResp.status).toBe(200);
+    const signData = (await signResp.json()) as { url: string };
+
+    // The signed token row should exist right after signing.
+    const tokensBefore = await fetch(
+      `${BASE_URL}/api/__test__/signed-token-count?key=${encodeURIComponent(key)}`,
+      { headers: { Cookie: cookie } }
+    ).then((r) => r.json() as Promise<{ count: number }>);
+    expect(tokensBefore.count).toBe(1);
+
+    // 2. PUT a 3 MB multipart body — multer should abort with LIMIT_FILE_SIZE
+    // and the global error handler should 413 + consume the token.
+    const oversize = Buffer.alloc(3 * 1024 * 1024, 0x25);
+    const boundary = '----flow-test-boundary-' + Date.now();
+    const headPart =
+      `--${boundary}\r\n` +
+      `Content-Disposition: form-data; name="file"; filename="oversize.pdf"\r\n` +
+      `Content-Type: application/pdf\r\n\r\n`;
+    const tailPart = `\r\n--${boundary}--\r\n`;
+    const body = Buffer.concat([
+      Buffer.from(headPart, 'utf8'),
+      oversize,
+      Buffer.from(tailPart, 'utf8'),
+    ]);
+
+    const upResp = await fetch(`${BASE_URL}${signData.url}`, {
+      method: 'PUT',
+      headers: {
+        'Content-Type': `multipart/form-data; boundary=${boundary}`,
+        Cookie: cookie,
+      },
+      body,
+    });
+    expect(upResp.status).toBe(413);
+
+    // 3. The signed_tokens row must have been deleted.
+    const tokensAfter = await fetch(
+      `${BASE_URL}/api/__test__/signed-token-count?key=${encodeURIComponent(key)}`,
+      { headers: { Cookie: cookie } }
+    ).then((r) => r.json() as Promise<{ count: number }>);
+    expect(tokensAfter.count).toBe(0);
+
+    // 4. A follow-up PUT with the same token must 401.
+    const replay = await fetch(`${BASE_URL}${signData.url}`, {
+      method: 'PUT',
+      headers: { 'Content-Type': 'application/pdf', Cookie: cookie },
+      body: Buffer.from('%PDF-1.4\n'),
+    });
+    expect(replay.status).toBe(401);
+
+    // 5. No storage_objects row should have been created.
+    const rowResp = await fetch(
+      `${BASE_URL}/api/__test__/storage-object-row?key=${encodeURIComponent(key)}`,
+      { headers: { Cookie: cookie } }
+    ).then((r) => r.json() as Promise<{ exists: boolean }>);
+    expect(rowResp.exists).toBe(false);
+  });
+
   test('upload-scan rejects a 3 MB multipart body with 413, no row created', async () => {
     const key = 'invoices/test/oversize-scan.pdf';
     const oversize = Buffer.alloc(3 * 1024 * 1024, 0x25);

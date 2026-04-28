@@ -5,6 +5,7 @@ import { registerRoutes } from "./routes";
 import { initializeAdminUser } from "./adminInit";
 import { setupVite, serveStatic, log } from "./vite";
 import { MAX_UPLOAD_ERROR_MESSAGE } from "./middleware";
+import { pool } from "./db";
 
 const app = express();
 app.use(helmet({
@@ -33,9 +34,24 @@ app.use((req, res, next) => {
   
   const server = await registerRoutes(app);
 
-  app.use((err: any, _req: Request, res: Response, next: NextFunction) => {
+  app.use(async (err: any, req: Request, res: Response, next: NextFunction) => {
     if (err instanceof multer.MulterError) {
       if (err.code === 'LIMIT_FILE_SIZE' || err.code === 'LIMIT_FILE_COUNT') {
+        // Parity with the raw-body overflow path in PUT /api/storage/upload/:token:
+        // when multer aborts an oversized multipart body, consume the signed
+        // token so it doesn't sit in the DB until the periodic cleanup runs.
+        // Awaited so the deletion commits in the same response cycle.
+        const uploadMatch =
+          req.method === 'PUT' &&
+          /^\/api\/storage\/upload\/([A-Za-z0-9]+)$/.exec(req.path);
+        if (uploadMatch) {
+          const token = uploadMatch[1];
+          try {
+            await pool.query('DELETE FROM signed_tokens WHERE token = $1', [token]);
+          } catch (delErr) {
+            console.error('Failed to consume signed token after multer reject:', delErr);
+          }
+        }
         if (!res.headersSent) {
           return res.status(413).json({ error: MAX_UPLOAD_ERROR_MESSAGE });
         }

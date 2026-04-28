@@ -51,7 +51,7 @@ setInterval(async () => {
   } catch (err) {
     console.error('Failed to clean up expired signed tokens:', err);
   }
-}, 60 * 60 * 1000);
+}, 5 * 60 * 1000);
 
 export async function generateDOPDF(
   deliveryOrder: any,
