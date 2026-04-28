@@ -3453,7 +3453,8 @@
         "success": {
           "name": "success",
           "type": "boolean",
-          "primaryKey": false
+          "primaryKey": false,
+          "notNull": false
         },
         "error_message": {
           "name": "error_message",
@@ -3471,15 +3472,13 @@
           "name": "finished_at",
           "type": "timestamp",
           "primaryKey": false,
-          "notNull": false,
-          "autoincrement": false
+          "notNull": false
         },
         "triggered_by_name": {
           "name": "triggered_by_name",
           "type": "text",
           "primaryKey": false,
-          "notNull": false,
-          "autoincrement": false
+          "notNull": false
         }
       },
       "indexes": {},
@@ -3507,9 +3506,7 @@
   },
   "enums": {},
   "schemas": {
-    "ops": {
-      "name": "ops"
-    }
+    "ops": "ops"
   },
   "views": {},
   "sequences": {},
