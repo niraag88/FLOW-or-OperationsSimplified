@@ -241,10 +241,21 @@ export function registerSystemRoutes(app: Express) {
     }
   });
 
-  app.get('/api/storage/signed-get', requireAuth(), async (req, res) => {
+  app.get('/api/storage/signed-get', requireAuth(), async (req: AuthenticatedRequest, res) => {
     try {
       const { key } = req.query;
       if (!key) return res.status(400).json({ error: 'Key parameter is required' });
+
+      // Sensitive prefixes (backups/, restores/) hold full DB dumps and
+      // restore artefacts. Any user able to mint a signed download token
+      // for these objects can exfiltrate every business record. Restrict
+      // them to Admin only — non-admin requests get 403 even if they
+      // happen to know or guess a key. (Task #319 hardening.)
+      const keyStr = String(key);
+      const isSensitivePrefix = keyStr.startsWith('backups/') || keyStr.startsWith('restores/');
+      if (isSensitivePrefix && req.user?.role !== 'Admin') {
+        return res.status(403).json({ error: 'Forbidden: admin role required for this key' });
+      }
 
       const exists = await objectStorageClient.exists(key as string);
       if (!exists.ok || !exists.value) {

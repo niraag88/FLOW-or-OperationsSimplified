@@ -3,12 +3,20 @@
  *
  * Proves that:
  *   1. POST /api/audit-logs and POST /api/recycle-bin are removed (404 for everyone).
- *   2. Sensitive backup / restore / factory-reset POSTs reject anonymous (401)
- *      and Staff (403) callers — never executed as Admin in this suite to
- *      avoid wiping or mutating data.
+ *   2. Sensitive backup / restore POSTs reject anonymous (401) and Staff (403),
+ *      AND that the Admin role passes the gate. For each destructive route we
+ *      drive admin into an *idempotent* failure mode (validation rejection,
+ *      missing-id 404) so the response status proves the gate let admin
+ *      through without actually wiping or mutating data. POST /api/ops/
+ *      factory-reset has no input validation and would destroy data on every
+ *      admin call — its admin path is documented and intentionally skipped.
  *   3. Sensitive admin-only GETs reject anonymous (401) and Staff (403),
  *      and succeed (200) for Admin.
  *   4. DELETE /api/storage/object rejects anonymous (401) and Staff (403).
+ *   5. GET /api/storage/signed-get is admin-only for sensitive prefixes
+ *      (`backups/`, `restores/`) — Staff is rejected with 403 even when
+ *      the key is well-formed, while non-sensitive prefixes remain open
+ *      to any authenticated user (so attachment downloads still work).
  *
  * Self-provisions a dedicated Staff user (`route_gate_staff`) and cleans it
  * up afterwards so this spec is independent of any other test file.
@@ -116,27 +124,54 @@ test.describe('Admin route gates (Task #319)', () => {
     expect(admin.status).toBe(404);
   });
 
-  // ── 2. Sensitive admin-only POSTs: reject anon + staff, never run as admin ──
+  // ── 2. Sensitive admin-only POSTs ─────────────────────────────────────────
 
-  const sensitivePosts: Array<{ name: string; path: string; body: object }> = [
-    { name: 'POST /api/ops/run-backups', path: '/api/ops/run-backups', body: {} },
-    { name: 'POST /api/ops/restore-upload', path: '/api/ops/restore-upload', body: {} },
-    {
-      name: 'POST /api/ops/backup-runs/:id/restore',
-      path: '/api/ops/backup-runs/999999/restore',
-      body: {},
-    },
-    { name: 'POST /api/ops/factory-reset', path: '/api/ops/factory-reset', body: {} },
-  ];
+  test('POST /api/ops/run-backups → 401 anon, 403 staff, 200 admin', async () => {
+    const anon = await api('POST', '/api/ops/run-backups', '', {});
+    expect(anon.status).toBe(401);
+    const staff = await api('POST', '/api/ops/run-backups', staffCookie, {});
+    expect(staff.status).toBe(403);
+    // Safe to actually execute as admin — produces a backup file + audit row.
+    const admin = await api('POST', '/api/ops/run-backups', adminCookie, {});
+    expect(admin.status).toBe(200);
+  });
 
-  for (const route of sensitivePosts) {
-    test(`${route.name} → 401 anon, 403 staff (admin gate proven)`, async () => {
-      const anon = await api('POST', route.path, '', route.body);
-      expect(anon.status).toBe(401);
-      const staff = await api('POST', route.path, staffCookie, route.body);
-      expect(staff.status).toBe(403);
-    });
-  }
+  test('POST /api/ops/restore-upload → 401 anon, 403 staff, admin reaches handler (400 on bad body)', async () => {
+    const anon = await api('POST', '/api/ops/restore-upload', '', {});
+    expect(anon.status).toBe(401);
+    const staff = await api('POST', '/api/ops/restore-upload', staffCookie, {});
+    expect(staff.status).toBe(403);
+    // Admin call with JSON body (not multipart) must hit the handler's
+    // content-type check and return 400 — proving the gate accepted admin
+    // without starting a destructive restore.
+    const admin = await api('POST', '/api/ops/restore-upload', adminCookie, {});
+    expect(admin.status).toBe(400);
+  });
+
+  test('POST /api/ops/backup-runs/:id/restore → 401 anon, 403 staff, admin reaches handler (404 on unknown id)', async () => {
+    const path = '/api/ops/backup-runs/999999/restore';
+    const anon = await api('POST', path, '', {});
+    expect(anon.status).toBe(401);
+    const staff = await api('POST', path, staffCookie, {});
+    expect(staff.status).toBe(403);
+    // Admin call with a non-existent run id must hit the "not found" branch
+    // (404), proving the gate accepted admin without executing a restore.
+    const admin = await api('POST', path, adminCookie, {});
+    expect(admin.status).toBe(404);
+  });
+
+  test('POST /api/ops/factory-reset → 401 anon, 403 staff (admin path is destructive — not exercised)', async () => {
+    // factory-reset takes no input and immediately wipes business data on
+    // every admin call. Driving admin into the handler here would destroy
+    // the test fixtures the rest of the suite relies on, so we deliberately
+    // restrict this test to the rejection cases. The admin path is covered
+    // implicitly by the `requireRole('Admin')` middleware shared with
+    // run-backups (above), which IS exercised end-to-end as admin.
+    const anon = await api('POST', '/api/ops/factory-reset', '', {});
+    expect(anon.status).toBe(401);
+    const staff = await api('POST', '/api/ops/factory-reset', staffCookie, {});
+    expect(staff.status).toBe(403);
+  });
 
   // ── 3. Sensitive admin-only GETs: 401 anon, 403 staff, 200 admin ─────────
 
@@ -169,5 +204,37 @@ test.describe('Admin route gates (Task #319)', () => {
     expect(anon.status).toBe(401);
     const staff = await api('DELETE', path, staffCookie);
     expect(staff.status).toBe(403);
+  });
+
+  // ── 5. GET /api/storage/signed-get: prefix-based admin gating ────────────
+
+  test('GET /api/storage/signed-get?key=backups/... → 401 anon, 403 staff, admin reaches handler', async () => {
+    const path = '/api/storage/signed-get?key=' + encodeURIComponent('backups/route-gate-nope.sql.gz');
+    const anon = await api('GET', path, '');
+    expect(anon.status).toBe(401);
+    // Staff is rejected with 403 by the prefix check, BEFORE the object
+    // existence lookup — proving role enforcement, not just a 404 leak.
+    const staff = await api('GET', path, staffCookie);
+    expect(staff.status).toBe(403);
+    // Admin clears the prefix gate and falls through to the existence
+    // lookup, which returns 404 for the non-existent key.
+    const admin = await api('GET', path, adminCookie);
+    expect(admin.status).toBe(404);
+  });
+
+  test('GET /api/storage/signed-get?key=restores/... → 403 for staff (sensitive prefix)', async () => {
+    const path = '/api/storage/signed-get?key=' + encodeURIComponent('restores/route-gate-nope.log');
+    const staff = await api('GET', path, staffCookie);
+    expect(staff.status).toBe(403);
+  });
+
+  test('GET /api/storage/signed-get?key=normal/... is open to staff (non-sensitive prefix)', async () => {
+    // Non-sensitive prefixes (e.g. invoice/PO/DO/GR scan attachments) must
+    // remain reachable for any authenticated user. A non-existent key here
+    // returns 404 for staff — NOT 403 — proving the prefix check did not
+    // over-broadly lock down the route.
+    const path = '/api/storage/signed-get?key=' + encodeURIComponent('attachments/route-gate-nope.pdf');
+    const staff = await api('GET', path, staffCookie);
+    expect(staff.status).toBe(404);
   });
 });
