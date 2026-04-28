@@ -411,121 +411,179 @@ export function registerDeliveryOrderRoutes(app: Express) {
           unit_price: it.unit_price,
           line_total: it.line_total,
         }));
-      } else if (oldItems.length > 0) {
-        const recomputeInput = oldItems.map(it => ({
-          product_id: it.productId,
-          quantity: it.quantity,
-          unit_price: parseFloat(it.unitPrice.toString()),
-        }));
-        const resolved = resolveDocumentTotals({
-          items: recomputeInput,
-          taxTreatment: requestedTreatment,
-          defaultVatRate,
+      }
+
+      // Sentinels thrown from inside the transaction so we can map them to
+      // the correct HTTP status outside (mirrors the cancel route's pattern).
+      const NOT_FOUND = '__do_not_found__';
+      const ALREADY_CANCELLED = '__do_already_cancelled__';
+      const DOWNGRADE_BLOCKED = '__do_downgrade_blocked__';
+
+      let becomingDelivered = false;
+
+      try {
+        await db.transaction(async (tx) => {
+          // Lock the DO row so a concurrent PUT or cancel cannot race with
+          // us. Without this, two simultaneous edits on the same delivered
+          // DO could both pass the pre-write status check and both
+          // reconcile stock against the same stale snapshot, double-
+          // adjusting product counts.
+          const [locked] = await tx.select({
+            id: deliveryOrders.id,
+            status: deliveryOrders.status,
+          }).from(deliveryOrders).where(eq(deliveryOrders.id, id)).for('update');
+
+          if (!locked) throw new Error(NOT_FOUND);
+          if (locked.status === 'cancelled') throw new Error(ALREADY_CANCELLED);
+          // Re-check the downgrade guard inside the lock — another request
+          // may have transitioned this DO to 'delivered' between our
+          // pre-tx read and acquiring the lock.
+          if (locked.status === 'delivered' && newStatus !== 'delivered') {
+            throw new Error(DOWNGRADE_BLOCKED);
+          }
+
+          // Re-read items inside the lock for a consistent snapshot. The
+          // pre-tx oldItems read is no longer authoritative if another
+          // request committed in between, so reconciliation and header-
+          // only totals recompute must use this one.
+          const lockedOldItems = await tx.select().from(deliveryOrderItems).where(eq(deliveryOrderItems.doId, id));
+
+          if (!willReplaceItems) {
+            if (lockedOldItems.length > 0) {
+              const recomputeInput = lockedOldItems.map(it => ({
+                product_id: it.productId,
+                quantity: it.quantity,
+                unit_price: parseFloat(it.unitPrice.toString()),
+              }));
+              const resolved = resolveDocumentTotals({
+                items: recomputeInput,
+                taxTreatment: requestedTreatment,
+                defaultVatRate,
+              });
+              resolvedTreatment = resolved.taxTreatment;
+              resolvedSubtotal = resolved.subtotal;
+              resolvedVatAmount = resolved.vatAmount;
+              resolvedTotal = resolved.totalAmount;
+              resolvedVatRate = resolved.vatRate;
+            } else {
+              // No items to recompute against — keep zeros and run the raw
+              // chain value through the same normaliser the resolver uses
+              // so unknown or missing tax_treatment falls back to
+              // ZeroRated, never silently adding 5% VAT.
+              resolvedTreatment = normalizeTaxTreatment(requestedTreatment);
+            }
+          }
+
+          await tx.update(deliveryOrders).set({
+            customerName: persistCustomerName,
+            customerId: persistCustomerId,
+            status: newStatus,
+            orderDate: body.order_date || null,
+            reference: body.reference || null,
+            referenceDate: body.reference_date || null,
+            subtotal: resolvedSubtotal.toFixed(2),
+            taxAmount: resolvedVatAmount.toFixed(2),
+            totalAmount: resolvedTotal.toFixed(2),
+            currency: body.currency || 'AED',
+            notes: body.remarks || body.notes || null,
+            taxRate: resolvedVatRate.toFixed(4),
+            taxTreatment: resolvedTreatment,
+            showRemarks: body.show_remarks || false,
+          }).where(eq(deliveryOrders.id, id));
+
+          const newItems: Array<{ productId: number | null; quantity: number }> = [];
+          if (willReplaceItems) {
+            await tx.delete(deliveryOrderItems).where(eq(deliveryOrderItems.doId, id));
+            for (const item of resolvedItems) {
+              await tx.insert(deliveryOrderItems).values({
+                doId: id,
+                productId: item.product_id,
+                brandId: item.brand_id,
+                productCode: item.product_code,
+                description: item.description,
+                quantity: item.quantity,
+                unitPrice: item.unit_price.toFixed(2),
+                lineTotal: item.line_total.toFixed(2),
+              });
+              newItems.push({ productId: item.product_id, quantity: item.quantity });
+            }
+          } else {
+            for (const it of lockedOldItems) {
+              newItems.push({ productId: it.productId, quantity: Number(it.quantity) });
+            }
+          }
+
+          // Stock movement logic based on the LOCKED status, not the pre-tx
+          // existingDO.status — otherwise we could double-deduct if the DO
+          // was concurrently transitioned to delivered.
+          becomingDelivered = newStatus === 'delivered' && locked.status !== 'delivered';
+          const remainingDelivered = newStatus === 'delivered' && locked.status === 'delivered';
+
+          if (becomingDelivered) {
+            // Deduct stock for all items with a product ID
+            for (const item of newItems) {
+              if (item.productId) {
+                await updateProductStock(
+                  item.productId,
+                  -item.quantity,
+                  'sale',
+                  id,
+                  'delivery_order',
+                  0,
+                  `Stock deducted: DO #${existingDO.orderNumber} delivered`,
+                  req.user!.id,
+                  tx,
+                );
+              }
+            }
+          } else if (remainingDelivered) {
+            // Reconcile stock: compare locked old vs new quantities per product
+            const oldQtyMap = new Map<number, number>();
+            for (const item of lockedOldItems) {
+              if (item.productId) {
+                oldQtyMap.set(item.productId, (oldQtyMap.get(item.productId) || 0) + Number(item.quantity));
+              }
+            }
+            const newQtyMap = new Map<number, number>();
+            for (const item of newItems) {
+              if (item.productId) {
+                newQtyMap.set(item.productId, (newQtyMap.get(item.productId) || 0) + item.quantity);
+              }
+            }
+            const allProductIds = new Set([...oldQtyMap.keys(), ...newQtyMap.keys()]);
+            for (const productId of allProductIds) {
+              const oldQty = oldQtyMap.get(productId) || 0;
+              const newQty = newQtyMap.get(productId) || 0;
+              const delta = oldQty - newQty; // positive = returned stock, negative = more deducted
+              if (delta !== 0) {
+                await updateProductStock(
+                  productId,
+                  delta,
+                  'adjustment',
+                  id,
+                  'delivery_order',
+                  0,
+                  `Stock adjusted: DO #${existingDO.orderNumber} edited while delivered`,
+                  req.user!.id,
+                  tx,
+                );
+              }
+            }
+          }
         });
-        resolvedTreatment = resolved.taxTreatment;
-        resolvedSubtotal = resolved.subtotal;
-        resolvedVatAmount = resolved.vatAmount;
-        resolvedTotal = resolved.totalAmount;
-        resolvedVatRate = resolved.vatRate;
-      } else {
-        // No items to recompute against — keep zeros and run the raw chain
-        // value through the same normaliser the resolver uses so unknown or
-        // missing tax_treatment falls back to ZeroRated, never silently
-        // adding 5% VAT.
-        resolvedTreatment = normalizeTaxTreatment(requestedTreatment);
-      }
-
-      await db.update(deliveryOrders).set({
-        customerName: persistCustomerName,
-        customerId: persistCustomerId,
-        status: newStatus,
-        orderDate: body.order_date || null,
-        reference: body.reference || null,
-        referenceDate: body.reference_date || null,
-        subtotal: resolvedSubtotal.toFixed(2),
-        taxAmount: resolvedVatAmount.toFixed(2),
-        totalAmount: resolvedTotal.toFixed(2),
-        currency: body.currency || 'AED',
-        notes: body.remarks || body.notes || null,
-        taxRate: resolvedVatRate.toFixed(4),
-        taxTreatment: resolvedTreatment,
-        showRemarks: body.show_remarks || false,
-      }).where(eq(deliveryOrders.id, id));
-
-      const newItems: Array<{ productId: number | null; quantity: number }> = [];
-      if (willReplaceItems) {
-        await db.delete(deliveryOrderItems).where(eq(deliveryOrderItems.doId, id));
-        for (const item of resolvedItems) {
-          await db.insert(deliveryOrderItems).values({
-            doId: id,
-            productId: item.product_id,
-            brandId: item.brand_id,
-            productCode: item.product_code,
-            description: item.description,
-            quantity: item.quantity,
-            unitPrice: item.unit_price.toFixed(2),
-            lineTotal: item.line_total.toFixed(2),
-          });
-          newItems.push({ productId: item.product_id, quantity: item.quantity });
-        }
-      } else {
-        for (const it of oldItems) {
-          newItems.push({ productId: it.productId, quantity: Number(it.quantity) });
-        }
-      }
-
-      // Stock movement logic based on status transitions
-      const becomingDelivered = newStatus === 'delivered' && existingDO.status !== 'delivered';
-      const remainingDelivered = newStatus === 'delivered' && existingDO.status === 'delivered';
-
-      if (becomingDelivered) {
-        // Deduct stock for all items with a product ID
-        for (const item of newItems) {
-          if (item.productId) {
-            await updateProductStock(
-              item.productId,
-              -item.quantity,
-              'sale',
-              id,
-              'delivery_order',
-              0,
-              `Stock deducted: DO #${existingDO.orderNumber} delivered`,
-              req.user!.id,
-            );
+      } catch (txError) {
+        if (txError instanceof Error) {
+          if (txError.message === NOT_FOUND) {
+            return res.status(404).json({ error: 'Delivery order not found' });
+          }
+          if (txError.message === ALREADY_CANCELLED) {
+            return res.status(409).json({ error: 'Delivery order is already cancelled' });
+          }
+          if (txError.message === DOWNGRADE_BLOCKED) {
+            return res.status(400).json({ error: 'Cannot change status of a delivered order. Use the Cancel action to cancel it.' });
           }
         }
-      } else if (remainingDelivered) {
-        // Reconcile stock: compare old vs new quantities per product
-        const oldQtyMap = new Map<number, number>();
-        for (const item of oldItems) {
-          if (item.productId) {
-            oldQtyMap.set(item.productId, (oldQtyMap.get(item.productId) || 0) + Number(item.quantity));
-          }
-        }
-        const newQtyMap = new Map<number, number>();
-        for (const item of newItems) {
-          if (item.productId) {
-            newQtyMap.set(item.productId, (newQtyMap.get(item.productId) || 0) + item.quantity);
-          }
-        }
-        const allProductIds = new Set([...oldQtyMap.keys(), ...newQtyMap.keys()]);
-        for (const productId of allProductIds) {
-          const oldQty = oldQtyMap.get(productId) || 0;
-          const newQty = newQtyMap.get(productId) || 0;
-          const delta = oldQty - newQty; // positive = returned stock, negative = more deducted
-          if (delta !== 0) {
-            await updateProductStock(
-              productId,
-              delta,
-              'adjustment',
-              id,
-              'delivery_order',
-              0,
-              `Stock adjusted: DO #${existingDO.orderNumber} edited while delivered`,
-              req.user!.id,
-            );
-          }
-        }
+        throw txError;
       }
 
       const [updated] = await db.select().from(deliveryOrders).where(eq(deliveryOrders.id, id));

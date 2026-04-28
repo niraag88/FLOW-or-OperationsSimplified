@@ -1507,6 +1507,159 @@ test.describe('Delivery Orders', () => {
     expect(cancel.status).toBe(200);
   });
 
+  // ── Task #306: PUT /api/delivery-orders/:id atomicity ────────────────────────
+
+  test('PUT /api/delivery-orders/:id full edit (happy path) → 200, header + items both persisted', async () => {
+    if (!IDs.customer || !IDs.product) return;
+
+    const create = await api('POST', '/api/delivery-orders', adminCookie, {
+      customer_id: IDs.customer,
+      status: 'draft',
+      currency: 'AED',
+      tax_treatment: 'StandardRated',
+      reference: 'ATOMIC-HAPPY-V1',
+      items: [{ product_id: IDs.product, description: 'happy-orig', quantity: 2, unit_price: 100, line_total: 200 }],
+    });
+    expect(create.status).toBe(201);
+    const doId = (create.data as { id: number }).id;
+
+    const put = await api('PUT', `/api/delivery-orders/${doId}`, adminCookie, {
+      customer_id: IDs.customer,
+      status: 'draft',
+      currency: 'AED',
+      tax_treatment: 'StandardRated',
+      reference: 'ATOMIC-HAPPY-V2',
+      items: [
+        { product_id: IDs.product, description: 'happy-edited', quantity: 4, unit_price: 50, line_total: 200 },
+      ],
+    });
+    expect(put.status).toBe(200);
+
+    // Re-fetch and confirm both header and items committed together.
+    const after = await api('GET', `/api/delivery-orders/${doId}`, adminCookie);
+    expect(after.status).toBe(200);
+    const fetched = after.data as { reference?: string; items?: Array<{ description?: string; quantity?: number }> };
+    expect(fetched.reference).toBe('ATOMIC-HAPPY-V2');
+    expect(Array.isArray(fetched.items)).toBe(true);
+    expect(fetched.items!.length).toBe(1);
+    expect(fetched.items![0].description).toBe('happy-edited');
+    expect(Number(fetched.items![0].quantity)).toBe(4);
+
+    await api('DELETE', `/api/delivery-orders/${doId}`, adminCookie);
+  });
+
+  test('PUT /api/delivery-orders/:id with non-existent product_id rolls back atomically (Task #306)', async () => {
+    if (!IDs.customer || !IDs.product) return;
+
+    // Create a draft DO with one valid line so we have a known starting state.
+    const create = await api('POST', '/api/delivery-orders', adminCookie, {
+      customer_id: IDs.customer,
+      status: 'draft',
+      currency: 'AED',
+      tax_treatment: 'StandardRated',
+      reference: 'ATOMIC-FK-V1',
+      items: [{ product_id: IDs.product, description: 'fk-orig', quantity: 3, unit_price: 75, line_total: 225 }],
+    });
+    expect(create.status).toBe(201);
+    const doId = (create.data as { id: number }).id;
+
+    // Capture the pre-PUT snapshot we need to compare against.
+    const before = await api('GET', `/api/delivery-orders/${doId}`, adminCookie);
+    const beforeData = before.data as {
+      reference?: string;
+      subtotal?: string | number;
+      items?: Array<{ description?: string; quantity?: number; unitPrice?: string; productId?: number; product_id?: number }>;
+    };
+    const beforeStockResp = await api('GET', `/api/products/${IDs.product}`, adminCookie);
+    const beforeStock = (beforeStockResp.data as { stockQuantity?: number }).stockQuantity ?? 0;
+
+    // PUT with an items payload containing a non-existent product_id. The
+    // FK on delivery_order_items.product_id → products.id will reject the
+    // INSERT after the header UPDATE has already run inside the transaction;
+    // with the atomic fix in place, the whole transaction rolls back.
+    const FAKE_PRODUCT_ID = 999_999_999;
+    const put = await api('PUT', `/api/delivery-orders/${doId}`, adminCookie, {
+      customer_id: IDs.customer,
+      status: 'draft',
+      currency: 'AED',
+      tax_treatment: 'StandardRated',
+      reference: 'ATOMIC-FK-V2-SHOULD-NOT-PERSIST',
+      items: [{ product_id: FAKE_PRODUCT_ID, description: 'fk-violator', quantity: 7, unit_price: 11, line_total: 77 }],
+    });
+    expect(put.status).not.toBe(200);
+    expect(put.status).not.toBe(201);
+
+    // Header reference, line items, and product stock must all be untouched.
+    const after = await api('GET', `/api/delivery-orders/${doId}`, adminCookie);
+    const afterData = after.data as {
+      reference?: string;
+      subtotal?: string | number;
+      items?: Array<{ description?: string; quantity?: number }>;
+    };
+    expect(afterData.reference).toBe(beforeData.reference);
+    expect(String(afterData.subtotal)).toBe(String(beforeData.subtotal));
+    expect(Array.isArray(afterData.items)).toBe(true);
+    expect(afterData.items!.length).toBe(beforeData.items!.length);
+    expect(afterData.items![0].description).toBe('fk-orig');
+    expect(Number(afterData.items![0].quantity)).toBe(3);
+
+    const afterStockResp = await api('GET', `/api/products/${IDs.product}`, adminCookie);
+    const afterStock = (afterStockResp.data as { stockQuantity?: number }).stockQuantity ?? 0;
+    expect(afterStock).toBe(beforeStock);
+
+    await api('DELETE', `/api/delivery-orders/${doId}`, adminCookie);
+  });
+
+  test('PUT /api/delivery-orders/:id delivered-edit reconciles stock correctly (Task #306 regression)', async () => {
+    if (!IDs.customer || !IDs.product) return;
+
+    // Baseline stock before any test work.
+    const baseStockResp = await api('GET', `/api/products/${IDs.product}`, adminCookie);
+    const baseStock = (baseStockResp.data as { stockQuantity?: number }).stockQuantity ?? 0;
+
+    // Create + transition to delivered with qty=5 — should deduct 5.
+    const create = await api('POST', '/api/delivery-orders', adminCookie, {
+      customer_id: IDs.customer,
+      status: 'draft',
+      currency: 'AED',
+      tax_treatment: 'StandardRated',
+      items: [{ product_id: IDs.product, description: 'reconcile-orig', quantity: 5, unit_price: 10, line_total: 50 }],
+    });
+    expect(create.status).toBe(201);
+    const doId = (create.data as { id: number }).id;
+
+    const deliver = await api('PUT', `/api/delivery-orders/${doId}`, adminCookie, {
+      customer_id: IDs.customer,
+      status: 'delivered',
+    });
+    expect(deliver.status).toBe(200);
+
+    const afterDeliverResp = await api('GET', `/api/products/${IDs.product}`, adminCookie);
+    const afterDeliverStock = (afterDeliverResp.data as { stockQuantity?: number }).stockQuantity ?? 0;
+    expect(afterDeliverStock).toBe(baseStock - 5);
+
+    // Edit while still delivered: qty 5 → 3, expecting +2 stock returned.
+    const edit = await api('PUT', `/api/delivery-orders/${doId}`, adminCookie, {
+      customer_id: IDs.customer,
+      status: 'delivered',
+      currency: 'AED',
+      tax_treatment: 'StandardRated',
+      items: [{ product_id: IDs.product, description: 'reconcile-edited', quantity: 3, unit_price: 10, line_total: 30 }],
+    });
+    expect(edit.status).toBe(200);
+
+    const afterEditResp = await api('GET', `/api/products/${IDs.product}`, adminCookie);
+    const afterEditStock = (afterEditResp.data as { stockQuantity?: number }).stockQuantity ?? 0;
+    expect(afterEditStock).toBe(baseStock - 3);
+
+    // Cleanup: cancel returns the remaining 3 to stock; DO retained for audit.
+    const cancel = await api('PATCH', `/api/delivery-orders/${doId}/cancel`, adminCookie);
+    expect(cancel.status).toBe(200);
+    const afterCancelResp = await api('GET', `/api/products/${IDs.product}`, adminCookie);
+    const afterCancelStock = (afterCancelResp.data as { stockQuantity?: number }).stockQuantity ?? 0;
+    expect(afterCancelStock).toBe(baseStock);
+  });
+
   test('GET /api/delivery-orders → 200', async () => {
     const { status } = await api('GET', '/api/delivery-orders', adminCookie);
     expect(status).toBe(200);
