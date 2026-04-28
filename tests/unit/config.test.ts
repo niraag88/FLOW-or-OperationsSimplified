@@ -11,7 +11,7 @@
 
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { validateConfig } from '../../server/config';
+import { validateConfig, validateConfigOrExit, getConfig } from '../../server/config';
 
 const VALID_ENV: NodeJS.ProcessEnv = {
   NODE_ENV: 'development',
@@ -129,6 +129,16 @@ test('validateConfig: never echoes the offending value (no secret leak)', () => 
     const joined = r.errors.join('\n');
     assert.equal(joined.includes('plaintext-secret-value-here'), false);
   }
+});
+
+test('getConfig: throws if called before validateConfigOrExit, returns the config after', () => {
+  // Note: this test file imports config.ts fresh per process; getConfig
+  // hasn't been populated yet so the first call must throw.
+  assert.throws(() => getConfig(), /before validateConfigOrExit/);
+  const config = validateConfigOrExit(VALID_ENV);
+  const fetched = getConfig();
+  assert.equal(fetched, config);
+  assert.equal(fetched.DATABASE_URL, VALID_ENV.DATABASE_URL);
 });
 
 // Integration test that catches the ESM-hoisting bug discovered in

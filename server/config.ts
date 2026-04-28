@@ -115,7 +115,9 @@ export function validateConfig(env: NodeJS.ProcessEnv = process.env): Validation
 /**
  * Run validation and, on failure, print a clear list of problems and
  * exit non-zero before the HTTP listener opens. Wired in as the very
- * first thing in server/index.ts.
+ * first thing in server/index.ts. The validated config is cached and
+ * available to other modules via `getConfig()` (typed `config` object
+ * mentioned in task-321.md).
  */
 export function validateConfigOrExit(env: NodeJS.ProcessEnv = process.env): Config {
   const result = validateConfig(env);
@@ -129,5 +131,24 @@ export function validateConfigOrExit(env: NodeJS.ProcessEnv = process.env): Conf
     console.error('\nFix the variables above in your environment and restart.\n');
     process.exit(1);
   }
+  cachedConfig = result.config;
   return result.config;
+}
+
+let cachedConfig: Config | null = null;
+
+/**
+ * Returns the typed, validated config. Must be called AFTER
+ * `validateConfigOrExit()` has run at startup (server/index.ts does
+ * this). Refactoring existing `process.env.X` reads to use this is
+ * out of scope for Task #321 — the export exists so future callers
+ * can adopt it incrementally.
+ */
+export function getConfig(): Config {
+  if (!cachedConfig) {
+    throw new Error(
+      'getConfig() called before validateConfigOrExit(). Ensure server/index.ts has run.',
+    );
+  }
+  return cachedConfig;
 }
