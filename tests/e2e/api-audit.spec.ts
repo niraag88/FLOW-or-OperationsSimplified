@@ -1462,10 +1462,12 @@ test.describe('Delivery Orders', () => {
     const { status: delDeliveredStatus } = await api('DELETE', `/api/delivery-orders/${doId}`, adminCookie);
     note('DELETE /api/delivery-orders/:id on a delivered DO → 400 (must cancel first)');
     expect(delDeliveredStatus).toBe(400);
-    // Cancel reverses stock; cancelled DOs are retained for audit
-    // and cannot be deleted, so we stop after cancel.
+    // Cancel the DO, then delete
     const { status: cancelStatus } = await api('PATCH', `/api/delivery-orders/${doId}/cancel`, adminCookie);
     expect(cancelStatus).toBe(200);
+    const { status: delStatus } = await api('DELETE', `/api/delivery-orders/${doId}`, adminCookie);
+    note('DELETE /api/delivery-orders/:id on a cancelled DO → 200 (allowed)');
+    expect(delStatus).toBe(200);
   });
 
   test('PUT /api/delivery-orders/:id status downgrade from delivered → 400', async () => {
