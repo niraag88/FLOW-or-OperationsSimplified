@@ -103,3 +103,25 @@ test("weekly: today's HH:MM still upcoming → first occurrence is TODAY at HH:M
   const r = computeNextDueAt('weekly', '09:00', REF_BEFORE, 'first');
   assert.equal(r.toISOString(), '2026-01-15T05:00:00.000Z');
 });
+
+// ── Failure-path semantic: only mode='next' advances by frequency ──
+//
+// The scheduler distinguishes attempt vs success: lastRunAt is bumped
+// on every attempt, but nextDueAt only advances after a *successful*
+// run via computeNextDueAt(..., 'next'). This pair of tests pins that
+// contract by showing that the same "current" reference returns the
+// upcoming today/tomorrow window in 'first' mode (used on save and
+// implicitly during retry — nextDueAt is left alone) but a one-period
+// later value in 'next' mode (used on success). A failed scheduler tick
+// therefore retries the same window on the next minute.
+
+test("scheduler retry contract: 'first' mode does NOT advance past the current window", () => {
+  // 09:00 Dubai = 05:00 UTC. ref is 04:30 UTC = 08:30 Dubai (still upcoming today)
+  const ref = new Date('2026-01-15T04:30:00Z');
+  const first = computeNextDueAt('daily', '09:00', ref, 'first');
+  assert.equal(first.toISOString(), '2026-01-15T05:00:00.000Z');
+  // ...but 'next' from the same reference is one full period later.
+  const next = computeNextDueAt('daily', '09:00', ref, 'next');
+  assert.equal(next.toISOString(), '2026-01-16T05:00:00.000Z');
+  assert.notEqual(first.toISOString(), next.toISOString());
+});
