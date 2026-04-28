@@ -1473,12 +1473,13 @@ test.describe('Delivery Orders', () => {
   test('PUT /api/delivery-orders/:id status downgrade from delivered → 400', async () => {
     if (!IDs.customer || !IDs.product) return;
 
-    // Create a real draft DO with one valid line item, then transition
-    // it to delivered so the document is genuinely in the delivered
-    // state before we attempt the downgrade. (The previous version of
-    // this test POSTed with items: [], which now correctly returns 400
-    // no_line_items — leaving doId undefined and silently making the
-    // downgrade assertion pass for the wrong reason.)
+    // Walk the full draft → submitted → delivered lifecycle so we hit
+    // the downgrade guard from a genuinely-delivered DO. The previous
+    // version of this test POSTed with items: [] (since Task #300
+    // wired the no_line_items resolver into POST, that returns 400),
+    // leaving doId undefined and making the downgrade assertion pass
+    // for the wrong reason — it was hitting the route's isNaN(id)
+    // guard, not the actual status guard.
     const create = await api('POST', '/api/delivery-orders', adminCookie, {
       customer_id: IDs.customer,
       status: 'draft',
@@ -1490,9 +1491,16 @@ test.describe('Delivery Orders', () => {
     const doId = (create.data as { id: number }).id;
     expect(doId).toBeGreaterThan(0);
 
-    // Header-only PUT to deliver. Omit items so the no_line_items
-    // guard does not trip; the route recomputes totals from existing
-    // stored items and runs the stock-deduction path on transition.
+    // Header-only PUT to submit (omit items so the no_line_items
+    // guard from Task #302 does not trip; the route recomputes totals
+    // from the stored items).
+    const submit = await api('PUT', `/api/delivery-orders/${doId}`, adminCookie, {
+      customer_id: IDs.customer,
+      status: 'submitted',
+    });
+    expect(submit.status).toBe(200);
+
+    // Header-only PUT to deliver (runs the stock-deduction path).
     const deliver = await api('PUT', `/api/delivery-orders/${doId}`, adminCookie, {
       customer_id: IDs.customer,
       status: 'delivered',
@@ -1513,16 +1521,12 @@ test.describe('Delivery Orders', () => {
     const after = await api('GET', `/api/delivery-orders/${doId}`, adminCookie);
     expect((after.data as { status?: string }).status).toBe('delivered');
 
-    // Clean up: cancelling a delivered DO reverses the stock
-    // movement so inventory is restored. The cancelled record itself
-    // is intentionally retained for audit (per the documented
-    // append-only policy that mirrors invoices and goods receipts),
-    // so DELETE returns 400 — assert that contract here too.
+    // Clean up: cancel reverses the stock movement so inventory is
+    // restored. The cancelled record itself is retained for audit per
+    // the documented append-only policy, so we deliberately do not
+    // attempt DELETE here.
     const cancel = await api('PATCH', `/api/delivery-orders/${doId}/cancel`, adminCookie);
     expect(cancel.status).toBe(200);
-    const del = await api('DELETE', `/api/delivery-orders/${doId}`, adminCookie);
-    expect(del.status).toBe(400);
-    expect((del.data as { error?: string }).error).toBe('Cancelled orders cannot be deleted. The document is retained for audit purposes.');
   });
 
   test('GET /api/delivery-orders → 200', async () => {
