@@ -1341,6 +1341,96 @@ test.describe('Invoices', () => {
     expect(updated.status).toBe('submitted');
   });
 
+  test('PUT /api/invoices/:id full edit (header + items committed atomically) → 200', async () => {
+    expect(IDs.invoice).toBeGreaterThan(0);
+    expect(IDs.customer).toBeGreaterThan(0);
+    expect(IDs.product).toBeGreaterThan(0);
+    const newRef = `AUDIT-INV-EDIT-${Date.now()}`;
+    const { status } = await api('PUT', `/api/invoices/${IDs.invoice}`, adminCookie, {
+      customer_id: IDs.customer,
+      status: 'submitted',
+      reference: newRef,
+      invoice_date: '2026-04-12',
+      items: [
+        {
+          product_id: IDs.product,
+          product_name: 'Audit Test Product',
+          product_code: 'AUDIT-SKU-001',
+          description: 'Audit invoice item — full edit',
+          quantity: 3,
+          unit_price: 99.0,
+          line_total: 297.0,
+        },
+      ],
+    });
+    expect(status).toBe(200);
+    const { data: after } = await api('GET', `/api/invoices/${IDs.invoice}`, adminCookie);
+    const inv = after as { reference?: string; items?: Array<{ quantity: number }>; subtotal?: number };
+    expect(inv.reference).toBe(newRef);
+    expect(inv.items?.length).toBe(1);
+    expect(inv.items?.[0].quantity).toBe(3);
+    expect(inv.subtotal).toBe(297);
+  });
+
+  test('PUT /api/invoices/:id with non-existent product_id rolls back atomically (FK violation on item insert: header + items + stock unchanged)', async () => {
+    expect(IDs.invoice).toBeGreaterThan(0);
+    expect(IDs.customer).toBeGreaterThan(0);
+    expect(IDs.product).toBeGreaterThan(0);
+
+    // Snapshot current invoice state (set by the previous full-edit test).
+    const { data: before } = await api('GET', `/api/invoices/${IDs.invoice}`, adminCookie);
+    const beforeInv = before as { reference?: string; subtotal?: number; total_amount?: number; items?: Array<{ quantity: number; product_id?: number }> };
+    const originalRef = beforeInv.reference;
+    const originalSubtotal = beforeInv.subtotal;
+    const originalItemCount = beforeInv.items?.length ?? 0;
+    const originalFirstQty = beforeInv.items?.[0]?.quantity;
+
+    // Snapshot product stock so we can prove no movement was posted.
+    const { data: prodBefore } = await api('GET', `/api/products/${IDs.product}`, adminCookie);
+    const stockBefore = (prodBefore as { stockQuantity?: number; stock_quantity?: number }).stockQuantity
+      ?? (prodBefore as { stock_quantity?: number }).stock_quantity
+      ?? 0;
+
+    // Sabotage PUT: header change + items containing a bogus product_id
+    // that violates the invoice_line_items.product_id → products.id FK.
+    // The header update happens BEFORE the item insert inside the
+    // transaction, so a row lock + transactional rollback is the only
+    // thing keeping the header from silently changing.
+    const sabotageRef = `SABOTAGE-${Date.now()}`;
+    const { status } = await api('PUT', `/api/invoices/${IDs.invoice}`, adminCookie, {
+      customer_id: IDs.customer,
+      status: 'submitted',
+      reference: sabotageRef,
+      invoice_date: '2026-04-12',
+      items: [
+        {
+          product_id: 999_999_999,
+          description: 'sabotage item — non-existent product',
+          quantity: 7,
+          unit_price: 50.0,
+          line_total: 350.0,
+        },
+      ],
+    });
+    expect(status).not.toBe(200);
+    expect(status).not.toBe(201);
+
+    // Verify nothing changed: header reference, totals, item count, item
+    // quantity, and product stock all match the pre-call snapshot.
+    const { data: after } = await api('GET', `/api/invoices/${IDs.invoice}`, adminCookie);
+    const afterInv = after as { reference?: string; subtotal?: number; items?: Array<{ quantity: number }> };
+    expect(afterInv.reference).toBe(originalRef);
+    expect(afterInv.subtotal).toBe(originalSubtotal);
+    expect(afterInv.items?.length).toBe(originalItemCount);
+    expect(afterInv.items?.[0]?.quantity).toBe(originalFirstQty);
+
+    const { data: prodAfter } = await api('GET', `/api/products/${IDs.product}`, adminCookie);
+    const stockAfter = (prodAfter as { stockQuantity?: number; stock_quantity?: number }).stockQuantity
+      ?? (prodAfter as { stock_quantity?: number }).stock_quantity
+      ?? 0;
+    expect(stockAfter).toBe(stockBefore);
+  });
+
   test('GET /api/invoices without auth → 401', async () => {
     const { status } = await api('GET', '/api/invoices', '');
     expect(status).toBe(401);

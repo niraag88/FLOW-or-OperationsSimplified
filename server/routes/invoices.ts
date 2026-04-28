@@ -419,23 +419,17 @@ export function registerInvoiceRoutes(app: Express) {
 
       // Block reverting a stock-deducted invoice back to draft or submitted.
       // Stock has already been moved out; reverting would silently desync inventory.
+      // Fast-fail using the pre-tx snapshot; the in-tx lock check is authoritative.
       if (existingInvoice.stockDeducted && (newStatus === 'draft' || newStatus === 'submitted')) {
         return res.status(400).json({
           error: 'Delivered invoices cannot be reverted. Use Cancel to reverse stock.',
         });
       }
 
-      const submittableStatuses2 = ['submitted', 'paid', 'delivered'];
       const willReplaceItems = Array.isArray(body.items) && body.items.length > 0;
-      if (submittableStatuses2.includes(newStatus) && !willReplaceItems) {
-        const [firstExisting] = await db.select({ id: invoiceLineItems.id })
-          .from(invoiceLineItems)
-          .where(eq(invoiceLineItems.invoiceId, id))
-          .limit(1);
-        if (!firstExisting) {
-          return res.status(400).json({ error: 'At least one item is required to submit an invoice' });
-        }
-      }
+      // (The "submittable status requires at least one item" check moved
+      // inside the transaction so it runs against the locked items snapshot —
+      // a concurrent line-item delete cannot slip a submit through.)
 
       // Resolve and validate items + totals BEFORE any DB write. If items
       // are not in the body (header-only edit), recompute totals from the
@@ -507,44 +501,25 @@ export function registerInvoiceRoutes(app: Express) {
           unit_price: it.unit_price,
           line_total: it.line_total,
         }));
-      } else {
-        // Header-only edit: recompute totals from already-stored items so
-        // the persisted totals stay consistent with the persisted lines.
-        const existingItems = await db.select().from(invoiceLineItems).where(eq(invoiceLineItems.invoiceId, id));
-        if (existingItems.length === 0) {
-          // Nothing to recompute against — keep zeros. Run the raw chain
-          // value through the same normaliser the resolver uses so we stay
-          // consistent with the conservative "unknown → ZeroRated" rule.
-          resolvedTreatment = normalizeTaxTreatment(treatmentInput);
-        } else {
-          const recomputeInput = existingItems.map(it => ({
-            product_id: it.productId,
-            quantity: it.quantity,
-            unit_price: parseFloat(it.unitPrice.toString()),
-          }));
-          const resolved = resolveDocumentTotals({
-            items: recomputeInput,
-            taxTreatment: treatmentInput,
-            defaultVatRate,
-          });
-          resolvedTreatment = resolved.taxTreatment;
-          resolvedSubtotal = resolved.subtotal;
-          resolvedVatAmount = resolved.vatAmount;
-          resolvedTotal = resolved.totalAmount;
-        }
       }
+      // NOTE: header-only totals recompute moved inside the transaction so
+      // it sees the locked items snapshot.
 
-      const becomingDelivered = newStatus === 'delivered' && existingInvoice.status !== 'delivered';
-      const needsStockDeduction = becomingDelivered && !existingInvoice.stockDeducted;
-      // Reconcile when stock has already been deducted AND the user is replacing line items.
-      // Source of truth is `stockDeducted`, not status — handles process-sale + later edit too.
-      const needsReconciliation = !!existingInvoice.stockDeducted && willReplaceItems;
+      // Sentinels thrown from inside the transaction so we can map them to
+      // the correct HTTP status outside (mirrors the pattern used by the
+      // delivery-orders PUT and the invoice cancel route).
+      const NOT_FOUND = '__inv_not_found__';
+      const ALREADY_CANCELLED = '__inv_already_cancelled__';
+      const STOCK_REVERT_BLOCKED = '__inv_stock_revert_blocked__';
+      const SUBMIT_REQUIRES_ITEMS = '__inv_submit_requires_items__';
 
-      const invoiceNum = existingInvoice.invoiceNumber || String(id);
+      let becomingDelivered = false;
+      let needsStockDeduction = false;
+      let needsReconciliation = false;
+      let lockedNewStatus = newStatus;
       let reconciledCount = 0;
 
-      // Wrap header update + line item replace + stock movements in one transaction so
-      // a failure rolls back everything and inventory never silently desyncs.
+      const invoiceNum = existingInvoice.invoiceNumber || String(id);
       // Preserve the existing customer linkage when the body omits
       // customer fields. Otherwise a header-only edit would silently
       // null out customerId and break VAT authority on the next edit.
@@ -554,122 +529,212 @@ export function registerInvoiceRoutes(app: Express) {
         ?? (customerId ? customerName : existingInvoice.customerName)
         ?? 'Unknown Customer';
 
-      await db.transaction(async (tx) => {
-        // 1. Update header — totals are server-computed; client values are ignored.
-        await tx.update(invoices).set({
-          customerName: persistCustomerName,
-          customerId: persistCustomerId,
-          amount: resolvedTotal.toFixed(2),
-          vatAmount: resolvedVatAmount.toFixed(2),
-          status: newStatus,
-          invoiceDate: body.invoice_date || null,
-          reference: body.reference || null,
-          referenceDate: body.reference_date || null,
-          notes: body.remarks || body.notes || null,
-          currency: body.currency || 'AED',
-          taxTreatment: resolvedTreatment,
-          paymentMethod: body.payment_method || null,
-        }).where(eq(invoices.id, id));
+      try {
+        await db.transaction(async (tx) => {
+          // Lock the invoice row so a concurrent PUT or cancel cannot race
+          // with us. Without this, two simultaneous edits on the same
+          // delivered invoice could both pass the pre-write status check
+          // and both reconcile stock against the same stale snapshot,
+          // double-adjusting product counts. Mirrors the row lock added
+          // to the delivery-orders PUT in Task #306 and the cancel route.
+          const [locked] = await tx.select({
+            status: invoices.status,
+            stockDeducted: invoices.stockDeducted,
+          }).from(invoices).where(eq(invoices.id, id)).for('update');
 
-        // 2. Snapshot OLD items before delete (only needed if we'll reconcile)
-        let oldItems: Array<{ productId: number | null; quantity: number; unitPrice: string }> = [];
-        if (willReplaceItems && needsReconciliation) {
-          oldItems = await tx.select({
-            productId: invoiceLineItems.productId,
-            quantity: invoiceLineItems.quantity,
-            unitPrice: invoiceLineItems.unitPrice,
-          }).from(invoiceLineItems).where(eq(invoiceLineItems.invoiceId, id));
-        }
+          if (!locked) throw new Error(NOT_FOUND);
+          if (locked.status === 'cancelled') throw new Error(ALREADY_CANCELLED);
 
-        // 3. Replace line items if provided — using resolver-validated values.
-        if (willReplaceItems) {
-          await tx.delete(invoiceLineItems).where(eq(invoiceLineItems.invoiceId, id));
-          for (const item of resolvedItems) {
-            await tx.insert(invoiceLineItems).values({
-              invoiceId: id,
-              productId: item.product_id,
-              brandId: item.brand_id,
-              productCode: item.product_code,
-              description: item.description,
-              quantity: item.quantity,
-              unitPrice: item.unit_price.toFixed(2),
-              lineTotal: item.line_total.toFixed(2),
-            });
+          // Re-derive newStatus against the locked row. A header-only edit
+          // (no body.status) must default to the *current* persisted status,
+          // not a pre-tx snapshot — otherwise a concurrent transition that
+          // committed between the pre-tx read and the lock would be silently
+          // overwritten.
+          lockedNewStatus = body.status || locked.status || 'draft';
+
+          // Re-check the stock-revert guard against locked.stockDeducted
+          // (the source of truth for inventory).
+          if (locked.stockDeducted && (lockedNewStatus === 'draft' || lockedNewStatus === 'submitted')) {
+            throw new Error(STOCK_REVERT_BLOCKED);
           }
-        }
 
-        // 4a. Reconcile (already-deducted invoice with item edits): aggregate per productId,
-        //     compute oldQty - newQty per product, apply each non-zero delta as an 'adjustment'.
-        if (needsReconciliation) {
-          const oldByProduct = new Map<number, { qty: number; unitPrice: number }>();
-          for (const it of oldItems) {
-            if (it.productId == null) continue;
-            const cur = oldByProduct.get(it.productId);
-            if (cur) {
-              cur.qty += it.quantity;
+          // In-lock items snapshot used for both header-only totals
+          // recompute and the submit-requires-items pre-check.
+          const lockedExistingItems = await tx.select().from(invoiceLineItems).where(eq(invoiceLineItems.invoiceId, id));
+
+          const submittableStatuses = ['submitted', 'paid', 'delivered'];
+          if (submittableStatuses.includes(lockedNewStatus) && !willReplaceItems && lockedExistingItems.length === 0) {
+            throw new Error(SUBMIT_REQUIRES_ITEMS);
+          }
+
+          // Header-only edits: recompute totals from the locked items
+          // snapshot so persisted totals stay consistent with persisted lines.
+          if (!willReplaceItems) {
+            if (lockedExistingItems.length === 0) {
+              // Nothing to recompute against — keep zeros. Run the raw chain
+              // value through the same normaliser so unknown/missing
+              // tax_treatment falls back to ZeroRated, never silently
+              // adding 5% VAT.
+              resolvedTreatment = normalizeTaxTreatment(treatmentInput);
             } else {
-              oldByProduct.set(it.productId, {
-                qty: it.quantity,
-                unitPrice: parseFloat(it.unitPrice.toString()),
+              const recomputeInput = lockedExistingItems.map(it => ({
+                product_id: it.productId,
+                quantity: it.quantity,
+                unit_price: parseFloat(it.unitPrice.toString()),
+              }));
+              const resolved = resolveDocumentTotals({
+                items: recomputeInput,
+                taxTreatment: treatmentInput,
+                defaultVatRate,
+              });
+              resolvedTreatment = resolved.taxTreatment;
+              resolvedSubtotal = resolved.subtotal;
+              resolvedVatAmount = resolved.vatAmount;
+              resolvedTotal = resolved.totalAmount;
+            }
+          }
+
+          // Re-derive stock flags from the locked snapshot — must reflect
+          // what the row currently looks like, not the pre-tx read.
+          becomingDelivered = lockedNewStatus === 'delivered' && locked.status !== 'delivered';
+          needsStockDeduction = becomingDelivered && !locked.stockDeducted;
+          // Reconcile when stock has already been deducted AND the user is
+          // replacing line items. Source of truth is locked.stockDeducted.
+          needsReconciliation = !!locked.stockDeducted && willReplaceItems;
+
+          // 1. Update header — totals are server-computed; client values are ignored.
+          await tx.update(invoices).set({
+            customerName: persistCustomerName,
+            customerId: persistCustomerId,
+            amount: resolvedTotal.toFixed(2),
+            vatAmount: resolvedVatAmount.toFixed(2),
+            status: lockedNewStatus,
+            invoiceDate: body.invoice_date || null,
+            reference: body.reference || null,
+            referenceDate: body.reference_date || null,
+            notes: body.remarks || body.notes || null,
+            currency: body.currency || 'AED',
+            taxTreatment: resolvedTreatment,
+            paymentMethod: body.payment_method || null,
+          }).where(eq(invoices.id, id));
+
+          // 2. Snapshot OLD items before delete (only needed if we'll reconcile).
+          //    Reuse the locked snapshot we already have to save a redundant SELECT.
+          let oldItems: Array<{ productId: number | null; quantity: number; unitPrice: string }> = [];
+          if (willReplaceItems && needsReconciliation) {
+            oldItems = lockedExistingItems.map(it => ({
+              productId: it.productId,
+              quantity: it.quantity,
+              unitPrice: it.unitPrice as unknown as string,
+            }));
+          }
+
+          // 3. Replace line items if provided — using resolver-validated values.
+          if (willReplaceItems) {
+            await tx.delete(invoiceLineItems).where(eq(invoiceLineItems.invoiceId, id));
+            for (const item of resolvedItems) {
+              await tx.insert(invoiceLineItems).values({
+                invoiceId: id,
+                productId: item.product_id,
+                brandId: item.brand_id,
+                productCode: item.product_code,
+                description: item.description,
+                quantity: item.quantity,
+                unitPrice: item.unit_price.toFixed(2),
+                lineTotal: item.line_total.toFixed(2),
               });
             }
           }
 
-          const newByProduct = new Map<number, { qty: number; unitPrice: number }>();
-          for (const item of resolvedItems) {
-            if (item.product_id == null) continue;
-            const cur = newByProduct.get(item.product_id);
-            if (cur) {
-              cur.qty += item.quantity;
-            } else {
-              newByProduct.set(item.product_id, { qty: item.quantity, unitPrice: item.unit_price });
+          // 4a. Reconcile (already-deducted invoice with item edits): aggregate per productId,
+          //     compute oldQty - newQty per product, apply each non-zero delta as an 'adjustment'.
+          if (needsReconciliation) {
+            const oldByProduct = new Map<number, { qty: number; unitPrice: number }>();
+            for (const it of oldItems) {
+              if (it.productId == null) continue;
+              const cur = oldByProduct.get(it.productId);
+              if (cur) {
+                cur.qty += it.quantity;
+              } else {
+                oldByProduct.set(it.productId, {
+                  qty: it.quantity,
+                  unitPrice: parseFloat(it.unitPrice.toString()),
+                });
+              }
             }
-          }
 
-          const allProductIds = new Set<number>([...oldByProduct.keys(), ...newByProduct.keys()]);
-          for (const pid of allProductIds) {
-            const oldQty = oldByProduct.get(pid)?.qty ?? 0;
-            const newQty = newByProduct.get(pid)?.qty ?? 0;
-            const adjustment = oldQty - newQty; // +ve returns stock, -ve deducts more
-            if (adjustment === 0) continue;
-            const unitCost =
-              newByProduct.get(pid)?.unitPrice ??
-              oldByProduct.get(pid)?.unitPrice ??
-              0;
-            await updateProductStock(
-              pid,
-              adjustment,
-              'adjustment',
-              id,
-              'invoice',
-              unitCost,
-              `Stock reconciled after editing delivered Invoice #${invoiceNum}`,
-              req.user!.id,
-              tx
-            );
-            reconciledCount++;
+            const newByProduct = new Map<number, { qty: number; unitPrice: number }>();
+            for (const item of resolvedItems) {
+              if (item.product_id == null) continue;
+              const cur = newByProduct.get(item.product_id);
+              if (cur) {
+                cur.qty += item.quantity;
+              } else {
+                newByProduct.set(item.product_id, { qty: item.quantity, unitPrice: item.unit_price });
+              }
+            }
+
+            const allProductIds = new Set<number>([...oldByProduct.keys(), ...newByProduct.keys()]);
+            for (const pid of allProductIds) {
+              const oldQty = oldByProduct.get(pid)?.qty ?? 0;
+              const newQty = newByProduct.get(pid)?.qty ?? 0;
+              const adjustment = oldQty - newQty; // +ve returns stock, -ve deducts more
+              if (adjustment === 0) continue;
+              const unitCost =
+                newByProduct.get(pid)?.unitPrice ??
+                oldByProduct.get(pid)?.unitPrice ??
+                0;
+              await updateProductStock(
+                pid,
+                adjustment,
+                'adjustment',
+                id,
+                'invoice',
+                unitCost,
+                `Stock reconciled after editing delivered Invoice #${invoiceNum}`,
+                req.user!.id,
+                tx
+              );
+              reconciledCount++;
+            }
+            // Do NOT touch stockDeducted — it remains true.
+          } else if (needsStockDeduction) {
+            // 4b. First-time deduction: deduct full quantities for the now-saved items.
+            const itemsToDeduct = await tx.select().from(invoiceLineItems).where(eq(invoiceLineItems.invoiceId, id));
+            for (const item of itemsToDeduct) {
+              if (!item.productId) continue;
+              await updateProductStock(
+                item.productId,
+                -item.quantity,
+                'sale',
+                id,
+                'invoice',
+                parseFloat(item.unitPrice.toString()),
+                `Sale from Invoice #${invoiceNum}`,
+                req.user!.id,
+                tx
+              );
+            }
+            await tx.update(invoices).set({ stockDeducted: true }).where(eq(invoices.id, id));
           }
-          // Do NOT touch stockDeducted — it remains true.
-        } else if (needsStockDeduction) {
-          // 4b. First-time deduction: deduct full quantities for the now-saved items.
-          const itemsToDeduct = await tx.select().from(invoiceLineItems).where(eq(invoiceLineItems.invoiceId, id));
-          for (const item of itemsToDeduct) {
-            if (!item.productId) continue;
-            await updateProductStock(
-              item.productId,
-              -item.quantity,
-              'sale',
-              id,
-              'invoice',
-              parseFloat(item.unitPrice.toString()),
-              `Sale from Invoice #${invoiceNum}`,
-              req.user!.id,
-              tx
-            );
+        });
+      } catch (txError) {
+        if (txError instanceof Error) {
+          if (txError.message === NOT_FOUND) {
+            return res.status(404).json({ error: 'Invoice not found' });
           }
-          await tx.update(invoices).set({ stockDeducted: true }).where(eq(invoices.id, id));
+          if (txError.message === ALREADY_CANCELLED) {
+            return res.status(409).json({ error: 'Cannot edit a cancelled invoice' });
+          }
+          if (txError.message === STOCK_REVERT_BLOCKED) {
+            return res.status(400).json({ error: 'Delivered invoices cannot be reverted. Use Cancel to reverse stock.' });
+          }
+          if (txError.message === SUBMIT_REQUIRES_ITEMS) {
+            return res.status(400).json({ error: 'At least one item is required to submit an invoice' });
+          }
         }
-      });
+        throw txError;
+      }
 
       const [updated] = await db.select().from(invoices).where(eq(invoices.id, id));
       const stockSuffix = needsStockDeduction
