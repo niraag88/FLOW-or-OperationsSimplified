@@ -1,0 +1,139 @@
+Priority 7: File Upload and Object Storage Safety
+
+Please implement this as a focused backend safety fix.
+
+Do not change PDF layouts, invoice print format, delivery order print format, XLSX export layouts, VAT logic, stock logic, invoice totals, delivery-order totals, GRN logic, backup/restore logic, authentication rules, database schema, or migrations.
+
+Problem:
+The app stores uploaded scan/PDF/image files in object storage and keeps references to those files in database fields such as scanKey or supplierScanKey. Some delete-scan endpoints currently clear the database reference even if the object-storage delete fails. That can hide the file from the UI while leaving the actual object in storage, creating orphaned files and unreliable storage tracking.
+
+Also, upload endpoints should be hardened so oversized uploads are rejected early and cannot be fully buffered into memory before size checks.
+
+Affected files to inspect:
+- server/routes/invoices.ts
+- server/routes/delivery-orders.ts
+- server/routes/goods-receipts.ts
+- server/routes/purchase-orders.ts
+- server/routes/system.ts
+- server/middleware.ts
+- tests/e2e/09-storage.spec.ts
+- tests/e2e/api-audit.spec.ts, only if this is where existing storage tests live
+
+Current risky behavior:
+1. Invoice scan delete can attempt objectStorageClient.delete(invoice.scanKey), but if delete fails, the route still clears scanKey.
+2. Delivery order scan delete has the same risk.
+3. Goods receipt scan delete has the same risk.
+4. Purchase order supplier scan delete has the same risk.
+5. Some upload paths use memory buffering and only validate size after the file/body is already received.
+6. Storage tracking can become inaccurate if the database says the file is gone but the object still exists.
+
+Desired correct behavior:
+1. A document scan key must only be cleared from the database after the object was successfully deleted from storage, or after storage confirms the object is already missing.
+2. If object storage delete fails because of a service/network/bucket error, return an error and keep the database scan key unchanged.
+3. Do not silently log “clearing key anyway” and proceed. That is the risky behavior being fixed.
+4. Oversized uploads should be rejected safely.
+5. Existing valid upload/delete flows should keep working.
+
+Exact logic rules to implement:
+
+A. Scan document delete endpoints
+
+For each document scan-delete endpoint:
+- Invoice scan delete
+- Delivery order scan delete
+- Goods receipt scan delete by slot
+- Purchase order supplier scan delete
+
+Implement this rule:
+
+1. Load the document.
+2. If there is no scan key, return success/no-op as today.
+3. If there is a scan key, call objectStorageClient.delete(scanKey).
+4. Check the delete result.
+5. If delete succeeds, delete the matching storageObjects tracking row and clear the scan key on the document.
+6. If storage says the object is already missing/not found, it is acceptable to delete the tracking row and clear the scan key because there is no live object left.
+7. If storage delete fails for any other reason, return a clear 5xx error and do not clear the scan key.
+8. Keep all database updates for tracking row deletion and document scan-key clearing together where practical.
+9. Log the failure with enough context: document type, document id, scan key, and storage error.
+
+Important:
+Do not clear the database scan key unless the storage object is deleted or confirmed missing.
+
+B. Upload size hardening
+
+Inspect these upload paths:
+- POST /api/storage/upload/:token
+- POST /api/storage/upload-scan
+
+Please harden upload size handling without changing the frontend API contract.
+
+Rules:
+1. Add multer file-size limits matching the app’s current allowed maximums.
+2. For multipart uploads, reject files over the allowed size with a clear 413 or 400 response.
+3. For raw-body signed uploads, stop accumulating chunks once the received byte count exceeds the expected token file size or the maximum allowed upload size.
+4. Do not wait until after Buffer.concat to reject a clearly oversized upload.
+5. Continue validating exact expected file size, checksum when present, content type, and PDF/image magic bytes as today.
+6. Do not loosen current key-prefix rules.
+7. Do not add new public upload paths.
+
+C. Storage tracking
+
+Do not make a broad storage redesign in this task.
+
+For scan-delete endpoints:
+- If object deletion succeeds or object is confirmed missing, delete the matching storageObjects row.
+- If object deletion fails, leave storageObjects and the document scan key unchanged.
+
+For upload endpoints:
+- Keep current successful upload behavior unless a small safety fix is required.
+- Do not introduce a risky compensation flow that could delete a successfully uploaded file after returning success.
+- If you notice storageObjects insert failure handling is unsafe, flag it as a follow-up instead of expanding this task.
+
+Edge cases:
+1. Deleting scan when scanKey is already null.
+2. Deleting scan when DB has a scanKey but storage object is already missing.
+3. Deleting scan when object storage returns a real failure.
+4. Deleting scan when storage succeeds but tracking row is already missing.
+5. Uploading a file larger than declared fileSize.
+6. Uploading a file larger than the allowed maximum.
+7. Uploading valid PDF/JPG/PNG files that should still pass.
+8. Signed upload token with wrong content length.
+9. Signed upload token with checksum mismatch.
+10. Two delete requests for the same scan key close together.
+
+Manual test steps:
+1. Upload a scan PDF to an invoice, then delete it. Confirm the UI shows no scan, the DB scanKey is null, and the object/tracking row is removed.
+2. Repeat for delivery order, purchase order, and goods receipt scan slots.
+3. Simulate object-storage delete failure. The endpoint should return an error and the document scan key should remain unchanged.
+4. Simulate object already missing while DB still has the key. The endpoint may clear the stale DB key and tracking row.
+5. Upload an oversized file to /api/storage/upload-scan. Confirm it is rejected and not stored.
+6. Use a signed upload token declaring a small file size, then send a larger raw body. Confirm it is rejected and not stored.
+7. Confirm a normal valid upload still works.
+8. Confirm existing storage total-size tracking test still passes.
+
+Acceptance criteria:
+1. No scan-delete endpoint clears a scan key after a failed storage delete.
+2. No endpoint contains behavior equivalent to “delete failed, clearing key anyway.”
+3. Storage delete result is explicitly checked.
+4. Missing-object cases are handled safely and intentionally.
+5. Oversized uploads are rejected before unnecessary full buffering.
+6. Valid existing upload and delete flows still work.
+7. No database migrations.
+8. No UI changes.
+9. No PDF, print, or export format changes.
+10. No invoice/VAT/stock/GRN/business-logic changes.
+
+Avoid changing:
+- Invoice PDF layout
+- Delivery order PDF layout
+- Print templates
+- XLSX export format
+- VAT/tax calculation logic
+- Invoice total calculation logic
+- Delivery order total calculation logic
+- Stock movement logic
+- GRN cancellation logic
+- Backup/restore logic
+- User roles and authentication
+- Database schema or migrations
+- Frontend UI unless absolutely required for an error message already returned by the backend
