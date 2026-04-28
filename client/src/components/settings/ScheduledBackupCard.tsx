@@ -219,7 +219,7 @@ export default function ScheduledBackupCard() {
                 )}
               />
 
-              {/* Settings grid */}
+              {/* Settings grid — every input below is disabled when the schedule is off */}
               <div className={`grid grid-cols-1 sm:grid-cols-2 gap-4 ${!enabled ? "opacity-60" : ""}`}>
                 <FormField
                   control={form.control}
@@ -283,6 +283,7 @@ export default function ScheduledBackupCard() {
                           max={14}
                           value={Number.isFinite(field.value) ? field.value : ""}
                           onChange={(e) => field.onChange(parseInt(e.target.value, 10))}
+                          disabled={!enabled}
                           data-testid="input-backup-retention"
                         />
                       </FormControl>
@@ -308,6 +309,7 @@ export default function ScheduledBackupCard() {
                           max={14}
                           value={Number.isFinite(field.value) ? field.value : ""}
                           onChange={(e) => field.onChange(parseInt(e.target.value, 10))}
+                          disabled={!enabled}
                           data-testid="input-backup-alert-threshold"
                         />
                       </FormControl>
