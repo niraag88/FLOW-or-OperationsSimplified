@@ -3,15 +3,58 @@ import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/com
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Input } from "@/components/ui/input";
-import { Label } from "@/components/ui/label";
 import { Switch } from "@/components/ui/switch";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Alert, AlertDescription } from "@/components/ui/alert";
+import {
+  Form,
+  FormControl,
+  FormDescription,
+  FormField,
+  FormItem,
+  FormLabel,
+  FormMessage,
+} from "@/components/ui/form";
 import { CalendarClock, Loader2, CheckCircle, XCircle, Save, AlertTriangle } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import { apiRequest } from "@/lib/queryClient";
-import { useEffect, useState } from "react";
+import { useEffect } from "react";
 import { format } from "date-fns";
+import { useForm } from "react-hook-form";
+import { zodResolver } from "@hookform/resolvers/zod";
+import { z } from "zod";
+
+const backupScheduleFormSchema = z
+  .object({
+    enabled: z.boolean(),
+    frequency: z.enum(["daily", "every_2_days", "weekly"]).nullable(),
+    timeOfDay: z
+      .string()
+      .regex(/^([01]\d|2[0-3]):[0-5]\d$/, "Time must be HH:MM (24-hour).")
+      .nullable(),
+    retentionCount: z
+      .number({ invalid_type_error: "Retention must be a number." })
+      .int("Retention must be a whole number.")
+      .min(1, "Must be between 1 and 14.")
+      .max(14, "Must be between 1 and 14."),
+    alertThresholdDays: z
+      .number({ invalid_type_error: "Alert threshold must be a number." })
+      .int("Alert threshold must be a whole number.")
+      .min(1, "Must be between 1 and 14.")
+      .max(14, "Must be between 1 and 14."),
+  })
+  .superRefine((val, ctx) => {
+    if (val.enabled) {
+      if (!val.frequency) {
+        ctx.addIssue({ code: z.ZodIssueCode.custom, message: "Pick a frequency.", path: ["frequency"] });
+      }
+      if (!val.timeOfDay) {
+        ctx.addIssue({ code: z.ZodIssueCode.custom, message: "Pick a time of day.", path: ["timeOfDay"] });
+      }
+    }
+  });
+
+type BackupScheduleFormValues = z.infer<typeof backupScheduleFormSchema>;
 
 interface ScheduleResponse {
   enabled: boolean;
@@ -22,6 +65,7 @@ interface ScheduleResponse {
   nextDueAt: string | null;
   lastRunAt: string | null;
   lastSuccessfulBackupAt: string | null;
+  lastRunSuccess: boolean | null;
 }
 
 const FREQUENCY_LABELS: Record<string, string> = {
@@ -48,40 +92,37 @@ export default function ScheduledBackupCard() {
     staleTime: 30 * 1000,
   });
 
-  const [enabled, setEnabled] = useState(false);
-  const [frequency, setFrequency] = useState<string>("");
-  const [timeOfDay, setTimeOfDay] = useState<string>("");
-  const [retentionCount, setRetentionCount] = useState<number>(7);
-  const [alertThresholdDays, setAlertThresholdDays] = useState<number>(2);
-  const [errors, setErrors] = useState<Record<string, string>>({});
+  const form = useForm<BackupScheduleFormValues>({
+    resolver: zodResolver(backupScheduleFormSchema),
+    defaultValues: {
+      enabled: false,
+      frequency: null,
+      timeOfDay: null,
+      retentionCount: 7,
+      alertThresholdDays: 2,
+    },
+  });
 
-  // Hydrate form state from server response
+  // Hydrate form values from server response when data arrives.
   useEffect(() => {
     if (!data) return;
-    setEnabled(data.enabled);
-    setFrequency(data.frequency ?? "");
-    setTimeOfDay(data.timeOfDay ?? "");
-    setRetentionCount(data.retentionCount ?? 7);
-    setAlertThresholdDays(data.alertThresholdDays ?? 2);
-  }, [data]);
+    form.reset({
+      enabled: data.enabled,
+      frequency: data.frequency,
+      timeOfDay: data.timeOfDay,
+      retentionCount: data.retentionCount ?? 7,
+      alertThresholdDays: data.alertThresholdDays ?? 2,
+    });
+  }, [data, form]);
+
+  const enabled = form.watch("enabled");
 
   const saveMutation = useMutation({
-    mutationFn: async () => {
-      const payload = {
-        enabled,
-        frequency: frequency || null,
-        timeOfDay: timeOfDay || null,
-        retentionCount,
-        alertThresholdDays,
-      };
-      const res = await apiRequest("PUT", "/api/ops/backup-schedule", payload);
+    mutationFn: async (values: BackupScheduleFormValues) => {
+      const res = await apiRequest("PUT", "/api/ops/backup-schedule", values);
       return res.json();
     },
-    onMutate: () => {
-      setErrors({});
-    },
     onSuccess: () => {
-      setErrors({});
       queryClient.invalidateQueries({ queryKey: ["/api/ops/backup-schedule"] });
       queryClient.invalidateQueries({ queryKey: ["/api/ops/backup-runs"] });
       toast({ title: "Schedule saved", description: "Backup schedule updated successfully." });
@@ -90,7 +131,10 @@ export default function ScheduledBackupCard() {
       try {
         const data = JSON.parse(err.message.replace(/^\d+:\s*/, ""));
         if (data.field) {
-          setErrors({ [data.field]: data.error });
+          form.setError(data.field as keyof BackupScheduleFormValues, {
+            type: "server",
+            message: data.error,
+          });
         }
         toast({ title: "Save failed", description: data.error || "Could not save schedule.", variant: "destructive" });
       } catch {
@@ -99,26 +143,11 @@ export default function ScheduledBackupCard() {
     },
   });
 
-  const handleSave = () => {
-    const localErrors: Record<string, string> = {};
-    if (enabled) {
-      if (!frequency) localErrors.frequency = "Pick a frequency.";
-      if (!timeOfDay) localErrors.timeOfDay = "Pick a time of day.";
-    }
-    if (retentionCount < 1 || retentionCount > 14) localErrors.retentionCount = "Must be between 1 and 14.";
-    if (alertThresholdDays < 1 || alertThresholdDays > 14) localErrors.alertThresholdDays = "Must be between 1 and 14.";
-    if (Object.keys(localErrors).length > 0) {
-      setErrors(localErrors);
-      return;
-    }
-    setErrors({});
-    saveMutation.mutate();
+  const onSubmit = (values: BackupScheduleFormValues) => {
+    saveMutation.mutate(values);
   };
 
-  const lastRunWasSuccess =
-    data?.lastSuccessfulBackupAt && data?.lastRunAt
-      ? new Date(data.lastSuccessfulBackupAt).getTime() === new Date(data.lastRunAt).getTime()
-      : null;
+  const lastRunWasSuccess = data?.lastRunSuccess ?? null;
 
   const isStale = (() => {
     if (!data?.enabled) return false;
@@ -144,154 +173,206 @@ export default function ScheduledBackupCard() {
             <Loader2 className="w-4 h-4 animate-spin" /> Loading schedule…
           </div>
         ) : (
-          <>
-            {isStale && (
-              <Alert className="border-red-300 bg-red-50">
-                <AlertTriangle className="w-4 h-4 text-red-700" />
-                <AlertDescription className="text-red-800">
-                  <strong>No successful backup in {data!.alertThresholdDays} day{data!.alertThresholdDays !== 1 ? "s" : ""}.</strong>{" "}
-                  Check that the scheduler is running and review recent backup runs below.
-                </AlertDescription>
-              </Alert>
-            )}
+          <Form {...form}>
+            <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-6">
+              {isStale && (
+                <Alert className="border-red-300 bg-red-50">
+                  <AlertTriangle className="w-4 h-4 text-red-700" />
+                  <AlertDescription className="text-red-800">
+                    <strong>No successful backup in {data!.alertThresholdDays} day{data!.alertThresholdDays !== 1 ? "s" : ""}.</strong>{" "}
+                    Check that the scheduler is running and review recent backup runs below.
+                  </AlertDescription>
+                </Alert>
+              )}
 
-            {/* Enable toggle */}
-            <div className="flex items-start justify-between gap-4 p-4 rounded-lg border bg-gray-50">
+              {/* Enable toggle */}
+              <FormField
+                control={form.control}
+                name="enabled"
+                render={({ field }) => (
+                  <FormItem className="flex items-start justify-between gap-4 p-4 rounded-lg border bg-gray-50 space-y-0">
+                    <div>
+                      <FormLabel htmlFor="bs-enabled" className="text-sm font-semibold cursor-pointer">
+                        Enable scheduled backups
+                      </FormLabel>
+                      <FormDescription className="text-xs text-gray-500 mt-1">
+                        When off, no automatic backups run and the stale-backup banner is hidden.
+                      </FormDescription>
+                    </div>
+                    <FormControl>
+                      <Switch
+                        id="bs-enabled"
+                        checked={field.value}
+                        onCheckedChange={field.onChange}
+                        data-testid="switch-backup-schedule-enabled"
+                      />
+                    </FormControl>
+                  </FormItem>
+                )}
+              />
+
+              {/* Settings grid */}
+              <div className={`grid grid-cols-1 sm:grid-cols-2 gap-4 ${!enabled ? "opacity-60" : ""}`}>
+                <FormField
+                  control={form.control}
+                  name="frequency"
+                  render={({ field }) => (
+                    <FormItem>
+                      <FormLabel htmlFor="bs-frequency">Frequency</FormLabel>
+                      <Select
+                        value={field.value ?? ""}
+                        onValueChange={(v) => field.onChange(v as BackupScheduleFormValues["frequency"])}
+                        disabled={!enabled}
+                      >
+                        <FormControl>
+                          <SelectTrigger id="bs-frequency" data-testid="select-backup-frequency">
+                            <SelectValue placeholder="Pick a frequency" />
+                          </SelectTrigger>
+                        </FormControl>
+                        <SelectContent>
+                          <SelectItem value="daily">Daily</SelectItem>
+                          <SelectItem value="every_2_days">Every 2 days</SelectItem>
+                          <SelectItem value="weekly">Weekly</SelectItem>
+                        </SelectContent>
+                      </Select>
+                      <FormMessage />
+                    </FormItem>
+                  )}
+                />
+
+                <FormField
+                  control={form.control}
+                  name="timeOfDay"
+                  render={({ field }) => (
+                    <FormItem>
+                      <FormLabel htmlFor="bs-time">Time of day (Asia/Dubai)</FormLabel>
+                      <FormControl>
+                        <Input
+                          id="bs-time"
+                          type="time"
+                          value={field.value ?? ""}
+                          onChange={(e) => field.onChange(e.target.value || null)}
+                          disabled={!enabled}
+                          data-testid="input-backup-time"
+                        />
+                      </FormControl>
+                      <FormMessage />
+                    </FormItem>
+                  )}
+                />
+
+                <FormField
+                  control={form.control}
+                  name="retentionCount"
+                  render={({ field }) => (
+                    <FormItem>
+                      <FormLabel htmlFor="bs-retention">Retention (keep N most recent backups)</FormLabel>
+                      <FormControl>
+                        <Input
+                          id="bs-retention"
+                          type="number"
+                          min={1}
+                          max={14}
+                          value={Number.isFinite(field.value) ? field.value : ""}
+                          onChange={(e) => field.onChange(parseInt(e.target.value, 10))}
+                          data-testid="input-backup-retention"
+                        />
+                      </FormControl>
+                      <FormDescription className="text-xs text-gray-500">
+                        Range 1–14. Older successful backups are deleted automatically after each run.
+                      </FormDescription>
+                      <FormMessage />
+                    </FormItem>
+                  )}
+                />
+
+                <FormField
+                  control={form.control}
+                  name="alertThresholdDays"
+                  render={({ field }) => (
+                    <FormItem>
+                      <FormLabel htmlFor="bs-threshold">Warn me if no successful backup in (days)</FormLabel>
+                      <FormControl>
+                        <Input
+                          id="bs-threshold"
+                          type="number"
+                          min={1}
+                          max={14}
+                          value={Number.isFinite(field.value) ? field.value : ""}
+                          onChange={(e) => field.onChange(parseInt(e.target.value, 10))}
+                          data-testid="input-backup-alert-threshold"
+                        />
+                      </FormControl>
+                      <FormDescription className="text-xs text-gray-500">
+                        Range 1–14. A red banner appears when the most recent success exceeds this age.
+                      </FormDescription>
+                      <FormMessage />
+                    </FormItem>
+                  )}
+                />
+              </div>
+
+              {/* Save button */}
               <div>
-                <Label htmlFor="bs-enabled" className="text-sm font-semibold cursor-pointer">
-                  Enable scheduled backups
-                </Label>
-                <p className="text-xs text-gray-500 mt-1">
-                  When off, no automatic backups run and the stale-backup banner is hidden.
+                <Button
+                  type="submit"
+                  disabled={saveMutation.isPending}
+                  data-testid="button-save-backup-schedule"
+                >
+                  {saveMutation.isPending ? (
+                    <><Loader2 className="w-4 h-4 mr-2 animate-spin" />Saving…</>
+                  ) : (
+                    <><Save className="w-4 h-4 mr-2" />Save schedule</>
+                  )}
+                </Button>
+              </div>
+            </form>
+          </Form>
+        )}
+
+        {/* Status panel */}
+        {!isLoading && (
+          <div className="border rounded-lg p-4 bg-gray-50 space-y-3">
+            <h4 className="text-xs font-semibold text-gray-500 uppercase tracking-wide">Current schedule status</h4>
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 text-sm">
+              <div>
+                <p className="text-gray-500 text-xs">Schedule</p>
+                <p className="font-medium" data-testid="text-schedule-summary">
+                  {data?.enabled
+                    ? `${FREQUENCY_LABELS[data.frequency || ""] || "—"} at ${data.timeOfDay || "—"} (Dubai)`
+                    : "Disabled"}
                 </p>
               </div>
-              <Switch
-                id="bs-enabled"
-                checked={enabled}
-                onCheckedChange={setEnabled}
-                data-testid="switch-backup-schedule-enabled"
-              />
-            </div>
-
-            {/* Settings grid */}
-            <div className={`grid grid-cols-1 sm:grid-cols-2 gap-4 ${!enabled ? "opacity-60 pointer-events-none" : ""}`}>
-              <div className="space-y-1">
-                <Label htmlFor="bs-frequency">Frequency</Label>
-                <Select value={frequency} onValueChange={setFrequency} disabled={!enabled}>
-                  <SelectTrigger id="bs-frequency" data-testid="select-backup-frequency">
-                    <SelectValue placeholder="Pick a frequency" />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="daily">Daily</SelectItem>
-                    <SelectItem value="every_2_days">Every 2 days</SelectItem>
-                    <SelectItem value="weekly">Weekly</SelectItem>
-                  </SelectContent>
-                </Select>
-                {errors.frequency && <p className="text-xs text-red-600">{errors.frequency}</p>}
+              <div>
+                <p className="text-gray-500 text-xs">Next scheduled run</p>
+                <p className="font-medium" data-testid="text-next-due-at">
+                  {data?.enabled && data?.nextDueAt ? formatDate(data.nextDueAt) : "—"}
+                </p>
               </div>
-
-              <div className="space-y-1">
-                <Label htmlFor="bs-time">Time of day (Asia/Dubai)</Label>
-                <Input
-                  id="bs-time"
-                  type="time"
-                  value={timeOfDay}
-                  onChange={(e) => setTimeOfDay(e.target.value)}
-                  disabled={!enabled}
-                  data-testid="input-backup-time"
-                />
-                {errors.timeOfDay && <p className="text-xs text-red-600">{errors.timeOfDay}</p>}
+              <div>
+                <p className="text-gray-500 text-xs">Last attempted run</p>
+                <p className="font-medium flex items-center gap-2" data-testid="text-last-run-at">
+                  {formatDate(data?.lastRunAt ?? null)}
+                  {lastRunWasSuccess === true && (
+                    <Badge className="bg-emerald-100 text-emerald-800 border-emerald-200">
+                      <CheckCircle className="w-3 h-3 mr-1 inline" />OK
+                    </Badge>
+                  )}
+                  {lastRunWasSuccess === false && (
+                    <Badge variant="destructive">
+                      <XCircle className="w-3 h-3 mr-1 inline" />Failed
+                    </Badge>
+                  )}
+                </p>
               </div>
-
-              <div className="space-y-1">
-                <Label htmlFor="bs-retention">Retention (keep N most recent backups)</Label>
-                <Input
-                  id="bs-retention"
-                  type="number"
-                  min={1}
-                  max={14}
-                  value={retentionCount}
-                  onChange={(e) => setRetentionCount(parseInt(e.target.value, 10) || 0)}
-                  data-testid="input-backup-retention"
-                />
-                <p className="text-xs text-gray-500">Range 1–14. Older successful backups are deleted automatically after each run.</p>
-                {errors.retentionCount && <p className="text-xs text-red-600">{errors.retentionCount}</p>}
-              </div>
-
-              <div className="space-y-1">
-                <Label htmlFor="bs-threshold">Warn me if no successful backup in (days)</Label>
-                <Input
-                  id="bs-threshold"
-                  type="number"
-                  min={1}
-                  max={14}
-                  value={alertThresholdDays}
-                  onChange={(e) => setAlertThresholdDays(parseInt(e.target.value, 10) || 0)}
-                  data-testid="input-backup-alert-threshold"
-                />
-                <p className="text-xs text-gray-500">Range 1–14. A red banner appears when the most recent success exceeds this age.</p>
-                {errors.alertThresholdDays && <p className="text-xs text-red-600">{errors.alertThresholdDays}</p>}
+              <div>
+                <p className="text-gray-500 text-xs">Last successful backup</p>
+                <p className="font-medium" data-testid="text-last-success-at">
+                  {formatDate(data?.lastSuccessfulBackupAt ?? null)}
+                </p>
               </div>
             </div>
-
-            {/* Save button */}
-            <div>
-              <Button
-                onClick={handleSave}
-                disabled={saveMutation.isPending}
-                data-testid="button-save-backup-schedule"
-              >
-                {saveMutation.isPending ? (
-                  <><Loader2 className="w-4 h-4 mr-2 animate-spin" />Saving…</>
-                ) : (
-                  <><Save className="w-4 h-4 mr-2" />Save schedule</>
-                )}
-              </Button>
-            </div>
-
-            {/* Status panel */}
-            <div className="border rounded-lg p-4 bg-gray-50 space-y-3">
-              <h4 className="text-xs font-semibold text-gray-500 uppercase tracking-wide">Current schedule status</h4>
-              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 text-sm">
-                <div>
-                  <p className="text-gray-500 text-xs">Schedule</p>
-                  <p className="font-medium" data-testid="text-schedule-summary">
-                    {data?.enabled
-                      ? `${FREQUENCY_LABELS[data.frequency || ""] || "—"} at ${data.timeOfDay || "—"} (Dubai)`
-                      : "Disabled"}
-                  </p>
-                </div>
-                <div>
-                  <p className="text-gray-500 text-xs">Next scheduled run</p>
-                  <p className="font-medium" data-testid="text-next-due-at">
-                    {data?.enabled && data?.nextDueAt ? formatDate(data.nextDueAt) : "—"}
-                  </p>
-                </div>
-                <div>
-                  <p className="text-gray-500 text-xs">Last attempted run</p>
-                  <p className="font-medium flex items-center gap-2" data-testid="text-last-run-at">
-                    {formatDate(data?.lastRunAt ?? null)}
-                    {lastRunWasSuccess === true && (
-                      <Badge className="bg-emerald-100 text-emerald-800 border-emerald-200">
-                        <CheckCircle className="w-3 h-3 mr-1 inline" />OK
-                      </Badge>
-                    )}
-                    {lastRunWasSuccess === false && (
-                      <Badge variant="destructive">
-                        <XCircle className="w-3 h-3 mr-1 inline" />Failed
-                      </Badge>
-                    )}
-                  </p>
-                </div>
-                <div>
-                  <p className="text-gray-500 text-xs">Last successful backup</p>
-                  <p className="font-medium" data-testid="text-last-success-at">
-                    {formatDate(data?.lastSuccessfulBackupAt ?? null)}
-                  </p>
-                </div>
-              </div>
-            </div>
-          </>
+          </div>
         )}
       </CardContent>
     </Card>

@@ -131,6 +131,7 @@ export interface BackupScheduleView {
   nextDueAt: string | null;
   lastRunAt: string | null;
   lastSuccessfulBackupAt: string | null;
+  lastRunSuccess: boolean | null;
 }
 
 export async function getBackupSchedule(): Promise<BackupScheduleView> {
@@ -139,6 +140,11 @@ export async function getBackupSchedule(): Promise<BackupScheduleView> {
     .select({ ranAt: backupRuns.ranAt })
     .from(backupRuns)
     .where(eq(backupRuns.success, true))
+    .orderBy(desc(backupRuns.ranAt))
+    .limit(1);
+  const [latestRun] = await db
+    .select({ success: backupRuns.success })
+    .from(backupRuns)
     .orderBy(desc(backupRuns.ranAt))
     .limit(1);
 
@@ -157,6 +163,7 @@ export async function getBackupSchedule(): Promise<BackupScheduleView> {
     lastSuccessfulBackupAt: latestSuccess?.ranAt
       ? new Date(latestSuccess.ranAt).toISOString()
       : null,
+    lastRunSuccess: latestRun ? latestRun.success : null,
   };
 }
 
