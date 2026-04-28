@@ -422,33 +422,9 @@ export function registerSystemRoutes(app: Express) {
     }
   });
 
-  app.post('/api/audit-logs', requireAuth(), async (req: AuthenticatedRequest, res) => {
-    try {
-      const { entity_type, entity_id, action, changes, metadata } = req.body;
-
-      if (!entity_type || !action) {
-        return res.status(400).json({ error: 'entity_type and action are required' });
-      }
-
-      const details = changes && Object.keys(changes).length > 0
-        ? JSON.stringify(changes)
-        : (metadata && Object.keys(metadata).length > 0 ? JSON.stringify(metadata) : undefined);
-
-      const [entry] = await db.insert(auditLog).values({
-        actor: req.user!.id,
-        actorName: req.user?.username || req.user!.id,
-        targetId: entity_id ? String(entity_id) : 'unknown',
-        targetType: entity_type,
-        action: String(action).toUpperCase(),
-        details: details ?? null,
-      }).returning();
-
-      res.status(201).json(entry);
-    } catch (error) {
-      console.error('Error writing audit log:', error);
-      res.status(500).json({ error: 'Failed to write audit log' });
-    }
-  });
+  // POST /api/audit-logs intentionally not exposed: audit log records are
+  // written server-side from each action handler via writeAuditLog(), so the
+  // log can never be forged through the HTTP layer (Task #319).
 
   app.get('/api/recycle-bin', requireAuth(), async (req: AuthenticatedRequest, res) => {
     try {
@@ -472,29 +448,11 @@ export function registerSystemRoutes(app: Express) {
     }
   });
 
-  app.post('/api/recycle-bin', requireAuth(), async (req: AuthenticatedRequest, res) => {
-    try {
-      const { document_type, document_id, document_number, document_data, reason, original_status, can_restore } = req.body;
-      if (!document_type || !document_id) {
-        return res.status(400).json({ error: 'document_type and document_id are required' });
-      }
-      const [item] = await db.insert(recycleBin).values({
-        documentType: String(document_type),
-        documentId: String(document_id),
-        documentNumber: document_number || String(document_id),
-        documentData: typeof document_data === 'string' ? document_data : JSON.stringify(document_data || {}),
-        deletedBy: req.user?.username || 'unknown',
-        deletedDate: new Date(),
-        reason: reason || 'Deleted from UI',
-        originalStatus: original_status || null,
-        canRestore: can_restore !== undefined ? Boolean(can_restore) : true,
-      }).returning();
-      res.json({ success: true, id: item.id });
-    } catch (error) {
-      console.error('Error adding to recycle bin:', error);
-      res.status(500).json({ error: 'Failed to add to recycle bin' });
-    }
-  });
+  // POST /api/recycle-bin intentionally not exposed: each entity DELETE
+  // handler (invoices, delivery orders, quotations, purchase orders, etc.)
+  // writes its own recycle-bin row server-side. Accepting forged
+  // recycle-bin payloads from a client would let any logged-in user inject
+  // bogus recovery rows referencing documents they never owned (Task #319).
 
   app.delete('/api/recycle-bin/:id', requireAuth(['Admin', 'Manager']), async (req: AuthenticatedRequest, res) => {
     try {

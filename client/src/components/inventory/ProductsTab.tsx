@@ -11,7 +11,7 @@ import { Checkbox } from "@/components/ui/checkbox";
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
 import { Package, Trash2, MoreHorizontal, Edit, Search, Filter, ChevronDown, X } from "lucide-react";
 import { Skeleton } from "@/components/ui/skeleton";
-import { Product, RecycleBin, User } from "@/api/entities";
+import { Product } from "@/api/entities";
 import { formatCurrency } from "@/utils/currency";
 import SimpleConfirmDialog from "../common/SimpleConfirmDialog";
 import type { Product as ProductType } from "@shared/schema";
@@ -85,24 +85,10 @@ export default function ProductsTab({
   const handleDeleteConfirm = async () => {
     if (!productToDelete) return;
     try {
-      const user = await User.me();
-      
-      // Move to recycle bin
-      await RecycleBin.create({
-        document_type: 'Product',
-        document_id: productToDelete.id,
-        document_number: productToDelete.name,
-        document_data: productToDelete,
-        deleted_by: (user as { email?: string })?.email || 'unknown',
-        deleted_date: new Date().toISOString(),
-        reason: 'Deleted from UI',
-        original_status: productToDelete.isActive ? 'Active' : 'Inactive',
-        can_restore: true
-      });
-
-      // Delete from main table
+      // The server-side DELETE handler writes the recycle-bin row in the
+      // same transaction as the product delete, so the client should not
+      // attempt a separate recycle-bin write (Task #319).
       await Product.delete(productToDelete.id);
-      
       onRefresh();
     } catch (error: any) {
       console.error("Error deleting product:", error);

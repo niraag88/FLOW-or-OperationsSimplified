@@ -37,7 +37,7 @@ The project uses a monorepo layout with distinct directories for client, server,
 ## Key Features & Implementations
 - **Enhanced Document Management**: Purchase Orders include `supplier_scan_key` for attaching invoices. Delivery reconciliation and tracking of received quantities for POs.
 - **Financial Features**: Product `cost_price_currency` and PO `currency` with `fxRateToAed` fields, defaulting PO currency based on selected products.
-- **API Improvements**: Added `POST /api/recycle-bin` with server-side metadata and invoice creation validation.
+- **API Improvements**: Server-side recycle-bin row creation runs inside each entity's DELETE transaction (e.g. `DELETE /api/products/:id`), and invoice creation validation is enforced server-side.
 - **E2E Test Suite**: Comprehensive Playwright test suite covering core functionalities and system resilience.
 - **Backup and Restore System**: Robust backup system with timestamped filenames, `backup_runs` table, and API endpoints for running, listing, and downloading backups. Full restore capability from stored backups or uploaded files, tracked in a `restore_runs` table, including factory reset functionality.
 - **Goods Receipt Enhancements (GRN)**: `reference_number`, `reference_date`, `payment_status`, `payment_made_date`, `payment_remarks` added to `goods_receipts` table. APIs for managing and tracking GRN references and payments. Payments ledger restructured to GRN-level tracking.
@@ -49,6 +49,7 @@ The project uses a monorepo layout with distinct directories for client, server,
 - **Quotation Status Enforcement**: `PUT /api/quotations/:id` enforces a one-way status machine. Terminal states (`cancelled`, `converted`) block all updates. Non-terminal transitions are validated against an explicit allowed-transitions map.
 - **Invoice Stock Reconciliation on Edit**: Editing an already-delivered invoice (`stockDeducted=true`) now reconciles inventory inside a single transaction. Quantities are aggregated per `productId`; for each product the delta `oldQty - newQty` is applied via `updateProductStock` with `movementType='adjustment'` (positive returns stock, negative deducts more). Header-only edits leave inventory untouched. `PUT /api/invoices/:id` rejects `status='cancelled'` (must use `PATCH /api/invoices/:id/cancel`) and rejects reverting a delivered invoice back to `draft`/`submitted` with explicit 400 errors.
 - **Server Route Reorganisation**: Customer routes moved to `server/routes/customers.ts`, brand routes to `server/routes/brands.ts`, and document export routes (`/api/export/*`) to `server/routes/exports.ts`. Each file has its own `registerXxxRoutes(app)` function registered in `server/routes.ts`.
+- **Audit-Log & Recycle-Bin Write Hardening**: `POST /api/audit-logs` and `POST /api/recycle-bin` are no longer exposed (return JSON 404 from the `/api/*` catch-all). Audit log records are written server-side from action handlers via the internal `writeAuditLog()` helper; recycle-bin rows are written by each entity's DELETE handler. All backup/restore/factory-reset routes (`/api/ops/*`) and sensitive storage routes (`/api/storage/list-prefix`, `DELETE /api/storage/object`) are Admin-only with e2e proof in `tests/e2e/11-admin-route-gates.spec.ts` (401 anon, 403 Staff, 200 Admin for safe GETs; 401/403 only for destructive POSTs).
 
 # External Dependencies
 
