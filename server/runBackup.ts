@@ -161,7 +161,11 @@ export async function pruneOldBackups(): Promise<number> {
     .where(eq(backupRuns.success, true))
     .orderBy(desc(backupRuns.ranAt));
 
-  const toPrune = allSuccessful.slice(retention);
+  // Keep the N most recent successes; everything beyond that is candidate
+  // for pruning. Iterate the candidates oldest-first so the storage
+  // delete attempts proceed from oldest to newest, matching the wording
+  // of the retention policy.
+  const toPrune = allSuccessful.slice(retention).reverse();
   if (toPrune.length === 0) return 0;
 
   let deleted = 0;

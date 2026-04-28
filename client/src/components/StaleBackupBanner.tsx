@@ -41,7 +41,6 @@ export default function StaleBackupBanner() {
   // only warn once we are past the first scheduled window plus the
   // alert threshold. Otherwise the banner would appear the moment an
   // admin enables the schedule, which is a false positive.
-  let ageDays: number | null = null;
   if (!data.lastSuccessfulBackupAt) {
     if (!data.nextDueAt) return null;
     const overdueMs = Date.now() - new Date(data.nextDueAt).getTime();
@@ -49,12 +48,9 @@ export default function StaleBackupBanner() {
   } else {
     const ageMs = Date.now() - new Date(data.lastSuccessfulBackupAt).getTime();
     if (ageMs <= thresholdMs) return null;
-    ageDays = Math.floor(ageMs / 86400_000);
   }
 
-  const ageDaysFinal = ageDays != null && Number.isFinite(ageDays)
-      ? ageDays
-      : null;
+  const thresholdDays = data.alertThresholdDays;
 
   const handleDismiss = () => {
     setDismissed(true);
@@ -70,7 +66,7 @@ export default function StaleBackupBanner() {
     >
       <AlertTriangle className="w-4 h-4 flex-shrink-0" />
       <p className="flex-1">
-        <strong>No successful backup{ageDaysFinal != null ? ` in ${ageDaysFinal} day${ageDaysFinal !== 1 ? "s" : ""}` : ""}.</strong>{" "}
+        <strong>No successful backup in {thresholdDays} day{thresholdDays !== 1 ? "s" : ""}.</strong>{" "}
         <Link to="/settings" className="underline hover:no-underline font-medium">
           Open Settings → Backup to check the backup schedule
         </Link>
