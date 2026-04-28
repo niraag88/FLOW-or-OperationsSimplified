@@ -213,15 +213,16 @@ test.describe('Scheduled Backups (API)', () => {
     });
   });
 
-  test('DB CHECK constraints reject out-of-range retention/alert at the database layer', async () => {
+  test('boundary values 14/14 round-trip through API and persist in DB (CHECK constraints exercised at the upper bound)', async () => {
     // Both API and DB enforce 1..14. The API rejects 15 / 0 first
-    // (covered above). Here we sanity-check the DB constraint via a
-    // direct manipulation that bypasses the Zod schema by running a
-    // raw insert against any table — but since the route is the only
-    // path, the API check is what matters in practice. We verify the
-    // database-level constraint exists by attempting a payload at
-    // the boundary that the API also rejects (15) and confirming
-    // the DB has not been corrupted.
+    // (covered by the out-of-range tests above). The DB-layer CHECK
+    // constraints are exercised directly by the unit suite at
+    // tests/unit/dbCheckConstraints.test.ts (which connects to the DB
+    // and asserts a raw INSERT with retentionCount=15 / alert=15 is
+    // rejected with 23514 check_violation). Here we simply confirm
+    // the upper-bound payload (14 / 14) flows cleanly through the
+    // PUT endpoint and persists, proving the constraint accepts the
+    // valid ceiling.
     const r = await fetch(`${BASE_URL}/api/ops/backup-schedule`, {
       method: 'PUT',
       headers: { 'Content-Type': 'application/json', Cookie: cookie },
