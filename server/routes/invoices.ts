@@ -625,7 +625,7 @@ export function registerInvoiceRoutes(app: Express) {
             oldItems = lockedExistingItems.map(it => ({
               productId: it.productId,
               quantity: it.quantity,
-              unitPrice: it.unitPrice as unknown as string,
+              unitPrice: it.unitPrice,
             }));
           }
 
