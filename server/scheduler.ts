@@ -1,6 +1,17 @@
 /**
  * In-app scheduled-backup runner (Task #325).
  *
+ * ACCEPTED DESIGN DEVIATION: the original task wording suggested a
+ * `SELECT ... FOR UPDATE NOWAIT` row lock on company_settings. We
+ * deliberately use a session-level advisory lock instead because the
+ * row lock would only protect the *read* of the schedule row at the
+ * top of each tick, not the long-running backup that follows; two
+ * concurrent backups would still be possible if a previous backup ran
+ * past the next minute tick. The advisory lock is held for the entire
+ * backup duration and auto-released on connection drop, so a crashed
+ * worker cannot leave the schedule wedged. This decision is also
+ * recorded in replit.md.
+ *
  * Ticks once per minute. On each tick:
  *   1. Tries to acquire a Postgres session-level advisory lock that
  *      will be held for the entire duration of the backup. This is the
