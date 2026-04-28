@@ -1,11 +1,30 @@
 import type { Express } from "express";
-import { ZodError } from 'zod';
+import { z, ZodError } from 'zod';
 import { customers, recycleBin } from "@shared/schema";
 import { insertCustomerSchema } from "@shared/schema";
 import { db } from "../db";
 import { eq } from "drizzle-orm";
 import { businessStorage } from "../businessStorage";
 import { requireAuth, writeAuditLog, type AuthenticatedRequest } from "../middleware";
+
+// Tighten the bare insert schema with format/length guards so malformed
+// emails and 10KB-payload names can't reach the DB (Task #320). Empty
+// string and null are both treated as "no email" so existing callers
+// that omit the field keep working.
+const emailField = z
+  .string()
+  .max(255, 'Email must be 255 characters or fewer')
+  .email('Email must be a valid address')
+  .or(z.literal(''))
+  .nullish();
+
+const customerWriteSchema = insertCustomerSchema.extend({
+  name: z.string().min(1, 'Name is required').max(255, 'Name must be 255 characters or fewer'),
+  email: emailField,
+  contactPerson: z.string().max(255).nullish(),
+  phone: z.string().max(64).nullish(),
+  vatNumber: z.string().max(64).nullish(),
+});
 
 export function registerCustomerRoutes(app: Express) {
   app.get('/api/customers/:id', requireAuth(), async (req: AuthenticatedRequest, res) => {
@@ -33,7 +52,7 @@ export function registerCustomerRoutes(app: Express) {
 
   app.post('/api/customers', requireAuth(), async (req: AuthenticatedRequest, res) => {
     try {
-      const validatedData = insertCustomerSchema.parse(req.body);
+      const validatedData = customerWriteSchema.parse(req.body);
       const customer = await businessStorage.createCustomer(validatedData);
       writeAuditLog({ actor: req.user!.id, actorName: req.user?.username || String(req.user!.id), targetId: String(customer.id), targetType: 'customer', action: 'CREATE', details: `Customer '${customer.name}' created` });
       res.status(201).json(customer);
@@ -48,12 +67,23 @@ export function registerCustomerRoutes(app: Express) {
 
   app.put('/api/customers/:id', requireAuth(), async (req: AuthenticatedRequest, res) => {
     try {
-      const customerId = parseInt(req.params.id);
-      const validatedData = insertCustomerSchema.partial().parse(req.body);
+      // Strict digits-only check rejects "abc", "1abc", and negative IDs
+      // before any DB work (Task #320).
+      if (!/^\d+$/.test(req.params.id)) {
+        return res.status(400).json({ error: 'Invalid customer ID' });
+      }
+      const customerId = parseInt(req.params.id, 10);
+      if (customerId <= 0) {
+        return res.status(400).json({ error: 'Invalid customer ID' });
+      }
+      const validatedData = customerWriteSchema.partial().parse(req.body);
       const customer = await businessStorage.updateCustomer(customerId, validatedData);
       writeAuditLog({ actor: req.user!.id, actorName: req.user?.username || String(req.user!.id), targetId: String(customerId), targetType: 'customer', action: 'UPDATE', details: `Customer '${customer.name}' updated` });
       res.json(customer);
     } catch (error) {
+      if (error instanceof ZodError) {
+        return res.status(400).json({ error: 'Validation failed', details: error.errors });
+      }
       console.error('Error updating customer:', error);
       res.status(500).json({ error: 'Failed to update customer' });
     }

@@ -124,7 +124,18 @@ export function registerPurchaseOrderRoutes(app: Express) {
 
   app.put('/api/purchase-orders/:id', requireAuth(['Admin', 'Manager']), async (req: AuthenticatedRequest, res) => {
     try {
-      const poId = parseInt(req.params.id);
+      // Validate ID before any DB work — bare parseInt('abc') yields NaN
+      // which then crashed inside the Drizzle query and surfaced as a 500
+      // (Task #320). Strict digits-only check also rejects mixed strings
+      // like "1abc" that parseInt would silently coerce to 1 and target
+      // the wrong row.
+      if (!/^\d+$/.test(req.params.id)) {
+        return res.status(400).json({ error: 'Invalid purchase order ID' });
+      }
+      const poId = parseInt(req.params.id, 10);
+      if (poId <= 0) {
+        return res.status(400).json({ error: 'Invalid purchase order ID' });
+      }
 
       const { companySnapshot: _ignoredPOSnapshot, ...bodyWithoutSnapshot } = req.body;
       const transformedBody = {

@@ -162,7 +162,18 @@ export function registerQuotationRoutes(app: Express) {
 
   app.put('/api/quotations/:id', requireAuth(['Admin', 'Manager']), async (req: AuthenticatedRequest, res) => {
     try {
-      const id = parseInt(req.params.id);
+      // Validate ID before any DB work — bare parseInt('abc') yields NaN
+      // which then crashed inside the Drizzle query and surfaced as a 500
+      // (Task #320). Strict digits-only check also rejects mixed strings
+      // like "1abc" that parseInt would silently coerce to 1 and target
+      // the wrong row.
+      if (!/^\d+$/.test(req.params.id)) {
+        return res.status(400).json({ error: 'Invalid quotation ID' });
+      }
+      const id = parseInt(req.params.id, 10);
+      if (id <= 0) {
+        return res.status(400).json({ error: 'Invalid quotation ID' });
+      }
 
       // Enforce status transition rules
       const [existing] = await db.select({ status: quotations.status }).from(quotations).where(eq(quotations.id, id));
