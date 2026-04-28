@@ -1462,24 +1462,17 @@ test.describe('Delivery Orders', () => {
     const { status: delDeliveredStatus } = await api('DELETE', `/api/delivery-orders/${doId}`, adminCookie);
     note('DELETE /api/delivery-orders/:id on a delivered DO → 400 (must cancel first)');
     expect(delDeliveredStatus).toBe(400);
-    // Cancel the DO, then delete
+    // Cancel reverses stock; cancelled DOs are retained for audit
+    // and cannot be deleted, so we stop after cancel.
     const { status: cancelStatus } = await api('PATCH', `/api/delivery-orders/${doId}/cancel`, adminCookie);
     expect(cancelStatus).toBe(200);
-    const { status: delStatus } = await api('DELETE', `/api/delivery-orders/${doId}`, adminCookie);
-    note('DELETE /api/delivery-orders/:id on a cancelled DO → 200 (allowed)');
-    expect(delStatus).toBe(200);
   });
 
   test('PUT /api/delivery-orders/:id status downgrade from delivered → 400', async () => {
     if (!IDs.customer || !IDs.product) return;
 
-    // Walk the full draft → submitted → delivered lifecycle so we hit
-    // the downgrade guard from a genuinely-delivered DO. The previous
-    // version of this test POSTed with items: [] (since Task #300
-    // wired the no_line_items resolver into POST, that returns 400),
-    // leaving doId undefined and making the downgrade assertion pass
-    // for the wrong reason — it was hitting the route's isNaN(id)
-    // guard, not the actual status guard.
+    // Create a real DO and walk draft → submitted → delivered using
+    // header-only PUTs (omitting items avoids the no_line_items guard).
     const create = await api('POST', '/api/delivery-orders', adminCookie, {
       customer_id: IDs.customer,
       status: 'draft',
@@ -1491,40 +1484,23 @@ test.describe('Delivery Orders', () => {
     const doId = (create.data as { id: number }).id;
     expect(doId).toBeGreaterThan(0);
 
-    // Header-only PUT to submit (omit items so the no_line_items
-    // guard from Task #302 does not trip; the route recomputes totals
-    // from the stored items).
-    const submit = await api('PUT', `/api/delivery-orders/${doId}`, adminCookie, {
-      customer_id: IDs.customer,
-      status: 'submitted',
-    });
+    const submit = await api('PUT', `/api/delivery-orders/${doId}`, adminCookie, { customer_id: IDs.customer, status: 'submitted' });
     expect(submit.status).toBe(200);
 
-    // Header-only PUT to deliver (runs the stock-deduction path).
-    const deliver = await api('PUT', `/api/delivery-orders/${doId}`, adminCookie, {
-      customer_id: IDs.customer,
-      status: 'delivered',
-    });
+    const deliver = await api('PUT', `/api/delivery-orders/${doId}`, adminCookie, { customer_id: IDs.customer, status: 'delivered' });
     expect(deliver.status).toBe(200);
 
-    // Now exercise the actual downgrade rejection.
-    const downgrade = await api('PUT', `/api/delivery-orders/${doId}`, adminCookie, {
-      customer_id: IDs.customer,
-      status: 'submitted',
-    });
+    // Attempt the downgrade and assert the rejection.
+    const downgrade = await api('PUT', `/api/delivery-orders/${doId}`, adminCookie, { customer_id: IDs.customer, status: 'submitted' });
     note('PUT /api/delivery-orders/:id: status downgrade from delivered → 400 (must cancel first)');
     expect(downgrade.status).toBe(400);
     expect((downgrade.data as { error?: string }).error).toBe('Cannot change status of a delivered order. Use the Cancel action to cancel it.');
 
-    // Confirm the DO is still delivered — the failed downgrade must
-    // not have mutated the status.
+    // Confirm status was not mutated by the failed downgrade.
     const after = await api('GET', `/api/delivery-orders/${doId}`, adminCookie);
     expect((after.data as { status?: string }).status).toBe('delivered');
 
-    // Clean up: cancel reverses the stock movement so inventory is
-    // restored. The cancelled record itself is retained for audit per
-    // the documented append-only policy, so we deliberately do not
-    // attempt DELETE here.
+    // Cleanup: cancel reverses stock; cancelled DOs are retained for audit.
     const cancel = await api('PATCH', `/api/delivery-orders/${doId}/cancel`, adminCookie);
     expect(cancel.status).toBe(200);
   });
