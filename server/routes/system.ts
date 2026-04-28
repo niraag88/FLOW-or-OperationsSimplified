@@ -113,33 +113,58 @@ export function registerSystemRoutes(app: Express) {
       if (req.file) {
         fileData = req.file.buffer;
       } else {
-        // Stream the body with a hard byte cap. Once we exceed the cap we
-        // STOP accumulating chunks (memory stays bounded) but keep draining
-        // the request to end-of-stream — that way the client always gets a
-        // deterministic 413 JSON response instead of a connection reset.
+        // Stream the body with a hard byte cap. As soon as we exceed the
+        // cap we pause the request (memory bounded at ≤2 MB + 1 chunk) and
+        // resolve immediately. The 413 JSON response is sent first, then
+        // the inbound socket is torn down once the response has flushed —
+        // so the client gets a deterministic 413 before the connection
+        // closes, never a bare reset.
         const overflow = await new Promise<{ tooLarge: boolean; data?: Buffer }>((resolve, reject) => {
           const chunks: Buffer[] = [];
           let total = 0;
-          let tooLarge = false;
+          let resolved = false;
           req.on('data', (chunk: Buffer) => {
+            if (resolved) return;
             total += chunk.length;
-            if (tooLarge) return;
             if (total > MAX_UPLOAD_BYTES) {
-              tooLarge = true;
+              resolved = true;
+              req.pause();
+              resolve({ tooLarge: true });
               return;
             }
             chunks.push(chunk);
           });
           req.on('end', () => {
-            if (tooLarge) resolve({ tooLarge: true });
-            else resolve({ tooLarge: false, data: Buffer.concat(chunks) });
+            if (resolved) return;
+            resolved = true;
+            resolve({ tooLarge: false, data: Buffer.concat(chunks) });
           });
-          req.on('error', (err) => reject(err));
+          req.on('aborted', () => {
+            if (resolved) return;
+            resolved = true;
+            reject(new Error('Request aborted by client'));
+          });
+          req.on('error', (err) => {
+            if (resolved) return;
+            resolved = true;
+            reject(err);
+          });
         });
 
         if (overflow.tooLarge) {
           await pool.query('DELETE FROM signed_tokens WHERE token = $1', [token]);
-          return res.status(413).json({ error: MAX_UPLOAD_ERROR_MESSAGE });
+          res.set('Connection', 'close');
+          res.status(413).json({ error: MAX_UPLOAD_ERROR_MESSAGE });
+          res.on('finish', () => {
+            try { req.unpipe?.(); } catch {}
+            try { req.destroy(); } catch {}
+            try { req.socket?.destroy(); } catch {}
+          });
+          // Suppress further data/error events so the destroyed socket
+          // doesn't surface as an unhandled error after we've responded.
+          req.on('data', () => {});
+          req.on('error', () => {});
+          return;
         }
         fileData = overflow.data!;
       }

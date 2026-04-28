@@ -254,30 +254,17 @@ test.describe('Storage: 2 MB upload cap', () => {
     expect(signResp.status).toBe(200);
     const signData = (await signResp.json()) as { url: string };
 
-    // 2. Send 3 MB raw body. The streaming counter should abort the request.
+    // 2. Send 3 MB raw body. The streaming counter pauses at 2 MB,
+    // sends a deterministic 413, then tears down the socket.
     const oversize = Buffer.alloc(3 * 1024 * 1024, 0x25); // '%' byte
-    let upStatus = 0;
-    let upError: string | undefined;
-    try {
-      const upResp = await fetch(`${BASE_URL}${signData.url}`, {
-        method: 'PUT',
-        headers: { 'Content-Type': 'application/pdf', Cookie: cookie },
-        body: oversize,
-      });
-      upStatus = upResp.status;
-      const body = (await upResp.json().catch(() => ({}))) as { error?: string };
-      upError = body.error;
-    } catch (err) {
-      // The server may close the socket before the full body is sent;
-      // a connection error is acceptable — what matters is that the upload
-      // did NOT succeed (verified via the storage_objects probe below).
-      upStatus = -1;
-    }
-    // Either we got a clean 413, or the connection was reset mid-upload.
-    expect([413, -1]).toContain(upStatus);
-    if (upStatus === 413 && upError) {
-      expect(upError.toLowerCase()).toContain('2 mb');
-    }
+    const upResp = await fetch(`${BASE_URL}${signData.url}`, {
+      method: 'PUT',
+      headers: { 'Content-Type': 'application/pdf', Cookie: cookie },
+      body: oversize,
+    });
+    expect(upResp.status).toBe(413);
+    const body = (await upResp.json()) as { error?: string };
+    expect((body.error ?? '').toLowerCase()).toContain('2 mb');
 
     // 3. No storage_objects row should have been created for this key.
     const rowResp = await fetch(
