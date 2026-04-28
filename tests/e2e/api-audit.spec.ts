@@ -1783,13 +1783,15 @@ test.describe('Delivery Orders', () => {
   });
 
   test('PATCH /api/delivery-orders/:id/scan-key → 200', async () => {
-    if (!IDs.customer) return;
+    if (!IDs.customer || !IDs.product) return;
     const createResp = await api('POST', '/api/delivery-orders', adminCookie, {
       customer_id: IDs.customer,
       status: 'draft',
-      total_amount: 0,
-      items: [],
+      currency: 'AED',
+      tax_treatment: 'StandardRated',
+      items: [{ product_id: IDs.product, description: 'scan-key-test', quantity: 1, unit_price: 10, line_total: 10 }],
     });
+    expect(createResp.status).toBe(201);
     const tempDoId = (createResp.data as { id: number }).id;
     const { status } = await api('PATCH', `/api/delivery-orders/${tempDoId}/scan-key`, adminCookie, {
       scanKey: 'delivery/2026/test-scan.pdf',
