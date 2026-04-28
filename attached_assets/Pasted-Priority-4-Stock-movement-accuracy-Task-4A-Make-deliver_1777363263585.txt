@@ -1,0 +1,87 @@
+Priority 4: Stock movement accuracy
+Task 4A: Make delivery order updates atomic
+
+Problem:
+The delivery order PUT route currently updates the delivery order header and line items first, then performs stock deduction or stock reconciliation afterward. These operations are not wrapped in one database transaction.
+
+Affected file:
+- server/routes/delivery-orders.ts
+
+Current risky behavior:
+In PUT /api/delivery-orders/:id:
+- The route updates the DO header.
+- Then it may delete and recreate delivery order line items.
+- Then it performs stock movement logic if the DO becomes delivered or remains delivered.
+- These writes are not atomic.
+
+What could go wrong:
+If anything fails halfway through, the database can be left inconsistent.
+
+Examples:
+- A DO header could be updated but line item replacement fails.
+- Existing line items could be deleted but new line items fail to insert.
+- A DO could be marked delivered but stock is only partly deducted.
+- A delivered DO edit could save new quantities but stock reconciliation fails.
+- Reports, stock counts, and audit history then disagree with the document.
+
+Desired behavior:
+The entire PUT /api/delivery-orders/:id update must succeed or fail as one unit.
+
+If any part fails:
+- DO header changes must roll back.
+- Line item deletes/inserts must roll back.
+- Stock movements must roll back.
+- Product stock quantity changes must roll back.
+- The DO must remain exactly as it was before the request.
+
+Exact implementation rules:
+1. Keep all existing validation before writes:
+   - Invalid ID check.
+   - Explicit bad items guard from the previous task.
+   - Existing DO existence check.
+   - Delivered-to-non-delivered status block.
+   - Totals/VAT resolver validation.
+   - Customer/tax treatment resolution.
+
+2. After validation succeeds, wrap the mutating work in one db.transaction.
+
+3. Inside the transaction, include:
+   - Updating the deliveryOrders header.
+   - Deleting old deliveryOrderItems when items are being replaced.
+   - Inserting new deliveryOrderItems.
+   - Building the newItems list.
+   - Draft/submitted -> delivered stock deduction.
+   - Delivered -> delivered stock reconciliation.
+   - Every updateProductStock call.
+
+4. Pass the transaction object into updateProductStock:
+   - updateProductStock(..., tx)
+
+5. Keep the existing business behavior unchanged:
+   - Header-only edits still work when items is omitted.
+   - Explicit bad items payloads still return 400 before DB writes.
+   - Delivered DOs still cannot be downgraded through PUT.
+   - Duplicate product lines should still be aggregated for reconciliation.
+   - Free-text lines with no productId should still create no stock movement.
+
+6. Write the audit log only after the transaction succeeds.
+
+Tests to add:
+1. Create a draft delivery order with one valid line.
+2. Attempt a PUT that changes the header/reference and replaces items with a payload that will fail during DB write, such as a non-existent product_id if FK constraints apply.
+3. Confirm the PUT fails.
+4. Confirm the original DO header/reference is unchanged.
+5. Confirm the original line item still exists.
+6. Add a normal successful PUT test to confirm valid updates still work.
+7. Add or keep a delivered DO edit test confirming stock reconciliation still works after moving into the transaction.
+
+Avoid changing:
+- No schema changes.
+- No migrations.
+- No UI changes.
+- No invoice route changes.
+- No GRN changes.
+- No cancellation logic changes.
+- No VAT/totals formula changes.
+- No PDF/export changes.
+- Do not rewrite updateProductStock; only pass tx into it from this route.
