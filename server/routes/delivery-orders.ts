@@ -3,7 +3,7 @@ import { deliveryOrders, deliveryOrderItems, customers, brands, products, recycl
 import { db } from "../db";
 import { and, eq } from "drizzle-orm";
 import { businessStorage } from "../businessStorage";
-import { requireAuth, writeAuditLog, objectStorageClient, updateProductStock, type AuthenticatedRequest } from "../middleware";
+import { requireAuth, writeAuditLog, objectStorageClient, deleteStorageObjectSafely, updateProductStock, type AuthenticatedRequest } from "../middleware";
 import { resolveDocumentTotals, isTotalsError, normalizeTaxTreatment, resolveAuthoritativeTaxTreatment } from "../utils/totals";
 
 export function registerDeliveryOrderRoutes(app: Express) {
@@ -734,12 +734,14 @@ export function registerDeliveryOrderRoutes(app: Express) {
         return res.status(404).json({ error: 'Delivery order not found' });
       }
       if (doRecord.scanKey) {
-        try {
-          await objectStorageClient.delete(doRecord.scanKey);
-          await db.delete(storageObjects).where(eq(storageObjects.key, doRecord.scanKey));
-        } catch (storageErr) {
-          console.error('Could not delete object from storage (clearing key anyway):', storageErr);
+        const storageResult = await deleteStorageObjectSafely(doRecord.scanKey);
+        if (!storageResult.ok) {
+          console.error(
+            `Failed to delete delivery-order scan from storage: type=delivery_order id=${id} key=${doRecord.scanKey} error=${storageResult.error}`
+          );
+          return res.status(502).json({ error: 'Could not delete file from storage. Please try again.' });
         }
+        await db.delete(storageObjects).where(eq(storageObjects.key, doRecord.scanKey));
       }
       await db.update(deliveryOrders).set({ scanKey: null }).where(eq(deliveryOrders.id, id));
       const [updated] = await db.select().from(deliveryOrders).where(eq(deliveryOrders.id, id));

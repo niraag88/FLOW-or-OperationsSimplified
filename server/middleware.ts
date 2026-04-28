@@ -12,6 +12,39 @@ export const objectStorageClient = new Client({
   bucketId: process.env.DEFAULT_OBJECT_STORAGE_BUCKET_ID
 });
 
+// One-shot test seam: when armed, the *next* call to
+// deleteStorageObjectSafely() returns a synthetic failure and the flag is
+// consumed (auto-resets). Persistent toggling is intentionally not supported,
+// so a forgotten cleanup or a parallel request can't poison subsequent
+// deletes.
+let _forceStorageDeleteFailOnce = false;
+export function setForceStorageDeleteFail(enabled: boolean) {
+  _forceStorageDeleteFailOnce = enabled;
+}
+export function isForceStorageDeleteFailEnabled() {
+  return _forceStorageDeleteFailOnce;
+}
+
+export async function deleteStorageObjectSafely(
+  key: string
+): Promise<{ ok: true } | { ok: false; error: string }> {
+  if (_forceStorageDeleteFailOnce) {
+    _forceStorageDeleteFailOnce = false;
+    return { ok: false, error: 'forced-failure (test seam, one-shot)' };
+  }
+  try {
+    const result = await objectStorageClient.delete(key, { ignoreNotFound: true });
+    if (result.ok) return { ok: true };
+    const errMsg =
+      result.error && typeof result.error === 'object' && 'message' in result.error
+        ? String((result.error as { message: unknown }).message)
+        : String(result.error);
+    return { ok: false, error: errMsg };
+  } catch (err) {
+    return { ok: false, error: err instanceof Error ? err.message : String(err) };
+  }
+}
+
 setInterval(async () => {
   try {
     await pool.query('DELETE FROM signed_tokens WHERE expires < $1', [Date.now()]);

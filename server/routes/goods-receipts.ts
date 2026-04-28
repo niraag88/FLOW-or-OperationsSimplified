@@ -3,7 +3,7 @@ import { goodsReceipts, goodsReceiptItems, purchaseOrders, purchaseOrderItems, s
 import { db } from "../db";
 import { eq, desc, sql, inArray, and } from "drizzle-orm";
 import { businessStorage } from "../businessStorage";
-import { requireAuth, writeAuditLog, updateProductStock, objectStorageClient, type AuthenticatedRequest } from "../middleware";
+import { requireAuth, writeAuditLog, updateProductStock, objectStorageClient, deleteStorageObjectSafely, type AuthenticatedRequest } from "../middleware";
 
 type NegativeStockEntry = {
   productId: number;
@@ -322,12 +322,14 @@ export function registerGoodsReceiptRoutes(app: Express) {
       if (!current) return res.status(404).json({ error: 'Goods receipt not found' });
       const existingKey = current[colName];
       if (existingKey) {
-        try {
-          await objectStorageClient.delete(existingKey);
-          await db.delete(storageObjects).where(eq(storageObjects.key, existingKey));
-        } catch (delErr) {
-          console.error('Could not delete object from storage:', delErr);
+        const storageResult = await deleteStorageObjectSafely(existingKey);
+        if (!storageResult.ok) {
+          console.error(
+            `Failed to delete goods-receipt scan from storage: type=goods_receipt id=${id} slot=${slotNum} key=${existingKey} error=${storageResult.error}`
+          );
+          return res.status(502).json({ error: 'Could not delete document from storage. Please try again.' });
         }
+        await db.delete(storageObjects).where(eq(storageObjects.key, existingKey));
       }
       const [updated] = await db
         .update(goodsReceipts)

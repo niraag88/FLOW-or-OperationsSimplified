@@ -4,7 +4,7 @@ import { type InsertInvoice } from "@shared/schema";
 import { db } from "../db";
 import { eq } from "drizzle-orm";
 import { businessStorage } from "../businessStorage";
-import { requireAuth, writeAuditLog, updateProductStock, objectStorageClient, type AuthenticatedRequest } from "../middleware";
+import { requireAuth, writeAuditLog, updateProductStock, objectStorageClient, deleteStorageObjectSafely, type AuthenticatedRequest } from "../middleware";
 import { resolveDocumentTotals, isTotalsError, normalizeTaxTreatment, resolveAuthoritativeTaxTreatment } from "../utils/totals";
 
 export function registerInvoiceRoutes(app: Express) {
@@ -788,12 +788,14 @@ export function registerInvoiceRoutes(app: Express) {
         return res.status(404).json({ error: 'Invoice not found' });
       }
       if (invoice.scanKey) {
-        try {
-          await objectStorageClient.delete(invoice.scanKey);
-          await db.delete(storageObjects).where(eq(storageObjects.key, invoice.scanKey));
-        } catch (storageErr) {
-          console.error('Could not delete object from storage (clearing key anyway):', storageErr);
+        const storageResult = await deleteStorageObjectSafely(invoice.scanKey);
+        if (!storageResult.ok) {
+          console.error(
+            `Failed to delete invoice scan from storage: type=invoice id=${id} key=${invoice.scanKey} error=${storageResult.error}`
+          );
+          return res.status(502).json({ error: 'Could not delete file from storage. Please try again.' });
         }
+        await db.delete(storageObjects).where(eq(storageObjects.key, invoice.scanKey));
       }
       await db.update(invoices).set({ scanKey: null }).where(eq(invoices.id, id));
       const [updated] = await db.select().from(invoices).where(eq(invoices.id, id));

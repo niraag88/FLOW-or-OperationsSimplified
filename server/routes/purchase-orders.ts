@@ -4,7 +4,7 @@ import { insertPurchaseOrderSchema } from "@shared/schema";
 import { db } from "../db";
 import { eq, sql, inArray } from "drizzle-orm";
 import { businessStorage } from "../businessStorage";
-import { requireAuth, requireRole, writeAuditLog, objectStorageClient, type AuthenticatedRequest } from "../middleware";
+import { requireAuth, requireRole, writeAuditLog, objectStorageClient, deleteStorageObjectSafely, type AuthenticatedRequest } from "../middleware";
 
 export function registerPurchaseOrderRoutes(app: Express) {
   app.get('/api/purchase-orders', requireAuth(['Admin', 'Manager']), async (req: AuthenticatedRequest, res) => {
@@ -425,12 +425,14 @@ export function registerPurchaseOrderRoutes(app: Express) {
       if (!po) return res.status(404).json({ error: 'Purchase order not found' });
 
       if (po.supplierScanKey) {
-        try {
-          await objectStorageClient.delete(po.supplierScanKey);
-          await db.delete(storageObjects).where(eq(storageObjects.key, po.supplierScanKey));
-        } catch (storageErr) {
-          console.error('Could not delete object from storage (clearing key anyway):', storageErr);
+        const storageResult = await deleteStorageObjectSafely(po.supplierScanKey);
+        if (!storageResult.ok) {
+          console.error(
+            `Failed to delete purchase-order supplier scan from storage: type=purchase_order id=${id} key=${po.supplierScanKey} error=${storageResult.error}`
+          );
+          return res.status(502).json({ error: 'Could not delete file from storage. Please try again.' });
         }
+        await db.delete(storageObjects).where(eq(storageObjects.key, po.supplierScanKey));
       }
 
       const [updated] = await db
