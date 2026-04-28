@@ -1,0 +1,197 @@
+Please create four separate technical tasks from this prompt.
+
+Important:
+Do NOT merge these into one broad refactor.
+Do NOT change PDFs, print layouts, XLSX exports, VAT/totals logic, stock logic, GRN cancellation, backup/restore behavior, or factory reset behavior unless a task explicitly says so.
+Do NOT run production migrations.
+Do NOT make schema changes unless explicitly required and explained first.
+Keep each priority separate in code, tests, and summary.
+
+Priority 9: Database Migration / Deployment Safety
+
+Goal:
+Make database migration state safer and easier to verify before deployment.
+
+Why:
+The app has Drizzle migrations, migration metadata, live schema, restore logic, and Replit deployment all depending on the database being in a known state. If migration metadata and schema drift, future deploys/restores can become risky.
+
+Affected files to inspect:
+- migrations/*
+- migrations/meta/*
+- drizzle.config.ts
+- shared/schema.ts
+- package.json
+- README.md or migrations/README.md if docs are needed
+
+Please do:
+1. Inspect migration files and migration metadata for drift or missing journal/snapshot entries.
+2. Confirm whether all committed migrations are represented correctly in Drizzle metadata.
+3. Add or improve a safe migration verification command/script if appropriate.
+4. Add documentation explaining the correct deployment flow:
+   - generate migration
+   - review SQL
+   - run migration
+   - verify
+5. Make it clear that destructive schema pushes should not be used on live data.
+6. Add a test/check where practical that catches missing migration metadata before deployment.
+
+Avoid:
+- Do not alter business tables casually.
+- Do not reset or wipe data.
+- Do not run migrations against production.
+- Do not change restore/factory reset behavior in this task.
+
+Acceptance criteria:
+- A developer can tell whether migrations are healthy before deploy.
+- Migration metadata is consistent or clearly documented.
+- Future migration mistakes are easier to catch.
+
+Priority 10: Authentication and Role-Permission Hardening
+
+Goal:
+Tighten high-risk route permissions without changing role names or redesigning login.
+
+Why:
+Some routes are protected only by general login even though they expose audit, storage, recycle-bin, exports, or system-level data. Staff should not accidentally get access to admin/manager surfaces.
+
+Affected files to inspect:
+- server/routes.ts
+- server/middleware.ts
+- server/routes/auth.ts
+- server/routes/system.ts
+- server/routes/settings.ts
+- server/routes/products.ts
+- server/routes/purchase-orders.ts
+- server/routes/invoices.ts
+- server/routes/delivery-orders.ts
+- server/routes/goods-receipts.ts
+- server/routes/exports.ts
+- tests/e2e auth/role tests
+
+Please do:
+1. Create a clear role-permission matrix for sensitive backend routes.
+2. Audit routes using plain requireAuth() and decide whether they should be Admin, Manager, Staff, or narrower.
+3. Pay special attention to:
+   - audit log routes
+   - recycle bin routes
+   - storage signed-get and object routes
+   - backup/restore/factory reset routes
+   - financial year export routes
+   - settings routes
+   - user-management routes
+4. If POST /api/audit-logs allows arbitrary client-written audit records, either lock it down or justify why it exists.
+5. If POST /api/recycle-bin allows arbitrary client-created recycle-bin rows, lock it down or justify why it exists.
+6. Add role tests for any changed permission.
+7. Keep existing Admin/Manager/Staff names.
+
+Avoid:
+- Do not redesign login.
+- Do not add new roles.
+- Do not change password hashing.
+- Do not change business workflows unless required by permission safety.
+- Do not change UI unless the frontend needs to handle a new 403 cleanly.
+
+Acceptance criteria:
+- Sensitive routes have intentional role restrictions.
+- Staff cannot access admin/system-only operations.
+- Tests prove 401 unauthenticated and 403 unauthorized behavior.
+
+Priority 11: Weak / Manual Route Validation Cleanup
+
+Goal:
+Reduce fragile manual validation in backend routes, starting with high-risk endpoints.
+
+Why:
+Several routes manually parse IDs, statuses, arrays, dates, totals, keys, and request bodies. Small malformed requests can produce 500s, partial writes, or unclear behavior.
+
+Affected files to inspect:
+- server/routes/purchase-orders.ts
+- server/routes/system.ts
+- server/routes/settings.ts
+- server/routes/products.ts
+- server/routes/customers.ts
+- server/routes/suppliers.ts
+- server/routes/quotations.ts
+- server/routes/invoices.ts
+- server/routes/delivery-orders.ts
+- server/routes/goods-receipts.ts
+- shared/schema.ts
+- server/utils/totals.ts if reusable patterns help
+
+Please do:
+1. Identify the highest-risk routes still using weak/manual validation.
+2. Start with routes where bad input can cause partial writes, wrong totals, fake audit records, fake recycle-bin records, or 500s instead of 400s.
+3. Add route-local Zod schemas or shared validation helpers where it keeps the code simpler.
+4. Validate IDs before database work.
+5. Validate enum/status values before writes.
+6. Validate arrays before delete/insert replacement flows.
+7. Return clear 400 errors for bad client input.
+8. Add focused e2e tests for the changed routes.
+
+Specific routes worth checking first:
+- purchase order create/update
+- recycle-bin create/delete/restore
+- audit-log create
+- storage object query/key routes
+- financial year routes
+- quotation create/update
+- product/customer/supplier create/update
+
+Avoid:
+- Do not rewrite every route in one pass.
+- Do not change document layouts.
+- Do not change VAT/invoice/DO totals already fixed.
+- Do not change stock movement logic.
+- Do not introduce schema migrations unless absolutely necessary.
+
+Acceptance criteria:
+- Bad input returns 400, not silent success or 500.
+- No route performs partial writes after validation failure.
+- Tests cover the hardened cases.
+
+Priority 12: Replit Portability Risk Reduction
+
+Goal:
+Reduce places where the app is tightly coupled to Replit so it can move later with less pain.
+
+Why:
+The app currently depends on Replit object storage, Replit paths/config, Replit deployment assumptions, and specific environment variables. We do not need to migrate away now, but we should isolate assumptions.
+
+Affected files to inspect:
+- server/middleware.ts
+- server/routes/system.ts
+- server/db.ts
+- server/routes/exports.ts
+- scripts/uploadBackup.js
+- scripts/writeManifest.js
+- scripts/restoreBackup.js
+- .replit
+- package.json
+- README.md
+
+Please do:
+1. Identify Replit-specific assumptions and isolate them behind small helpers where safe.
+2. Add or improve environment variable validation for:
+   - DATABASE_URL
+   - SESSION_SECRET
+   - DEFAULT_OBJECT_STORAGE_BUCKET_ID
+   - OPS_TOKEN where required
+   - any backup/object-storage config
+3. Avoid scattering direct Replit object-storage calls further.
+4. Consider a small object-storage adapter/interface if it can be done without a broad rewrite.
+5. Replace hardcoded /home/runner/workspace usage with a configurable app-root fallback where safe.
+6. Document what would need to change to move to another host/storage provider.
+7. Keep current Replit behavior working.
+
+Avoid:
+- Do not replace Replit object storage now.
+- Do not migrate to S3 now.
+- Do not change backup/restore behavior.
+- Do not change PDFs/exports.
+- Do not change database provider unless only documenting the risk.
+- Do not alter deployment scripts in a way that breaks Replit.
+
+Acceptance criteria:
+- Current Replit deployment still works.
+- Replit-specific assumptions are documented or isolated.
+- Moving later to another host/storage provider is less risky.

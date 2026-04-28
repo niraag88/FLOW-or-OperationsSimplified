@@ -115,7 +115,7 @@ export default function GoodsReceiptsTab({
 
 
   const ALLOWED_TYPES = ['application/pdf', 'image/jpeg', 'image/jpg', 'image/png'];
-  const MAX_DOC_SIZE = 2 * 1024 * 1024;
+  const MAX_DOC_SIZE = 5 * 1024 * 1024;
 
   const updatePendingDoc = (idx: number, file: File | null) => {
     setPendingDocs(prev => {
@@ -134,7 +134,7 @@ export default function GoodsReceiptsTab({
       return;
     }
     if (file.size > MAX_DOC_SIZE) {
-      toast({ title: 'File too large', description: 'Max 2 MB per document.', variant: 'destructive' });
+      toast({ title: 'File too large', description: 'Max 5 MB per document.', variant: 'destructive' });
       return;
     }
     updatePendingDoc(idx, file);
@@ -1252,7 +1252,7 @@ export default function GoodsReceiptsTab({
 
             <div className="space-y-2 border-t pt-3">
               <Label>Attach Delivery Documents (optional)</Label>
-              <p className="text-xs text-gray-500">Up to 3 documents — PDF, JPG, PNG, max 2 MB each. Attached automatically after saving.</p>
+              <p className="text-xs text-gray-500">Up to 3 documents — PDF, JPG, PNG, max 5 MB each. Attached automatically after saving.</p>
               <div className="flex gap-2 flex-wrap">
                 {[0, 1, 2].map((idx: number) => {
                   const slotLabel = `Supporting Documentation ${idx + 1}`;
@@ -1364,7 +1364,7 @@ export default function GoodsReceiptsTab({
           recordType="goods-receipts"
           recordId={attachGrnState.grnId}
           documentNumber={`${attachGrnState.receiptNumber}-doc${attachGrnState.slot}`}
-          maxSizeMB={2}
+          maxSizeMB={5}
         />
       )}
 

@@ -183,8 +183,8 @@ export async function generateDOPDF(
   `;
 }
 
-export const MAX_UPLOAD_BYTES = 2 * 1024 * 1024;
-export const MAX_UPLOAD_ERROR_MESSAGE = 'File too large — uploads are capped at 2 MB';
+export const MAX_UPLOAD_BYTES = 5 * 1024 * 1024;
+export const MAX_UPLOAD_ERROR_MESSAGE = 'File too large. Maximum size is 5 MB. Please scan in black-and-white, or reduce colour resolution to 200 dpi.';
 
 export const upload = multer({
   storage: multer.memoryStorage(),

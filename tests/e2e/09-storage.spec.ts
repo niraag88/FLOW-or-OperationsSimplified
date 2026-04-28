@@ -197,16 +197,16 @@ test.describe('Storage: scan-delete failure path leaves DB untouched', () => {
   });
 });
 
-test.describe('Storage: 2 MB upload cap', () => {
+test.describe('Storage: 5 MB upload cap', () => {
   let cookie: string;
 
   test.beforeAll(async () => {
     cookie = await apiLogin();
   });
 
-  test('sign-upload rejects fileSize > 2 MB with 400 and creates no signed token + no storage row', async () => {
+  test('sign-upload rejects fileSize > 5 MB with 400 and creates no signed token + no storage row', async () => {
     const key = 'invoices/test/oversize-claim.pdf';
-    const oversize = 3 * 1024 * 1024;
+    const oversize = 6 * 1024 * 1024;
 
     // Baseline: no signed_tokens row exists for this key before the test.
     const beforeTokens = await fetch(
@@ -226,7 +226,8 @@ test.describe('Storage: 2 MB upload cap', () => {
     });
     expect(r.status).toBe(400);
     const body = (await r.json()) as { error?: string };
-    expect((body.error ?? '').toLowerCase()).toContain('2 mb');
+    expect((body.error ?? '').toLowerCase()).toContain('5 mb');
+    expect((body.error ?? '').toLowerCase()).toContain('200 dpi');
 
     // No signed_tokens row was created.
     const afterTokens = await fetch(
@@ -243,7 +244,7 @@ test.describe('Storage: 2 MB upload cap', () => {
     expect(rowResp.exists).toBe(false);
   });
 
-  test('PUT /api/storage/upload/:token aborts a 3 MB raw body with 413, no row created, token consumed', async () => {
+  test('PUT /api/storage/upload/:token aborts a 6 MB raw body with 413, no row created, token consumed', async () => {
     // 1. Sign for a small claim so the route accepts the token.
     const key = 'invoices/test/oversize-raw-body.pdf';
     const signResp = await fetch(`${BASE_URL}/api/storage/sign-upload`, {
@@ -254,9 +255,9 @@ test.describe('Storage: 2 MB upload cap', () => {
     expect(signResp.status).toBe(200);
     const signData = (await signResp.json()) as { url: string };
 
-    // 2. Send 3 MB raw body. The streaming counter pauses at 2 MB,
+    // 2. Send 6 MB raw body. The streaming counter pauses at 5 MB,
     // sends a deterministic 413, then tears down the socket.
-    const oversize = Buffer.alloc(3 * 1024 * 1024, 0x25); // '%' byte
+    const oversize = Buffer.alloc(6 * 1024 * 1024, 0x25); // '%' byte
     const upResp = await fetch(`${BASE_URL}${signData.url}`, {
       method: 'PUT',
       headers: { 'Content-Type': 'application/pdf', Cookie: cookie },
@@ -266,7 +267,8 @@ test.describe('Storage: 2 MB upload cap', () => {
     // Hard stop: the server must signal connection termination, not keep-alive.
     expect((upResp.headers.get('connection') ?? '').toLowerCase()).toBe('close');
     const body = (await upResp.json()) as { error?: string };
-    expect((body.error ?? '').toLowerCase()).toContain('2 mb');
+    expect((body.error ?? '').toLowerCase()).toContain('5 mb');
+    expect((body.error ?? '').toLowerCase()).toContain('200 dpi');
 
     // 3. No storage_objects row should have been created for this key.
     const rowResp = await fetch(
@@ -302,9 +304,9 @@ test.describe('Storage: 2 MB upload cap', () => {
     ).then((r) => r.json() as Promise<{ count: number }>);
     expect(tokensBefore.count).toBe(1);
 
-    // 2. PUT a 3 MB multipart body — multer should abort with LIMIT_FILE_SIZE
+    // 2. PUT a 6 MB multipart body — multer should abort with LIMIT_FILE_SIZE
     // and the global error handler should 413 + consume the token.
-    const oversize = Buffer.alloc(3 * 1024 * 1024, 0x25);
+    const oversize = Buffer.alloc(6 * 1024 * 1024, 0x25);
     const boundary = '----flow-test-boundary-' + Date.now();
     const headPart =
       `--${boundary}\r\n` +
@@ -326,6 +328,12 @@ test.describe('Storage: 2 MB upload cap', () => {
       body,
     });
     expect(upResp.status).toBe(413);
+    // Global error handler must signal connection close so the client can't
+    // reuse the socket after a 413 (parity with the raw-body overflow path).
+    expect((upResp.headers.get('connection') ?? '').toLowerCase()).toBe('close');
+    const multipartErr = (await upResp.json().catch(() => ({}))) as { error?: string };
+    expect((multipartErr.error ?? '').toLowerCase()).toContain('5 mb');
+    expect((multipartErr.error ?? '').toLowerCase()).toContain('200 dpi');
 
     // 3. The signed_tokens row must have been deleted.
     const tokensAfter = await fetch(
@@ -350,9 +358,9 @@ test.describe('Storage: 2 MB upload cap', () => {
     expect(rowResp.exists).toBe(false);
   });
 
-  test('upload-scan rejects a 3 MB multipart body with 413, no row created', async () => {
+  test('upload-scan rejects a 6 MB multipart body with 413, no row created', async () => {
     const key = 'invoices/test/oversize-scan.pdf';
-    const oversize = Buffer.alloc(3 * 1024 * 1024, 0x25);
+    const oversize = Buffer.alloc(6 * 1024 * 1024, 0x25);
 
     const boundary = '----flow-test-boundary-' + Date.now();
     const headPart =
@@ -379,10 +387,10 @@ test.describe('Storage: 2 MB upload cap', () => {
     });
     // Multer aborts during body parse → 413 from the global error handler.
     expect(upResp.status).toBe(413);
+    expect((upResp.headers.get('connection') ?? '').toLowerCase()).toBe('close');
     const errBody = (await upResp.json().catch(() => ({}))) as { error?: string };
-    if (errBody.error) {
-      expect(errBody.error.toLowerCase()).toContain('2 mb');
-    }
+    expect((errBody.error ?? '').toLowerCase()).toContain('5 mb');
+    expect((errBody.error ?? '').toLowerCase()).toContain('200 dpi');
 
     const rowResp = await fetch(
       `${BASE_URL}/api/__test__/storage-object-row?key=${encodeURIComponent(key)}`,

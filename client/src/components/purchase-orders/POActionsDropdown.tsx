@@ -166,7 +166,7 @@ export default function POActionsDropdown({ po, canEdit, onEdit, onRefresh, curr
         recordType="purchase-orders"
         recordId={po.id}
         documentNumber={poNumber}
-        maxSizeMB={2}
+        maxSizeMB={5}
       />
     </>
   );

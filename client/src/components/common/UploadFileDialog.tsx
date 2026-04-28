@@ -38,7 +38,7 @@ interface UploadFileDialogProps {
   maxSizeMB?: number;
 }
 
-export default function UploadFileDialog({ open, onClose, onSuccess, recordType, recordId, documentNumber, maxSizeMB = 2 }: UploadFileDialogProps) {
+export default function UploadFileDialog({ open, onClose, onSuccess, recordType, recordId, documentNumber, maxSizeMB = 5 }: UploadFileDialogProps) {
   const { toast } = useToast();
   const [selectedFile, setSelectedFile] = useState<File | null>(null);
   const [uploading, setUploading] = useState(false);

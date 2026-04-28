@@ -53,6 +53,9 @@ app.use((req, res, next) => {
           }
         }
         if (!res.headersSent) {
+          // Match the raw-body overflow contract: signal connection termination
+          // so the client doesn't try to keep reusing the socket after a 413.
+          res.set('Connection', 'close');
           return res.status(413).json({ error: MAX_UPLOAD_ERROR_MESSAGE });
         }
         return next(err);
