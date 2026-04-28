@@ -132,7 +132,13 @@ export function registerSystemRoutes(app: Express) {
         if (overflow.tooLarge) {
           await pool.query('DELETE FROM signed_tokens WHERE token = $1', [token]);
           res.set('Connection', 'close');
-          return res.status(413).json({ error: MAX_UPLOAD_ERROR_MESSAGE });
+          res.status(413).json({ error: MAX_UPLOAD_ERROR_MESSAGE });
+          await new Promise<void>((resolve) => {
+            res.once('finish', resolve);
+            res.once('close', resolve);
+          });
+          req.destroy();
+          return;
         }
         fileData = overflow.data!;
       }

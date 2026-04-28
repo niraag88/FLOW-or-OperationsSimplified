@@ -263,6 +263,8 @@ test.describe('Storage: 2 MB upload cap', () => {
       body: oversize,
     });
     expect(upResp.status).toBe(413);
+    // Hard stop: the server must signal connection termination, not keep-alive.
+    expect((upResp.headers.get('connection') ?? '').toLowerCase()).toBe('close');
     const body = (await upResp.json()) as { error?: string };
     expect((body.error ?? '').toLowerCase()).toContain('2 mb');
 
