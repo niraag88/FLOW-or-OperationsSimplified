@@ -357,7 +357,29 @@ export function registerInvoiceRoutes(app: Express) {
     try {
       const id = parseInt(req.params.id);
       if (isNaN(id)) return res.status(400).json({ error: 'Invalid ID' });
-      const body = req.body;
+      const body = req.body ?? {};
+
+      // Reject an explicit empty/invalid items field BEFORE any DB read or
+      // write. An omitted items key is a legitimate header-only edit and
+      // falls through to the existing recompute-from-stored-items path.
+      // But if the caller explicitly supplies items, it must be a non-empty
+      // array of objects — otherwise the saved-document contract (every
+      // invoice must have at least one valid line) is violated and we
+      // would silently keep stale items. Mirrors the no_line_items
+      // contract that POST already enforces via the totals resolver.
+      if (typeof body === 'object' && body !== null && 'items' in body) {
+        const rawItems = (body as { items?: unknown }).items;
+        const isValidItemsArray =
+          Array.isArray(rawItems)
+          && rawItems.length > 0
+          && rawItems.every((it) => it !== null && typeof it === 'object' && !Array.isArray(it));
+        if (!isValidItemsArray) {
+          return res.status(400).json({
+            error: 'no_line_items',
+            message: 'At least one valid line item is required',
+          });
+        }
+      }
 
       let customerName = body.customer_name || 'Unknown Customer';
       let customerId: number | undefined = undefined;

@@ -1328,12 +1328,13 @@ test.describe('Invoices', () => {
   test('PUT /api/invoices/:id draft→submitted status transition → 200', async () => {
     expect(IDs.invoice).toBeGreaterThan(0);
     expect(IDs.customer).toBeGreaterThan(0);
+    // Header-only edit: omit `items` entirely (sending items: [] would
+    // now be rejected by the no_line_items guard).
     const { status, data } = await api('PUT', `/api/invoices/${IDs.invoice}`, adminCookie, {
       customer_id: IDs.customer,
       status: 'submitted',
       total_amount: 519.75,
       tax_amount: 24.75,
-      items: [],
     });
     expect(status).toBe(200);
     const updated = data as { status?: string };
@@ -1452,9 +1453,11 @@ test.describe('Delivery Orders', () => {
     const doId = (data as { id: number }).id;
     expect(doId).toBeGreaterThan(0);
 
-    // Advance through lifecycle
-    await api('PUT', `/api/delivery-orders/${doId}`, adminCookie, { customer_id: IDs.customer, status: 'submitted', total_amount: 495.0, items: [] });
-    await api('PUT', `/api/delivery-orders/${doId}`, adminCookie, { customer_id: IDs.customer, status: 'delivered', total_amount: 495.0, items: [] });
+    // Advance through lifecycle. Header-only edits omit `items`
+    // entirely (sending items: [] would now be rejected by the
+    // no_line_items guard).
+    await api('PUT', `/api/delivery-orders/${doId}`, adminCookie, { customer_id: IDs.customer, status: 'submitted', total_amount: 495.0 });
+    await api('PUT', `/api/delivery-orders/${doId}`, adminCookie, { customer_id: IDs.customer, status: 'delivered', total_amount: 495.0 });
     // Delivered DOs cannot be deleted directly — must cancel first
     const { status: delDeliveredStatus } = await api('DELETE', `/api/delivery-orders/${doId}`, adminCookie);
     note('DELETE /api/delivery-orders/:id on a delivered DO → 400 (must cancel first)');
@@ -1650,8 +1653,9 @@ test.describe('Cancellation all-or-nothing contract', () => {
     });
     if (create.status !== 201) return;
     const doId = (create.data as { id: number }).id;
+    // Header-only status advance: omit `items` (no_line_items guard).
     await api('PUT', `/api/delivery-orders/${doId}`, adminCookie, {
-      customer_id: IDs.customer, status: 'submitted', total_amount: 0, items: [],
+      customer_id: IDs.customer, status: 'submitted', total_amount: 0,
     });
 
     const reject = await api('PATCH', `/api/delivery-orders/${doId}/cancel`, adminCookie, {
@@ -2380,6 +2384,150 @@ test.describe('Server-side totals authority', () => {
     expect(inv.items?.[0].description).toBe('preserve-on-bad-edit');
 
     await api('DELETE', `/api/invoices/${invId}`, adminCookie);
+  });
+
+  test('PUT /api/invoices/:id with explicit items: [] → 400 no_line_items, existing line items unchanged', async () => {
+    if (!IDs.customer || !IDs.product) return;
+
+    // Seed an invoice with one valid line item.
+    const create = await api('POST', '/api/invoices', adminCookie, {
+      customer_id: IDs.customer,
+      invoice_date: '2026-04-18',
+      status: 'draft',
+      currency: 'AED',
+      tax_treatment: 'StandardRated',
+      items: [{ product_id: IDs.product, description: 'preserve-on-empty-edit', quantity: 2, unit_price: 50, line_total: 100 }],
+    });
+    expect(create.status).toBe(201);
+    const invId = (create.data as { id: number }).id;
+
+    // Explicit empty items array → 400 before any DB write.
+    const empty = await api('PUT', `/api/invoices/${invId}`, adminCookie, {
+      customer_id: IDs.customer,
+      status: 'draft',
+      items: [],
+    });
+    expect(empty.status).toBe(400);
+    expect((empty.data as { error?: string }).error).toBe('no_line_items');
+
+    // Same rule for null, plain object, string, and array of non-objects.
+    for (const bad of [null, {}, 'oops', [1, 2, 3]]) {
+      const r = await api('PUT', `/api/invoices/${invId}`, adminCookie, {
+        customer_id: IDs.customer,
+        status: 'draft',
+        items: bad,
+      });
+      expect(r.status).toBe(400);
+      expect((r.data as { error?: string }).error).toBe('no_line_items');
+    }
+
+    // Existing line items must still be present and unchanged.
+    const after = await api('GET', `/api/invoices/${invId}`, adminCookie);
+    const inv = after.data as { items?: Array<{ description?: string; quantity?: number; unit_price?: number }> };
+    expect(inv.items?.length).toBe(1);
+    expect(inv.items?.[0].description).toBe('preserve-on-empty-edit');
+    expect(inv.items?.[0].quantity).toBe(2);
+    expect(Number(inv.items?.[0].unit_price)).toBeCloseTo(50, 2);
+
+    await api('DELETE', `/api/invoices/${invId}`, adminCookie);
+  });
+
+  test('PUT /api/delivery-orders/:id with explicit items: [] → 400 no_line_items, existing line items unchanged', async () => {
+    if (!IDs.customer || !IDs.product) return;
+
+    const create = await api('POST', '/api/delivery-orders', adminCookie, {
+      customer_id: IDs.customer,
+      status: 'draft',
+      currency: 'AED',
+      tax_treatment: 'StandardRated',
+      items: [{ product_id: IDs.product, description: 'do-preserve-on-empty', quantity: 3, unit_price: 40, line_total: 120 }],
+    });
+    expect(create.status).toBe(201);
+    const doId = (create.data as { id: number }).id;
+
+    const empty = await api('PUT', `/api/delivery-orders/${doId}`, adminCookie, {
+      customer_id: IDs.customer,
+      status: 'draft',
+      items: [],
+    });
+    expect(empty.status).toBe(400);
+    expect((empty.data as { error?: string }).error).toBe('no_line_items');
+
+    for (const bad of [null, {}, 'oops', [1, 2, 3]]) {
+      const r = await api('PUT', `/api/delivery-orders/${doId}`, adminCookie, {
+        customer_id: IDs.customer,
+        status: 'draft',
+        items: bad,
+      });
+      expect(r.status).toBe(400);
+      expect((r.data as { error?: string }).error).toBe('no_line_items');
+    }
+
+    const after = await api('GET', `/api/delivery-orders/${doId}`, adminCookie);
+    const doData = after.data as { items?: Array<{ description?: string; quantity?: number; unit_price?: number }> };
+    expect(doData.items?.length).toBe(1);
+    expect(doData.items?.[0].description).toBe('do-preserve-on-empty');
+    expect(doData.items?.[0].quantity).toBe(3);
+    expect(Number(doData.items?.[0].unit_price)).toBeCloseTo(40, 2);
+
+    await api('DELETE', `/api/delivery-orders/${doId}`, adminCookie);
+  });
+
+  test('PUT without an items field is a header-only edit and continues to work (no 400)', async () => {
+    if (!IDs.customer || !IDs.product) return;
+
+    // One invoice and one DO. PUT each with the items field omitted
+    // entirely — that path must still succeed (200) and recompute totals
+    // from existing stored items, leaving line items untouched.
+    const inv = await api('POST', '/api/invoices', adminCookie, {
+      customer_id: IDs.customer,
+      invoice_date: '2026-04-18',
+      status: 'draft',
+      currency: 'AED',
+      tax_treatment: 'StandardRated',
+      items: [{ product_id: IDs.product, description: 'header-only-omit', quantity: 1, unit_price: 80, line_total: 80 }],
+    });
+    expect(inv.status).toBe(201);
+    const invId = (inv.data as { id: number }).id;
+
+    const putInv = await api('PUT', `/api/invoices/${invId}`, adminCookie, {
+      customer_id: IDs.customer,
+      status: 'submitted',
+      reference: 'header-only-no-items-key',
+    });
+    expect(putInv.status).toBe(200);
+    const getInv = await api('GET', `/api/invoices/${invId}`, adminCookie);
+    const invData = getInv.data as { status?: string; amount?: string; items?: Array<{ description?: string }> };
+    expect(invData.status).toBe('submitted');
+    expect(parseFloat(String(invData.amount))).toBeCloseTo(84, 2); // 80 + 5% VAT
+    expect(invData.items?.length).toBe(1);
+    expect(invData.items?.[0].description).toBe('header-only-omit');
+
+    const doRes = await api('POST', '/api/delivery-orders', adminCookie, {
+      customer_id: IDs.customer,
+      status: 'draft',
+      currency: 'AED',
+      tax_treatment: 'StandardRated',
+      items: [{ product_id: IDs.product, description: 'do-header-only-omit', quantity: 2, unit_price: 30, line_total: 60 }],
+    });
+    expect(doRes.status).toBe(201);
+    const doId = (doRes.data as { id: number }).id;
+
+    const putDo = await api('PUT', `/api/delivery-orders/${doId}`, adminCookie, {
+      customer_id: IDs.customer,
+      status: 'submitted',
+      reference: 'do-header-only-no-items-key',
+    });
+    expect(putDo.status).toBe(200);
+    const getDo = await api('GET', `/api/delivery-orders/${doId}`, adminCookie);
+    const doData = getDo.data as { status?: string; total_amount?: number; items?: Array<{ description?: string }> };
+    expect(doData.status).toBe('submitted');
+    expect(Number(doData.total_amount)).toBeCloseTo(63, 2); // 60 + 5% VAT
+    expect(doData.items?.length).toBe(1);
+    expect(doData.items?.[0].description).toBe('do-header-only-omit');
+
+    await api('DELETE', `/api/invoices/${invId}`, adminCookie);
+    await api('DELETE', `/api/delivery-orders/${doId}`, adminCookie);
   });
 });
 
