@@ -1,8 +1,10 @@
 import express, { type Request, Response, NextFunction } from "express";
 import helmet from "helmet";
+import multer from "multer";
 import { registerRoutes } from "./routes";
 import { initializeAdminUser } from "./adminInit";
 import { setupVite, serveStatic, log } from "./vite";
+import { MAX_UPLOAD_ERROR_MESSAGE } from "./middleware";
 
 const app = express();
 app.use(helmet({
@@ -31,11 +33,26 @@ app.use((req, res, next) => {
   
   const server = await registerRoutes(app);
 
-  app.use((err: any, _req: Request, res: Response, _next: NextFunction) => {
+  app.use((err: any, _req: Request, res: Response, next: NextFunction) => {
+    if (err instanceof multer.MulterError) {
+      if (err.code === 'LIMIT_FILE_SIZE' || err.code === 'LIMIT_FILE_COUNT') {
+        if (!res.headersSent) {
+          return res.status(413).json({ error: MAX_UPLOAD_ERROR_MESSAGE });
+        }
+        return next(err);
+      }
+      if (!res.headersSent) {
+        return res.status(400).json({ error: err.message });
+      }
+      return next(err);
+    }
+
     const status = err.status || err.statusCode || 500;
     const message = err.message || "Internal Server Error";
 
-    res.status(status).json({ message });
+    if (!res.headersSent) {
+      res.status(status).json({ message });
+    }
     console.error(err);
   });
 

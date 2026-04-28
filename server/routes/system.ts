@@ -8,7 +8,7 @@ import { execSync } from 'child_process';
 import { createWriteStream, createReadStream, unlink } from 'fs';
 import { tmpdir } from 'os';
 import ExcelJS from 'exceljs';
-import { requireAuth, requireRole, writeAuditLog, objectStorageClient, validateUploadInput, validatePdfMagicBytes, validateImageMagicBytes, upload, setForceStorageDeleteFail, isForceStorageDeleteFailEnabled, type AuthenticatedRequest } from "../middleware";
+import { requireAuth, requireRole, writeAuditLog, objectStorageClient, validateUploadInput, validatePdfMagicBytes, validateImageMagicBytes, upload, setForceStorageDeleteFail, isForceStorageDeleteFailEnabled, MAX_UPLOAD_BYTES, MAX_UPLOAD_ERROR_MESSAGE, type AuthenticatedRequest } from "../middleware";
 import crypto from 'crypto';
 
 export function registerSystemRoutes(app: Express) {
@@ -101,10 +101,53 @@ export function registerSystemRoutes(app: Express) {
       if (req.file) {
         fileData = req.file.buffer;
       } else {
-        const chunks: Buffer[] = [];
-        req.on('data', (chunk) => chunks.push(chunk));
-        await new Promise((resolve) => req.on('end', resolve));
-        fileData = Buffer.concat(chunks);
+        const overflow = await new Promise<{ tooLarge: boolean; data?: Buffer }>((resolve, reject) => {
+          const chunks: Buffer[] = [];
+          let total = 0;
+          let resolved = false;
+          req.on('data', (chunk: Buffer) => {
+            if (resolved) return;
+            total += chunk.length;
+            if (total > MAX_UPLOAD_BYTES) {
+              resolved = true;
+              req.pause();
+              resolve({ tooLarge: true });
+              return;
+            }
+            chunks.push(chunk);
+          });
+          req.on('end', () => {
+            if (resolved) return;
+            resolved = true;
+            resolve({ tooLarge: false, data: Buffer.concat(chunks) });
+          });
+          req.on('error', (err) => {
+            if (resolved) return;
+            resolved = true;
+            reject(err);
+          });
+        });
+
+        if (overflow.tooLarge) {
+          await pool.query('DELETE FROM signed_tokens WHERE token = $1', [token]);
+          if (!res.headersSent) {
+            res.set('Connection', 'close');
+            res.status(413).json({ error: MAX_UPLOAD_ERROR_MESSAGE });
+          }
+          // Drain any remaining body so the client sees the response cleanly,
+          // then ensure the socket is closed.
+          req.on('data', () => {});
+          req.on('end', () => req.socket?.destroy());
+          req.on('error', () => req.socket?.destroy());
+          req.resume();
+          return;
+        }
+        fileData = overflow.data!;
+      }
+
+      if (fileData.length > MAX_UPLOAD_BYTES) {
+        await pool.query('DELETE FROM signed_tokens WHERE token = $1', [token]);
+        return res.status(413).json({ error: MAX_UPLOAD_ERROR_MESSAGE });
       }
 
       if (tokenData.fileSize && fileData.length !== tokenData.fileSize) {
@@ -167,10 +210,8 @@ export function registerSystemRoutes(app: Express) {
         return res.status(400).json({ error: 'Only PDF, JPG, and PNG files are allowed' });
       }
 
-      const isSmallUpload = storageKey.startsWith('purchase-orders/') || storageKey.startsWith('goods-receipts/');
-      const maxSizeBytes = isSmallUpload ? 2 * 1024 * 1024 : 25 * 1024 * 1024;
-      if (fileSize > maxSizeBytes) {
-        return res.status(400).json({ error: `File size exceeds ${isSmallUpload ? '2MB' : '25MB'} limit` });
+      if (fileSize > MAX_UPLOAD_BYTES) {
+        return res.status(413).json({ error: MAX_UPLOAD_ERROR_MESSAGE });
       }
 
       if (!storageKey.match(/^(invoices|delivery|purchase-orders|goods-receipts)\/\d{4}\/([^\/]+\.(pdf|jpg|jpeg|png)|[^\/]+\/\d{10,}-[^\/]+\.(pdf|jpg|jpeg|png))$/)) {

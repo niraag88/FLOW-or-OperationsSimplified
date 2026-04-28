@@ -183,7 +183,13 @@ export async function generateDOPDF(
   `;
 }
 
-export const upload = multer({ storage: multer.memoryStorage() });
+export const MAX_UPLOAD_BYTES = 2 * 1024 * 1024;
+export const MAX_UPLOAD_ERROR_MESSAGE = 'File too large — uploads are capped at 2 MB';
+
+export const upload = multer({
+  storage: multer.memoryStorage(),
+  limits: { fileSize: MAX_UPLOAD_BYTES, files: 1 },
+});
 
 declare module 'express-session' {
   interface SessionData {
@@ -246,9 +252,8 @@ export const validateUploadInput = (key: string, contentType: string, fileSize?:
   if (contentType !== 'application/pdf') {
     return { valid: false, error: 'Content type must be application/pdf' };
   }
-  const maxSize = 25 * 1024 * 1024;
-  if (fileSize && fileSize > maxSize) {
-    return { valid: false, error: 'File size must be ≤ 25 MB' };
+  if (fileSize && fileSize > MAX_UPLOAD_BYTES) {
+    return { valid: false, error: MAX_UPLOAD_ERROR_MESSAGE };
   }
   return { valid: true };
 };

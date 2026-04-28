@@ -196,3 +196,127 @@ test.describe('Storage: scan-delete failure path leaves DB untouched', () => {
     });
   });
 });
+
+test.describe('Storage: 2 MB upload cap', () => {
+  let cookie: string;
+
+  test.beforeAll(async () => {
+    cookie = await apiLogin();
+  });
+
+  test('sign-upload rejects fileSize > 2 MB with 400 and creates no token', async () => {
+    const oversize = 3 * 1024 * 1024;
+    const r = await fetch(`${BASE_URL}/api/storage/sign-upload`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', Cookie: cookie },
+      body: JSON.stringify({
+        key: 'invoices/test/oversize-claim.pdf',
+        fileSize: oversize,
+        contentType: 'application/pdf',
+      }),
+    });
+    expect(r.status).toBe(400);
+    const body = (await r.json()) as { error?: string };
+    expect((body.error ?? '').toLowerCase()).toContain('2 mb');
+
+    // No tracked storage_objects row should exist for this key.
+    const rowResp = await fetch(
+      `${BASE_URL}/api/__test__/storage-object-row?key=${encodeURIComponent('invoices/test/oversize-claim.pdf')}`,
+      { headers: { Cookie: cookie } }
+    ).then((r) => r.json() as Promise<{ exists: boolean }>);
+    expect(rowResp.exists).toBe(false);
+  });
+
+  test('PUT /api/storage/upload/:token aborts a 3 MB raw body with 413, no row created, token consumed', async () => {
+    // 1. Sign for a small claim so the route accepts the token.
+    const key = 'invoices/test/oversize-raw-body.pdf';
+    const signResp = await fetch(`${BASE_URL}/api/storage/sign-upload`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', Cookie: cookie },
+      body: JSON.stringify({ key, fileSize: 9, contentType: 'application/pdf' }),
+    });
+    expect(signResp.status).toBe(200);
+    const signData = (await signResp.json()) as { url: string };
+
+    // 2. Send 3 MB raw body. The streaming counter should abort the request.
+    const oversize = Buffer.alloc(3 * 1024 * 1024, 0x25); // '%' byte
+    let upStatus = 0;
+    let upError: string | undefined;
+    try {
+      const upResp = await fetch(`${BASE_URL}${signData.url}`, {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/pdf', Cookie: cookie },
+        body: oversize,
+      });
+      upStatus = upResp.status;
+      const body = (await upResp.json().catch(() => ({}))) as { error?: string };
+      upError = body.error;
+    } catch (err) {
+      // The server may close the socket before the full body is sent;
+      // a connection error is acceptable — what matters is that the upload
+      // did NOT succeed (verified via the storage_objects probe below).
+      upStatus = -1;
+    }
+    // Either we got a clean 413, or the connection was reset mid-upload.
+    expect([413, -1]).toContain(upStatus);
+    if (upStatus === 413 && upError) {
+      expect(upError.toLowerCase()).toContain('2 mb');
+    }
+
+    // 3. No storage_objects row should have been created for this key.
+    const rowResp = await fetch(
+      `${BASE_URL}/api/__test__/storage-object-row?key=${encodeURIComponent(key)}`,
+      { headers: { Cookie: cookie } }
+    ).then((r) => r.json() as Promise<{ exists: boolean }>);
+    expect(rowResp.exists).toBe(false);
+
+    // 4. The signed token should have been deleted — a follow-up PUT must 401.
+    const replay = await fetch(`${BASE_URL}${signData.url}`, {
+      method: 'PUT',
+      headers: { 'Content-Type': 'application/pdf', Cookie: cookie },
+      body: Buffer.from('%PDF-1.4\n'),
+    });
+    expect(replay.status).toBe(401);
+  });
+
+  test('upload-scan rejects a 3 MB multipart body with 413, no row created', async () => {
+    const key = 'invoices/test/oversize-scan.pdf';
+    const oversize = Buffer.alloc(3 * 1024 * 1024, 0x25);
+
+    const boundary = '----flow-test-boundary-' + Date.now();
+    const headPart =
+      `--${boundary}\r\n` +
+      `Content-Disposition: form-data; name="file"; filename="oversize.pdf"\r\n` +
+      `Content-Type: application/pdf\r\n\r\n`;
+    const tailPart = `\r\n--${boundary}--\r\n`;
+    const body = Buffer.concat([
+      Buffer.from(headPart, 'utf8'),
+      oversize,
+      Buffer.from(tailPart, 'utf8'),
+    ]);
+
+    const upResp = await fetch(`${BASE_URL}/api/storage/upload-scan`, {
+      method: 'POST',
+      headers: {
+        'Content-Type': `multipart/form-data; boundary=${boundary}`,
+        'x-storage-key': key,
+        'x-content-type': 'application/pdf',
+        'x-file-size': String(oversize.length),
+        Cookie: cookie,
+      },
+      body,
+    });
+    // Multer aborts during body parse → 413 from the global error handler.
+    expect(upResp.status).toBe(413);
+    const errBody = (await upResp.json().catch(() => ({}))) as { error?: string };
+    if (errBody.error) {
+      expect(errBody.error.toLowerCase()).toContain('2 mb');
+    }
+
+    const rowResp = await fetch(
+      `${BASE_URL}/api/__test__/storage-object-row?key=${encodeURIComponent(key)}`,
+      { headers: { Cookie: cookie } }
+    ).then((r) => r.json() as Promise<{ exists: boolean }>);
+    expect(rowResp.exists).toBe(false);
+  });
+});
