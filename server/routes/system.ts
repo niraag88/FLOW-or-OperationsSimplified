@@ -36,6 +36,18 @@ export function registerSystemRoutes(app: Express) {
       const rows = await db.select({ key: storageObjects.key }).from(storageObjects).where(eq(storageObjects.key, key)).limit(1);
       res.json({ exists: rows.length > 0 });
     });
+
+    app.get('/api/__test__/signed-token-count', requireAuth(['Admin']), async (req: AuthenticatedRequest, res) => {
+      const key = req.query.key;
+      if (typeof key !== 'string' || !key) {
+        return res.status(400).json({ error: 'key query parameter is required' });
+      }
+      const result = await pool.query(
+        'SELECT COUNT(*)::int AS count FROM signed_tokens WHERE key = $1',
+        [key]
+      );
+      res.json({ count: result.rows[0]?.count ?? 0 });
+    });
   }
 
   app.post('/api/storage/sign-upload', requireAuth(['Admin', 'Staff', 'Manager']), async (req: AuthenticatedRequest, res) => {
@@ -101,46 +113,33 @@ export function registerSystemRoutes(app: Express) {
       if (req.file) {
         fileData = req.file.buffer;
       } else {
+        // Stream the body with a hard byte cap. Once we exceed the cap we
+        // STOP accumulating chunks (memory stays bounded) but keep draining
+        // the request to end-of-stream — that way the client always gets a
+        // deterministic 413 JSON response instead of a connection reset.
         const overflow = await new Promise<{ tooLarge: boolean; data?: Buffer }>((resolve, reject) => {
           const chunks: Buffer[] = [];
           let total = 0;
-          let resolved = false;
+          let tooLarge = false;
           req.on('data', (chunk: Buffer) => {
-            if (resolved) return;
             total += chunk.length;
+            if (tooLarge) return;
             if (total > MAX_UPLOAD_BYTES) {
-              resolved = true;
-              req.pause();
-              resolve({ tooLarge: true });
+              tooLarge = true;
               return;
             }
             chunks.push(chunk);
           });
           req.on('end', () => {
-            if (resolved) return;
-            resolved = true;
-            resolve({ tooLarge: false, data: Buffer.concat(chunks) });
+            if (tooLarge) resolve({ tooLarge: true });
+            else resolve({ tooLarge: false, data: Buffer.concat(chunks) });
           });
-          req.on('error', (err) => {
-            if (resolved) return;
-            resolved = true;
-            reject(err);
-          });
+          req.on('error', (err) => reject(err));
         });
 
         if (overflow.tooLarge) {
           await pool.query('DELETE FROM signed_tokens WHERE token = $1', [token]);
-          if (!res.headersSent) {
-            res.set('Connection', 'close');
-            res.status(413).json({ error: MAX_UPLOAD_ERROR_MESSAGE });
-          }
-          // Drain any remaining body so the client sees the response cleanly,
-          // then ensure the socket is closed.
-          req.on('data', () => {});
-          req.on('end', () => req.socket?.destroy());
-          req.on('error', () => req.socket?.destroy());
-          req.resume();
-          return;
+          return res.status(413).json({ error: MAX_UPLOAD_ERROR_MESSAGE });
         }
         fileData = overflow.data!;
       }

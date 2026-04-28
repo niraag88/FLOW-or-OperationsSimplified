@@ -204,13 +204,22 @@ test.describe('Storage: 2 MB upload cap', () => {
     cookie = await apiLogin();
   });
 
-  test('sign-upload rejects fileSize > 2 MB with 400 and creates no token', async () => {
+  test('sign-upload rejects fileSize > 2 MB with 400 and creates no signed token + no storage row', async () => {
+    const key = 'invoices/test/oversize-claim.pdf';
     const oversize = 3 * 1024 * 1024;
+
+    // Baseline: no signed_tokens row exists for this key before the test.
+    const beforeTokens = await fetch(
+      `${BASE_URL}/api/__test__/signed-token-count?key=${encodeURIComponent(key)}`,
+      { headers: { Cookie: cookie } }
+    ).then((r) => r.json() as Promise<{ count: number }>);
+    expect(beforeTokens.count).toBe(0);
+
     const r = await fetch(`${BASE_URL}/api/storage/sign-upload`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json', Cookie: cookie },
       body: JSON.stringify({
-        key: 'invoices/test/oversize-claim.pdf',
+        key,
         fileSize: oversize,
         contentType: 'application/pdf',
       }),
@@ -219,9 +228,16 @@ test.describe('Storage: 2 MB upload cap', () => {
     const body = (await r.json()) as { error?: string };
     expect((body.error ?? '').toLowerCase()).toContain('2 mb');
 
-    // No tracked storage_objects row should exist for this key.
+    // No signed_tokens row was created.
+    const afterTokens = await fetch(
+      `${BASE_URL}/api/__test__/signed-token-count?key=${encodeURIComponent(key)}`,
+      { headers: { Cookie: cookie } }
+    ).then((r) => r.json() as Promise<{ count: number }>);
+    expect(afterTokens.count).toBe(0);
+
+    // No tracked storage_objects row was created.
     const rowResp = await fetch(
-      `${BASE_URL}/api/__test__/storage-object-row?key=${encodeURIComponent('invoices/test/oversize-claim.pdf')}`,
+      `${BASE_URL}/api/__test__/storage-object-row?key=${encodeURIComponent(key)}`,
       { headers: { Cookie: cookie } }
     ).then((r) => r.json() as Promise<{ exists: boolean }>);
     expect(rowResp.exists).toBe(false);
