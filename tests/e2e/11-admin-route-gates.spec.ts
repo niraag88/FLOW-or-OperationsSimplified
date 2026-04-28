@@ -196,6 +196,18 @@ test.describe('Admin route gates (Task #319)', () => {
     });
   }
 
+  test('GET /api/ops/backup-runs/:id/download → 401 anon, 403 staff, admin reaches handler (404 on unknown id)', async () => {
+    const path = '/api/ops/backup-runs/999999/download';
+    const anon = await api('GET', path, '');
+    expect(anon.status).toBe(401);
+    const staff = await api('GET', path, staffCookie);
+    expect(staff.status).toBe(403);
+    // Admin clears the gate and falls through to the not-found branch
+    // (404), proving the gate accepted admin without serving a real file.
+    const admin = await api('GET', path, adminCookie);
+    expect(admin.status).toBe(404);
+  });
+
   // ── 4. DELETE /api/storage/object: 401 anon, 403 staff (skip admin) ──────
 
   test('DELETE /api/storage/object → 401 anon, 403 staff (admin gate proven)', async () => {
