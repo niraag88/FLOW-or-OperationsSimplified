@@ -200,10 +200,27 @@ export async function updateBackupSchedule(
 }
 
 /**
- * After a scheduled run completes, record lastRunAt and advance
- * nextDueAt. Called by server/scheduler.ts.
+ * Record that a scheduled run was *attempted* (success OR failure).
+ * Always updates lastRunAt so the status panel and the stale-banner
+ * see the most recent attempt timestamp regardless of outcome.
+ * Does NOT touch nextDueAt — see recordScheduledRunSuccess for that.
  */
-export async function recordScheduledRunCompletion(runStartedAt: Date): Promise<void> {
+export async function recordScheduledRunAttempt(runStartedAt: Date): Promise<void> {
+  const [settings] = await db.select({ id: companySettings.id }).from(companySettings).limit(1);
+  if (!settings) return;
+  await db
+    .update(companySettings)
+    .set({ backupScheduleLastRunAt: runStartedAt })
+    .where(eq(companySettings.id, settings.id));
+}
+
+/**
+ * After a scheduled run *succeeds*, advance nextDueAt by one period.
+ * Called by server/scheduler.ts only on the success branch — failed
+ * runs deliberately leave nextDueAt alone so the next minute tick
+ * retries the same window.
+ */
+export async function recordScheduledRunSuccess(runStartedAt: Date): Promise<void> {
   const [settings] = await db.select().from(companySettings).limit(1);
   if (!settings || !settings.backupScheduleEnabled) return;
   const freq = settings.backupScheduleFrequency as BackupFrequency | null;
@@ -217,9 +234,6 @@ export async function recordScheduledRunCompletion(runStartedAt: Date): Promise<
   }
   await db
     .update(companySettings)
-    .set({
-      backupScheduleLastRunAt: runStartedAt,
-      backupScheduleNextDueAt: nextDueAt,
-    })
+    .set({ backupScheduleNextDueAt: nextDueAt })
     .where(eq(companySettings.id, settings.id));
 }

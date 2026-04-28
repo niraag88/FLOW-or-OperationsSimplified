@@ -10,7 +10,13 @@
  *   3. If enabled === false or nextDueAt > NOW(): releases the lock and
  *      no-ops.
  *   4. Otherwise calls runBackup() (same code path as POST
- *      /api/ops/run-backups), then advances nextDueAt by one period.
+ *      /api/ops/run-backups). The run is attributed to a synthetic
+ *      "scheduler" actor so backup_runs.triggered_by_label can be
+ *      filtered later.
+ *      - lastRunAt is updated on every attempt (success OR failure).
+ *      - nextDueAt is advanced ONLY on success. Failed attempts leave
+ *        nextDueAt at the same overdue value so the next minute tick
+ *        will retry the same window.
  *   5. Releases the advisory lock.
  *
  * If the process crashes mid-run the advisory lock is released by the
@@ -21,7 +27,7 @@
 
 import { pool } from "./db";
 import { runBackup } from "./runBackup";
-import { recordScheduledRunCompletion } from "./backupSchedule";
+import { recordScheduledRunAttempt, recordScheduledRunSuccess } from "./backupSchedule";
 
 const TICK_INTERVAL_MS = 60_000;
 // Arbitrary 64-bit key chosen for this lock. Picked to avoid colliding
@@ -41,7 +47,7 @@ export async function backupSchedulerTick(now: Date = new Date()): Promise<"ran"
   try {
     const lockRes = await client.query<{ locked: boolean }>(
       "SELECT pg_try_advisory_lock($1) AS locked",
-      [SCHEDULER_ADVISORY_LOCK_KEY.toString()]
+      [SCHEDULER_ADVISORY_LOCK_KEY]
     );
     lockAcquired = lockRes.rows[0]?.locked === true;
     if (!lockAcquired) {
@@ -75,38 +81,41 @@ export async function backupSchedulerTick(now: Date = new Date()): Promise<"ran"
 
     // Run the backup while still holding the advisory lock.
     const runStartedAt = new Date();
+    let succeeded = false;
     try {
       const result = await runBackup({ id: null, username: "scheduler" });
-      if (result.success) {
-        await recordScheduledRunCompletion(runStartedAt);
-      } else {
+      succeeded = result.success === true;
+      if (!succeeded) {
         console.error(
           "Scheduled backup failed:",
           result.errorMessage || result.dbBackup.error || result.manifestBackup.error
         );
-        // Push nextDueAt forward 5 min so we don't hammer it every tick
-        // while a transient issue persists.
-        await client.query(
-          `UPDATE company_settings
-              SET backup_schedule_next_due_at = $1
-            WHERE id = $2`,
-          [new Date(now.getTime() + 5 * 60 * 1000), row.id]
-        );
       }
     } catch (err) {
       console.error("Scheduled backup threw unexpectedly:", err);
-      await client.query(
-        `UPDATE company_settings
-            SET backup_schedule_next_due_at = $1
-          WHERE id = $2`,
-        [new Date(now.getTime() + 5 * 60 * 1000), row.id]
-      );
+    }
+
+    // Always record that an attempt was made (success or failure) so the
+    // status panel reflects the most recent activity.
+    try {
+      await recordScheduledRunAttempt(runStartedAt);
+    } catch (err) {
+      console.error("recordScheduledRunAttempt failed:", err);
+    }
+
+    // Only advance nextDueAt on success — failures retry next tick.
+    if (succeeded) {
+      try {
+        await recordScheduledRunSuccess(runStartedAt);
+      } catch (err) {
+        console.error("recordScheduledRunSuccess failed:", err);
+      }
     }
     return "ran";
   } finally {
     if (lockAcquired) {
       try {
-        await client.query("SELECT pg_advisory_unlock($1)", [SCHEDULER_ADVISORY_LOCK_KEY.toString()]);
+        await client.query("SELECT pg_advisory_unlock($1)", [SCHEDULER_ADVISORY_LOCK_KEY]);
       } catch (err) {
         // Connection-level release happens automatically anyway.
         console.error("pg_advisory_unlock failed:", err);

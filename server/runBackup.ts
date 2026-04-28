@@ -76,6 +76,7 @@ export async function runBackup(actor: BackupActor): Promise<BackupRunResult> {
       ranAt: startedAt,
       finishedAt: new Date(),
       triggeredBy: actor.id,
+      triggeredByLabel: actor.username,
       success,
       dbSuccess: dbResult?.success ?? false,
       dbFilename: dbResult?.filename || null,

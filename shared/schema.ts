@@ -1,5 +1,5 @@
 import { sql } from "drizzle-orm";
-import { pgTable, pgSchema, text, varchar, timestamp, boolean, serial, decimal, integer, bigint, date, index, jsonb } from "drizzle-orm/pg-core";
+import { pgTable, pgSchema, text, varchar, timestamp, boolean, serial, decimal, integer, bigint, date, index, jsonb, check } from "drizzle-orm/pg-core";
 import { createInsertSchema } from "drizzle-zod";
 import { z } from "zod";
 
@@ -458,7 +458,16 @@ export const companySettings = pgTable("company_settings", {
   backupScheduleAlertThresholdDays: integer("backup_schedule_alert_threshold_days").notNull().default(2),
   backupScheduleNextDueAt: timestamp("backup_schedule_next_due_at"),
   backupScheduleLastRunAt: timestamp("backup_schedule_last_run_at"),
-});
+}, (t) => ({
+  backupRetentionRangeChk: check(
+    "company_settings_backup_retention_range_chk",
+    sql`${t.backupScheduleRetentionCount} BETWEEN 1 AND 14`
+  ),
+  backupAlertRangeChk: check(
+    "company_settings_backup_alert_range_chk",
+    sql`${t.backupScheduleAlertThresholdDays} BETWEEN 1 AND 14`
+  ),
+}));
 
 // Signed URL tokens — persisted to DB so they survive restarts and work across instances
 export const signedTokens = pgTable("signed_tokens", {
@@ -798,6 +807,10 @@ export const backupRuns = pgTable("backup_runs", {
   ranAt: timestamp("ran_at").defaultNow().notNull(), // startedAt
   finishedAt: timestamp("finished_at"),              // null if still running / crashed
   triggeredBy: varchar("triggered_by").references(() => users.id),
+  // Free-form actor label so synthetic actors (e.g. "scheduler") can be
+  // recorded even when there's no user FK. Mirrors the
+  // restore_runs.triggered_by_name pattern.
+  triggeredByLabel: text("triggered_by_label"),
   success: boolean("success").notNull().default(false), // true only when BOTH db + manifest succeeded
   dbSuccess: boolean("db_success").notNull(),
   dbFilename: text("db_filename"),
