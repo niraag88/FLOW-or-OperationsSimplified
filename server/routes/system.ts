@@ -9,6 +9,8 @@ import { createWriteStream, createReadStream, unlink } from 'fs';
 import { tmpdir } from 'os';
 import ExcelJS from 'exceljs';
 import { requireAuth, requireRole, writeAuditLog, objectStorageClient, validateUploadInput, validatePdfMagicBytes, validateImageMagicBytes, upload, setForceStorageDeleteFail, isForceStorageDeleteFailEnabled, MAX_UPLOAD_BYTES, MAX_UPLOAD_ERROR_MESSAGE, type AuthenticatedRequest } from "../middleware";
+import { runBackup } from "../runBackup";
+import { getBackupSchedule, updateBackupSchedule, computeNextDueAt, BackupScheduleInputSchema } from "../backupSchedule";
 import crypto from 'crypto';
 
 export function registerSystemRoutes(app: Express) {
@@ -606,64 +608,58 @@ export function registerSystemRoutes(app: Express) {
   });
 
   app.post('/api/ops/run-backups', requireAuth(['Admin']), async (req: AuthenticatedRequest, res) => {
-    const startedAt = new Date();
-    let dbResult: any = null;
-    let manifestResult: any = null;
-
-    const recordRun = async (overrideError?: string) => {
-      const success = !!(dbResult?.success && manifestResult?.success);
-      try {
-        await db.insert(backupRuns).values({
-          ranAt: startedAt,
-          finishedAt: new Date(),
-          triggeredBy: req.user!.id,
-          success,
-          dbSuccess: dbResult?.success ?? false,
-          dbFilename: dbResult?.filename || null,
-          dbStorageKey: dbResult?.storageKey || null,
-          dbFileSize: dbResult?.fileSize || null,
-          manifestSuccess: manifestResult?.success ?? false,
-          manifestFilename: manifestResult?.filename || null,
-          manifestStorageKey: manifestResult?.storageKey || null,
-          manifestTotalObjects: manifestResult?.totalObjects || null,
-          manifestTotalSizeBytes: manifestResult?.totalSize || null,
-          errorMessage: overrideError || (!success ? [dbResult?.error, manifestResult?.error].filter(Boolean).join('; ') : null),
-        });
-      } catch (dbErr) {
-        console.error('Failed to record backup run:', dbErr);
-      }
-    };
-
     try {
-      // @ts-ignore
-      const { uploadBackup } = await import('../../scripts/uploadBackup.js');
-      // @ts-ignore
-      const { writeManifest } = await import('../../scripts/writeManifest.js');
-
-      [dbResult, manifestResult] = await Promise.all([uploadBackup(), writeManifest()]);
-      const success = dbResult.success && manifestResult.success;
-
-      await recordRun();
-      writeAuditLog({ actor: req.user!.id, actorName: req.user?.username || String(req.user!.id), targetId: 'backup', targetType: 'backup_run', action: 'CREATE', details: `Manual backup ${success ? 'succeeded' : 'failed'}` });
-
-      const response = {
-        success,
-        timestamp: new Date().toISOString(),
-        dbBackup: { success: dbResult.success, filename: dbResult.filename, storageKey: dbResult.storageKey, fileSize: dbResult.fileSize, error: dbResult.error },
-        manifestBackup: { success: manifestResult.success, filename: manifestResult.filename, storageKey: manifestResult.storageKey, totalObjects: manifestResult.totalObjects, totalSize: manifestResult.totalSize, error: manifestResult.error }
-      };
-
-      if (success) {
-        res.status(200).json(response);
+      const result = await runBackup({
+        id: req.user!.id,
+        username: req.user?.username || String(req.user!.id),
+      });
+      if (result.success) {
+        res.status(200).json(result);
       } else {
-        console.error('Backup failed:', { dbResult, manifestResult });
-        res.status(500).json(response);
+        console.error('Backup failed:', { db: result.dbBackup, manifest: result.manifestBackup, err: result.errorMessage });
+        res.status(500).json(result);
       }
     } catch (error) {
       console.error('Error running backups:', error);
       const errMsg = error instanceof Error ? error.message : 'Unknown error';
-      await recordRun(errMsg);
       res.status(500).json({ success: false, error: errMsg, timestamp: new Date().toISOString() });
+    }
+  });
+
+  app.get('/api/ops/backup-schedule', requireAuth(['Admin']), async (req: AuthenticatedRequest, res) => {
+    try {
+      const schedule = await getBackupSchedule();
+      res.json(schedule);
+    } catch (error) {
+      console.error('Error fetching backup schedule:', error);
+      res.status(500).json({ error: 'Failed to fetch backup schedule' });
+    }
+  });
+
+  app.put('/api/ops/backup-schedule', requireAuth(['Admin']), async (req: AuthenticatedRequest, res) => {
+    try {
+      const parsed = BackupScheduleInputSchema.safeParse(req.body);
+      if (!parsed.success) {
+        const firstIssue = parsed.error.issues[0];
+        return res.status(400).json({
+          error: firstIssue?.message || 'Invalid backup schedule input',
+          field: firstIssue?.path.join('.') || null,
+          issues: parsed.error.issues,
+        });
+      }
+      const updated = await updateBackupSchedule(parsed.data, req.user!.id);
+      writeAuditLog({
+        actor: req.user!.id,
+        actorName: req.user?.username || String(req.user!.id),
+        targetId: 'company',
+        targetType: 'backup_schedule',
+        action: 'UPDATE',
+        details: `Backup schedule ${parsed.data.enabled ? `enabled (${parsed.data.frequency} at ${parsed.data.timeOfDay} Asia/Dubai, retain ${parsed.data.retentionCount}, alert ${parsed.data.alertThresholdDays}d)` : 'disabled'}`,
+      });
+      res.json(updated);
+    } catch (error) {
+      console.error('Error updating backup schedule:', error);
+      res.status(500).json({ error: 'Failed to update backup schedule' });
     }
   });
 

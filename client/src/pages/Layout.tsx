@@ -3,6 +3,7 @@ import React, { useState } from "react";
 import { Link, useLocation, useNavigate } from "react-router-dom";
 import { createPageUrl } from "@/utils";
 import { useAuth } from "@/hooks/useAuth";
+import StaleBackupBanner from "@/components/StaleBackupBanner";
 import { 
   LayoutDashboard, 
   Package, 
@@ -348,6 +349,7 @@ export default function Layout({ children, currentPageName = "" }: LayoutProps) 
       </header>
 
       <main className="flex-1">
+        <StaleBackupBanner />
         <div className="bg-white shadow-sm border-b border-gray-200">
           <div className="px-3 sm:px-4 lg:px-8 py-4">
             <h2 className="text-xl sm:text-2xl font-bold text-gray-900 tracking-tight truncate">

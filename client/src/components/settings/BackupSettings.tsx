@@ -11,6 +11,7 @@ import { useToast } from "@/hooks/use-toast";
 import { apiRequest } from "@/lib/queryClient";
 import { format } from "date-fns";
 import { useState, useRef, useEffect } from "react";
+import ScheduledBackupCard from "./ScheduledBackupCard";
 
 function formatBytes(bytes: any) {
   if (!bytes) return "—";
@@ -358,6 +359,8 @@ export default function BackupSettings() {
 
   return (
     <>
+      <ScheduledBackupCard />
+
       <Card className="border-0 shadow-lg">
         <CardHeader>
           <CardTitle className="flex items-center gap-2">

@@ -20,6 +20,7 @@ import { initializeAdminUser } from "./adminInit";
 import { setupVite, serveStatic, log } from "./vite";
 import { MAX_UPLOAD_ERROR_MESSAGE } from "./middleware";
 import { pool } from "./db";
+import { startBackupScheduler } from "./scheduler";
 
 const app = express();
 app.use(helmet({
@@ -108,4 +109,5 @@ server.listen({
   reusePort: true,
 }, () => {
   log(`serving on port ${port}`);
+  startBackupScheduler();
 });

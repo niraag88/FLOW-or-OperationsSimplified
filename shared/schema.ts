@@ -451,6 +451,13 @@ export const companySettings = pgTable("company_settings", {
   retentionExportsDays: integer("retention_exports_days").default(60),
   retentionAuditLogsDays: integer("retention_audit_logs_days").default(730),
   retentionColdStorageDays: integer("retention_cold_storage_days").default(30),
+  backupScheduleEnabled: boolean("backup_schedule_enabled").notNull().default(false),
+  backupScheduleFrequency: text("backup_schedule_frequency").$type<'daily' | 'every_2_days' | 'weekly'>(),
+  backupScheduleTimeOfDay: text("backup_schedule_time_of_day"),
+  backupScheduleRetentionCount: integer("backup_schedule_retention_count").notNull().default(7),
+  backupScheduleAlertThresholdDays: integer("backup_schedule_alert_threshold_days").notNull().default(2),
+  backupScheduleNextDueAt: timestamp("backup_schedule_next_due_at"),
+  backupScheduleLastRunAt: timestamp("backup_schedule_last_run_at"),
 });
 
 // Signed URL tokens — persisted to DB so they survive restarts and work across instances
