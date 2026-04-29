@@ -22,7 +22,6 @@ interface StockTabProps {
 export default function StockTab({ products, loading, onStockSubTabChange }: StockTabProps) {
   const [stockData, setStockData] = useState<StockData | null>(null);
   const [stockMovements, setStockMovements] = useState<StockMovement[]>([]);
-  const [loadingStock, setLoadingStock] = useState(true);
   const [loadingMovements, setLoadingMovements] = useState(true);
   const [companySettings, setCompanySettings] = useState<CompanySettings | null>(null);
   const [activeStockTab, setActiveStockTab] = useState("stock-levels");
@@ -92,7 +91,6 @@ export default function StockTab({ products, loading, onStockSubTabChange }: Sto
   // is already in AED. All three rates are stored here for any future client-side cost display.
 
   const loadStockData = async (threshold: number) => {
-    setLoadingStock(true);
     try {
       const lowStockThreshold = threshold || companySettings?.lowStockThreshold || 6;
       const response = await fetch(`/api/products/stock-analysis?threshold=${lowStockThreshold}`, { credentials: 'include' });
@@ -102,8 +100,6 @@ export default function StockTab({ products, loading, onStockSubTabChange }: Sto
     } catch (error: unknown) {
       console.error("Error loading stock data:", error);
       setStockData(null);
-    } finally {
-      setLoadingStock(false);
     }
   };
 
@@ -231,9 +227,6 @@ export default function StockTab({ products, loading, onStockSubTabChange }: Sto
       </div>
     );
   }
-
-  // loadingStock is referenced to avoid unused-variable lint while keeping the state for future use
-  void loadingStock;
 
   return (
     <div className="space-y-6">
