@@ -73,12 +73,18 @@ export function computePurchaseOrderTotals(
           error: "Quantity cannot be negative",
         });
       }
+      // Quantity column is integer-typed; a fractional value would
+      // crash at insert time today. Reject up front with a clear 400.
+      if (qty !== null && !Number.isInteger(qty)) {
+        throw new PurchaseOrderRequestError(400, {
+          error: "Quantity must be a whole number",
+        });
+      }
 
       // Validate unitPrice on every line where the caller actually
       // supplied one, even if the line will later be skipped for a
-      // missing productId or non-positive qty. A non-numeric or
-      // negative price must reject the whole request, not be hidden
-      // behind a silent skip.
+      // missing productId or zero qty. A non-numeric or negative price
+      // must reject the whole request, not be hidden behind a silent skip.
       if (unitPriceWasProvided(raw?.unitPrice)) {
         const probe = coerceFiniteNumber(raw?.unitPrice);
         if (probe === null) {
@@ -93,15 +99,9 @@ export function computePurchaseOrderTotals(
         }
       }
 
-      // Lines without a productId or with quantity <= 0 / non-integer
-      // are silently skipped — same as today's `if (productId && qty > 0)`
-      // filter that previously sat in the route.
-      if (
-        !raw?.productId ||
-        qty === null ||
-        qty <= 0 ||
-        !Number.isInteger(qty)
-      ) {
+      // Lines without a productId or with quantity <= 0 are silently
+      // skipped — same as today's `if (productId && qty > 0)` filter.
+      if (!raw?.productId || qty === null || qty <= 0) {
         continue;
       }
 

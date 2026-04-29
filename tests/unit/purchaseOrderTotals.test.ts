@@ -116,13 +116,12 @@ test("rejects truly non-numeric unit price (parseFloat returns NaN)", () => {
 });
 
 test("rejects invalid unitPrice on a would-be-skipped line — invalidates the whole request", () => {
-  // Even when a line would normally be silently skipped (no productId,
-  // qty=0, or non-integer qty), an invalid unitPrice on that line must
-  // still abort the entire request rather than slip through.
+  // Even when a line would normally be silently skipped (no productId
+  // or qty=0), an invalid unitPrice on that line must still abort the
+  // entire request rather than slip through.
   for (const skippedLine of [
     { quantity: 1, unitPrice: "abc" },               // missing productId
     { productId: 1, quantity: 0, unitPrice: "abc" }, // zero qty
-    { productId: 1, quantity: 1.5, unitPrice: "abc" }, // non-integer qty
   ]) {
     assert.throws(
       () =>
@@ -198,12 +197,11 @@ test("preserves prior parseFloat() coercion semantics for fxRate edge cases", ()
   assert.equal(r2.grandTotalStr, (10 * PO_DEFAULT_FX_RATE_TO_AED).toFixed(2));
 });
 
-test("silently skips lines without productId, with zero qty, or non-integer qty", () => {
+test("silently skips lines without productId or with zero qty", () => {
   const result = computePurchaseOrderTotals(
     [
       { productId: null, quantity: 5, unitPrice: 10 },
       { productId: 1, quantity: 0, unitPrice: 10 },
-      { productId: 2, quantity: 1.5, unitPrice: 10 },
       { productId: 3, quantity: 2, unitPrice: 50 }, // only this one survives
     ],
     "AED",
@@ -212,6 +210,26 @@ test("silently skips lines without productId, with zero qty, or non-integer qty"
   assert.equal(result.items.length, 1);
   assert.equal(result.items[0].productId, 3);
   assert.equal(result.totalAmountStr, "100.00");
+});
+
+test("rejects non-integer quantity with a clear 400 — the quantity column is integer-typed", () => {
+  for (const badQty of [1.5, "2.5", 0.1]) {
+    assert.throws(
+      () =>
+        computePurchaseOrderTotals(
+          [{ productId: 1, quantity: badQty, unitPrice: 10 }],
+          "AED",
+          null,
+        ),
+      (err: unknown) => {
+        assert.ok(err instanceof PurchaseOrderRequestError);
+        assert.equal(err.statusCode, 400);
+        assert.equal(err.responseBody.error, "Quantity must be a whole number");
+        return true;
+      },
+      `quantity=${JSON.stringify(badQty)} should be rejected`,
+    );
+  }
 });
 
 test("empty / missing items array returns zero totals", () => {
