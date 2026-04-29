@@ -13,12 +13,19 @@ const objectStorageClient = new Client({
 });
 
 async function uploadBackup() {
+  // tempPath is assigned only AFTER pg_dump has been spawned and the write
+  // stream has been opened, so the finally block at the bottom of the
+  // function can distinguish "no file ever created" (tempPath === null,
+  // nothing to clean up) from "file created and may need cleanup" (tempPath
+  // is a string). Declared with let at function scope so catch/finally can
+  // see it.
+  let tempPath = null;
+
   try {
     const now = new Date();
     const dateStr = now.toISOString().split('T')[0].replace(/-/g, '');
     const timeStr = now.toISOString().split('T')[1].substring(0, 8).replace(/:/g, '');
     const filename = `db-${dateStr}-${timeStr}.sql.gz`;
-    const tempPath = `/tmp/${filename}`;
     const storageKey = `backups/db/${filename}`;
 
     console.log(`Starting database backup: ${filename}`);
@@ -45,8 +52,11 @@ async function uploadBackup() {
 
     const gzip = createGzip();
 
-    // Create write stream to temp file
+    // Create write stream to temp file. pg_dump has been spawned; once we
+    // open the write stream we own the temp file and the finally block must
+    // be able to clean it up if anything below throws.
     const fs = await import('fs');
+    tempPath = `/tmp/${filename}`;
     const writeStream = fs.createWriteStream(tempPath);
 
     // Register the close listener BEFORE the pipeline starts so we cannot
@@ -79,15 +89,12 @@ async function uploadBackup() {
 
     // Upload to object storage
     const uploadResult = await objectStorageClient.uploadFromFilename(storageKey, tempPath);
-    
+
     if (!uploadResult.ok) {
       throw new Error(`Failed to upload backup: ${uploadResult.error}`);
     }
 
     console.log(`Backup uploaded to: ${storageKey} (${fileSize} bytes)`);
-
-    // Clean up temp file
-    await fs.promises.unlink(tempPath);
     console.log('Database backup completed successfully');
 
     return {
@@ -105,6 +112,30 @@ async function uploadBackup() {
       error: error.message,
       timestamp: new Date().toISOString()
     };
+  } finally {
+    // Best-effort cleanup of the temp dump file. Runs on BOTH success and
+    // failure so a failed upload (or any post-spawn error) cannot leave a
+    // /tmp/db-*.sql.gz behind to fill the disk on retries.
+    //  - If tempPath is null, pg_dump never reached the point where the
+    //    write stream was opened — nothing to remove.
+    //  - ENOENT means the file was never written or already removed; treat
+    //    as success and stay silent.
+    //  - Any other unlink error is logged but does NOT mutate the
+    //    function's return value: the original backup error (if any) must
+    //    remain the visible failure to the caller.
+    if (tempPath) {
+      try {
+        const fs = await import('fs');
+        await fs.promises.unlink(tempPath);
+      } catch (cleanupErr) {
+        if (cleanupErr && cleanupErr.code !== 'ENOENT') {
+          console.error(
+            `Failed to clean up temp backup file ${tempPath}:`,
+            cleanupErr
+          );
+        }
+      }
+    }
   }
 }
 
