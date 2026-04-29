@@ -13,6 +13,7 @@
 import { test, expect } from '@playwright/test';
 import { BASE_URL, apiLogin, apiPost, browserLogin, loadState, saveState } from './audit-helpers';
 import { gateFactoryResetTests } from '../factory-reset-gate';
+import { RECYCLE_BIN_PERMANENT_DELETE_PHRASE } from '../../../shared/destructiveActionPhrases';
 
 interface AuditLogEntry { action: string; }
 interface PurchaseOrderResponse { id: number; status: string; poNumber?: string; }
@@ -222,9 +223,12 @@ test.describe('Phase 10 — Audit Log & Recycle Bin', () => {
     test.info().annotations.push({ type: 'result', description: `PO-${permDeletePoId} in recycle bin: ${!!permEntry}` });
     expect(permEntry).toBeTruthy();
 
+    // Task #337 typed-confirmation guard: must include the phrase in
+    // the JSON body, otherwise the server returns 400.
     const delResp = await fetch(`${BASE_URL}/api/recycle-bin/${permEntry!.id}`, {
       method: 'DELETE',
-      headers: { Cookie: cookie },
+      headers: { Cookie: cookie, 'Content-Type': 'application/json' },
+      body: JSON.stringify({ confirmation: RECYCLE_BIN_PERMANENT_DELETE_PHRASE }),
     });
     test.info().annotations.push({ type: 'result', description: `DELETE /api/recycle-bin/${permEntry!.id} → HTTP ${delResp.status}` });
     expect([200, 204]).toContain(delResp.status);

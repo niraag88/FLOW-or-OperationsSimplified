@@ -6,6 +6,8 @@ import { Label } from "@/components/ui/label";
 import { Save, Trash, Clock } from "lucide-react";
 import { logAuditAction } from "../utils/auditLogger";
 import { useToast } from "@/hooks/use-toast";
+import TypedConfirmDialog from "../common/TypedConfirmDialog";
+import { RETENTION_PURGE_PHRASE } from "@shared/destructiveActionPhrases";
 
 interface RetentionSettingsProps {
   currentUser?: { email?: string; role?: string } | null;
@@ -20,6 +22,12 @@ const initialSettings = {
 export default function RetentionSettings({ currentUser }: RetentionSettingsProps) {
   const [settings, setSettings] = useState(initialSettings);
   const [loading, setLoading] = useState(false);
+  // Typed-phrase confirmation gate (Task #337). The "Run now" button only
+  // opens this dialog; the actual purge runs after the admin types the
+  // confirmation phrase. The scheduled background retention job is
+  // unaffected because it does not go through this HTTP endpoint.
+  const [showPurgeConfirm, setShowPurgeConfirm] = useState(false);
+  const [purgePending, setPurgePending] = useState(false);
   const { toast } = useToast();
 
   useEffect(() => {
@@ -65,25 +73,31 @@ export default function RetentionSettings({ currentUser }: RetentionSettingsProp
     }
   };
 
-  const handleRunRetention = async () => {
-    setLoading(true);
+  const handleRunRetention = async (typedPhrase: string) => {
+    setPurgePending(true);
     try {
       const response = await fetch('/api/settings/retention/purge', {
         method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
         credentials: 'include',
+        body: JSON.stringify({ confirmation: typedPhrase }),
       });
-      if (!response.ok) throw new Error('Purge failed');
+      if (!response.ok) {
+        const body = await response.json().catch(() => ({}));
+        throw new Error(body.message || body.error || 'Purge failed');
+      }
       const result = await response.json();
       await logAuditAction("StorageSettings", "singleton", "manual_retention_run", currentUser?.email, { auditLogsDeleted: result.auditLogsDeleted, storageFilesDeleted: result.storageFilesDeleted });
       toast({
         title: "Retention purge complete",
         description: `Removed ${result.auditLogsDeleted} audit log records (>${result.auditLogRetentionDays}d) and ${result.storageFilesDeleted} export files (>${result.exportRetentionDays}d).`,
       });
+      setShowPurgeConfirm(false);
     } catch (error: any) {
       console.error("Error running retention purge:", error);
-      toast({ title: "Purge failed", variant: "destructive" });
+      toast({ title: "Purge failed", description: error?.message, variant: "destructive" });
     } finally {
-      setLoading(false);
+      setPurgePending(false);
     }
   };
 
@@ -131,7 +145,12 @@ export default function RetentionSettings({ currentUser }: RetentionSettingsProp
           </div>
         </div>
         <div>
-          <Button onClick={handleRunRetention} variant="destructive" disabled={loading}>
+          <Button
+            onClick={() => setShowPurgeConfirm(true)}
+            variant="destructive"
+            disabled={loading || purgePending}
+            data-testid="button-retention-purge-open"
+          >
             <Trash className="w-4 h-4 mr-2"/>
             Run Retention & Purge Now
           </Button>
@@ -145,6 +164,40 @@ export default function RetentionSettings({ currentUser }: RetentionSettingsProp
           </Button>
         </div>
       </CardFooter>
+
+      {/*
+        Typed-phrase confirmation gate (Task #337). The destructive
+        button enables only after the admin types RETENTION_PURGE_PHRASE
+        verbatim. The same phrase is forwarded to the server, which
+        also rejects the request without it.
+      */}
+      <TypedConfirmDialog
+        open={showPurgeConfirm}
+        onClose={() => {
+          if (!purgePending) setShowPurgeConfirm(false);
+        }}
+        onConfirm={handleRunRetention}
+        title="Run Retention Purge"
+        description={
+          <>
+            <p>
+              This will <strong>permanently delete</strong> audit-log rows
+              older than {settings.retention_audit_logs_days} days and
+              export files older than {settings.retention_exports_days}{' '}
+              days.
+            </p>
+            <p className="text-red-700 font-semibold">
+              This cannot be undone — purged records and files will not be
+              recoverable.
+            </p>
+          </>
+        }
+        phrase={RETENTION_PURGE_PHRASE}
+        confirmLabel="Run Purge"
+        isPending={purgePending}
+        inputTestId="input-retention-purge-confirm"
+        confirmTestId="button-retention-purge-confirm"
+      />
     </Card>
   );
 }

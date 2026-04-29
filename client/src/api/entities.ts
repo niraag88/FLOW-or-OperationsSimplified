@@ -135,6 +135,14 @@ export const CompanySettings = {
 
 interface RecycleBinEntity extends ApiEntity {
   restore(id: number | string): Promise<unknown>;
+  /**
+   * Permanently delete a recycle-bin row. The server requires a typed
+   * confirmation phrase from `shared/destructiveActionPhrases.ts`
+   * (RECYCLE_BIN_PERMANENT_DELETE_PHRASE) — see Task #337. Single-item,
+   * bulk, and "Clear All" UI flows all reuse this method, sending the
+   * SAME phrase the user typed once into the typed-confirmation dialog.
+   */
+  deletePermanent(id: number | string, confirmation: string): Promise<unknown>;
 }
 
 const _recycleBinEntity = new ApiEntity('recycle-bin') as RecycleBinEntity;
@@ -145,6 +153,26 @@ _recycleBinEntity.restore = async function(id: number | string): Promise<unknown
     credentials: 'include',
   });
   if (!response.ok) throw new Error('Failed to restore document');
+  return await response.json() as unknown;
+};
+_recycleBinEntity.deletePermanent = async function(
+  id: number | string,
+  confirmation: string,
+): Promise<unknown> {
+  const response = await fetch(`/api/recycle-bin/${id}`, {
+    method: 'DELETE',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ confirmation }),
+    credentials: 'include',
+  });
+  if (!response.ok) {
+    const body = await response.json().catch(() => ({})) as EntityData;
+    throw new Error(
+      (body.message as string) ||
+        (body.error as string) ||
+        'Failed to permanently delete document',
+    );
+  }
   return await response.json() as unknown;
 };
 export const RecycleBin = _recycleBinEntity;

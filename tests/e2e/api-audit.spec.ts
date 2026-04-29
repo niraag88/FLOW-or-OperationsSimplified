@@ -9,6 +9,7 @@
  */
 
 import { test, expect } from '@playwright/test';
+import { USER_DELETE_PHRASE } from '../../shared/destructiveActionPhrases';
 
 const BASE_URL = 'http://localhost:5000';
 
@@ -218,7 +219,7 @@ test.describe('Users', () => {
     const existingList = ((listData as { users?: Array<{ id: string; username: string }> })?.users) ?? [];
     const existing = existingList.find(u => u.username === 'viewer_audit_test');
     if (existing) {
-      await api('DELETE', `/api/users/${existing.id}`, adminCookie);
+      await api('DELETE', `/api/users/${existing.id}`, adminCookie, { confirmation: USER_DELETE_PHRASE });
     }
 
     const { status, data } = await api('POST', '/api/users', adminCookie, {
@@ -292,16 +293,26 @@ test.describe('Users', () => {
   });
 
   test('DELETE /api/users/:id self-delete → 400', async () => {
+    // Sends the typed-confirmation phrase (Task #337) so the request
+    // passes the typed-confirmation guard and reaches the original
+    // self-delete check, which is what this test asserts.
     const meResp = await api('GET', '/api/auth/me', adminCookie);
     const adminId = ((meResp.data as { user?: { id: string } })?.user)?.id;
     if (!adminId) return;
-    const { status } = await api('DELETE', `/api/users/${adminId}`, adminCookie);
+    const { status } = await api('DELETE', `/api/users/${adminId}`, adminCookie, { confirmation: USER_DELETE_PHRASE });
     expect(status).toBe(400);
   });
 
   test('DELETE /api/users/:id non-existent ID → 404', async () => {
-    const { status } = await api('DELETE', '/api/users/00000000-0000-0000-0000-000000000000', adminCookie);
+    const { status } = await api('DELETE', '/api/users/00000000-0000-0000-0000-000000000000', adminCookie, { confirmation: USER_DELETE_PHRASE });
     expect(status).toBe(404);
+  });
+
+  test('DELETE /api/users/:id without confirmation phrase → 400 user_delete_confirmation_required', async () => {
+    // Task #337 guard: typed-confirmation must be present in body.
+    const { status, data } = await api('DELETE', '/api/users/00000000-0000-0000-0000-000000000000', adminCookie);
+    expect(status).toBe(400);
+    expect((data as { error?: string }).error).toBe('user_delete_confirmation_required');
   });
 });
 
@@ -3157,7 +3168,7 @@ test.describe('Cleanup', () => {
       if (viewer) IDs.viewerUserId = viewer.id;
     }
     if (!IDs.viewerUserId) return;
-    const { status } = await api('DELETE', `/api/users/${IDs.viewerUserId}`, adminCookie);
+    const { status } = await api('DELETE', `/api/users/${IDs.viewerUserId}`, adminCookie, { confirmation: USER_DELETE_PHRASE });
     expect([200, 404]).toContain(status);
   });
 

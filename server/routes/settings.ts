@@ -4,6 +4,11 @@ import { db } from "../db";
 import { eq, lt, sql } from "drizzle-orm";
 import { requireAuth, requireRole, hashPassword, writeAuditLog, objectStorageClient, type AuthenticatedRequest } from "../middleware";
 import { businessStorage } from "../businessStorage";
+import { sendIfMissingConfirmation } from "../typedConfirmation";
+import {
+  USER_DELETE_PHRASE,
+  RETENTION_PURGE_PHRASE,
+} from "../../shared/destructiveActionPhrases";
 
 export function registerSettingsRoutes(app: Express) {
   app.get('/api/company-settings', requireAuth(), async (req: AuthenticatedRequest, res) => {
@@ -61,7 +66,24 @@ export function registerSettingsRoutes(app: Express) {
     }
   });
 
+  /**
+   * POST /api/settings/retention/purge — runs the retention policy now.
+   * Permanently deletes audit-log rows older than the configured retention
+   * window AND old `exports/` storage objects. The scheduled background
+   * job calls the same logic without going through HTTP, so it is
+   * unaffected by this guard. Typed-phrase guard from Task #337 protects
+   * only the manual "Run now" button. See
+   * `shared/destructiveActionPhrases.ts` for the exact phrase.
+   */
   app.post('/api/settings/retention/purge', requireAuth(['Admin']), async (req: AuthenticatedRequest, res) => {
+    if (!sendIfMissingConfirmation(
+      res,
+      req.body,
+      RETENTION_PURGE_PHRASE,
+      'retention_purge_confirmation_required',
+      'Retention purge',
+    )) return;
+
     try {
       const settings = await businessStorage.getCompanySettings();
       const auditLogRetentionDays = settings?.retentionAuditLogsDays ?? 730;
@@ -229,7 +251,24 @@ export function registerSettingsRoutes(app: Express) {
     }
   });
 
+  /**
+   * DELETE /api/users/:id — Admin user-account delete. There is no recycle
+   * bin for user accounts, so the typed-phrase guard from Task #337 is
+   * mandatory: the request body must include
+   *   { confirmation: USER_DELETE_PHRASE }
+   * The check runs BEFORE the self-delete check so a bare DELETE never
+   * reaches the database. The expected phrase is never echoed back in
+   * the error response.
+   */
   app.delete('/api/users/:id', requireRole('Admin'), async (req: AuthenticatedRequest, res) => {
+    if (!sendIfMissingConfirmation(
+      res,
+      req.body,
+      USER_DELETE_PHRASE,
+      'user_delete_confirmation_required',
+      'Delete user account',
+    )) return;
+
     try {
       const userId = req.params.id;
 

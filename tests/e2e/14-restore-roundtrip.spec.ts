@@ -42,6 +42,7 @@ import { pipeline } from 'node:stream/promises';
 
 import { apiLogin, apiPost, BASE_URL } from './helpers';
 import { gateFactoryResetTests, FACTORY_RESET_CONFIRMATION_PHRASE } from './factory-reset-gate';
+import { RESTORE_PHRASE } from '../../shared/destructiveActionPhrases';
 // Single source of truth for the wipe list. Importing from server/factoryReset
 // is safe because that file only re-exports the phrase from shared/ and a few
 // types from `pg` — no DB connections, no env reads, no Express side effects.
@@ -415,6 +416,11 @@ test.describe('Restore round-trip (seed → backup → reset → restore)', () =
     const buf = readFileSync(backupFilePath);
     const blob = new Blob([buf], { type: 'application/gzip' });
     const fd = new FormData();
+    // Task #337 typed-confirmation guard for restore-upload. The
+    // server's busboy `field` listener captures `confirmation` before
+    // runRestore() is called. Append the field BEFORE the file so the
+    // phrase is parsed in time even if buffering is disabled.
+    fd.append('confirmation', RESTORE_PHRASE);
     fd.append('file', blob, `backup-${backupRunId}.sql.gz`);
 
     const r = await fetch(`${BASE_URL}/api/ops/restore-upload`, {

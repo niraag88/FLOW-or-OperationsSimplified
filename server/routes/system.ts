@@ -6,6 +6,11 @@ import {
   FACTORY_RESET_CONFIRMATION_PHRASE,
   FactoryResetConfirmationError,
 } from "../factoryReset";
+import { sendIfMissingConfirmation } from "../typedConfirmation";
+import {
+  RECYCLE_BIN_PERMANENT_DELETE_PHRASE,
+  RESTORE_PHRASE,
+} from "../../shared/destructiveActionPhrases";
 import { eq, desc, sum, inArray } from "drizzle-orm";
 import { Readable } from 'stream';
 import { execSync } from 'child_process';
@@ -471,7 +476,25 @@ export function registerSystemRoutes(app: Express) {
   // recycle-bin payloads from a client would let any logged-in user inject
   // bogus recovery rows referencing documents they never owned (Task #319).
 
+  /**
+   * DELETE /api/recycle-bin/:id — permanently remove a single recycle-bin
+   * row. Used by single-item, bulk-selected, and "Clear All" UI flows
+   * (each loops over this endpoint). Once this row is gone the original
+   * document cannot be restored, so the typed-phrase guard from Task #337
+   * is mandatory: the request body must include
+   *   { confirmation: RECYCLE_BIN_PERMANENT_DELETE_PHRASE }
+   * or the helper returns 400 BEFORE the DELETE is issued. The expected
+   * phrase is never echoed back in the error response.
+   */
   app.delete('/api/recycle-bin/:id', requireAuth(['Admin', 'Manager']), async (req: AuthenticatedRequest, res) => {
+    if (!sendIfMissingConfirmation(
+      res,
+      req.body,
+      RECYCLE_BIN_PERMANENT_DELETE_PHRASE,
+      'recycle_bin_permanent_delete_confirmation_required',
+      'Permanently delete from recycle bin',
+    )) return;
+
     try {
       const id = parseInt(req.params.id);
       const [rbItem] = await db.select({ documentType: recycleBin.documentType, documentNumber: recycleBin.documentNumber }).from(recycleBin).where(eq(recycleBin.id, id));
@@ -872,8 +895,25 @@ export function registerSystemRoutes(app: Express) {
     }
   }
 
-  /** POST /api/ops/backup-runs/:id/restore — restore from a stored cloud backup */
+  /**
+   * POST /api/ops/backup-runs/:id/restore — restore from a stored cloud backup.
+   *
+   * Typed-phrase guard (Task #337): the body MUST include
+   *   { confirmation: RESTORE_PHRASE }
+   * — replacing the entire current database with the contents of the
+   * backup file is irreversible. The check runs BEFORE the schema lookup
+   * so a bare POST never reaches the destructive `runRestore()` helper.
+   * The expected phrase is never echoed back in the error response.
+   */
   app.post('/api/ops/backup-runs/:id/restore', requireAuth(['Admin']), async (req: AuthenticatedRequest, res) => {
+    if (!sendIfMissingConfirmation(
+      res,
+      req.body,
+      RESTORE_PHRASE,
+      'restore_confirmation_required',
+      'Emergency restore from cloud backup',
+    )) return;
+
     const runId = parseInt(req.params.id, 10);
     if (isNaN(runId)) return res.status(400).json({ error: 'Invalid backup run ID' });
 
@@ -907,10 +947,17 @@ export function registerSystemRoutes(app: Express) {
    * where a truncated oversized file could start a restore.
    *
    * Flow:
-   *   1. bb.on('file'): pipe fileStream → temp file; track hitSizeLimit flag
-   *   2. bb.on('finish'): await writePromise (disk flush confirmed), then
-   *      check hitSizeLimit → 413, or call runRestore from createReadStream
-   *   3. cleanupTemp() is called in all exit paths including bb.on('error')
+   *   1. bb.on('field'): collect the `confirmation` typed-phrase field
+   *   2. bb.on('file'): pipe fileStream → temp file; track hitSizeLimit flag
+   *   3. bb.on('finish'): verify the confirmation phrase from Task #337
+   *      BEFORE invoking runRestore — a missing/wrong phrase always
+   *      returns 400 and the buffered file is cleaned up. Only after
+   *      the phrase passes does the destructive replay start.
+   *   4. cleanupTemp() is called in all exit paths including bb.on('error')
+   *
+   * Typed-phrase guard (Task #337): the multipart payload MUST include a
+   * text field `confirmation` whose value equals RESTORE_PHRASE. The
+   * expected phrase is never echoed back in the error response.
    */
   app.post('/api/ops/restore-upload', requireAuth(['Admin']), async (req: AuthenticatedRequest, res) => {
     const contentType = req.headers['content-type'] || '';
@@ -929,6 +976,11 @@ export function registerSystemRoutes(app: Express) {
     let tempPath: string | null = null;
     let hitSizeLimit = false;
     let sourceFilename = '';
+    let confirmationField: string | undefined;
+
+    bb.on('field', (fieldname: string, value: string) => {
+      if (fieldname === 'confirmation') confirmationField = value;
+    });
 
     // Resolves when the write stream finishes flushing to disk; rejects on error.
     // Default to resolved so bb.on('finish') can always await it safely when
@@ -999,6 +1051,25 @@ export function registerSystemRoutes(app: Express) {
       if (hitSizeLimit) {
         cleanupTemp();
         if (!res.headersSent) res.status(413).json({ error: 'File too large. Maximum size is 500 MB.' });
+        return;
+      }
+
+      // Wall 1 of the typed-phrase guard for restore (Task #337). Runs
+      // AFTER the upload is buffered (so we know the field events have
+      // fired) but BEFORE any destructive action. Missing/wrong phrase
+      // returns 400 and the buffered file is cleaned up.
+      if (confirmationField !== RESTORE_PHRASE) {
+        cleanupTemp();
+        if (!res.headersSent) {
+          res.status(400).json({
+            error: 'restore_confirmation_required',
+            message:
+              'Emergency restore from uploaded file refused: the multipart ' +
+              'payload must include a `confirmation` text field whose value ' +
+              'matches the phrase shown in the dialog. This is a deliberate ' +
+              'guard against accidental data loss.',
+          });
+        }
         return;
       }
 

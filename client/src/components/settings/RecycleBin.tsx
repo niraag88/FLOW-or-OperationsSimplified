@@ -25,6 +25,8 @@ import { useAuth } from '@/hooks/useAuth';
 import { format } from 'date-fns';
 import { RecycleBin } from '@/api/entities';
 import SimpleConfirmDialog from '../common/SimpleConfirmDialog';
+import TypedConfirmDialog from '../common/TypedConfirmDialog';
+import { RECYCLE_BIN_PERMANENT_DELETE_PHRASE } from '@shared/destructiveActionPhrases';
 
 export default function RecycleBinComponent() {
   const [deletedItems, setDeletedItems] = useState<any[]>([]);
@@ -35,6 +37,9 @@ export default function RecycleBinComponent() {
   const [showPermanentDeleteDialog, setShowPermanentDeleteDialog] = useState(false);
   const [showBulkDeleteDialog, setShowBulkDeleteDialog] = useState(false);
   const [showClearAllDialog, setShowClearAllDialog] = useState(false);
+  const [permanentDeletePending, setPermanentDeletePending] = useState(false);
+  const [bulkDeletePending, setBulkDeletePending] = useState(false);
+  const [clearAllPending, setClearAllPending] = useState(false);
   const [selectedItem, setSelectedItem] = useState<any>(null);
   const [selectedItems, setSelectedItems] = useState(new Set());
   const { toast } = useToast();
@@ -77,12 +82,17 @@ export default function RecycleBinComponent() {
     }
   };
 
-  const handleBulkPermanentDelete = async () => {
+  // Each handler accepts the typed phrase from TypedConfirmDialog and
+  // forwards it on every iteration of its loop. The user types the phrase
+  // ONCE per dialog opening; the loop then sends that same phrase with
+  // every per-row request the server-side guard checks (Task #337).
+  const handleBulkPermanentDelete = async (typedPhrase: string) => {
+    setBulkDeletePending(true);
     try {
       const itemsToDelete = Array.from(selectedItems);
 
       for (const itemId of itemsToDelete) {
-        await RecycleBin.delete(itemId as any);
+        await RecycleBin.deletePermanent(itemId as any, typedPhrase);
       }
 
       toast({
@@ -97,18 +107,21 @@ export default function RecycleBinComponent() {
       console.error('Error bulk deleting documents:', error);
       toast({
         title: 'Bulk Deletion Failed',
-        description: 'Failed to permanently delete selected documents. Please try again.',
+        description: error?.message || 'Failed to permanently delete selected documents. Please try again.',
         variant: 'destructive'
       });
+    } finally {
+      setBulkDeletePending(false);
     }
   };
 
-  const handleClearAll = async () => {
+  const handleClearAll = async (typedPhrase: string) => {
+    setClearAllPending(true);
     try {
       const allItemsToClear = filteredItems.map((item: any) => item.id);
 
       for (const itemId of allItemsToClear) {
-        await RecycleBin.delete(itemId as any);
+        await RecycleBin.deletePermanent(itemId as any, typedPhrase);
       }
 
       toast({
@@ -123,9 +136,11 @@ export default function RecycleBinComponent() {
       console.error('Error clearing recycle bin:', error);
       toast({
         title: 'Clear Operation Failed',
-        description: 'Failed to clear the recycle bin. Please try again.',
+        description: error?.message || 'Failed to clear the recycle bin. Please try again.',
         variant: 'destructive'
       });
+    } finally {
+      setClearAllPending(false);
     }
   };
 
@@ -153,11 +168,12 @@ export default function RecycleBinComponent() {
     }
   };
 
-  const handlePermanentDelete = async () => {
+  const handlePermanentDelete = async (typedPhrase: string) => {
     if (!selectedItem) return;
 
+    setPermanentDeletePending(true);
     try {
-      await RecycleBin.delete(selectedItem.id);
+      await RecycleBin.deletePermanent(selectedItem.id, typedPhrase);
 
       toast({
         title: 'Document Permanently Deleted',
@@ -171,9 +187,11 @@ export default function RecycleBinComponent() {
       console.error('Error permanently deleting document:', error);
       toast({
         title: 'Deletion Failed',
-        description: 'Failed to permanently delete the document. Please try again.',
+        description: error?.message || 'Failed to permanently delete the document. Please try again.',
         variant: 'destructive'
       });
+    } finally {
+      setPermanentDeletePending(false);
     }
   };
 
@@ -416,8 +434,15 @@ export default function RecycleBinComponent() {
         confirmText="Yes, Restore"
       />
 
-      {/* Permanent Delete Dialog */}
-      <SimpleConfirmDialog
+      {/*
+        Permanent-delete dialogs (Task #337). All three reuse the same
+        TypedConfirmDialog and pass the SAME phrase constant — so the
+        admin's typed text is what the server checks before each
+        per-row DELETE. Once the server-side guard rejects unphrased
+        requests, a stray POST without the phrase can no longer wipe
+        a recovery record.
+      */}
+      <TypedConfirmDialog
         open={showPermanentDeleteDialog}
         onClose={() => {
           setShowPermanentDeleteDialog(false);
@@ -425,31 +450,77 @@ export default function RecycleBinComponent() {
         }}
         onConfirm={handlePermanentDelete}
         title="Permanently Delete Document"
-        description={`Do you wish to confirm permanently deleting "${selectedItem?.document_number}"? This action cannot be undone.`}
-        confirmText="Yes, Delete Forever"
-        confirmVariant="destructive"
+        description={
+          <>
+            <p>
+              You are about to <strong>permanently delete</strong>{' '}
+              <span className="font-mono">
+                {selectedItem?.document_number}
+              </span>{' '}
+              from the recycle bin.
+            </p>
+            <p className="text-red-700 font-semibold">
+              This cannot be undone — the document will not be recoverable.
+            </p>
+          </>
+        }
+        phrase={RECYCLE_BIN_PERMANENT_DELETE_PHRASE}
+        confirmLabel="Delete Forever"
+        isPending={permanentDeletePending}
+        inputTestId="input-recycle-permanent-delete-confirm"
+        confirmTestId="button-recycle-permanent-delete-confirm"
       />
 
-      {/* Bulk Delete Dialog */}
-      <SimpleConfirmDialog
+      <TypedConfirmDialog
         open={showBulkDeleteDialog}
         onClose={() => setShowBulkDeleteDialog(false)}
         onConfirm={handleBulkPermanentDelete}
         title="Permanently Delete Selected Documents"
-        description={`Do you wish to confirm permanently deleting ${selectedItems.size} selected documents? This action cannot be undone.`}
-        confirmText="Yes, Delete All Selected"
-        confirmVariant="destructive"
+        description={
+          <>
+            <p>
+              You are about to <strong>permanently delete</strong>{' '}
+              {selectedItems.size} selected{' '}
+              {selectedItems.size === 1 ? 'document' : 'documents'} from
+              the recycle bin.
+            </p>
+            <p className="text-red-700 font-semibold">
+              This cannot be undone — none of these documents will be
+              recoverable.
+            </p>
+          </>
+        }
+        phrase={RECYCLE_BIN_PERMANENT_DELETE_PHRASE}
+        confirmLabel="Delete All Selected"
+        isPending={bulkDeletePending}
+        inputTestId="input-recycle-bulk-delete-confirm"
+        confirmTestId="button-recycle-bulk-delete-confirm"
       />
 
-      {/* Clear All Dialog */}
-      <SimpleConfirmDialog
+      <TypedConfirmDialog
         open={showClearAllDialog}
         onClose={() => setShowClearAllDialog(false)}
         onConfirm={handleClearAll}
         title="Clear Entire Recycle Bin"
-        description={`Do you wish to confirm permanently deleting ALL ${filteredItems.length} documents in the recycle bin? This action cannot be undone.`}
-        confirmText="Yes, Clear All"
-        confirmVariant="destructive"
+        description={
+          <>
+            <p>
+              You are about to <strong>permanently delete ALL</strong>{' '}
+              {filteredItems.length}{' '}
+              {filteredItems.length === 1 ? 'document' : 'documents'}{' '}
+              currently shown in the recycle bin.
+            </p>
+            <p className="text-red-700 font-semibold">
+              This cannot be undone — none of these documents will be
+              recoverable.
+            </p>
+          </>
+        }
+        phrase={RECYCLE_BIN_PERMANENT_DELETE_PHRASE}
+        confirmLabel="Clear All"
+        isPending={clearAllPending}
+        inputTestId="input-recycle-clear-all-confirm"
+        confirmTestId="button-recycle-clear-all-confirm"
       />
     </div>
   );

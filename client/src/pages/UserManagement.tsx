@@ -18,6 +18,8 @@ import { apiRequest } from '@/lib/queryClient';
 import { useToast } from '@/hooks/use-toast';
 import AuditLogTable from '@/components/user-management/AuditLogTable';
 import { FACTORY_RESET_CONFIRMATION_PHRASE } from '@shared/factoryResetPhrase';
+import { USER_DELETE_PHRASE } from '@shared/destructiveActionPhrases';
+import TypedConfirmDialog from '@/components/common/TypedConfirmDialog';
 
 interface User {
   id: string;
@@ -71,6 +73,10 @@ export default function UserManagement() {
   const [showResetConfirm, setShowResetConfirm] = useState(false);
   const [isResetting, setIsResetting] = useState(false);
   const [resetConfirmText, setResetConfirmText] = useState('');
+  // Tracks which user account is awaiting typed-phrase confirmation
+  // before deletion. Null while no dialog is open. Replaces the old
+  // browser `confirm()` call (Task #337).
+  const [userPendingDelete, setUserPendingDelete] = useState<User | null>(null);
   const [createForm, setCreateForm] = useState<CreateUserData>({
     username: '',
     password: '',
@@ -153,13 +159,17 @@ export default function UserManagement() {
     },
   });
 
-  // Delete user mutation
+  // Delete user mutation. The DELETE request now carries a typed
+  // confirmation phrase in its JSON body — the server-side guard
+  // installed by Task #337 returns 400 without it. The phrase the user
+  // typed in the confirmation dialog is forwarded verbatim.
   const deleteUserMutation = useMutation({
-    mutationFn: async (userId: string) => {
-      await apiRequest('DELETE', `/api/users/${userId}`);
+    mutationFn: async ({ userId, confirmation }: { userId: string; confirmation: string }) => {
+      await apiRequest('DELETE', `/api/users/${userId}`, { confirmation });
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['/api/users'] });
+      setUserPendingDelete(null);
       toast({ title: 'User deleted', description: 'The user account has been removed.' });
     },
     onError: (error: Error) => {
@@ -184,10 +194,19 @@ export default function UserManagement() {
     await updateUserMutation.mutateAsync({ ...editingUser, password: editPassword });
   };
 
-  const handleDeleteUser = async (userId: string, username: string) => {
-    if (confirm(`Are you sure you want to delete user "${username}"? This action cannot be undone.`)) {
-      await deleteUserMutation.mutateAsync(userId);
-    }
+  // Open the typed-phrase confirmation dialog for the given user.
+  // Actual deletion happens in confirmDeleteUser once the admin types
+  // the phrase exactly (Task #337).
+  const handleDeleteUser = (u: User) => {
+    setUserPendingDelete(u);
+  };
+
+  const confirmDeleteUser = async (typedPhrase: string) => {
+    if (!userPendingDelete) return;
+    await deleteUserMutation.mutateAsync({
+      userId: userPendingDelete.id,
+      confirmation: typedPhrase,
+    });
   };
 
   // ─── Backup-freshness warning for the factory-reset dialog (Task #336) ───
@@ -541,7 +560,7 @@ export default function UserManagement() {
                                   <Button
                                     variant="outline"
                                     
-                                    onClick={() => handleDeleteUser(u.id, u.username)}
+                                    onClick={() => handleDeleteUser(u)}
                                     disabled={deleteUserMutation.isPending}
                                     data-testid={`button-delete-${u.username}`}
                                   >
@@ -881,6 +900,43 @@ export default function UserManagement() {
           </DialogContent>
         </Dialog>
       )}
+
+      {/*
+        Typed-phrase delete-user dialog (Task #337). The destructive
+        button enables only after the admin types USER_DELETE_PHRASE
+        verbatim. The same phrase is forwarded to the server, which
+        also rejects the request without it.
+      */}
+      <TypedConfirmDialog
+        open={userPendingDelete !== null}
+        onClose={() => {
+          if (!deleteUserMutation.isPending) setUserPendingDelete(null);
+        }}
+        onConfirm={confirmDeleteUser}
+        title="Delete User Account"
+        description={
+          <>
+            <p>
+              You are about to <strong>permanently delete</strong> the
+              user account{' '}
+              <span className="font-mono">
+                {userPendingDelete?.username}
+              </span>
+              .
+            </p>
+            <p className="text-red-700 font-semibold">
+              This cannot be undone — the account, its session, and its
+              login credentials will be removed. Audit-log entries that
+              reference this user are preserved.
+            </p>
+          </>
+        }
+        phrase={USER_DELETE_PHRASE}
+        confirmLabel="Delete User"
+        isPending={deleteUserMutation.isPending}
+        inputTestId="input-user-delete-confirm"
+        confirmTestId="button-user-delete-confirm"
+      />
     </div>
   );
 }
