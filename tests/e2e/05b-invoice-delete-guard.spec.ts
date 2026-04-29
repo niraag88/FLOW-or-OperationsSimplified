@@ -1,4 +1,5 @@
 import { test, expect } from '@playwright/test';
+import { Pool } from 'pg';
 import { apiLogin, apiGet, apiPost, apiPut, apiDelete, BASE_URL } from './helpers';
 
 /**
@@ -20,11 +21,15 @@ import { apiLogin, apiGet, apiPost, apiPut, apiDelete, BASE_URL } from './helper
  *    and reverses stock — proving we only blocked the wrong path, not
  *    the legitimate one.
  *
- * Defence-in-depth (`stockDeducted=true` on a non-delivered status) is
- * impossible to construct via the public API without raw SQL — every
- * code path that flips stockDeducted true also flips status to
- * delivered — so the server check on `stockDeducted` is exercised by
- * the unit reading of the route, and is documented inline.
+ * Defence-in-depth (`stockDeducted=true` on a non-delivered status):
+ * impossible to construct via the public API alone — every code path
+ * that flips stockDeducted true also flips status to delivered — so
+ * the test below uses a direct `pg.Pool` write to plant the drifted
+ * row, then asserts the DELETE route still rejects it. This locks the
+ * `|| stockDeducted` half of the server guard against future regressions
+ * (e.g. a new status that retains stock effects, or a row drifting out
+ * of sync). The raw-SQL pattern follows the same approach used by the
+ * restore round-trip and factory-reset specs.
  */
 
 interface RecycleBinRow {
@@ -48,6 +53,7 @@ async function stockOf(productId: number, cookie: string): Promise<number> {
 
 test.describe('Invoice DELETE guard — delivered invoices must use Cancel (Task #363, RF-1)', () => {
   let cookie: string;
+  let pool: Pool | null = null;
   const created: {
     brandId?: number;
     customerId?: number;
@@ -55,11 +61,15 @@ test.describe('Invoice DELETE guard — delivered invoices must use Cancel (Task
     deliveredInvoiceId?: number;
     draftInvoiceId?: number;
     cancelDeliveredInvoiceId?: number;
+    driftedInvoiceId?: number;
   } = {};
   const tag = `RF1-${Date.now()}`;
 
   test.beforeAll(async () => {
     cookie = await apiLogin();
+    if (process.env.DATABASE_URL) {
+      pool = new Pool({ connectionString: process.env.DATABASE_URL });
+    }
 
     const brand = await apiPost('/api/brands', { name: `RF1 Brand ${tag}` }, cookie);
     expect(brand.status).toBe(201);
@@ -107,9 +117,17 @@ test.describe('Invoice DELETE guard — delivered invoices must use Cancel (Task
     // control test below; if anything failed mid-test, best-effort
     // cleanup follows.
     if (created.draftInvoiceId) await apiDelete(`/api/invoices/${created.draftInvoiceId}`, cookie);
+    // The drifted-row test plants stockDeducted=true via raw SQL on a
+    // submitted invoice; reverse that flag so the normal DELETE path can
+    // soft-delete it through the API like any other test fixture.
+    if (created.driftedInvoiceId && pool) {
+      await pool.query('UPDATE invoices SET stock_deducted = false WHERE id = $1', [created.driftedInvoiceId]);
+      await apiDelete(`/api/invoices/${created.driftedInvoiceId}`, cookie);
+    }
     if (created.productId) await apiDelete(`/api/products/${created.productId}`, cookie);
     if (created.customerId) await apiDelete(`/api/customers/${created.customerId}`, cookie);
     if (created.brandId) await apiDelete(`/api/brands/${created.brandId}`, cookie);
+    if (pool) await pool.end();
   });
 
   test('DELETE on a delivered invoice is rejected with 400 invoice_delete_requires_cancel', async () => {
@@ -222,6 +240,70 @@ test.describe('Invoice DELETE guard — delivered invoices must use Cancel (Task
       headers: { Cookie: cookie },
     });
     expect(lookup.status).toBe(404);
+  });
+
+  test('defence-in-depth: DELETE on a non-delivered invoice with stockDeducted=true is also rejected', async () => {
+    test.skip(!pool, 'DATABASE_URL not available — direct DB access required');
+
+    // Create a normal invoice via the public API.
+    const create = await apiPost(
+      '/api/invoices',
+      {
+        customer_id: created.customerId,
+        invoice_date: '2026-04-28',
+        status: 'draft',
+        tax_amount: '5',
+        total_amount: '105',
+        items: [
+          {
+            product_id: created.productId,
+            quantity: 1,
+            unit_price: 100,
+            line_total: 100,
+            description: 'RF1 drift',
+          },
+        ],
+      },
+      cookie,
+    );
+    expect(create.status).toBe(201);
+    created.driftedInvoiceId = (create.data as { id: number }).id;
+
+    // Plant the drifted state via raw SQL: a non-delivered invoice
+    // (status='submitted') with stockDeducted=true. This combination
+    // shouldn't be reachable through normal flows, but the server must
+    // still refuse to soft-delete such a row because its stock effect
+    // would otherwise be silently lost.
+    await pool!.query(
+      "UPDATE invoices SET status = 'submitted', stock_deducted = true WHERE id = $1",
+      [created.driftedInvoiceId],
+    );
+
+    // Confirm the row is in the drifted state.
+    const { rows } = await pool!.query<{ status: string; stock_deducted: boolean }>(
+      'SELECT status, stock_deducted FROM invoices WHERE id = $1',
+      [created.driftedInvoiceId],
+    );
+    expect(rows[0]?.status).toBe('submitted');
+    expect(rows[0]?.stock_deducted).toBe(true);
+
+    // DELETE must be rejected by the stockDeducted half of the guard.
+    const r = await fetch(`${BASE_URL}/api/invoices/${created.driftedInvoiceId}`, {
+      method: 'DELETE',
+      headers: { Cookie: cookie },
+    });
+    expect(r.status).toBe(400);
+    const body = (await r.json()) as { error?: string };
+    expect(body.error).toBe('invoice_delete_requires_cancel');
+
+    // Invoice still present, no recycle-bin row.
+    const stillThere = (await apiGet(
+      `/api/invoices/${created.driftedInvoiceId}`,
+      cookie,
+    )) as { id?: number; status?: string };
+    expect(stillThere.id).toBe(created.driftedInvoiceId);
+    expect(stillThere.status).toBe('submitted');
+    expect(await recycleBinHasInvoice(created.driftedInvoiceId!, cookie)).toBe(false);
   });
 
   test('PATCH /api/invoices/:id/cancel still cancels a delivered invoice and reverses stock', async () => {
