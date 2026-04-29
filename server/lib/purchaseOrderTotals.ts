@@ -39,10 +39,12 @@ export const PO_DEFAULT_FX_RATE_TO_AED = 4.85;
 // "12abc" -> 12, "4.5abc" -> 4.5, "0x10" -> 0, and special string values
 // "Infinity" / "NaN". After this change, only finite numbers and clean
 // numeric strings (digits, optional single decimal point, optional leading
-// sign, surrounding whitespace tolerated) are accepted; everything else
-// returns null and is rejected upstream by the caller's "was provided"
-// check. Scientific notation ("1e5") is also rejected — PO inputs are
-// human-entered decimals, not exponents.
+// minus sign, surrounding whitespace tolerated) are accepted; everything
+// else returns null and is rejected upstream by the caller's "was
+// provided" check. A leading "+" is intentionally NOT accepted — PO
+// inputs are user-typed decimals where "+12" is non-idiomatic and
+// indistinguishable from a typo. Scientific notation ("1e5") is also
+// rejected for the same reason.
 const STRICT_NUMERIC_PATTERN = /^-?\d+(\.\d+)?$/;
 
 function coerceFiniteNumber(value: unknown): number | null {
