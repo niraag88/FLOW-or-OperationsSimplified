@@ -1,31 +1,19 @@
 /**
  * Staff role matrix (Task #370, RF-7B)
  *
- * Proves that the Staff role is now explicitly bounded at the route level:
+ * Proves that the Staff role is now explicitly bounded at the route level.
+ * The single authoritative matrix lives in replit.md ("Explicit Staff Role
+ * Matrix (Task #370, RF-7B)") — see that section for the canonical list of
+ * Staff-allowed and Admin/Manager-only write routes. This file exercises a
+ * representative probe for each entry in that matrix.
  *
- *   ALLOWED for Staff (status must NOT be 401/403):
- *     - Customer create + update (POST/PUT /api/customers)
- *     - Invoice create + update + cancel + scan-key + payment status
- *     - Delivery Order create + update + scan-key
- *     - Quotation create + convert
- *
- *   FORBIDDEN for Staff (status MUST be 403):
- *     - Brand POST/PUT/DELETE
- *     - Supplier POST/PUT/DELETE
- *     - Product POST/PUT/DELETE/bulk-import/adjust-stock
- *     - Bulk stock movements (POST /api/stock-movements/bulk)
- *     - Stock-count POST + DELETE
- *     - Customer DELETE
- *     - Delivery Order DELETE + cancel
- *     - Invoice DELETE + process-sale
- *     - Quotation PUT + DELETE
- *
- * For the "allowed" routes we assert status !== 401/403 — a 400 from the
- * validator still proves the gate accepted the Staff session and handed off
- * to the handler, which is exactly what this test guards against (a future
- * refactor that accidentally re-clamps these to Admin/Manager would surface
- * here as a 403). For the forbidden routes we assert an exact 403 so any
- * regression that re-opens them to Staff fails loudly.
+ * For routes the matrix marks Staff-allowed we assert status !== 401/403 —
+ * a 400 from the validator still proves the gate accepted the Staff session
+ * and handed off to the handler, which is exactly what this test guards
+ * against (a future refactor that accidentally re-clamps these to
+ * Admin/Manager would surface here as a 403). For routes the matrix marks
+ * Staff-forbidden we assert an exact 403 so any regression that re-opens
+ * them to Staff fails loudly.
  *
  * Self-provisions a dedicated Staff user (`staff_matrix_test`) and cleans it
  * up afterwards so this spec is independent of any other test file.
