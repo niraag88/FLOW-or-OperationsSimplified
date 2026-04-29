@@ -9,19 +9,17 @@
  * place to assert the escape contract is on the HTML template stage,
  * BEFORE puppeteer rasterises it — which is what this suite does.
  *
- * Run with:  npx tsx --test --test-force-exit tests/unit/escapeHtmlPdf.test.ts
- *
- * `--test-force-exit` is required because importing server/middleware.ts
- * registers a 5-minute setInterval (signed-token cleanup) that holds the
- * event loop open. Without the flag the suite passes but never exits.
+ * Run with:  npx tsx --test tests/unit/escapeHtmlPdf.test.ts
  *
  * No DATABASE_URL needed: the tests import escapeHtml + generateDOPDF
- * directly and call them with hand-built fixture objects.
+ * directly from the side-effect-free server/lib/pdfTemplates module
+ * and call them with hand-built fixture objects. The suite exits
+ * cleanly without --test-force-exit.
  */
 
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { escapeHtml, generateDOPDF } from '../../server/middleware';
+import { escapeHtml, generateDOPDF } from '../../server/lib/pdfTemplates';
 
 // ── escapeHtml: the helper itself ────────────────────────────────────────────
 
