@@ -41,11 +41,20 @@ function StatusBadge({ success }: { success: boolean }) {
 // Informational panel rendered as the `extra` slot of TypedConfirmDialog
 // for the emergency-restore flow. Never participates in the disable
 // predicate — the typed phrase is the sole safeguard.
+interface BackupRunSummary {
+  id: number;
+  ranAt: string | number | Date;
+  dbStorageKey?: string;
+  dbFilename?: string;
+  dbFileSize?: number;
+  success?: boolean;
+}
+
 interface RestoreConfirmExtraProps {
   filename: string;
-  run?: any;
-  file?: any;
-  latestSuccessfulBackup?: any;
+  run?: BackupRunSummary;
+  file?: File;
+  latestSuccessfulBackup?: BackupRunSummary | null;
   onTakeBackup: () => void;
   backupPending: boolean;
   backupJustTaken: boolean;
@@ -124,8 +133,12 @@ export default function BackupSettings() {
   const queryClient = useQueryClient();
   const fileInputRef = useRef<HTMLInputElement>(null);
 
-  const [downloadingId, setDownloadingId] = useState<any>(null);
-  const [restoreModal, setRestoreModal] = useState<any>(null); // { type: 'cloud'|'upload', run?, file? }
+  const [downloadingId, setDownloadingId] = useState<number | null>(null);
+  const [restoreModal, setRestoreModal] = useState<
+    | { type: "cloud"; run: BackupRunSummary; filename: string }
+    | { type: "upload"; file: File; filename: string }
+    | null
+  >(null);
   const [restoredSuccessfully, setRestoredSuccessfully] = useState(false);
   const [backupJustTaken, setBackupJustTaken] = useState(false);
 
@@ -163,13 +176,9 @@ export default function BackupSettings() {
     },
   });
 
-  // Both restore mutations now forward the typed phrase to the server
-  // so the Task #337 server-side guard accepts the request. The phrase
-  // is sourced from the typed-confirmation dialog the admin has just
-  // satisfied — there is no other code path that can reach these
-  // mutations without it.
+  // Both restore mutations forward the typed phrase to the server.
   const restoreFromCloud = useMutation({
-    mutationFn: async ({ runId, confirmation }: { runId: any; confirmation: string }) => {
+    mutationFn: async ({ runId, confirmation }: { runId: number; confirmation: string }) => {
       const res = await apiRequest("POST", `/api/ops/backup-runs/${runId}/restore`, { confirmation });
       return res.json();
     },
@@ -190,13 +199,10 @@ export default function BackupSettings() {
   });
 
   const restoreFromUpload = useMutation({
-    mutationFn: async ({ file, confirmation }: { file: any; confirmation: string }) => {
+    mutationFn: async ({ file, confirmation }: { file: File; confirmation: string }) => {
       const formData = new FormData();
-      // The server reads `confirmation` from the multipart fields (parsed
-      // before the file is streamed to disk) and rejects the request
-      // with 400 if it does not match RESTORE_PHRASE. Append the field
-      // BEFORE the file so the server's `bb.on('field')` handler sees
-      // the phrase in time.
+      // Append the confirmation field BEFORE the file so busboy
+      // captures it before the file event fires.
       formData.append("confirmation", confirmation);
       formData.append("file", file);
       const res = await fetch("/api/ops/restore-upload", {
