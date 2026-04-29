@@ -19,7 +19,7 @@ import cookieParser from "cookie-parser";
 import { registerRoutes } from "./routes";
 import { initializeAdminUser } from "./adminInit";
 import { setupVite, serveStatic, log } from "./vite";
-import { MAX_UPLOAD_ERROR_MESSAGE } from "./middleware";
+import { MAX_UPLOAD_ERROR_MESSAGE, startAuditSpoolReplayTimer } from "./middleware";
 import { pool } from "./db";
 import { startBackupScheduler } from "./scheduler";
 
@@ -112,4 +112,7 @@ server.listen({
 }, () => {
   log(`serving on port ${port}`);
   startBackupScheduler();
+  // Task #375: drain any audit rows that the async path spooled to
+  // disk during a previous DB outage. Re-runs every 60s.
+  startAuditSpoolReplayTimer();
 });

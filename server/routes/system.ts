@@ -16,7 +16,7 @@ import { execSync } from 'child_process';
 import { createWriteStream, unlink } from 'fs';
 import { tmpdir } from 'os';
 import ExcelJS from 'exceljs';
-import { requireAuth, requireRole, writeAuditLog, writeAuditLogSync, objectStorageClient, validateUploadInput, validatePdfMagicBytes, validateImageMagicBytes, upload, setForceStorageDeleteFail, isForceStorageDeleteFailEnabled, MAX_UPLOAD_BYTES, MAX_UPLOAD_ERROR_MESSAGE, type AuthenticatedRequest } from "../middleware";
+import { requireAuth, requireRole, writeAuditLog, writeAuditLogSync, objectStorageClient, validateUploadInput, validatePdfMagicBytes, validateImageMagicBytes, upload, setForceStorageDeleteFail, isForceStorageDeleteFailEnabled, setAuditFaultInject, isAuditFaultInjectEnabled, MAX_UPLOAD_BYTES, MAX_UPLOAD_ERROR_MESSAGE, type AuthenticatedRequest } from "../middleware";
 import { runBackup } from "../runBackup";
 import { withBackupLock } from "../backupLock";
 import {
@@ -62,6 +62,17 @@ export function registerSystemRoutes(app: Express) {
         [key]
       );
       res.json({ count: result.rows[0]?.count ?? 0 });
+    });
+
+    // Task #375: persistent toggle that makes writeAuditLogSync throw,
+    // so the integration test for sensitive-action rollback can prove
+    // the surrounding transaction is actually atomic. Admin-gated and
+    // mounted in non-production only — there is no production code path
+    // that can flip this on.
+    app.post('/api/__test__/audit-fault-inject', requireAuth(['Admin']), (req: AuthenticatedRequest, res) => {
+      const enabled = (req.body as { enabled?: unknown })?.enabled === true;
+      setAuditFaultInject(enabled);
+      res.json({ ok: true, enabled: isAuditFaultInjectEnabled() });
     });
   }
 

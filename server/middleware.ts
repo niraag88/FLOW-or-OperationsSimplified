@@ -7,6 +7,8 @@ import multer from 'multer';
 import bcrypt from 'bcrypt';
 import session from 'express-session';
 import connectPg from 'connect-pg-simple';
+import { promises as fsPromises } from 'fs';
+import path from 'path';
 
 export const objectStorageClient = new Client({
   bucketId: process.env.DEFAULT_OBJECT_STORAGE_BUCKET_ID
@@ -212,12 +214,151 @@ export type DbClient = typeof db | Parameters<Parameters<typeof db.transaction>[
 //
 // Adding a new sensitive route MUST use writeAuditLogSync. Bare
 // writeAuditLog on a destructive route is a regression.
+//
+// If the async path exhausts its retries the row is appended to a
+// disk-spool file (audit-spool.jsonl by default; override via
+// AUDIT_SPOOL_PATH). A periodic replay worker drains the spool back
+// into the DB once it recovers — so even an extended Neon outage
+// does not silently lose audit rows.
 const AUDIT_LOG_RETRY_ATTEMPTS = 3;
 const AUDIT_LOG_RETRY_BASE_MS = 100;
+const AUDIT_SPOOL_PATH = process.env.AUDIT_SPOOL_PATH || path.join(process.cwd(), 'audit-spool.jsonl');
+const AUDIT_SPOOL_REPLAY_INTERVAL_MS = 60_000;
+const AUDIT_SPOOL_REPLAY_INITIAL_DELAY_MS = 30_000;
+
+// Test seam: when set to '1' (only honoured outside production) the
+// next writeAuditLogSync call throws synthetically so the integration
+// test can prove the surrounding transaction rolls back. Persistent
+// flag — toggled by an admin-only test endpoint mounted in dev only.
+let _auditFaultInject = false;
+export function setAuditFaultInject(enabled: boolean) {
+  _auditFaultInject = enabled;
+}
+export function isAuditFaultInjectEnabled() {
+  return _auditFaultInject;
+}
 
 export async function writeAuditLogSync(tx: DbClient, auditData: InsertAuditLog): Promise<void> {
+  if (process.env.NODE_ENV !== 'production' && _auditFaultInject) {
+    throw new Error('writeAuditLogSync: synthetic test failure (AUDIT_FAULT_INJECT)');
+  }
   // No catch — propagate the error so the surrounding tx rolls back.
   await tx.insert(auditLog).values(auditData);
+}
+
+// Serialize spool appends across concurrent writeAuditLog callers.
+// Node is single-threaded so a chained promise is enough — no need for
+// fcntl-style file locks.
+let spoolWriteQueue: Promise<void> = Promise.resolve();
+
+async function spoolAuditRow(data: InsertAuditLog): Promise<void> {
+  const next = spoolWriteQueue
+    .catch(() => {})
+    .then(async () => {
+      const line = JSON.stringify({ data, spooledAt: new Date().toISOString() }) + '\n';
+      try {
+        await fsPromises.appendFile(AUDIT_SPOOL_PATH, line, 'utf8');
+      } catch (writeErr) {
+        // The DB is down AND the disk write failed — nothing left to
+        // do but log loudly. Operationally this is the audit-log
+        // equivalent of a hardware failure.
+        console.error(
+          'CRITICAL: Audit-log disk-spool write failed; row will be lost:',
+          writeErr,
+          { auditData: data },
+        );
+      }
+    });
+  spoolWriteQueue = next;
+  return next;
+}
+
+let spoolReplayInFlight = false;
+
+// Drain the on-disk spool back into the audit_log table. Returns the
+// number of rows replayed and the number that are still pending. Safe
+// to call concurrently — the in-flight guard short-circuits parallel
+// invocations.
+export async function replayAuditSpool(): Promise<{ replayed: number; pending: number }> {
+  if (spoolReplayInFlight) return { replayed: 0, pending: 0 };
+  spoolReplayInFlight = true;
+  try {
+    let content: string;
+    try {
+      content = await fsPromises.readFile(AUDIT_SPOOL_PATH, 'utf8');
+    } catch (readErr: unknown) {
+      if ((readErr as NodeJS.ErrnoException)?.code === 'ENOENT') {
+        return { replayed: 0, pending: 0 };
+      }
+      throw readErr;
+    }
+    const lines = content.split('\n').filter((l) => l.trim().length > 0);
+    if (lines.length === 0) {
+      // Empty spool file — clean it up.
+      await fsPromises.writeFile(AUDIT_SPOOL_PATH, '', 'utf8');
+      return { replayed: 0, pending: 0 };
+    }
+    const stillPending: string[] = [];
+    let replayed = 0;
+    for (const line of lines) {
+      try {
+        const parsed = JSON.parse(line);
+        const data = parsed.data as InsertAuditLog;
+        await db.insert(auditLog).values(data);
+        replayed++;
+      } catch (replayErr) {
+        // DB still down or row malformed — keep it on disk and try
+        // again next tick. Better to retry forever than to silently
+        // drop a sensitive audit row.
+        stillPending.push(line);
+      }
+    }
+    await fsPromises.writeFile(
+      AUDIT_SPOOL_PATH,
+      stillPending.length ? stillPending.join('\n') + '\n' : '',
+      'utf8',
+    );
+    if (replayed > 0) {
+      console.log(
+        `[audit-spool] Replayed ${replayed} buffered audit row(s); ${stillPending.length} still pending`,
+      );
+    }
+    return { replayed, pending: stillPending.length };
+  } finally {
+    spoolReplayInFlight = false;
+  }
+}
+
+let spoolReplayTimer: NodeJS.Timeout | null = null;
+let spoolReplayInitialTimer: NodeJS.Timeout | null = null;
+
+export function startAuditSpoolReplayTimer(): void {
+  if (spoolReplayTimer || spoolReplayInitialTimer) return;
+  // Initial attempt after a short grace period so the DB pool is warm.
+  spoolReplayInitialTimer = setTimeout(() => {
+    spoolReplayInitialTimer = null;
+    void replayAuditSpool().catch((err) =>
+      console.error('[audit-spool] initial replay error:', err),
+    );
+  }, AUDIT_SPOOL_REPLAY_INITIAL_DELAY_MS);
+  spoolReplayInitialTimer.unref?.();
+  spoolReplayTimer = setInterval(() => {
+    void replayAuditSpool().catch((err) =>
+      console.error('[audit-spool] periodic replay error:', err),
+    );
+  }, AUDIT_SPOOL_REPLAY_INTERVAL_MS);
+  spoolReplayTimer.unref?.();
+}
+
+export function stopAuditSpoolReplayTimer(): void {
+  if (spoolReplayTimer) {
+    clearInterval(spoolReplayTimer);
+    spoolReplayTimer = null;
+  }
+  if (spoolReplayInitialTimer) {
+    clearTimeout(spoolReplayInitialTimer);
+    spoolReplayInitialTimer = null;
+  }
 }
 
 export const writeAuditLog = (auditData: InsertAuditLog): void => {
@@ -236,11 +377,14 @@ export const writeAuditLog = (auditData: InsertAuditLog): void => {
         }
       }
     }
+    // All in-memory retries exhausted — spool to disk and let the
+    // periodic replay worker drain it once the DB recovers.
     console.error(
-      `Audit log write failed after ${AUDIT_LOG_RETRY_ATTEMPTS} attempts:`,
+      `Audit log write failed after ${AUDIT_LOG_RETRY_ATTEMPTS} attempts; spooling to disk:`,
       lastErr,
       { auditData },
     );
+    await spoolAuditRow(auditData);
   })();
 };
 
