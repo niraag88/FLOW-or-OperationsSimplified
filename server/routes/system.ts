@@ -439,7 +439,7 @@ export function registerSystemRoutes(app: Express) {
   // written server-side from each action handler via writeAuditLog(), so the
   // log can never be forged through the HTTP layer (Task #319).
 
-  app.get('/api/recycle-bin', requireAuth(), async (req: AuthenticatedRequest, res) => {
+  app.get('/api/recycle-bin', requireAuth(['Admin', 'Manager']), async (req: AuthenticatedRequest, res) => {
     try {
       const items = await db.select().from(recycleBin).orderBy(desc(recycleBin.deletedDate));
       const mapped = items.map(item => ({

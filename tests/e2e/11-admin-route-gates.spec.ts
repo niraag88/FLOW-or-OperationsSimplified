@@ -183,6 +183,13 @@ test.describe('Admin route gates (Task #319)', () => {
     { name: 'GET /api/db/size', path: '/api/db/size' },
     { name: 'GET /api/storage/total-size', path: '/api/storage/total-size' },
     { name: 'GET /api/system/app-size', path: '/api/system/app-size' },
+    // GET /api/recycle-bin (Task #329) — visibility raised from
+    // requireAuth() to requireAuth(['Admin', 'Manager']) so the deletion
+    // timeline (deleted-document names, deletion dates, deleted-by
+    // usernames, document IDs, recovery metadata) is no longer visible
+    // to Staff. The recycle-bin DELETE/restore endpoints already require
+    // Admin/Manager — this test proves the listing endpoint now matches.
+    { name: 'GET /api/recycle-bin', path: '/api/recycle-bin' },
   ];
 
   for (const route of sensitiveGets) {
