@@ -31,6 +31,21 @@ async function poCount(cookie: string): Promise<number> {
   return toPurchaseOrderList(raw).length;
 }
 
+interface AuditRow {
+  action?: string;
+  targetType?: string;
+  targetId?: string;
+  details?: string;
+}
+async function poCreateAuditCount(cookie: string): Promise<number> {
+  const rows = (await apiGet('/api/audit-logs', cookie)) as AuditRow[];
+  return Array.isArray(rows)
+    ? rows.filter(
+        (r) => r.action === 'CREATE' && r.targetType === 'purchase_order',
+      ).length
+    : 0;
+}
+
 test.describe('PO POST atomicity & zero-valid-line rejection (Task #366, RF-3)', () => {
   let cookie: string;
   let brandId: number;
@@ -87,14 +102,16 @@ test.describe('PO POST atomicity & zero-valid-line rejection (Task #366, RF-3)',
   });
 
   // ─── POST: atomicity on item-insert failure ─────────────────────
-  test('POST with one valid line and one FK-bad productId → header rolled back', async () => {
+  test('POST with one valid line and one FK-bad productId → header AND audit row rolled back', async () => {
     test.skip(!brandId || !product, 'Requires at least one brand and one product');
     const before = await poCount(cookie);
+    const beforeAudit = await poCreateAuditCount(cookie);
 
     // First line is real (passes compute, would insert OK), second
     // line uses a non-existent productId so the per-item insert
     // raises FK 23503 inside the transaction. The header insert
-    // earlier in the SAME tx must roll back.
+    // earlier in the SAME tx must roll back. The audit-log row is
+    // also written inside the tx (Task #366), so it must roll back too.
     const { status } = await apiPost('/api/purchase-orders', {
       brandId,
       orderDate: '2026-04-29',
@@ -125,15 +142,18 @@ test.describe('PO POST atomicity & zero-valid-line rejection (Task #366, RF-3)',
 
     const after = await poCount(cookie);
     expect(after).toBe(before);
+    const afterAudit = await poCreateAuditCount(cookie);
+    expect(afterAudit).toBe(beforeAudit);
   });
 
   // ─── POST: happy path still works ───────────────────────────────
-  test('POST with one valid line → 201 + PO has matching items + totals', async () => {
+  test('POST with one valid line → 201 + PO has matching items + totals + audit row written', async () => {
     test.skip(!brandId || !product, 'Requires at least one brand and one product');
 
     const qty = 3;
     const unit = productPrice(product);
     const expectedTotal = (qty * unit).toFixed(2);
+    const beforeAudit = await poCreateAuditCount(cookie);
 
     const { status, data } = await apiPost('/api/purchase-orders', {
       brandId,
@@ -161,6 +181,9 @@ test.describe('PO POST atomicity & zero-valid-line rejection (Task #366, RF-3)',
     };
     expect(Array.isArray(detail.items) && detail.items!.length).toBe(1);
     expect(detail.totalAmount).toBe(expectedTotal);
+
+    const afterAudit = await poCreateAuditCount(cookie);
+    expect(afterAudit).toBe(beforeAudit + 1);
   });
 
   // ─── PUT: zero-valid-items rejection ────────────────────────────

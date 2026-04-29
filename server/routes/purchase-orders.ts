@@ -1,5 +1,5 @@
 import type { Express } from "express";
-import { purchaseOrders, purchaseOrderItems, goodsReceipts, suppliers, brands, products, recycleBin, storageObjects } from "@shared/schema";
+import { purchaseOrders, purchaseOrderItems, goodsReceipts, suppliers, brands, products, recycleBin, storageObjects, auditLog } from "@shared/schema";
 import { insertPurchaseOrderSchema } from "@shared/schema";
 import { db } from "../db";
 import { eq, sql, inArray } from "drizzle-orm";
@@ -119,11 +119,13 @@ export function registerPurchaseOrderRoutes(app: Express) {
       }
 
       // Task #366 (RF-3): wrap header insert + item inserts + totals /
-      // snapshot update in one db.transaction. Previously the header
-      // was inserted via businessStorage.createPurchaseOrder OUTSIDE
-      // any tx — a failure in the item loop or the totals UPDATE
-      // would leave a header-only PO behind. The audit-log call stays
-      // outside (fire-and-forget, matching the PUT path).
+      // snapshot update + audit-log row in ONE db.transaction. Previously
+      // the header was inserted via businessStorage.createPurchaseOrder
+      // OUTSIDE any tx — a failure in the item loop or the totals UPDATE
+      // would leave a header-only PO behind, and a fire-and-forget audit
+      // entry could race ahead of (or survive) a partial failure. Doing
+      // every write through `tx` means rollback covers the audit row too:
+      // a rejected POST leaves no PO AND no audit row.
       const purchaseOrder = await db.transaction(async (tx) => {
         const [created] = await tx
           .insert(purchaseOrders)
@@ -152,10 +154,19 @@ export function registerPurchaseOrderRoutes(app: Express) {
           .where(eq(purchaseOrders.id, created.id))
           .returning();
 
-        return finalRow ?? created;
+        const settled = finalRow ?? created;
+        await tx.insert(auditLog).values({
+          actor: req.user!.id,
+          actorName: req.user?.username || String(req.user!.id),
+          targetId: String(settled.id),
+          targetType: 'purchase_order',
+          action: 'CREATE',
+          details: `PO #${settled.poNumber} created`,
+        });
+
+        return settled;
       });
 
-      writeAuditLog({ actor: req.user!.id, actorName: req.user?.username || String(req.user!.id), targetId: String(purchaseOrder.id), targetType: 'purchase_order', action: 'CREATE', details: `PO #${purchaseOrder.poNumber} created` });
       res.status(201).json(purchaseOrder);
     } catch (error) {
       if (error instanceof PurchaseOrderRequestError) {
