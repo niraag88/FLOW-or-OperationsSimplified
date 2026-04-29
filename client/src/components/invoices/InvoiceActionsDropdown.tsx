@@ -41,11 +41,7 @@ export default function InvoiceActionsDropdown({ invoice, canEdit, canOverride, 
 
   const isCancelled = invoice.status === 'cancelled';
   const isDelivered = invoice.status === 'delivered';
-  // Task #363 (RF-1): Delivered invoices (and any invoice that has
-  // already produced stock movements) MUST go through Cancel Invoice
-  // — the recycle-bin path doesn't reverse stock. Hide Delete for
-  // these rows so the only available irreversible action is Cancel
-  // Invoice. The server enforces the same rule.
+  // Task #363 (RF-1): delivered/stockDeducted invoices must go through Cancel Invoice (server enforces the same rule).
   const canDelete = !isCancelled && !isDelivered && !invoice.stockDeducted;
 
   const handleExportXLSX = async () => {

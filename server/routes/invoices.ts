@@ -1024,35 +1024,16 @@ export function registerInvoiceRoutes(app: Express) {
       if (!invoiceHeader) {
         return res.status(404).json({ error: 'Invoice not found' });
       }
-      // Task #363 (RF-1): Both delete-rejection branches share the
-      // same {error: <code>, message: <human text>} envelope so clients
-      // can switch on the stable error code while still surfacing a
-      // friendly message. The cancelled branch's previous shape
-      // ({error: <human text>}) was migrated up to this format in the
-      // same task. The legacy human text is preserved as the message
-      // for any UI that surfaces it directly.
       if (invoiceHeader.status === 'cancelled') {
-        return res.status(400).json({
-          error: 'invoice_already_cancelled',
-          message: 'Cancelled invoices cannot be deleted. The document is retained for audit purposes.',
-        });
+        return res.status(400).json({ error: 'Cancelled invoices cannot be deleted. The document is retained for audit purposes.' });
       }
-      // Block delete on delivered invoices and on any invoice whose
-      // stock has already been deducted. Such invoices have produced
-      // stock movements that the recycle-bin path does not reverse —
-      // they must go through PATCH /api/invoices/:id/cancel, which is
-      // the all-or-nothing inventory reversal contract documented above
-      // the cancel handler. Defence-in-depth: we check stockDeducted in
-      // addition to status === 'delivered' so a future status that
-      // retains stock effects (or a row that drifted out of sync) is
-      // still caught here. The frontend hides the Delete option for
-      // these rows, so this gate only fires for direct API callers and
-      // as a backstop against UI bugs.
+      // Task #363 (RF-1): delivered invoices, and any invoice whose
+      // stock has been deducted, must go through PATCH .../cancel —
+      // the recycle-bin path doesn't reverse stock movements.
+      // stockDeducted is checked alongside status as defence-in-depth
+      // for any drifted row.
       if (invoiceHeader.status === 'delivered' || invoiceHeader.stockDeducted) {
-        return res.status(400).json({
-          error: 'invoice_delete_requires_cancel',
-          message: 'Delivered invoices have already produced stock movements. Use Cancel Invoice to reverse stock and retain the audit record — they cannot be moved to the recycle bin.',
-        });
+        return res.status(400).json({ error: 'Delivered invoices have already produced stock movements. Use Cancel Invoice to reverse stock and retain the audit record — they cannot be moved to the recycle bin.' });
       }
       const lineItems = await db.select().from(invoiceLineItems).where(eq(invoiceLineItems.invoiceId, id));
 
