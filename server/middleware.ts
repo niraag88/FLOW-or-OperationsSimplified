@@ -1,6 +1,6 @@
 import type { Request, Response, NextFunction } from "express";
 import { Client } from '@replit/object-storage';
-import { users, auditLog, products, stockMovements, storageObjects, type InsertAuditLog, type User } from "@shared/schema";
+import { users, auditLog, products, stockMovements, type InsertAuditLog, type User } from "@shared/schema";
 import { db, pool } from "./db";
 import { eq, sql } from "drizzle-orm";
 import multer from 'multer';
@@ -197,26 +197,6 @@ declare module 'express-session' {
   }
 }
 
-export const requireOpsToken = (req: Request, res: Response, next: NextFunction) => {
-  const authHeader = req.headers.authorization;
-  const expectedToken = process.env.OPS_TOKEN;
-
-  if (!expectedToken) {
-    return res.status(500).json({ error: 'OPS_TOKEN not configured' });
-  }
-
-  if (!authHeader || !authHeader.startsWith('Bearer ')) {
-    return res.status(401).json({ error: 'Authorization header required with Bearer token' });
-  }
-
-  const token = authHeader.substring(7);
-
-  if (token !== expectedToken) {
-    return res.status(401).json({ error: 'Invalid operations token' });
-  }
-
-  next();
-};
 
 export const validatePdfMagicBytes = (fileBuffer: Buffer) => {
   if (!fileBuffer || fileBuffer.length < 4) {

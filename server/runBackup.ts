@@ -13,7 +13,7 @@
 
 import { db } from "./db";
 import { backupRuns, companySettings } from "@shared/schema";
-import { desc, eq, and } from "drizzle-orm";
+import { desc, eq } from "drizzle-orm";
 import { writeAuditLog, deleteStorageObjectSafely } from "./middleware";
 
 export type BackupActor = {

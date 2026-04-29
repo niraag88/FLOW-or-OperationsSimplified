@@ -1,9 +1,9 @@
 import type { Express } from "express";
-import { goodsReceipts, goodsReceiptItems, purchaseOrders, purchaseOrderItems, stockCounts, stockCountItems, products, suppliers, brands, storageObjects, stockMovements } from "@shared/schema";
+import { goodsReceipts, goodsReceiptItems, purchaseOrders, purchaseOrderItems, stockCounts, stockCountItems, products, suppliers, storageObjects } from "@shared/schema";
 import { db } from "../db";
 import { eq, desc, sql, inArray, and } from "drizzle-orm";
 import { businessStorage } from "../businessStorage";
-import { requireAuth, writeAuditLog, updateProductStock, objectStorageClient, deleteStorageObjectSafely, type AuthenticatedRequest } from "../middleware";
+import { requireAuth, writeAuditLog, updateProductStock, deleteStorageObjectSafely, type AuthenticatedRequest } from "../middleware";
 
 type NegativeStockEntry = {
   productId: number;

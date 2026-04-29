@@ -4,7 +4,7 @@ import { insertPurchaseOrderSchema } from "@shared/schema";
 import { db } from "../db";
 import { eq, sql, inArray } from "drizzle-orm";
 import { businessStorage } from "../businessStorage";
-import { requireAuth, requireRole, writeAuditLog, objectStorageClient, deleteStorageObjectSafely, type AuthenticatedRequest } from "../middleware";
+import { requireAuth, writeAuditLog, deleteStorageObjectSafely, type AuthenticatedRequest } from "../middleware";
 import {
   computePurchaseOrderTotals,
   PurchaseOrderRequestError,

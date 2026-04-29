@@ -1,7 +1,7 @@
 import type { Express } from "express";
 import { users, auditLog, storageObjects } from "@shared/schema";
 import { db } from "../db";
-import { eq, lt, sql } from "drizzle-orm";
+import { eq, lt } from "drizzle-orm";
 import { requireAuth, requireRole, hashPassword, writeAuditLog, objectStorageClient, type AuthenticatedRequest } from "../middleware";
 import { businessStorage } from "../businessStorage";
 import { sendIfMissingConfirmation } from "../typedConfirmation";

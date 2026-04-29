@@ -4,7 +4,7 @@ import { type InsertInvoice } from "@shared/schema";
 import { db } from "../db";
 import { eq } from "drizzle-orm";
 import { businessStorage } from "../businessStorage";
-import { requireAuth, writeAuditLog, updateProductStock, objectStorageClient, deleteStorageObjectSafely, type AuthenticatedRequest } from "../middleware";
+import { requireAuth, writeAuditLog, updateProductStock, deleteStorageObjectSafely, type AuthenticatedRequest } from "../middleware";
 import { resolveDocumentTotals, isTotalsError, normalizeTaxTreatment, resolveAuthoritativeTaxTreatment } from "../utils/totals";
 
 export function registerInvoiceRoutes(app: Express) {

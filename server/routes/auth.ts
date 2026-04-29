@@ -3,7 +3,7 @@ import type { RateLimitRequestHandler } from 'express-rate-limit';
 import { users } from "@shared/schema";
 import { db } from "../db";
 import { eq } from "drizzle-orm";
-import { requireAuth, comparePassword, writeAuditLog, type AuthenticatedRequest } from "../middleware";
+import { requireAuth, comparePassword, type AuthenticatedRequest } from "../middleware";
 
 export function registerAuthRoutes(app: Express, loginLimiter: RateLimitRequestHandler) {
   app.post('/api/auth/login', loginLimiter, async (req: AuthenticatedRequest, res) => {

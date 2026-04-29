@@ -3,7 +3,7 @@ import { deliveryOrders, deliveryOrderItems, customers, brands, products, recycl
 import { db } from "../db";
 import { and, eq } from "drizzle-orm";
 import { businessStorage } from "../businessStorage";
-import { requireAuth, writeAuditLog, objectStorageClient, deleteStorageObjectSafely, updateProductStock, type AuthenticatedRequest } from "../middleware";
+import { requireAuth, writeAuditLog, deleteStorageObjectSafely, updateProductStock, type AuthenticatedRequest } from "../middleware";
 import { resolveDocumentTotals, isTotalsError, normalizeTaxTreatment, resolveAuthoritativeTaxTreatment } from "../utils/totals";
 
 export function registerDeliveryOrderRoutes(app: Express) {
