@@ -1,0 +1,96 @@
+Please create TWO separate tasks from this prompt. Do not combine them into one large patch.
+
+General constraints:
+- Do not touch PDF, print, XLSX export, invoice/DO document formatting, or visual layouts.
+- Do not run factory reset.
+- Do not run restore against live data.
+- Do not run migrations; these should be code/test-only changes.
+- Keep each task independently reviewable.
+- RF-3B should be done first. RF-7B can be done after.
+
+Task RF-3B — Finish strict Purchase Order numeric validation
+
+Context:
+The core PO risk is already mostly fixed: PO POST is atomic and zero-valid-line payloads are rejected. However the helper still preserves old parseFloat behavior, so strings like "12abc" or "4.5abc" can be accepted as numbers. Please finish this hardening.
+
+Affected files:
+- server/lib/purchaseOrderTotals.ts
+- server/routes/purchase-orders.ts
+- tests/unit/purchaseOrderTotals.test.ts
+- tests/e2e/04b-po-post-atomicity.spec.ts or a focused PO validation test
+
+Required behavior:
+1. Replace loose parseFloat-style coercion with strict numeric parsing.
+   - Accept finite numbers.
+   - Accept clean numeric strings like "12", "12.50", "0.5", " 12.50 ".
+   - Reject partially numeric strings like "12abc", "4.5abc", "0x10", "Infinity", "NaN", "abc".
+2. Quantity:
+   - Must be numeric.
+   - Must be a whole number.
+   - Must not be negative.
+   - Existing blank/skipped rows may still be skipped, but malformed explicit values should not be silently accepted.
+3. Unit price:
+   - Must be numeric when supplied.
+   - Must not be negative.
+   - Reject malformed values even if another field on the row is invalid.
+4. Product ID:
+   - If productId is supplied but malformed, reject with 400 instead of silently skipping.
+   - Fully blank UI placeholder rows may still be skipped if needed, but intentional malformed rows must fail.
+5. FX rate:
+   - If fxRateToAed is supplied, it must be a strict positive number.
+   - Reject zero, negative, malformed, Infinity, NaN, and partially numeric strings.
+   - If fxRateToAed is genuinely omitted/blank and currency needs an FX rate, keep the existing default fallback.
+6. Header-only PUT:
+   - If currency or fxRateToAed is changed without items, validate fxRateToAed before DB writes.
+   - Do not allow a bad fxRateToAed to partially save the header and then fail later.
+7. Keep the existing no-schema-change design.
+
+Tests:
+- Unit test that "12abc", "4.5abc", "0x10", "Infinity", "NaN", and "abc" are rejected where relevant.
+- Unit test that negative/zero supplied fxRateToAed is rejected.
+- Unit test that valid clean strings still work.
+- E2E/API test that PO POST/PUT with malformed numeric fields returns 400 and creates/changes nothing.
+- Existing normal PO create/update tests should still pass.
+
+Avoid:
+- Do not touch GRN logic.
+- Do not touch PO print/PDF/export.
+- Do not change VAT/invoice/DO totals.
+
+
+Task RF-7B — Make Staff write permissions explicit and remove unintended destructive access
+
+Context:
+Some routes still use plain requireAuth(), which defaults to Admin/Manager/Staff. That may be fine for normal operational work, but destructive/master-data/stock-control routes should be explicit and consistent.
+
+Please implement this permission matrix unless you find a direct existing UI workflow that would break; if so, explain before changing.
+
+Desired role matrix:
+1. Staff MAY continue to:
+   - View normal business records.
+   - Create/update invoices, delivery orders, and quotations if currently allowed.
+   - Upload/remove document scans where already allowed.
+   - Update invoice payment status if currently part of Staff workflow.
+
+2. Staff must NOT be able to:
+   - Delete invoices, delivery orders, purchase orders, GRNs, stock counts, products, brands, suppliers, or customers.
+   - Create/update/delete brands.
+   - Create/update/delete suppliers.
+   - Create/update/delete products.
+   - Perform manual stock adjustments.
+   - Run bulk stock movements / initial stock import.
+   - Create/delete stock counts.
+   - Access admin/system/backup/restore/factory-reset/recycle-bin management.
+
+3. Customer records:
+   - If the current UI needs Staff to create/update customers while making sales documents, keep customer create/update allowed for Staff but make it explicit with requireAuth(["Admin", "Manager", "Staff"]).
+   - Customer delete must be Admin/Manager only.
+   - If Staff customer creation is not needed, restrict customer create/update to Admin/Manager too, but do not break invoice creation.
+
+Affected files likely include:
+- server/routes/brands.ts
+- server/routes/suppliers.ts
+- server/routes/products.ts
+- server/routes/customers.ts
+- server/routes/delivery-orders.ts
+- server/routes/goods-receipts
