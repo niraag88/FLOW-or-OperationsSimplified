@@ -5,6 +5,28 @@ import { db } from "../db";
 import { eq, sql, inArray } from "drizzle-orm";
 import { businessStorage } from "../businessStorage";
 import { requireAuth, requireRole, writeAuditLog, objectStorageClient, deleteStorageObjectSafely, type AuthenticatedRequest } from "../middleware";
+import {
+  computePurchaseOrderTotals,
+  PurchaseOrderRequestError,
+} from "../lib/purchaseOrderTotals";
+
+// Strip client-supplied totals from the validated header payload before
+// it is persisted. POST and PUT both recompute these on the server from
+// quantity * unitPrice (see computePurchaseOrderTotals + task-351); the
+// raw client values must NEVER reach the database.
+function stripClientTotals<T extends Record<string, unknown>>(data: T): T {
+  const {
+    totalAmount: _ignT,
+    grandTotal: _ignG,
+    vatAmount: _ignV,
+    ...rest
+  } = data as T & {
+    totalAmount?: unknown;
+    grandTotal?: unknown;
+    vatAmount?: unknown;
+  };
+  return rest as T;
+}
 
 export function registerPurchaseOrderRoutes(app: Express) {
   app.get('/api/purchase-orders', requireAuth(['Admin', 'Manager']), async (req: AuthenticatedRequest, res) => {
@@ -45,13 +67,6 @@ export function registerPurchaseOrderRoutes(app: Express) {
     if (!req.body.items || !Array.isArray(req.body.items) || req.body.items.length === 0) {
       return res.status(400).json({ error: 'At least one line item is required to save a purchase order' });
     }
-    if (Array.isArray(req.body.items)) {
-      for (const item of req.body.items) {
-        if (item.unitPrice !== undefined && parseFloat(item.unitPrice) < 0) {
-          return res.status(400).json({ error: 'Unit price cannot be negative' });
-        }
-      }
-    }
     try {
       const { companySettings } = await import('@shared/schema');
       const [poNumber, settingsRow] = await Promise.all([
@@ -75,39 +90,47 @@ export function registerPurchaseOrderRoutes(app: Express) {
         fxRateToAed: req.body.fxRateToAed !== undefined ? String(req.body.fxRateToAed) : undefined,
       };
 
-      const validatedData = insertPurchaseOrderSchema.parse({
+      const validatedDataRaw = insertPurchaseOrderSchema.parse({
         ...transformedBody,
         poNumber,
         createdBy: req.user!.id
       });
+      // Header payload with client-supplied totals stripped — totals
+      // come from the helper below, never from the request body.
+      const validatedData = stripClientTotals(validatedDataRaw);
+
+      // Server-recomputed totals + per-item validation. Throws
+      // PurchaseOrderRequestError on negative qty / bad unit price;
+      // caught below to mirror today's 400 contract.
+      const computed = computePurchaseOrderTotals(
+        req.body.items,
+        validatedData.currency ?? null,
+        validatedData.fxRateToAed ?? null,
+      );
 
       const purchaseOrder = await businessStorage.createPurchaseOrder(validatedData);
 
-      let computedTotal = 0;
-      if (req.body.items && Array.isArray(req.body.items) && req.body.items.length > 0) {
-        for (const item of req.body.items) {
-          if (item.productId && item.quantity > 0) {
-            const lineTotal = parseFloat(item.lineTotal) || 0;
-            computedTotal += lineTotal;
-            await db.insert(purchaseOrderItems).values({
-              poId: purchaseOrder.id,
-              productId: parseInt(item.productId),
-              quantity: item.quantity,
-              unitPrice: item.unitPrice.toString(),
-              lineTotal: item.lineTotal.toString(),
-              descriptionOverride: item.productName || null,
-              sizeOverride: item.size || null,
-            });
-          }
+      if (computed.items.length > 0) {
+        for (const item of computed.items) {
+          await db.insert(purchaseOrderItems).values({
+            poId: purchaseOrder.id,
+            productId: item.productId,
+            quantity: item.quantity,
+            unitPrice: item.unitPriceStr,
+            lineTotal: item.lineTotalStr,
+            descriptionOverride: item.descriptionOverride,
+            sizeOverride: item.sizeOverride,
+          });
         }
-        const poFxRate = parseFloat(String(purchaseOrder.fxRateToAed)) || 4.85;
-        const poCurrency = purchaseOrder.currency || 'GBP';
-        const computedGrandTotal = poCurrency === 'AED' ? computedTotal : computedTotal * poFxRate;
         await db.update(purchaseOrders)
-          .set({ totalAmount: computedTotal.toFixed(2), grandTotal: computedGrandTotal.toFixed(2), companySnapshot: companySnapshotData })
+          .set({
+            totalAmount: computed.totalAmountStr,
+            grandTotal: computed.grandTotalStr,
+            companySnapshot: companySnapshotData,
+          })
           .where(eq(purchaseOrders.id, purchaseOrder.id));
-        purchaseOrder.totalAmount = computedTotal.toFixed(2);
-        purchaseOrder.grandTotal = computedGrandTotal.toFixed(2);
+        purchaseOrder.totalAmount = computed.totalAmountStr;
+        purchaseOrder.grandTotal = computed.grandTotalStr;
       } else if (companySnapshotData) {
         await db.update(purchaseOrders)
           .set({ companySnapshot: companySnapshotData })
@@ -117,6 +140,9 @@ export function registerPurchaseOrderRoutes(app: Express) {
       writeAuditLog({ actor: req.user!.id, actorName: req.user?.username || String(req.user!.id), targetId: String(purchaseOrder.id), targetType: 'purchase_order', action: 'CREATE', details: `PO #${purchaseOrder.poNumber} created` });
       res.status(201).json(purchaseOrder);
     } catch (error) {
+      if (error instanceof PurchaseOrderRequestError) {
+        return res.status(error.statusCode).json(error.responseBody);
+      }
       console.error('Error creating purchase order:', error);
       res.status(500).json({ error: 'Failed to create purchase order' });
     }
@@ -145,88 +171,137 @@ export function registerPurchaseOrderRoutes(app: Express) {
         expectedDelivery: req.body.expectedDelivery ? new Date(req.body.expectedDelivery) : undefined
       };
 
-      const validatedData = insertPurchaseOrderSchema.partial().parse(transformedBody);
+      const validatedDataRaw = insertPurchaseOrderSchema.partial().parse(transformedBody);
+      // Strip client-supplied totals from EVERY PUT path. The header-only
+      // path keeps today's businessStorage.updatePurchaseOrder write
+      // (totals stay untouched); the items-included path recomputes
+      // totals from quantity * unitPrice inside the transaction below.
+      const validatedData = stripClientTotals(validatedDataRaw);
 
-      const updatedPO = await businessStorage.updatePurchaseOrder(poId, validatedData);
+      const hasItems = req.body.items && Array.isArray(req.body.items);
+      let updatedPO: typeof purchaseOrders.$inferSelect;
 
-      if (req.body.items && Array.isArray(req.body.items)) {
-        const existingItems = await db
-          .select({ productId: purchaseOrderItems.productId, receivedQuantity: purchaseOrderItems.receivedQuantity })
-          .from(purchaseOrderItems)
-          .where(eq(purchaseOrderItems.poId, poId));
-        const receivedQtyByProduct = new Map<number, number>();
-        for (const ei of existingItems) {
-          const existing = receivedQtyByProduct.get(ei.productId) ?? 0;
-          receivedQtyByProduct.set(ei.productId, Math.max(existing, ei.receivedQuantity ?? 0));
-        }
-
-        // Validate: no received product line may be removed or reduced below received qty
-        const incomingProductIds = new Set(
-          req.body.items
-            .filter((item: any) => item.productId && item.quantity > 0)
-            .map((item: any) => parseInt(item.productId))
-        );
-        for (const [productId, received] of receivedQtyByProduct.entries()) {
-          if (received > 0 && !incomingProductIds.has(productId)) {
-            return res.status(400).json({
-              error: `Cannot remove a product that has already been received (received qty: ${received}). Reduce the quantity to at least ${received} instead.`
-            });
+      if (hasItems) {
+        // Header update + receivedQuantity validation + items
+        // delete/insert + totals update all run in ONE transaction so a
+        // mid-write failure rolls back the entire request and leaves the
+        // PO header AND items intact (task-351).
+        updatedPO = await db.transaction(async (tx) => {
+          const [currentPO] = await tx.select().from(purchaseOrders).where(eq(purchaseOrders.id, poId));
+          if (!currentPO) {
+            throw new PurchaseOrderRequestError(404, { error: 'Purchase order not found' });
           }
-        }
-        for (const item of req.body.items) {
-          if (item.productId && item.quantity > 0) {
-            const productId = parseInt(item.productId);
-            const prevReceived = receivedQtyByProduct.get(productId) ?? 0;
-            if (item.quantity < prevReceived) {
-              return res.status(400).json({
-                error: `Cannot set quantity to ${item.quantity} — this product has already been received in quantity ${prevReceived}. The new quantity must be at least ${prevReceived}.`
+
+          // Effective currency / fxRate for the totals helper: prefer
+          // body, then pre-update header. We read these BEFORE the
+          // header update so a single source of truth drives totals.
+          const effectiveCurrency = (validatedData.currency ?? currentPO.currency) ?? null;
+          const effectiveFxRate = validatedData.fxRateToAed ?? currentPO.fxRateToAed;
+
+          // Server-recomputed totals + per-item validation (throws
+          // PurchaseOrderRequestError on negative qty / bad unit price
+          // → tx rolls back).
+          const computed = computePurchaseOrderTotals(
+            req.body.items,
+            effectiveCurrency,
+            effectiveFxRate,
+          );
+
+          // Read existing item state inside the tx so the
+          // received-qty contract is checked against the same snapshot
+          // that we delete from.
+          const existingItems = await tx
+            .select({ productId: purchaseOrderItems.productId, receivedQuantity: purchaseOrderItems.receivedQuantity })
+            .from(purchaseOrderItems)
+            .where(eq(purchaseOrderItems.poId, poId));
+          const receivedQtyByProduct = new Map<number, number>();
+          for (const ei of existingItems) {
+            const existing = receivedQtyByProduct.get(ei.productId) ?? 0;
+            receivedQtyByProduct.set(ei.productId, Math.max(existing, ei.receivedQuantity ?? 0));
+          }
+
+          // Validate: no received product line may be removed.
+          const incomingProductIds = new Set(computed.items.map((it) => it.productId));
+          for (const [productId, received] of receivedQtyByProduct.entries()) {
+            if (received > 0 && !incomingProductIds.has(productId)) {
+              throw new PurchaseOrderRequestError(400, {
+                error: `Cannot remove a product that has already been received (received qty: ${received}). Reduce the quantity to at least ${received} instead.`,
               });
             }
           }
-        }
+          // Validate: no received product line may be reduced below the
+          // received quantity.
+          for (const item of computed.items) {
+            const prevReceived = receivedQtyByProduct.get(item.productId) ?? 0;
+            if (item.quantity < prevReceived) {
+              throw new PurchaseOrderRequestError(400, {
+                error: `Cannot set quantity to ${item.quantity} — this product has already been received in quantity ${prevReceived}. The new quantity must be at least ${prevReceived}.`,
+              });
+            }
+          }
 
-        await db.delete(purchaseOrderItems).where(eq(purchaseOrderItems.poId, poId));
+          // 1. Header update (validatedData has totals stripped).
+          const [headerRow] = await tx
+            .update(purchaseOrders)
+            .set({ ...validatedData, updatedAt: new Date() })
+            .where(eq(purchaseOrders.id, poId))
+            .returning();
 
-        let updatedComputedTotal = 0;
-        for (const item of req.body.items) {
-          if (item.productId && item.quantity > 0) {
-            const productId = parseInt(item.productId);
-            const prevReceived = receivedQtyByProduct.get(productId) ?? 0;
-            updatedComputedTotal += parseFloat(item.lineTotal) || 0;
-            await db.insert(purchaseOrderItems).values({
-              poId: poId,
-              productId,
+          // 2. Replace items, preserving receivedQuantity per product.
+          await tx.delete(purchaseOrderItems).where(eq(purchaseOrderItems.poId, poId));
+          for (const item of computed.items) {
+            const prevReceived = receivedQtyByProduct.get(item.productId) ?? 0;
+            await tx.insert(purchaseOrderItems).values({
+              poId,
+              productId: item.productId,
               quantity: item.quantity,
-              unitPrice: item.unitPrice.toString(),
-              lineTotal: item.lineTotal.toString(),
-              descriptionOverride: item.productName || null,
-              sizeOverride: item.size || null,
+              unitPrice: item.unitPriceStr,
+              lineTotal: item.lineTotalStr,
+              descriptionOverride: item.descriptionOverride,
+              sizeOverride: item.sizeOverride,
               receivedQuantity: prevReceived,
             });
           }
-        }
-        const putFxRate = parseFloat(String(req.body.fxRateToAed || updatedPO.fxRateToAed)) || 4.85;
-        const putCurrency = req.body.currency || updatedPO.currency || 'GBP';
-        const updatedGrandTotal = putCurrency === 'AED' ? updatedComputedTotal : updatedComputedTotal * putFxRate;
-        await db.update(purchaseOrders)
-          .set({ totalAmount: updatedComputedTotal.toFixed(2), grandTotal: updatedGrandTotal.toFixed(2) })
-          .where(eq(purchaseOrders.id, poId));
-      } else if (req.body.fxRateToAed !== undefined || req.body.currency !== undefined) {
-        const [currentPO] = await db.select().from(purchaseOrders).where(eq(purchaseOrders.id, poId));
-        if (currentPO) {
-          const currentTotal = parseFloat(String(currentPO.totalAmount)) || 0;
-          const newFxRate = parseFloat(String(req.body.fxRateToAed ?? currentPO.fxRateToAed)) || 4.85;
-          const newCurrency = req.body.currency ?? currentPO.currency ?? 'GBP';
-          const recomputedGrandTotal = newCurrency === 'AED' ? currentTotal : currentTotal * newFxRate;
-          await db.update(purchaseOrders)
-            .set({ grandTotal: recomputedGrandTotal.toFixed(2) })
-            .where(eq(purchaseOrders.id, poId));
+
+          // 3. Totals update from server-recomputed values.
+          const [finalRow] = await tx
+            .update(purchaseOrders)
+            .set({
+              totalAmount: computed.totalAmountStr,
+              grandTotal: computed.grandTotalStr,
+            })
+            .where(eq(purchaseOrders.id, poId))
+            .returning();
+
+          return finalRow ?? headerRow;
+        });
+      } else {
+        // Header-only PUT: keep today's flow (no items touched, no
+        // totals recomputed from items). validatedData has client
+        // totals stripped, so a request body cannot poison
+        // totalAmount / grandTotal even on this path.
+        updatedPO = await businessStorage.updatePurchaseOrder(poId, validatedData);
+
+        if (req.body.fxRateToAed !== undefined || req.body.currency !== undefined) {
+          const [currentPO] = await db.select().from(purchaseOrders).where(eq(purchaseOrders.id, poId));
+          if (currentPO) {
+            const currentTotal = parseFloat(String(currentPO.totalAmount)) || 0;
+            const newFxRate = parseFloat(String(req.body.fxRateToAed ?? currentPO.fxRateToAed)) || 4.85;
+            const newCurrency = req.body.currency ?? currentPO.currency ?? 'GBP';
+            const recomputedGrandTotal = newCurrency === 'AED' ? currentTotal : currentTotal * newFxRate;
+            await db.update(purchaseOrders)
+              .set({ grandTotal: recomputedGrandTotal.toFixed(2) })
+              .where(eq(purchaseOrders.id, poId));
+          }
         }
       }
 
       writeAuditLog({ actor: req.user!.id, actorName: req.user?.username || String(req.user!.id), targetId: String(poId), targetType: 'purchase_order', action: 'UPDATE', details: `PO #${updatedPO.poNumber} updated (status: ${updatedPO.status})` });
       res.json(updatedPO);
     } catch (error) {
+      if (error instanceof PurchaseOrderRequestError) {
+        return res.status(error.statusCode).json(error.responseBody);
+      }
       console.error('Error updating purchase order:', error);
       res.status(500).json({ error: 'Failed to update purchase order' });
     }
