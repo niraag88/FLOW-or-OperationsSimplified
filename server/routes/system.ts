@@ -19,6 +19,10 @@ import ExcelJS from 'exceljs';
 import { requireAuth, requireRole, writeAuditLog, objectStorageClient, validateUploadInput, validatePdfMagicBytes, validateImageMagicBytes, upload, setForceStorageDeleteFail, isForceStorageDeleteFailEnabled, MAX_UPLOAD_BYTES, MAX_UPLOAD_ERROR_MESSAGE, type AuthenticatedRequest } from "../middleware";
 import { runBackup } from "../runBackup";
 import { withBackupLock } from "../backupLock";
+import {
+  withDestructiveDbLock,
+  DestructiveDbOpInProgressError,
+} from "../destructiveDbLock";
 import { getBackupSchedule, updateBackupSchedule, BackupScheduleInputSchema } from "../backupSchedule";
 import crypto from 'crypto';
 
@@ -923,6 +927,27 @@ export function registerSystemRoutes(app: Express) {
     const { sqlGzInput, triggeredBy, sourceBackupRunId, sourceFilename, res, actorName } = opts;
     const label = sourceFilename || (sourceBackupRunId ? `backup run #${sourceBackupRunId}` : 'unknown');
 
+    // Task #368 (RF-5): take the shared destructive-DB-op lock BEFORE
+    // pre-creating the restore_runs row or invoking restoreBackup, so a
+    // second restore (or a concurrent factory-reset) gets a friendly 409
+    // with no DB writes attempted. The lock is released in `finally` even
+    // if restoreBackup throws; a worker crash drops the connection and
+    // Postgres releases the session-level advisory lock automatically.
+    try {
+      return await withDestructiveDbLock(async () => {
+        return await runRestoreLocked();
+      });
+    } catch (err) {
+      if (err instanceof DestructiveDbOpInProgressError) {
+        return res.status(409).json({
+          error: err.code,
+          message: err.message,
+        });
+      }
+      throw err;
+    }
+
+    async function runRestoreLocked() {
     // Step 1: Pre-create a pending record in ops.restore_runs BEFORE the restore.
     // ops schema is not touched by DROP SCHEMA public CASCADE, so this always persists.
     let preCreatedId: number | null = null;
@@ -1001,6 +1026,7 @@ export function registerSystemRoutes(app: Express) {
       return res.json({ success: true, durationMs: result.durationMs });
     } else {
       return res.status(500).json({ success: false, error: result.error || 'Restore failed', durationMs: result.durationMs });
+    }
     }
   }
 
@@ -1256,36 +1282,35 @@ export function registerSystemRoutes(app: Express) {
       databaseHost = undefined;
     }
 
-    const client = await pool.connect();
-    // Postgres session-level advisory lock — prevents two concurrent
-    // factory-reset requests from interleaving. The lock key (-31) is a
-    // stable arbitrary integer dedicated to this operation; releasing on
-    // any exit path (including server crash) is automatic when the
-    // connection drops because session locks live on the connection.
-    const FACTORY_RESET_LOCK_KEY = -31;
-    let lockAcquired = false;
+    // Task #368 (RF-5): factory-reset now uses the SHARED destructive-DB-op
+    // advisory lock so it cannot overlap with a cloud or upload restore.
+    // The original inline FACTORY_RESET_LOCK_KEY (-31) was retired during
+    // this refactor. The 409 error code below is intentionally KEPT as
+    // `factory_reset_in_progress` for backward compatibility — any
+    // existing client/script that already checks for that code keeps
+    // working — even though the underlying lock is now shared. Restore
+    // endpoints surface the helper's generic `destructive_db_op_in_progress`
+    // code instead. The lock-holding client is reused for the
+    // `executeFactoryReset` transaction so we don't open a second
+    // connection for the same op.
     try {
-      const lockResult = await client.query<{ locked: boolean }>(
-        'SELECT pg_try_advisory_lock($1) AS locked',
-        [FACTORY_RESET_LOCK_KEY],
-      );
-      lockAcquired = lockResult.rows[0]?.locked === true;
-      if (!lockAcquired) {
+      await withDestructiveDbLock(async (client) => {
+        await executeFactoryReset(
+          client,
+          { id: String(req.user!.id), name: req.user!.username },
+          { confirmation, databaseHost },
+        );
+      });
+      res.json({ ok: true, message: 'Factory reset complete. All business data has been wiped.' });
+    } catch (error: any) {
+      if (error instanceof DestructiveDbOpInProgressError) {
         return res.status(409).json({
           error: 'factory_reset_in_progress',
           message:
-            'Another factory reset is already running. Wait for it to finish, ' +
-            'then try again.',
+            'Another destructive database operation (factory reset or restore) ' +
+            'is already running. Wait for it to finish, then try again.',
         });
       }
-
-      await executeFactoryReset(
-        client,
-        { id: String(req.user!.id), name: req.user!.username },
-        { confirmation, databaseHost },
-      );
-      res.json({ ok: true, message: 'Factory reset complete. All business data has been wiped.' });
-    } catch (error: any) {
       if (error instanceof FactoryResetConfirmationError) {
         return res.status(400).json({
           error: 'factory_reset_confirmation_required',
@@ -1294,13 +1319,6 @@ export function registerSystemRoutes(app: Express) {
       }
       console.error('Factory reset failed:', error);
       res.status(500).json({ error: 'Factory reset failed', details: error.message });
-    } finally {
-      if (lockAcquired) {
-        await client
-          .query('SELECT pg_advisory_unlock($1)', [FACTORY_RESET_LOCK_KEY])
-          .catch(() => {});
-      }
-      client.release();
     }
   });
 
