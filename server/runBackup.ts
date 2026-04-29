@@ -170,37 +170,8 @@ export async function pruneOldBackups(): Promise<number> {
 
   let deleted = 0;
   for (const row of toPrune) {
-    // Try to delete each storage object via the shared safe-delete helper.
-    // The helper passes ignoreNotFound:true to the SDK so 404 / NoSuchKey
-    // is normalised to {ok:true}; both thrown errors AND the SDK's
-    // {ok:false} return shape are surfaced as {ok:false, error}. We only
-    // drop the backup_runs catalogue row when EVERY referenced object
-    // has been deleted successfully (or was already gone); otherwise
-    // the row could vanish while the file lingers in storage, leaving
-    // an orphan that no UI row points to. Previously this loop only
-    // caught throws, so a silent {ok:false} would have orphaned the file.
-    let allObjectsGone = true;
-
-    if (row.dbStorageKey) {
-      const result = await deleteStorageObjectSafely(row.dbStorageKey);
-      if (!result.ok) {
-        allObjectsGone = false;
-        console.error(
-          `pruneOldBackups: failed to delete storage object ${row.dbStorageKey}, retaining backup_runs row ${row.id} for retry: ${result.error}`
-        );
-      }
-    }
-    if (row.manifestStorageKey) {
-      const result = await deleteStorageObjectSafely(row.manifestStorageKey);
-      if (!result.ok) {
-        allObjectsGone = false;
-        console.error(
-          `pruneOldBackups: failed to delete manifest object ${row.manifestStorageKey}, retaining backup_runs row ${row.id} for retry: ${result.error}`
-        );
-      }
-    }
-
-    if (!allObjectsGone) continue;
+    const { allGone } = await tryDeleteBackupRowObjects(row);
+    if (!allGone) continue;
 
     try {
       await db.delete(backupRuns).where(eq(backupRuns.id, row.id));
@@ -210,4 +181,48 @@ export async function pruneOldBackups(): Promise<number> {
     }
   }
   return deleted;
+}
+
+/**
+ * Per-row helper: attempt to delete every storage object referenced by a
+ * backup_runs row and report whether the catalogue row is safe to drop.
+ *
+ * Both keys are deleted via the shared deleteStorageObjectSafely() helper
+ * (server/middleware.ts), which:
+ *   - passes `ignoreNotFound:true` to the SDK, so 404/NoSuchKey normalises
+ *     to {ok:true} (= already gone, safe to drop the catalogue row);
+ *   - normalises BOTH thrown errors AND the SDK's silent {ok:false, error}
+ *     return shape into {ok:false, error} — the prior implementation only
+ *     caught throws and silently treated {ok:false} as "deleted", which
+ *     would orphan the file while removing the only UI pointer to it.
+ *
+ * Exported so a unit test can drive the {ok:false} branch via the
+ * one-shot test seam in server/middleware.ts (setForceStorageDeleteFail)
+ * without needing live backup_runs rows or live storage objects.
+ */
+export async function tryDeleteBackupRowObjects(
+  row: { id: number; dbStorageKey: string | null; manifestStorageKey: string | null }
+): Promise<{ allGone: boolean }> {
+  let allGone = true;
+
+  if (row.dbStorageKey) {
+    const result = await deleteStorageObjectSafely(row.dbStorageKey);
+    if (!result.ok) {
+      allGone = false;
+      console.error(
+        `pruneOldBackups: failed to delete storage object ${row.dbStorageKey}, retaining backup_runs row ${row.id} for retry: ${result.error}`
+      );
+    }
+  }
+  if (row.manifestStorageKey) {
+    const result = await deleteStorageObjectSafely(row.manifestStorageKey);
+    if (!result.ok) {
+      allGone = false;
+      console.error(
+        `pruneOldBackups: failed to delete manifest object ${row.manifestStorageKey}, retaining backup_runs row ${row.id} for retry: ${result.error}`
+      );
+    }
+  }
+
+  return { allGone };
 }
