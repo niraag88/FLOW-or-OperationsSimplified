@@ -62,6 +62,11 @@ Internal documents use simple bordered data tables. External documents (POs, Quo
 # Accepted Security Risks
 
 - **`uuid` transitive vulnerability via `exceljs` (GHSA-w5hq-g745-h8pq, moderate, Task #385)** — `npm audit` flags the `uuid` package shipped under `exceljs@4.4.0` (currently `uuid@8.3.2`). The advisory describes a missing buffer-bounds check in `uuid.v3()`, `v5()`, and `v6()` **only when the caller passes a `buf` argument**. Verified that `exceljs` calls `uuid.v4()` exclusively (`node_modules/exceljs/lib/xlsx/xform/sheet/cf-ext/cf-rule-ext-xform.js`) with no `buf` argument, so the vulnerable code path is unreachable from our usage (bulk product import/export and Excel report generation in `client/src/pages/BulkAddProduct.tsx`, `server/routes/products.ts`). The advisory range is `<14.0.0`; `uuid` does not yet ship a v14, so a `package.json` `overrides` entry cannot clear the audit (the same advisory is also surfaced via `@google-cloud/storage` → `gaxios`/`teeny-request`, which already use `uuid@9.0.1`). Revisit when `uuid@14` ships or when `exceljs` cuts a release pinning to a patched `uuid`. Do not downgrade to `exceljs@3.4.0` — `npm audit`'s suggested "fix" is a major-version downgrade with breaking API changes.
+  - **Evidence (recorded 2026-04-29):**
+    - `npm audit --json` advisory source id `1116970`; severity `moderate`; CVSS string `null` (score 0); affected nodes `node_modules/uuid`, `node_modules/gaxios/node_modules/uuid`, `node_modules/teeny-request/node_modules/uuid`; `fixAvailable: false`.
+    - `npm ls uuid`: `exceljs@4.4.0 → uuid@8.3.2`; `@replit/object-storage@1.0.0 → @google-cloud/storage@7.19.0 → uuid@8.3.2 (deduped)` plus inner `gaxios@6.7.1 → uuid@9.0.1` and `teeny-request@9.0.0 → uuid@9.0.1`.
+    - exceljs call-path snippet (only `uuid` import in the package): `const {v4: uuidv4} = require('uuid');` in `node_modules/exceljs/lib/xlsx/xform/sheet/cf-ext/cf-rule-ext-xform.js` (lines 1, 43, 77 — all `${uuidv4()}` with no second argument).
+  - **Re-evaluation triggers:** (a) `uuid@14.x` published, (b) new `exceljs` release pinning a patched uuid, (c) the advisory metadata changes its `range` to exclude our installed version, or (d) any FLOW code path begins calling `uuid.v3/v5/v6` directly with a `buf` argument (none today).
 
 # External Dependencies
 
