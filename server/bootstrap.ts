@@ -19,7 +19,7 @@ import cookieParser from "cookie-parser";
 import { registerRoutes } from "./routes";
 import { initializeAdminUser } from "./adminInit";
 import { setupVite, serveStatic, log } from "./vite";
-import { MAX_UPLOAD_ERROR_MESSAGE, startAuditSpoolReplayTimer } from "./middleware";
+import { MAX_UPLOAD_ERROR_MESSAGE, startAuditSpoolReplayTimer, stopBackgroundJobs } from "./middleware";
 import { pool } from "./db";
 import { startBackupScheduler } from "./scheduler";
 
@@ -116,3 +116,22 @@ server.listen({
   // disk during a previous DB outage. Re-runs every 60s.
   startAuditSpoolReplayTimer();
 });
+
+// Task #384: graceful shutdown so background timers (signed-token
+// cleanup + audit-spool replay) don't keep the event loop alive on
+// SIGTERM/SIGINT, and so test runners that import middleware.ts can
+// exit cleanly without --forceExit.
+let shuttingDown = false;
+function gracefulShutdown(signal: string): void {
+  if (shuttingDown) return;
+  shuttingDown = true;
+  log(`received ${signal}, shutting down`);
+  stopBackgroundJobs();
+  server.close(() => {
+    pool.end().finally(() => process.exit(0));
+  });
+  // Hard fallback if close hangs (e.g. lingering keep-alive sockets).
+  setTimeout(() => process.exit(0), 10_000).unref();
+}
+process.on('SIGTERM', () => gracefulShutdown('SIGTERM'));
+process.on('SIGINT', () => gracefulShutdown('SIGINT'));

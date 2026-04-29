@@ -47,13 +47,22 @@ export async function deleteStorageObjectSafely(
   }
 }
 
-setInterval(async () => {
+let signedTokenCleanupTimer: NodeJS.Timeout | null = setInterval(async () => {
   try {
     await pool.query('DELETE FROM signed_tokens WHERE expires < $1', [Date.now()]);
   } catch (err) {
     console.error('Failed to clean up expired signed tokens:', err);
   }
 }, 5 * 60 * 1000);
+signedTokenCleanupTimer.unref?.();
+
+export function stopBackgroundJobs(): void {
+  if (signedTokenCleanupTimer) {
+    clearInterval(signedTokenCleanupTimer);
+    signedTokenCleanupTimer = null;
+  }
+  stopAuditSpoolReplayTimer();
+}
 
 // PDF template helpers (Task #373) live in a side-effect-free module so
 // unit tests can import them without keeping the event loop alive via
