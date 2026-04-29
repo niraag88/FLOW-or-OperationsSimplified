@@ -8,7 +8,8 @@
  * `test.beforeAll` hook. The gate skips the entire spec unless BOTH:
  *
  *   1. The env flag ALLOW_FACTORY_RESET_TESTS=true is set, AND
- *   2. DATABASE_URL contains one of the disposable-marker substrings below.
+ *   2. DATABASE_URL contains a disposable-marker token at a word boundary
+ *      (see tests/e2e/disposable-db.ts).
  *
  * Standing route-gate tests that only check 401/403 (and never hit the
  * helper) — e.g. tests/e2e/11-admin-route-gates.spec.ts — do NOT need this
@@ -18,31 +19,13 @@
  * (when the gate allows them through) so they reach the helper successfully.
  */
 import { test } from '@playwright/test';
+import { isDisposableDatabase } from './disposable-db';
 
 export { FACTORY_RESET_CONFIRMATION_PHRASE } from '../../shared/factoryResetPhrase';
-
-/**
- * Tokens that mark the *database name* (not host, not username, not password)
- * as a disposable test database. Each token is matched with a word-style
- * boundary against the parsed DB name only, so an incidental substring in a
- * username/host/password can never trick the gate. Add new tokens cautiously.
- */
-const DISPOSABLE_DBNAME_TOKENS = ['test', 'disposable', 'ephemeral'];
 
 export interface GateDecision {
   allow: boolean;
   reason: string;
-}
-
-/** Extract the database name (path without leading slash) from DATABASE_URL. */
-function parseDatabaseName(databaseUrl: string): string | null {
-  try {
-    const u = new URL(databaseUrl);
-    const dbName = u.pathname.replace(/^\//, '').split('?')[0];
-    return dbName.length > 0 ? dbName : null;
-  } catch {
-    return null;
-  }
 }
 
 export function shouldAllowFactoryResetTests(
@@ -56,35 +39,13 @@ export function shouldAllowFactoryResetTests(
         'opt in. This is one of two safety walls — see tests/e2e/factory-reset-gate.ts.',
     };
   }
-  const dbName = parseDatabaseName(env.DATABASE_URL ?? '');
-  if (!dbName) {
-    return {
-      allow: false,
-      reason:
-        'DATABASE_URL is missing or unparseable, so the disposable-database ' +
-        'check cannot run. Refusing to execute destructive factory-reset tests.',
-    };
-  }
-  // Word-style boundary: token must start the name, end the name, or be
-  // surrounded by non-alphanumeric characters. Prevents an incidental
-  // substring like "latest" matching "test".
-  const matchedToken = DISPOSABLE_DBNAME_TOKENS.find((token) => {
-    const re = new RegExp(`(^|[^a-z0-9])${token}([^a-z0-9]|$)`, 'i');
-    return re.test(dbName);
-  });
-  if (!matchedToken) {
-    return {
-      allow: false,
-      reason:
-        `Database name "${dbName}" does not contain any disposable-marker ` +
-        `token (${DISPOSABLE_DBNAME_TOKENS.join(', ')}) at a word boundary. ` +
-        `Refusing to run destructive factory-reset tests against what looks ` +
-        `like a non-disposable database.`,
-    };
+  const disposable = isDisposableDatabase(env);
+  if (!disposable.allow) {
+    return { allow: false, reason: disposable.reason };
   }
   return {
     allow: true,
-    reason: `disposable token "${matchedToken}" found in database name "${dbName}"`,
+    reason: disposable.reason,
   };
 }
 

@@ -1,5 +1,6 @@
 import { test, expect } from '@playwright/test';
 import { apiLogin, BASE_URL } from './helpers';
+import { gateBackupDestructiveTests } from './backup-destructive-gate';
 
 interface BackupRun {
   id: number;
@@ -11,20 +12,37 @@ interface BackupRun {
 }
 
 /**
- * Scheduled Backups spec (Task #325).
+ * Scheduled Backups spec (Task #325, hardened in Task #344).
  *
- * This spec exercises the new admin endpoints + the in-app scheduler.
- * The actual end-to-end "wait 75s for the backup to fire" path is
- * gated behind RUN_DESTRUCTIVE_BACKUP_TEST=1 because it (a) takes
- * minutes and (b) writes real backups to object storage. The default
- * run only covers the API contract: GET shape, PUT validation
- * branches, and that nextDueAt is computed when valid.
+ * Default run (no env overrides) covers ONLY safe API-contract behaviour:
+ *   - GET /api/ops/backup-schedule shape and 401 for anon.
+ *   - PUT validation branches (frequency, timeOfDay, retention range,
+ *     alert range), enable/disable, and the 14/14 boundary round-trip.
  *
- * To run the destructive test:
- *   RUN_DESTRUCTIVE_BACKUP_TEST=1 npx playwright test tests/e2e/13-scheduled-backups.spec.ts
+ * The default run does NOT call POST /api/ops/run-backups, does NOT
+ * change the configured retention to a value that would prune real
+ * backup history, and does NOT exercise the in-process scheduler tick.
+ *
+ * Two further describe blocks are gated and self-skip unless explicitly
+ * opted in:
+ *   - "Scheduled Backups (destructive — manual run + retention prune)"
+ *     covers the manual-run label assertion and the retention-pruning
+ *     assertion. Both write real backup rows and one of them sets
+ *     retentionCount=1 then runs two backups, which prunes prior
+ *     successful runs. Gated by gateBackupDestructiveTests.
+ *   - "Scheduled Backups (live tick)" covers the in-process scheduler
+ *     firing inside a ~75s window. Gated by the same helper.
+ *
+ * Both gates require RUN_DESTRUCTIVE_BACKUP_TEST=1 AND a DATABASE_URL
+ * whose database name contains a disposable-marker token at a word
+ * boundary (see tests/e2e/disposable-db.ts), so a careless env-var set
+ * cannot wipe live backup history.
+ *
+ * To run the destructive blocks:
+ *   RUN_DESTRUCTIVE_BACKUP_TEST=1 \
+ *   DATABASE_URL="postgres://.../my_test_db" \
+ *   npx playwright test tests/e2e/13-scheduled-backups.spec.ts
  */
-
-const RUN_DESTRUCTIVE = process.env.RUN_DESTRUCTIVE_BACKUP_TEST === '1';
 
 interface ScheduleResponse {
   enabled: boolean;
@@ -151,6 +169,45 @@ test.describe('Scheduled Backups (API)', () => {
     expect(body.nextDueAt).toBeNull();
   });
 
+  test('boundary values 14/14 round-trip through API and persist in DB (CHECK constraints exercised at the upper bound)', async () => {
+    // Both API and DB enforce 1..14. The API rejects 15 / 0 first
+    // (covered by the out-of-range tests above). The DB-layer CHECK
+    // constraints are exercised directly by the unit suite at
+    // tests/unit/dbCheckConstraints.test.ts (which connects to the DB
+    // and asserts a raw INSERT with retentionCount=15 / alert=15 is
+    // rejected with 23514 check_violation). Here we simply confirm
+    // the upper-bound payload (14 / 14) flows cleanly through the
+    // PUT endpoint and persists, proving the constraint accepts the
+    // valid ceiling.
+    const r = await fetch(`${BASE_URL}/api/ops/backup-schedule`, {
+      method: 'PUT',
+      headers: { 'Content-Type': 'application/json', Cookie: cookie },
+      body: JSON.stringify({ enabled: false, retentionCount: 14, alertThresholdDays: 14 }),
+    });
+    expect(r.status).toBe(200);
+    const body = (await r.json()) as ScheduleResponse;
+    expect(body.retentionCount).toBe(14);
+    expect(body.alertThresholdDays).toBe(14);
+
+    // Reset to defaults
+    await fetch(`${BASE_URL}/api/ops/backup-schedule`, {
+      method: 'PUT',
+      headers: { 'Content-Type': 'application/json', Cookie: cookie },
+      body: JSON.stringify({ enabled: false, retentionCount: 7, alertThresholdDays: 2 }),
+    });
+  });
+});
+
+test.describe('Scheduled Backups (destructive — manual run + retention prune)', () => {
+  let cookie: string;
+
+  test.beforeAll(async () => {
+    gateBackupDestructiveTests(
+      'Scheduled Backups (destructive — manual run + retention prune)',
+    );
+    cookie = await apiLogin();
+  });
+
   test('manual run records triggered_by_label = the admin username', async () => {
     // Trigger a manual backup
     const r = await fetch(`${BASE_URL}/api/ops/run-backups`, {
@@ -212,42 +269,13 @@ test.describe('Scheduled Backups (API)', () => {
       body: JSON.stringify({ enabled: false, retentionCount: 7, alertThresholdDays: 2 }),
     });
   });
-
-  test('boundary values 14/14 round-trip through API and persist in DB (CHECK constraints exercised at the upper bound)', async () => {
-    // Both API and DB enforce 1..14. The API rejects 15 / 0 first
-    // (covered by the out-of-range tests above). The DB-layer CHECK
-    // constraints are exercised directly by the unit suite at
-    // tests/unit/dbCheckConstraints.test.ts (which connects to the DB
-    // and asserts a raw INSERT with retentionCount=15 / alert=15 is
-    // rejected with 23514 check_violation). Here we simply confirm
-    // the upper-bound payload (14 / 14) flows cleanly through the
-    // PUT endpoint and persists, proving the constraint accepts the
-    // valid ceiling.
-    const r = await fetch(`${BASE_URL}/api/ops/backup-schedule`, {
-      method: 'PUT',
-      headers: { 'Content-Type': 'application/json', Cookie: cookie },
-      body: JSON.stringify({ enabled: false, retentionCount: 14, alertThresholdDays: 14 }),
-    });
-    expect(r.status).toBe(200);
-    const body = (await r.json()) as ScheduleResponse;
-    expect(body.retentionCount).toBe(14);
-    expect(body.alertThresholdDays).toBe(14);
-
-    // Reset to defaults
-    await fetch(`${BASE_URL}/api/ops/backup-schedule`, {
-      method: 'PUT',
-      headers: { 'Content-Type': 'application/json', Cookie: cookie },
-      body: JSON.stringify({ enabled: false, retentionCount: 7, alertThresholdDays: 2 }),
-    });
-  });
 });
 
 test.describe('Scheduled Backups (live tick)', () => {
-  test.skip(!RUN_DESTRUCTIVE, 'destructive backup tick test — set RUN_DESTRUCTIVE_BACKUP_TEST=1 to enable');
-
   let cookie: string;
 
   test.beforeAll(async () => {
+    gateBackupDestructiveTests('Scheduled Backups (live tick)');
     cookie = await apiLogin();
   });
 
