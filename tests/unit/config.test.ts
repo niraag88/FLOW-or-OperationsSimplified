@@ -83,6 +83,15 @@ test('validateConfig: a production env without OPS_TOKEN still passes (Task #362
   assert.equal(r.ok, true);
 });
 
+test('validateConfig: a dev env without OPS_TOKEN still passes (Task #362)', () => {
+  // Pinned alongside the production case so intent is explicit: OPS_TOKEN
+  // is no longer part of the schema in either NODE_ENV.
+  const env = { ...VALID_ENV };
+  delete env.OPS_TOKEN;
+  const r = validateConfig(env);
+  assert.equal(r.ok, true);
+});
+
 test('validateConfig: missing DEFAULT_OBJECT_STORAGE_BUCKET_ID fails', () => {
   const env = { ...VALID_ENV };
   delete env.DEFAULT_OBJECT_STORAGE_BUCKET_ID;
