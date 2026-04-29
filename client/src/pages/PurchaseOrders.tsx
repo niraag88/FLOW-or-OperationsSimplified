@@ -124,7 +124,10 @@ export default function PurchaseOrders() {
 
   const fetchGoodsReceipts = () => {
     fetch('/api/goods-receipts', { credentials: 'include' })
-      .then(r => r.json())
+      .then(r => {
+        if (!r.ok) throw new Error(`HTTP ${r.status} ${r.statusText}`);
+        return r.json();
+      })
       .then(data => {
         const grns = Array.isArray(data) ? data : [];
         setGoodsReceipts(grns as SchemaGoodsReceipt[]);
@@ -141,7 +144,10 @@ export default function PurchaseOrders() {
 
   const fetchAllPOsForGRNTab = () => {
     fetch('/api/purchase-orders?status=submitted,closed', { credentials: 'include' })
-      .then(r => r.json())
+      .then(r => {
+        if (!r.ok) throw new Error(`HTTP ${r.status} ${r.statusText}`);
+        return r.json();
+      })
       .then(result => setAllPOs(Array.isArray(result) ? result : (result.data || [])))
       .catch((err) => {
         console.error('Failed to load purchase orders for goods-receipts tab:', err);
