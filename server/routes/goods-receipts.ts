@@ -1,5 +1,5 @@
 import type { Express } from "express";
-import { goodsReceipts, goodsReceiptItems, purchaseOrders, purchaseOrderItems, stockCounts, stockCountItems, products, suppliers, storageObjects } from "@shared/schema";
+import { goodsReceipts, goodsReceiptItems, purchaseOrders, purchaseOrderItems, stockCounts, stockCountItems, stockMovements, products, suppliers, storageObjects } from "@shared/schema";
 import { db } from "../db";
 import { eq, desc, sql, inArray, and } from "drizzle-orm";
 import { businessStorage } from "../businessStorage";
@@ -198,6 +198,27 @@ export function registerGoodsReceiptRoutes(app: Express) {
     try {
       const stockCountId = parseInt(req.params.id);
       if (isNaN(stockCountId)) return res.status(400).json({ error: 'Invalid ID' });
+
+      // Task #364 (RF-6): a confirmed stock count writes adjustment rows
+      // into stock_movements (referenceType='stock_count', referenceId=
+      // this id). Hard-deleting the count would orphan those movements
+      // — the audit trail would point at a count document that no
+      // longer exists. Only counts that produced no movements (e.g. a
+      // count where every item matched current stock, or one created
+      // and never confirmed) can still be removed today; anything that
+      // touched stock is retained for audit. No void/reversal flow
+      // exists yet, so the only path forward is to refuse the delete.
+      const [linkedMovement] = await db
+        .select({ id: stockMovements.id })
+        .from(stockMovements)
+        .where(and(
+          eq(stockMovements.referenceType, 'stock_count'),
+          eq(stockMovements.referenceId, stockCountId),
+        ))
+        .limit(1);
+      if (linkedMovement) {
+        return res.status(400).json({ error: 'Stock counts are retained for audit and cannot be deleted. Create a new stock count to correct stock if needed.' });
+      }
 
       await db.delete(stockCountItems).where(eq(stockCountItems.stockCountId, stockCountId));
       await db.delete(stockCounts).where(eq(stockCounts.id, stockCountId));
