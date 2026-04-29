@@ -130,6 +130,7 @@
     "bufferutil": "^4.0.8"
   },
   "overrides": {
-    "basic-ftp": "^5.3.1"
+    "basic-ftp": "^5.3.1",
+    "dompurify": "^3.4.1"
   }
 }
