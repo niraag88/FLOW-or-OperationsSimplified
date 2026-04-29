@@ -18,7 +18,6 @@ const VALID_ENV: NodeJS.ProcessEnv = {
   DATABASE_URL: 'postgres://user:pass@localhost:5432/db',
   SESSION_SECRET: 'a'.repeat(32),
   DEFAULT_OBJECT_STORAGE_BUCKET_ID: 'replit-objstore-fixture-bucket-id',
-  // OPS_TOKEN intentionally omitted — optional in dev.
 };
 
 test('validateConfig: a complete dev env passes', () => {
@@ -68,22 +67,20 @@ test('validateConfig: malformed DATABASE_URL fails', () => {
   }
 });
 
-test('validateConfig: missing OPS_TOKEN is OK in dev', () => {
-  const env = { ...VALID_ENV };
-  delete env.OPS_TOKEN;
-  const r = validateConfig(env);
-  assert.equal(r.ok, true);
-});
-
-test('validateConfig: missing OPS_TOKEN fails in production', () => {
+// Task #362 (RF-8): OPS_TOKEN was previously required in production to
+// gate /api/ops/* endpoints. The middleware that consumed it
+// (`requireOpsToken`) was removed during Task #355's cleanup because
+// every /api/ops/* route is now protected by an authenticated Admin
+// session. The startup requirement was therefore stale, and the field
+// was dropped from the schema. The matching "missing OPS_TOKEN fails
+// in production" assertion was deleted; this test pins the new contract
+// by asserting that a PRODUCTION env without OPS_TOKEN now passes
+// validation, so a future contributor doesn't silently reintroduce the
+// requirement.
+test('validateConfig: a production env without OPS_TOKEN still passes (Task #362)', () => {
   const env = { ...VALID_ENV, NODE_ENV: 'production' as const };
   const r = validateConfig(env);
-  assert.equal(r.ok, false);
-  if (!r.ok) {
-    const joined = r.errors.join('\n');
-    assert.match(joined, /OPS_TOKEN/);
-    assert.match(joined, /production/);
-  }
+  assert.equal(r.ok, true);
 });
 
 test('validateConfig: missing DEFAULT_OBJECT_STORAGE_BUCKET_ID fails', () => {
@@ -163,7 +160,6 @@ test('server/index.ts: validator banner wins over side-effect imports', async ()
       DATABASE_URL: '',
       SESSION_SECRET: 'too-short',
       DEFAULT_OBJECT_STORAGE_BUCKET_ID: '',
-      OPS_TOKEN: '',
     },
     encoding: 'utf-8',
     timeout: 30000,

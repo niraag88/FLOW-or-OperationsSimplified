@@ -12,60 +12,57 @@
 
 import { z } from 'zod';
 
-// Helper: production = NODE_ENV explicitly set to 'production'. Anything
-// else (undefined, 'development', 'test', etc.) is treated as non-prod.
-const isProd = (env: NodeJS.ProcessEnv) => env.NODE_ENV === 'production';
-
 /**
- * Schema describing the environment contract. The schema is built
- * dynamically because OPS_TOKEN's required-ness depends on NODE_ENV.
+ * Schema describing the environment contract.
+ *
+ * Note (Task #362, RF-8): `OPS_TOKEN` was previously required in
+ * production to gate `/api/ops/*` endpoints. The middleware that
+ * consumed it (`requireOpsToken`) was removed during Task #355's
+ * cleanup because every `/api/ops/*` route is now protected by an
+ * authenticated Admin session. The startup requirement was therefore
+ * stale — production deployments were forced to set a secret that
+ * nothing read — so it has been dropped here. Do not reintroduce
+ * `OPS_TOKEN` without first wiring a real consumer middleware AND
+ * documenting in `replit.md` exactly which routes it gates.
  */
-function buildSchema(env: NodeJS.ProcessEnv) {
-  return z.object({
-    NODE_ENV: z
-      .enum(['development', 'production', 'test'])
-      .optional()
-      .default('development'),
+const SCHEMA = z.object({
+  NODE_ENV: z
+    .enum(['development', 'production', 'test'])
+    .optional()
+    .default('development'),
 
-    PORT: z
-      .string()
-      .optional()
-      .default('5000')
-      .refine((v) => /^\d+$/.test(v) && Number(v) > 0 && Number(v) <= 65535, {
-        message: 'PORT must be a positive integer between 1 and 65535',
-      }),
+  PORT: z
+    .string()
+    .optional()
+    .default('5000')
+    .refine((v) => /^\d+$/.test(v) && Number(v) > 0 && Number(v) <= 65535, {
+      message: 'PORT must be a positive integer between 1 and 65535',
+    }),
 
-    DATABASE_URL: z
-      .string({ required_error: 'DATABASE_URL is required' })
-      .min(1, 'DATABASE_URL is required')
-      .refine((v) => v.startsWith('postgres://') || v.startsWith('postgresql://'), {
-        message: 'DATABASE_URL must be a postgres:// or postgresql:// connection string',
-      }),
+  DATABASE_URL: z
+    .string({ required_error: 'DATABASE_URL is required' })
+    .min(1, 'DATABASE_URL is required')
+    .refine((v) => v.startsWith('postgres://') || v.startsWith('postgresql://'), {
+      message: 'DATABASE_URL must be a postgres:// or postgresql:// connection string',
+    }),
 
-    SESSION_SECRET: z
-      .string({ required_error: 'SESSION_SECRET is required' })
-      .min(32, 'SESSION_SECRET must be at least 32 characters long'),
+  SESSION_SECRET: z
+    .string({ required_error: 'SESSION_SECRET is required' })
+    .min(32, 'SESSION_SECRET must be at least 32 characters long'),
 
-    DEFAULT_OBJECT_STORAGE_BUCKET_ID: z
-      .string({ required_error: 'DEFAULT_OBJECT_STORAGE_BUCKET_ID is required (object storage is in active use)' })
-      .min(1, 'DEFAULT_OBJECT_STORAGE_BUCKET_ID is required (object storage is in active use)'),
+  DEFAULT_OBJECT_STORAGE_BUCKET_ID: z
+    .string({ required_error: 'DEFAULT_OBJECT_STORAGE_BUCKET_ID is required (object storage is in active use)' })
+    .min(1, 'DEFAULT_OBJECT_STORAGE_BUCKET_ID is required (object storage is in active use)'),
 
-    OPS_TOKEN: isProd(env)
-      ? z
-          .string({ required_error: 'OPS_TOKEN is required in production (used to gate /api/ops/* endpoints)' })
-          .min(1, 'OPS_TOKEN is required in production (used to gate /api/ops/* endpoints)')
-      : z.string().optional(),
+  SESSION_MAX_AGE: z
+    .string()
+    .optional()
+    .refine((v) => v === undefined || (/^\d+$/.test(v) && Number(v) > 0), {
+      message: 'SESSION_MAX_AGE must be a positive integer (milliseconds) when set',
+    }),
+});
 
-    SESSION_MAX_AGE: z
-      .string()
-      .optional()
-      .refine((v) => v === undefined || (/^\d+$/.test(v) && Number(v) > 0), {
-        message: 'SESSION_MAX_AGE must be a positive integer (milliseconds) when set',
-      }),
-  });
-}
-
-export type Config = z.infer<ReturnType<typeof buildSchema>>;
+export type Config = z.infer<typeof SCHEMA>;
 
 /**
  * Per-variable hint shown alongside each failure. Kept short so the
@@ -79,8 +76,6 @@ const FIX_HINTS: Record<string, string> = {
     'Set SESSION_SECRET to a random 32+ character string. Generate one with: openssl rand -hex 32',
   DEFAULT_OBJECT_STORAGE_BUCKET_ID:
     'Set DEFAULT_OBJECT_STORAGE_BUCKET_ID to the object-storage bucket ID. On Replit, provision Object Storage to populate this automatically.',
-  OPS_TOKEN:
-    'Set OPS_TOKEN to a long random secret. It gates the destructive /api/ops/* endpoints when called outside an authenticated admin session.',
   PORT: 'Set PORT to an integer between 1 and 65535, or leave it unset to use the default (5000).',
   SESSION_MAX_AGE:
     'Set SESSION_MAX_AGE to a positive integer in milliseconds, or leave it unset to use the default (8 hours).',
@@ -97,8 +92,7 @@ export type ValidationResult =
  * triggering process.exit.
  */
 export function validateConfig(env: NodeJS.ProcessEnv = process.env): ValidationResult {
-  const schema = buildSchema(env);
-  const parsed = schema.safeParse(env);
+  const parsed = SCHEMA.safeParse(env);
   if (parsed.success) {
     return { ok: true, config: parsed.data };
   }
