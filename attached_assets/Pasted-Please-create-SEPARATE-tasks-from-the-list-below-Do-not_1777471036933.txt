@@ -1,0 +1,232 @@
+Please create SEPARATE tasks from the list below. Do not implement this as one giant patch.
+
+Important constraints:
+- Do not touch PDF, print, Excel export layouts, or document formatting.
+- Do not run factory reset.
+- Do not run restore against live data.
+- Do not run migrations unless a task explicitly needs one; these tasks should not need schema changes.
+- Keep each task scoped, testable, and independently reviewable.
+- If two tasks touch the same file, do them sequentially, not in parallel.
+
+Task RF-1 — Critical: Block delivered invoice deletion
+
+Problem:
+Delivered invoices can still be deleted/moved to recycle bin instead of going through the cancel flow. This bypasses the intended stock-reversal/audit path.
+
+Affected files:
+- server/routes/invoices.ts
+- client/src/components/invoices/InvoiceActionsDropdown.tsx
+- relevant invoice tests
+
+Required behavior:
+- DELETE /api/invoices/:id must reject invoices where status is "delivered" OR stockDeducted is true.
+- Return a clear 400/409 message telling the user to use Cancel Invoice instead.
+- The UI must not show "Delete" for delivered invoices. It should show/use the existing Cancel Invoice flow.
+- Draft/submitted invoices may keep the existing delete-to-recycle behavior.
+
+Tests:
+- Delivered invoice DELETE returns error and invoice remains.
+- Delivered invoice action menu does not offer Delete.
+- Draft/submitted invoice delete still works as before.
+- Cancel invoice flow still works.
+
+Avoid:
+- Do not change stock movement logic.
+- Do not change PDF/print/export.
+- Do not change invoice totals/VAT logic.
+
+
+Task RF-2 — High/Medium: Make master-data recycle-bin deletes atomic
+
+Problem:
+Brand, customer, and supplier delete routes insert a recycle-bin row before the actual delete. If the delete fails due to foreign-key/history usage, the recycle bin can contain a fake deleted record while the live record still exists.
+
+Affected files:
+- server/routes/brands.ts
+- server/routes/customers.ts
+- server/routes/suppliers.ts
+- optionally server/routes/products.ts only to verify it already behaves safely
+
+Required behavior:
+- Recycle-bin insert and actual delete/deactivate must happen in one transaction.
+- If deletion fails, no recycle-bin row should remain.
+- FK/history failures should return a clear 400/409, not create partial state.
+- Keep existing user-facing behavior otherwise.
+
+Tests:
+- Try deleting a supplier used by a PO: route fails cleanly and no recycle-bin row is created.
+- Same idea for customer/brand if referenced.
+- Deleting an unused record still creates recycle-bin row and removes/deactivates the live record.
+
+Avoid:
+- Do not redesign recycle bin.
+- Do not change restore behavior except as needed by the transaction.
+
+
+Task RF-3 — Medium: Harden Purchase Order valid-line enforcement and POST atomicity
+
+Problem:
+PO create/update checks that items is a non-empty array, but the totals helper can silently skip invalid rows. This can create/update a PO with zero valid line items. PO POST is also not fully atomic.
+
+Affected files:
+- server/routes/purchase-orders.ts
+- server/lib/purchaseOrderTotals.ts
+- relevant PO tests
+
+Required behavior:
+- After computePurchaseOrderTotals(), reject with 400 if computed.items.length === 0.
+- Apply this to POST and PUT-with-items.
+- Wrap PO POST header creation, item inserts, totals update, and company snapshot update in one transaction.
+- Keep PUT transaction behavior.
+- Tighten numeric parsing:
+  - reject malformed numeric strings like "12abc"
+  - reject negative/non-positive FX rates when provided
+  - reject malformed productId where an item row was intentionally supplied
+- Keep accepting normal UI payloads.
+
+Tests:
+- POST with items array but zero valid computed items returns 400 and creates no PO.
+- PUT with invalid/empty computed items returns 400 and preserves existing PO lines.
+- POST failure during item insert does not leave a header-only PO.
+- Normal PO create/update still works.
+
+Avoid:
+- No schema changes.
+- Do not touch GRN logic except tests if needed.
+- Do not touch PO PDF/print/export layout.
+
+
+Task RF-4 — Medium: Prevent scan upload overwrite for existing document-bound keys
+
+Problem:
+Upload-scan now verifies that a key belongs to a real document, which is good, but document-bound keys can still overwrite an existing object. The “key already exists” check only applies to anonymous GRN staging keys.
+
+Affected files:
+- server/routes/system.ts
+- storage/upload tests
+
+Required behavior:
+- For all upload-scan keys, including invoices, delivery, purchase-orders, and goods-receipts document-bound keys:
+  - check storage_objects for an existing key
+  - check object storage for an existing object
+  - reject with 409 if the key already exists
+- Only allow replacement through an explicit existing replace/remove flow, not by accidental direct upload.
+
+Tests:
+- Upload to a fresh generated key succeeds.
+- Upload to the same key again returns 409.
+- Anonymous GRN staging behavior remains protected.
+
+Avoid:
+- Do not change signed-get behavior.
+- Do not change file-size limits.
+- Do not change PDF/image validation rules.
+
+
+Task RF-5 — Medium: Add shared destructive-operation lock for restore and factory reset
+
+Problem:
+Factory reset has an advisory lock, but restore does not appear to share it. Two restores, or restore plus factory reset, could overlap.
+
+Affected files:
+- server/routes/system.ts
+- optionally a small helper file if needed
+
+Required behavior:
+- Add one shared advisory lock for destructive DB operations:
+  - factory reset
+  - restore from cloud backup
+  - restore from uploaded backup
+- If another destructive DB operation is running, return 409 with a clear message.
+- Preserve existing typed confirmation phrases.
+- Preserve existing restore validation/decompression behavior.
+
+Tests:
+- Mock/trigger concurrent restore attempts and confirm one gets 409.
+- Factory reset lock behavior still works.
+- Tests must be gated and must not run destructive operations against a live DB.
+
+Avoid:
+- Do not run factory reset manually.
+- Do not run restore manually on live data.
+- Do not change backup file format.
+
+
+Task RF-6 — Medium/Low: Stop hard-deleting stock count records after stock correction
+
+Problem:
+Stock counts can adjust product stock, but the stock-count delete endpoint hard-deletes the count record afterward. That removes the audit document while leaving stock movements/product stock changed.
+
+Affected files:
+- server/routes/goods-receipts.ts or wherever stock-count routes live
+- stock count UI/tests if needed
+
+Required behavior:
+- Do not allow hard deletion of stock counts that created stock corrections.
+- Either:
+  - reject delete with a clear message saying stock counts are retained for audit, OR
+  - implement a proper void/cancel flow with reversal movements.
+- Prefer the smallest safe fix: reject deletion for audit retention.
+
+Tests:
+- Create stock count with corrections, then DELETE returns clear error and count remains.
+- Existing stock-count list/detail still works.
+
+Avoid:
+- Do not rewrite inventory logic.
+- Do not alter existing stock movement history.
+
+
+Task RF-7 — Medium/Low: Review and tighten broad write permissions
+
+Problem:
+Many write/delete routes use requireAuth() with default Admin/Manager/Staff access. This may be intended for some routes, but it should be explicit and consistent.
+
+Affected files:
+- server/routes/products.ts
+- server/routes/brands.ts
+- server/routes/customers.ts
+- server/routes/suppliers.ts
+- server/routes/delivery-orders.ts
+- server/routes/inventory.ts
+- any related route tests
+
+Required behavior:
+- Produce a small permission matrix first.
+- Confirm which write/delete actions Staff should be allowed to perform.
+- Where Staff should not be allowed, change requireAuth() to requireAuth(["Admin", "Manager"]) or the appropriate role list.
+- Keep read-only routes broadly accessible if currently intended.
+
+Tests:
+- Staff gets 403 for restricted write/delete routes.
+- Admin/Manager still succeed.
+- Existing UI should not show actions the backend now forbids.
+
+Avoid:
+- Do not change authentication/session architecture.
+- Do not touch backup/restore/factory reset permissions in this task unless only adding tests.
+
+
+Task RF-8 — Low: Resolve OPS_TOKEN production mismatch
+
+Problem:
+server/config.ts requires OPS_TOKEN in production, but OPS_TOKEN does not appear to be used by the current route protection. This can cause deployment failures for an unused variable.
+
+Affected files:
+- server/config.ts
+- tests/unit/config.test.ts
+- documentation only if needed
+
+Required behavior:
+- Decide one of two safe approaches:
+  1. If OPS_TOKEN is no longer used, stop requiring it in production and update tests/comments.
+  2. If OPS_TOKEN is still intended, wire it intentionally and document exactly what it protects.
+- Prefer option 1 unless there is an existing real caller.
+
+Tests:
+- Production config validation matches the chosen behavior.
+- No secrets are printed in logs.
+
+Avoid:
+- Do not introduce a second auth system.
+- Do not weaken Admin-only HTTP route protection.
