@@ -89,33 +89,171 @@ export async function apiLogin(): Promise<string> {
   return cookie;
 }
 
+// ── CSRF helpers (Task #374) ──────────────────────────────────────────────────
+//
+// Two layers protect existing specs from the new CSRF middleware:
+//
+//   1. `apiPost`/`apiPut`/`apiDelete` explicitly call `withCsrf()` and attach
+//      the token + paired cookie themselves.
+//   2. A global `fetch` interceptor (installed at module load) auto-attaches
+//      a CSRF token to ANY raw `fetch(..., { method: 'POST' | ... })` call
+//      that targets `${BASE_URL}/api/*` and carries a session cookie. This
+//      keeps the ~99 raw mutating fetches scattered across spec files
+//      working without per-callsite changes.
+//
+// Tests that need the un-intercepted fetch (e.g. the CSRF regression spec
+// itself) should import `rawFetch` from this module.
+
+const CSRF_COOKIE_NAME = 'flow.x-csrf-token';
+const SESSION_COOKIE_REGEX = /connect\.sid=[^;]+/;
+const SIGNED_UPLOAD_PATH_REGEX = /^\/api\/storage\/upload\/[A-Za-z0-9]+$/;
+const SKIP_PATHS = new Set<string>([
+  '/api/auth/login',
+  '/api/auth/logout',
+  '/api/auth/csrf-token',
+]);
+const MUTATING_METHODS = new Set(['POST', 'PUT', 'PATCH', 'DELETE']);
+
+export const rawFetch: typeof fetch = globalThis.fetch.bind(globalThis);
+
+const csrfCache = new Map<string, { token: string; combinedCookie: string; csrfCookie: string }>();
+
+function pickCsrfCookieFromHeaders(setCookieHeaders: string[]): string {
+  for (const sc of setCookieHeaders) {
+    const semi = sc.indexOf(';');
+    const pair = (semi === -1 ? sc : sc.slice(0, semi)).trim();
+    if (pair.startsWith(`${CSRF_COOKIE_NAME}=`)) return pair;
+  }
+  return '';
+}
+
+async function withCsrf(sessionCookie: string): Promise<{ token: string; combinedCookie: string; csrfCookie: string }> {
+  const cached = csrfCache.get(sessionCookie);
+  if (cached) return cached;
+
+  const r = await rawFetch(`${BASE_URL}/api/auth/csrf-token`, {
+    headers: { Cookie: sessionCookie },
+  });
+  if (!r.ok) {
+    throw new Error(`Failed to fetch CSRF token: ${r.status} ${await r.text()}`);
+  }
+  const data = (await r.json()) as { csrfToken: string };
+
+  // Node 18+: getSetCookie() returns one entry per Set-Cookie header.
+  const setCookies =
+    typeof (r.headers as unknown as { getSetCookie?: () => string[] }).getSetCookie === 'function'
+      ? (r.headers as unknown as { getSetCookie: () => string[] }).getSetCookie()
+      : [r.headers.get('set-cookie') ?? ''];
+  const csrfCookie = pickCsrfCookieFromHeaders(setCookies);
+  if (!csrfCookie) {
+    throw new Error('CSRF cookie was not set by /api/auth/csrf-token');
+  }
+
+  const result = {
+    token: data.csrfToken,
+    csrfCookie,
+    combinedCookie: `${sessionCookie}; ${csrfCookie}`,
+  };
+  csrfCache.set(sessionCookie, result);
+  return result;
+}
+
+// Install global fetch interceptor — auto-attaches CSRF to raw mutating
+// fetches against the live server. Idempotent: re-importing helpers.ts in
+// multiple specs only patches once thanks to the marker symbol.
+const PATCHED_MARKER = Symbol.for('flow.csrf.patched');
+type PatchedFetch = typeof fetch & { [PATCHED_MARKER]?: true };
+if (!(globalThis.fetch as PatchedFetch)[PATCHED_MARKER]) {
+  function resolveUrlAndMethod(input: RequestInfo | URL, init?: RequestInit): { url: string; method: string } {
+    const method = (init?.method ?? (typeof input === 'object' && 'method' in input ? input.method : 'GET') ?? 'GET').toUpperCase();
+    let url: string;
+    if (typeof input === 'string') url = input;
+    else if (input instanceof URL) url = input.toString();
+    else url = (input as Request).url;
+    return { url, method };
+  }
+
+  const patched: PatchedFetch = (async (input: RequestInfo | URL, init?: RequestInit) => {
+    const { url, method } = resolveUrlAndMethod(input, init);
+
+    if (!url.startsWith(BASE_URL)) return rawFetch(input, init);
+    if (!MUTATING_METHODS.has(method)) return rawFetch(input, init);
+
+    const pathOnly = url.slice(BASE_URL.length).split('?')[0];
+    if (!pathOnly.startsWith('/api/')) return rawFetch(input, init);
+    if (SKIP_PATHS.has(pathOnly)) return rawFetch(input, init);
+    if (SIGNED_UPLOAD_PATH_REGEX.test(pathOnly)) return rawFetch(input, init);
+
+    const headers = new Headers(init?.headers);
+    // Caller already set a token (regression spec exercising rejection paths
+    // or success path) — don't overwrite.
+    if (headers.has('x-csrf-token')) return rawFetch(input, init);
+
+    const cookieHeader = headers.get('cookie');
+    if (!cookieHeader) return rawFetch(input, init);
+
+    const sessionMatch = cookieHeader.match(SESSION_COOKIE_REGEX);
+    if (!sessionMatch) return rawFetch(input, init);
+
+    try {
+      const { token, csrfCookie } = await withCsrf(sessionMatch[0]);
+      headers.set('X-CSRF-Token', token);
+      // Avoid duplicating the csrf cookie if it's already in the Cookie header.
+      if (!cookieHeader.includes(`${CSRF_COOKIE_NAME}=`)) {
+        headers.set('Cookie', `${cookieHeader}; ${csrfCookie}`);
+      }
+      return rawFetch(input, { ...init, headers });
+    } catch {
+      // If token fetch fails (e.g. session expired), fall through and let the
+      // server return its real error to the caller.
+      return rawFetch(input, init);
+    }
+  }) as PatchedFetch;
+  patched[PATCHED_MARKER] = true;
+  globalThis.fetch = patched;
+}
+
 export async function apiGet(path: string, cookie: string): Promise<unknown> {
   const r = await fetch(`${BASE_URL}${path}`, { headers: { Cookie: cookie } });
   return r.json();
 }
 
 export async function apiPost(path: string, body: object, cookie: string) {
+  const { token, combinedCookie } = await withCsrf(cookie);
   const r = await fetch(`${BASE_URL}${path}`, {
     method: 'POST',
-    headers: { 'Content-Type': 'application/json', Cookie: cookie },
+    headers: {
+      'Content-Type': 'application/json',
+      Cookie: combinedCookie,
+      'X-CSRF-Token': token,
+    },
     body: JSON.stringify(body),
   });
   return { status: r.status, data: (await r.json()) as unknown };
 }
 
 export async function apiPut(path: string, body: object, cookie: string) {
+  const { token, combinedCookie } = await withCsrf(cookie);
   const r = await fetch(`${BASE_URL}${path}`, {
     method: 'PUT',
-    headers: { 'Content-Type': 'application/json', Cookie: cookie },
+    headers: {
+      'Content-Type': 'application/json',
+      Cookie: combinedCookie,
+      'X-CSRF-Token': token,
+    },
     body: JSON.stringify(body),
   });
   return { status: r.status, data: (await r.json()) as unknown };
 }
 
 export async function apiDelete(path: string, cookie: string) {
+  const { token, combinedCookie } = await withCsrf(cookie);
   const r = await fetch(`${BASE_URL}${path}`, {
     method: 'DELETE',
-    headers: { Cookie: cookie },
+    headers: {
+      Cookie: combinedCookie,
+      'X-CSRF-Token': token,
+    },
   });
   return r.status;
 }

@@ -4,6 +4,7 @@ import { users } from "@shared/schema";
 import { db } from "../db";
 import { eq } from "drizzle-orm";
 import { requireAuth, comparePassword, type AuthenticatedRequest } from "../middleware";
+import { generateCsrfToken } from "../csrf";
 
 export function registerAuthRoutes(app: Express, loginLimiter: RateLimitRequestHandler) {
   app.post('/api/auth/login', loginLimiter, async (req: AuthenticatedRequest, res) => {
@@ -57,5 +58,13 @@ export function registerAuthRoutes(app: Express, loginLimiter: RateLimitRequestH
   app.get('/api/auth/me', requireAuth(), async (req: AuthenticatedRequest, res) => {
     const { password: _, ...userInfo } = req.user!;
     res.json({ user: userInfo });
+  });
+
+  // Issue a CSRF token bound to the current session. Sets the paired
+  // double-submit cookie on the response. Requires a session so each
+  // user gets a token tied to their own session ID.
+  app.get('/api/auth/csrf-token', requireAuth(), (req: AuthenticatedRequest, res) => {
+    const csrfToken = generateCsrfToken(req, res);
+    res.json({ csrfToken });
   });
 }

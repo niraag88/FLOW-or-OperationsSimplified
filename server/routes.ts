@@ -3,6 +3,7 @@ import { createServer, type Server } from "http";
 import rateLimit from 'express-rate-limit';
 import session from 'express-session';
 import { sessionStore } from "./middleware";
+import { doubleCsrfProtection } from "./csrf";
 
 import { registerAuthRoutes } from "./routes/auth";
 import { registerBrandRoutes } from "./routes/brands";
@@ -58,6 +59,14 @@ export async function registerRoutes(app: Express): Promise<Server> {
   });
 
   app.use('/api', apiLimiter);
+
+  // CSRF protection — must run AFTER session middleware (needs req.sessionID).
+  // Mounted at app level (NOT '/api') because Express strips the mount prefix
+  // from req.path, which would break our skip-list checks for /api/auth/login
+  // etc. The middleware ignores GET/HEAD/OPTIONS and skips non-/api/ routes,
+  // /api/auth/login, /api/auth/logout, and signed-token uploads (see
+  // server/csrf.ts).
+  app.use(doubleCsrfProtection);
 
   registerSystemRoutes(app);
   registerAuthRoutes(app, loginLimiter);

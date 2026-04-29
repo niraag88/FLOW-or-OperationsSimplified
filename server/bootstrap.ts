@@ -15,6 +15,7 @@
 import express, { type Request, Response, NextFunction } from "express";
 import helmet from "helmet";
 import multer from "multer";
+import cookieParser from "cookie-parser";
 import { registerRoutes } from "./routes";
 import { initializeAdminUser } from "./adminInit";
 import { setupVite, serveStatic, log } from "./vite";
@@ -28,6 +29,7 @@ app.use(helmet({
 }));
 app.use(express.json());
 app.use(express.urlencoded({ extended: false }));
+app.use(cookieParser());
 
 app.use((req, res, next) => {
   const start = Date.now();
