@@ -295,6 +295,14 @@ export function registerSystemRoutes(app: Express) {
         if (existing.length > 0) {
           return res.status(409).json({ error: 'Storage key already in use' });
         }
+        // Belt-and-braces: also check the underlying object store for any
+        // legacy object that was uploaded before storage_objects tracking
+        // existed. This closes the narrow case where a guessed timestamp
+        // could overwrite an untracked legacy file.
+        const objectExists = await objectStorageClient.exists(storageKey);
+        if (objectExists.ok && objectExists.value) {
+          return res.status(409).json({ error: 'Storage key already in use' });
+        }
       }
 
       if (req.file.size !== fileSize) {
