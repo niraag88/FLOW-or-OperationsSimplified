@@ -280,6 +280,28 @@ export function registerSystemRoutes(app: Express) {
         if (docDate.getUTCFullYear() !== keyYear) {
           return res.status(404).json({ error: 'Storage key year does not match document year' });
         }
+        // Task #367 (RF-4): refuse a direct re-upload to a key that already
+        // holds a scan. Without this, a user who knows an existing
+        // attachment path can silently overwrite a real document's scan,
+        // bypassing the audited remove-then-upload replace flow that is the
+        // ONLY sanctioned way to swap an existing scan. The same 409 has
+        // applied since #353 to anonymous staging keys (below); this brings
+        // doc-bound keys to parity. Check storage_objects first (cheap,
+        // covers every key written by the app) and then probe object
+        // storage to catch any legacy file uploaded before tracking
+        // existed.
+        const existing = await db
+          .select({ key: storageObjects.key })
+          .from(storageObjects)
+          .where(eq(storageObjects.key, storageKey))
+          .limit(1);
+        if (existing.length > 0) {
+          return res.status(409).json({ error: 'A scan already exists at that key. Use the replace flow.' });
+        }
+        const objectExists = await objectStorageClient.exists(storageKey);
+        if (objectExists.ok && objectExists.value) {
+          return res.status(409).json({ error: 'A scan already exists at that key. Use the replace flow.' });
+        }
       } else {
         // Anonymous staging upload (GRN flat format only). Require the key
         // is fresh — refuse if storage_objects already tracks it so a
