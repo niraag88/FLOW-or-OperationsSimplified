@@ -13,12 +13,10 @@ const objectStorageClient = new Client({
 });
 
 async function uploadBackup() {
-  // tempPath is assigned only AFTER pg_dump has been spawned and the write
-  // stream has been opened, so the finally block at the bottom of the
-  // function can distinguish "no file ever created" (tempPath === null,
-  // nothing to clean up) from "file created and may need cleanup" (tempPath
-  // is a string). Declared with let at function scope so catch/finally can
-  // see it.
+  // Function-scoped so catch/finally can see it. Stays null until pg_dump
+  // has been spawned and we are about to open the write stream — so the
+  // finally block can distinguish "no file ever created" (null) from "file
+  // may exist on disk" (string).
   let tempPath = null;
 
   try {
@@ -52,9 +50,9 @@ async function uploadBackup() {
 
     const gzip = createGzip();
 
-    // Create write stream to temp file. pg_dump has been spawned; once we
-    // open the write stream we own the temp file and the finally block must
-    // be able to clean it up if anything below throws.
+    // Assign tempPath immediately before opening the write stream — from
+    // this line on, the finally block must clean the file up if anything
+    // throws.
     const fs = await import('fs');
     tempPath = `/tmp/${filename}`;
     const writeStream = fs.createWriteStream(tempPath);
@@ -113,16 +111,10 @@ async function uploadBackup() {
       timestamp: new Date().toISOString()
     };
   } finally {
-    // Best-effort cleanup of the temp dump file. Runs on BOTH success and
-    // failure so a failed upload (or any post-spawn error) cannot leave a
-    // /tmp/db-*.sql.gz behind to fill the disk on retries.
-    //  - If tempPath is null, pg_dump never reached the point where the
-    //    write stream was opened — nothing to remove.
-    //  - ENOENT means the file was never written or already removed; treat
-    //    as success and stay silent.
-    //  - Any other unlink error is logged but does NOT mutate the
-    //    function's return value: the original backup error (if any) must
-    //    remain the visible failure to the caller.
+    // Best-effort temp cleanup on both success and failure. ENOENT is
+    // silent; other unlink errors are logged but never mutate the
+    // function's return value, so the original backup error remains
+    // visible to the caller.
     if (tempPath) {
       try {
         const fs = await import('fs');
