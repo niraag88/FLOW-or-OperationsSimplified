@@ -106,12 +106,33 @@ export function registerPurchaseOrderRoutes(app: Express) {
         validatedData.fxRateToAed ?? null,
       );
 
-      const purchaseOrder = await businessStorage.createPurchaseOrder(validatedData);
+      // Task #366 (RF-3): the helper legitimately skips lines with no
+      // productId or qty <= 0 (kept by #351). The route's first guard
+      // catches a literally empty items array; this second guard catches
+      // a non-empty array whose every line was skipped after compute.
+      // Without this, a PO would be created with zero items and zero
+      // totals, sitting orphaned in the list view.
+      if (computed.items.length === 0) {
+        throw new PurchaseOrderRequestError(400, {
+          error: 'At least one valid line item is required to save a purchase order',
+        });
+      }
 
-      if (computed.items.length > 0) {
+      // Task #366 (RF-3): wrap header insert + item inserts + totals /
+      // snapshot update in one db.transaction. Previously the header
+      // was inserted via businessStorage.createPurchaseOrder OUTSIDE
+      // any tx — a failure in the item loop or the totals UPDATE
+      // would leave a header-only PO behind. The audit-log call stays
+      // outside (fire-and-forget, matching the PUT path).
+      const purchaseOrder = await db.transaction(async (tx) => {
+        const [created] = await tx
+          .insert(purchaseOrders)
+          .values(validatedData)
+          .returning();
+
         for (const item of computed.items) {
-          await db.insert(purchaseOrderItems).values({
-            poId: purchaseOrder.id,
+          await tx.insert(purchaseOrderItems).values({
+            poId: created.id,
             productId: item.productId,
             quantity: item.quantity,
             unitPrice: item.unitPriceStr,
@@ -120,20 +141,19 @@ export function registerPurchaseOrderRoutes(app: Express) {
             sizeOverride: item.sizeOverride,
           });
         }
-        await db.update(purchaseOrders)
+
+        const [finalRow] = await tx
+          .update(purchaseOrders)
           .set({
             totalAmount: computed.totalAmountStr,
             grandTotal: computed.grandTotalStr,
             companySnapshot: companySnapshotData,
           })
-          .where(eq(purchaseOrders.id, purchaseOrder.id));
-        purchaseOrder.totalAmount = computed.totalAmountStr;
-        purchaseOrder.grandTotal = computed.grandTotalStr;
-      } else if (companySnapshotData) {
-        await db.update(purchaseOrders)
-          .set({ companySnapshot: companySnapshotData })
-          .where(eq(purchaseOrders.id, purchaseOrder.id));
-      }
+          .where(eq(purchaseOrders.id, created.id))
+          .returning();
+
+        return finalRow ?? created;
+      });
 
       writeAuditLog({ actor: req.user!.id, actorName: req.user?.username || String(req.user!.id), targetId: String(purchaseOrder.id), targetType: 'purchase_order', action: 'CREATE', details: `PO #${purchaseOrder.poNumber} created` });
       res.status(201).json(purchaseOrder);
@@ -196,6 +216,15 @@ export function registerPurchaseOrderRoutes(app: Express) {
             effectiveCurrency,
             effectiveFxRate,
           );
+
+          // Task #366 (RF-3): mirror POST. Helper legitimately skips
+          // lines without productId or qty <= 0; reject before any
+          // header/items write so a PUT can never zero-out a PO.
+          if (computed.items.length === 0) {
+            throw new PurchaseOrderRequestError(400, {
+              error: 'At least one valid line item is required to save a purchase order',
+            });
+          }
 
           const existingItems = await tx
             .select({ productId: purchaseOrderItems.productId, receivedQuantity: purchaseOrderItems.receivedQuantity })
