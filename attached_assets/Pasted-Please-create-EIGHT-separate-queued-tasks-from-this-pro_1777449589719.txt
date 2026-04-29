@@ -1,0 +1,331 @@
+Please create EIGHT separate queued tasks from this prompt. Do not combine them into one broad refactor.
+
+Context:
+Codex reviewed the app after the Fix Now backup/restore work. The remaining items are Medium/Low “Fix Soon” hardening tasks. They should be handled separately and safely.
+
+Global guardrails for all eight tasks:
+- Treat each section below as a separate task.
+- Do not touch PDF/print layouts.
+- Do not change invoice/DO/GRN stock logic unless a task explicitly says so.
+- Do not run factory reset.
+- Do not run restore against live data.
+- Do not create schema migrations unless the task absolutely requires it.
+- If a task is already fixed in the current code, mark it complete and explain where it is fixed.
+- Prefer small tests for each task.
+- Keep UI changes minimal and only where explicitly requested.
+
+TASK FS-1 — Clean up temp DB backup files on failure
+
+Problem:
+scripts/uploadBackup.js writes the DB dump to /tmp, but if upload or another later step fails, the temp .sql.gz file may be left behind.
+
+Affected file:
+- scripts/uploadBackup.js
+
+Current risky behavior:
+- Backup succeeds: temp file is deleted.
+- Backup fails after pg_dump creates the file: temp file may remain.
+- Scheduled retries could eventually fill disk.
+
+Desired behavior:
+- Any temp file created by uploadBackup() is removed in a finally block.
+- Cleanup should happen on success and failure.
+- Cleanup failure should be logged but should not hide the original backup error.
+
+Exact logic:
+- Track tempPath only after it is assigned.
+- In finally, if tempPath exists, attempt fs.promises.unlink(tempPath).
+- Ignore ENOENT.
+- Log other cleanup errors.
+- Do not change backup filename/storage key format in this task unless needed.
+
+Manual test:
+- Temporarily force objectStorageClient.uploadFromFilename to fail in a test/mocked path.
+- Confirm uploadBackup() returns success:false.
+- Confirm the temp file is removed.
+
+Acceptance criteria:
+- Successful backup still works.
+- Failed upload does not leave /tmp/db-*.sql.gz behind.
+- Original error message remains visible.
+
+TASK FS-2 — Make backup pruning respect object-storage delete failures
+
+Problem:
+server/runBackup.ts calls objectStorageClient.delete() during pruning but appears to rely mostly on thrown errors. Elsewhere in the app, objectStorageClient.delete() returns an { ok } result. If delete returns ok:false without throwing, pruning may still delete the backup_runs DB row and orphan the file.
+
+Affected file:
+- server/runBackup.ts
+
+Current risky behavior:
+- A storage delete can fail.
+- The visible backup history row may still be removed.
+- The file can remain in object storage with no UI row pointing to it.
+
+Desired behavior:
+- Only delete the backup_runs row after every referenced storage object is confirmed deleted or already missing.
+- If storage delete returns ok:false, keep the backup_runs row for retry.
+
+Exact logic:
+- For dbStorageKey and manifestStorageKey:
+  - Call delete.
+  - If result.ok === true, treat as deleted.
+  - If delete throws 404/NoSuchKey/NotFound, treat as already gone.
+  - If result.ok === false or throws non-404, set allObjectsGone=false.
+- Keep the DB row when allObjectsGone=false.
+- Log enough detail to troubleshoot.
+- Do not change retention count rules.
+
+Manual test:
+- Mock or force objectStorageClient.delete() to return ok:false.
+- Run pruneOldBackups().
+- Confirm the backup_runs row remains.
+- Confirm it is retried on next prune.
+
+Acceptance criteria:
+- Pruning never removes catalogue rows unless files are gone or already missing.
+- No orphaned backup objects are intentionally created.
+- Existing 404/already-gone behavior still works.
+
+TASK FS-3 — Make scheduled backups clear about in-process/autoscale behavior and catch overdue runs on startup
+
+Problem:
+Scheduled backups run inside the web server process. On Replit autoscale, if the app is asleep or scaled down at the scheduled time, the backup may run late, only after the app wakes. Also the scheduler currently waits until the next interval tick after startup.
+
+Affected files:
+- server/scheduler.ts
+- client/src/components/settings/ScheduledBackupCard.tsx
+- client/src/components/StaleBackupBanner.tsx, only if needed
+
+Current behavior:
+- Scheduler starts when the app process starts.
+- It ticks every minute.
+- It is not an external guaranteed cron service.
+
+Desired behavior:
+- If a backup is overdue when the app starts, attempt one scheduler tick soon after startup.
+- UI wording should be honest: scheduled backups run when the app is awake; the stale banner is the safety net.
+
+Exact logic:
+- In startBackupScheduler(), after starting the interval, trigger backupSchedulerTick() once asynchronously.
+- Keep DISABLE_BACKUP_SCHEDULER=1 behavior unchanged.
+- Keep advisory-lock behavior unchanged.
+- In ScheduledBackupCard wording, add concise wording that scheduled backups run from the app process and may run late if the app was asleep; stale banner warns if no success occurs.
+- Do not add a new external scheduler provider.
+
+Manual test:
+- Set nextDueAt in the past on a safe test database.
+- Start app.
+- Confirm scheduler attempts backup without waiting a full minute.
+- Confirm future nextDueAt does not run immediately.
+
+Acceptance criteria:
+- Overdue scheduled backup is attempted soon after app startup.
+- Non-overdue schedule is skipped.
+- UI wording no longer implies exact guaranteed wall-clock execution.
+
+TASK FS-4 — Harden purchase order totals and update transaction safety
+
+Problem:
+Invoices and delivery orders now recompute totals server-side, but purchase orders still trust client lineTotal values and update the PO header before line-item replacement validation/write work finishes.
+
+Affected file:
+- server/routes/purchase-orders.ts
+- tests if available/appropriate
+
+Current risky behavior:
+- Client can send lineTotal that does not equal quantity × unitPrice.
+- PO totals can be saved incorrectly.
+- PUT can update the PO header before item replacement completes.
+- A later validation/write failure can leave a half-updated purchase order.
+
+Desired behavior:
+- Server recomputes PO line totals and total/grand total from quantity and unitPrice.
+- PO update with line items should be atomic: header, item validation, item replacement, totals all succeed or all roll back.
+- Existing receivedQuantity safeguards must remain intact.
+
+Exact logic:
+- For POST and PUT with items:
+  - Validate items before writes.
+  - Reject missing/empty items on POST as today.
+  - Reject negative quantity, zero/negative quantity where not allowed, negative/non-numeric unitPrice.
+  - Compute lineTotal = round(quantity × unitPrice, 2).
+  - Compute totalAmount = sum lineTotal.
+  - Compute grandTotal = totalAmount if currency AED, otherwise totalAmount × fxRateToAed.
+  - Ignore client-supplied lineTotal/totalAmount/grandTotal for persistence.
+- For PUT:
+  - Wrap header update, item deletion, item insertion, and totals update in one transaction.
+  - Preserve existing checks that received products cannot be removed or reduced below receivedQuantity.
+  - Preserve existing receivedQuantity when replacing items.
+- Do not change GRN logic.
+
+Manual test:
+- Create PO with deliberately wrong lineTotal and totals; saved values should be server-computed.
+- Update PO with wrong totals; saved values should be server-computed.
+- Try reducing a received item below receivedQuantity; request should fail and header should remain unchanged.
+- Try a malformed item; request should fail without deleting existing items.
+
+Acceptance criteria:
+- PO totals cannot be poisoned by client payload.
+- PUT is atomic for header + items + totals.
+- Received-quantity protections still work.
+
+TASK FS-5 — Correct financial-year export invoice subtotal/total columns
+
+Problem:
+The financial-year XLSX export maps invoice “Subtotal” and “Total” to the same stored invoice amount. Since invoice amount now represents the total including VAT, the export can show incorrect subtotal when VAT exists.
+
+Affected file:
+- server/routes/system.ts
+
+Current risky behavior:
+- In /api/books/:id/export, invoice rows output:
+  - Subtotal = r.amount
+  - VAT = r.vatAmount
+  - Total = r.amount
+- This makes subtotal wrong for VAT invoices.
+
+Desired behavior:
+- Invoice export should show:
+  - Total = invoice amount
+  - VAT = vatAmount
+  - Subtotal = total - VAT
+- Do not change PDF/print layouts.
+- Do not change invoice persistence.
+
+Exact logic:
+- In the invoice export mapping only:
+  - total = parseFloat(r.amount || 0)
+  - vat = parseFloat(r.vatAmount || 0)
+  - subtotal = total - vat
+  - format all as 2 decimals.
+- Guard against NaN.
+- Keep column names unchanged unless absolutely necessary.
+
+Manual test:
+- Invoice total 105, VAT 5.
+- Export financial year.
+- Confirm Subtotal 100, VAT 5, Total 105.
+
+Acceptance criteria:
+- XLSX export invoice subtotal is correct.
+- No PDF/print code touched.
+- Other export sheets unchanged except if tests require formatting stability.
+
+TASK FS-6 — Prevent scan uploads from overwriting arbitrary document scan keys
+
+Problem:
+POST /api/storage/upload-scan validates the storage key format, file type, and size, but it does not confirm that the target document exists or that the user is allowed to attach/overwrite that document’s scan.
+
+Affected file:
+- server/routes/system.ts
+- related scan-key routes only if necessary
+
+Current risky behavior:
+- Any logged-in user can upload to a valid-looking key such as invoices/2026/...
+- A user can potentially overwrite another document’s scan object if they know/guess the key.
+- The route tracks the object but does not tie upload permission to a document.
+
+Desired behavior:
+- Scan upload should only be allowed when the key clearly belongs to an existing document/path the app recognizes.
+- Overwrite should be intentional and safe.
+
+Exact logic:
+- Parse storageKey prefix:
+  - invoices/
+  - delivery/
+  - purchase-orders/
+  - goods-receipts/
+- Validate that the key belongs to an expected scan upload pattern used by the frontend.
+- Require appropriate role:
+  - Staff/Manager/Admin can upload normal document scans if existing app behavior expects that.
+  - Admin/Manager only if that matches existing scan delete/update permissions.
+- Before uploading, verify the referenced document exists when the key format includes an ID or document-specific folder.
+- If the key cannot be tied to a real existing document, return 400/403.
+- Do not break existing normal scan upload flow.
+- Do not change the global 5 MB limit.
+
+Manual test:
+- Valid scan upload from the UI still works.
+- Upload to a made-up invoice/PO/GRN key fails.
+- Upload to an invalid prefix fails.
+- Non-authorized role cannot overwrite protected scans if permissions say they should not.
+
+Acceptance criteria:
+- Arbitrary valid-looking keys cannot be uploaded blindly.
+- Existing scan uploads still pass.
+- File type/size validation remains.
+
+TASK FS-7 — Verify and repair Drizzle migration metadata consistency
+
+Problem:
+migrations/meta/_journal.json includes entries for 0016 and 0017, but the repo tree appears to lack matching 0016_snapshot.json and 0017_snapshot.json files. This may or may not be acceptable, but it can make future Drizzle checks/generation fragile.
+
+Affected files:
+- migrations/meta/_journal.json
+- migrations/meta/*.json
+- package scripts only if needed
+
+Current risk:
+- Future drizzle-kit check/generate may fail or produce confusing results.
+- Migration history may look inconsistent to future developers.
+
+Desired behavior:
+- Confirm whether drizzle-kit check passes on the current repo.
+- If it fails because snapshots are missing, repair metadata using Drizzle’s expected format.
+- If it passes, document/mark as no code change required.
+
+Exact rules:
+- First run the non-destructive metadata check only:
+  - npx drizzle-kit check
+- Do not run db:migrate against production for this task.
+- Do not run db:push.
+- If snapshots must be recreated, do so using the safest Drizzle-supported workflow.
+- Do not hand-edit large snapshot JSON unless that is the only safe route and clearly explained.
+
+Manual test:
+- npx drizzle-kit check passes.
+- npm run db:generate does not create unexpected destructive migration noise on a clean schema.
+
+Acceptance criteria:
+- Migration metadata integrity is confirmed clean.
+- No live database migration is run as part of this task unless explicitly approved separately.
+- db:push remains absent from package.json.
+
+TASK FS-8 — Remove or quarantine obvious dead code/imports without behavioral changes
+
+Problem:
+There are small signs of dead code or unused imports, such as requireOpsToken and unused imports. This is low severity, but it reduces confusion.
+
+Affected files likely include:
+- server/middleware.ts
+- server/runBackup.ts
+- server/routes/system.ts
+- any other files TypeScript reports
+
+Current issue:
+- Unused code makes future review harder.
+- requireOpsToken appears unused now that ops routes are authenticated Admin routes.
+- Some imports look unused.
+
+Desired behavior:
+- Clean only obvious unused imports/dead helpers.
+- Do not remove anything that is still used by scripts/tests/runtime.
+- Do not refactor behavior.
+
+Exact rules:
+- Run TypeScript check / linter equivalent available in repo.
+- Remove unused imports.
+- If requireOpsToken is truly unused everywhere, either remove it or leave a clear comment saying it is intentionally retained for future external ops-token routes. Prefer removal if no references exist.
+- Do not alter route permissions as part of this cleanup.
+- Do not touch business logic.
+
+Manual test:
+- npm run check passes.
+- App still starts.
+- Auth routes and ops routes still work as before.
+
+Acceptance criteria:
+- No behavior changes.
+- TypeScript still passes.
+- Only obvious dead code/import cleanup included.
