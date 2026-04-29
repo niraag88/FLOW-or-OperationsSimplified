@@ -190,13 +190,59 @@ export const requireRole = (role: "Admin" | "Manager" | "Staff") => {
   };
 };
 
-export const writeAuditLog = (auditData: InsertAuditLog) => {
-  db.insert(auditLog).values(auditData).catch((err) => {
-    console.error('Audit log write failed:', err);
-  });
-};
-
 export type DbClient = typeof db | Parameters<Parameters<typeof db.transaction>[0]>[0];
+
+// ─── Audit-log durability (Task #375) ────────────────────────────────────────
+// Two complementary write paths:
+//
+//   writeAuditLogSync(tx, data)
+//     For sensitive admin actions (factory reset, user delete, permanent
+//     delete from recycle bin, invoice/DO cancel). Inserts inside the
+//     caller's transaction and THROWS on failure so the surrounding
+//     work rolls back together with the audit row. Never use the
+//     non-tx db here — the durability guarantee depends on every audit
+//     write happening atomically with the action it describes.
+//
+//   writeAuditLog(data)  (default async / fire-and-forget)
+//     For non-sensitive bookkeeping (CRUD on ordinary entities). Uses a
+//     small retry-with-backoff window so a brief Neon hiccup doesn't
+//     silently swallow the row. Only after every retry has failed do
+//     we fall through to console.error — which still preserves the
+//     pre-#375 behaviour (the request itself is not failed).
+//
+// Adding a new sensitive route MUST use writeAuditLogSync. Bare
+// writeAuditLog on a destructive route is a regression.
+const AUDIT_LOG_RETRY_ATTEMPTS = 3;
+const AUDIT_LOG_RETRY_BASE_MS = 100;
+
+export async function writeAuditLogSync(tx: DbClient, auditData: InsertAuditLog): Promise<void> {
+  // No catch — propagate the error so the surrounding tx rolls back.
+  await tx.insert(auditLog).values(auditData);
+}
+
+export const writeAuditLog = (auditData: InsertAuditLog): void => {
+  void (async () => {
+    let lastErr: unknown;
+    for (let attempt = 0; attempt < AUDIT_LOG_RETRY_ATTEMPTS; attempt++) {
+      try {
+        await db.insert(auditLog).values(auditData);
+        return;
+      } catch (err) {
+        lastErr = err;
+        if (attempt < AUDIT_LOG_RETRY_ATTEMPTS - 1) {
+          // Exponential backoff: 100ms, 200ms, 400ms…
+          const delayMs = AUDIT_LOG_RETRY_BASE_MS * Math.pow(2, attempt);
+          await new Promise((resolve) => setTimeout(resolve, delayMs));
+        }
+      }
+    }
+    console.error(
+      `Audit log write failed after ${AUDIT_LOG_RETRY_ATTEMPTS} attempts:`,
+      lastErr,
+      { auditData },
+    );
+  })();
+};
 
 export async function updateProductStock(
   productId: number,

@@ -3,7 +3,7 @@ import { deliveryOrders, deliveryOrderItems, customers, brands, products, recycl
 import { db } from "../db";
 import { and, eq } from "drizzle-orm";
 import { businessStorage } from "../businessStorage";
-import { requireAuth, writeAuditLog, deleteStorageObjectSafely, updateProductStock, type AuthenticatedRequest } from "../middleware";
+import { requireAuth, writeAuditLog, writeAuditLogSync, deleteStorageObjectSafely, updateProductStock, type AuthenticatedRequest } from "../middleware";
 import { resolveDocumentTotals, isTotalsError, normalizeTaxTreatment, resolveAuthoritativeTaxTreatment } from "../utils/totals";
 
 export function registerDeliveryOrderRoutes(app: Express) {
@@ -679,6 +679,21 @@ export function registerDeliveryOrderRoutes(app: Express) {
           }
 
           await tx.update(deliveryOrders).set({ status: 'cancelled' }).where(eq(deliveryOrders.id, id));
+
+          // Task #375: audit row writes inside the same transaction so an
+          // audit-DB hiccup also rolls back the cancellation and any
+          // stock reversal — see the matching note on the invoice cancel
+          // route and the comment block in server/middleware.ts.
+          await writeAuditLogSync(tx, {
+            actor: req.user!.id,
+            actorName: req.user?.username || String(req.user!.id),
+            targetId: String(id),
+            targetType: 'delivery_order',
+            action: 'UPDATE',
+            details: stockReversed
+              ? `DO #${doRecord.orderNumber} cancelled — full stock reversed`
+              : `DO #${doRecord.orderNumber} cancelled — no stock to reverse`,
+          });
         });
       } catch (txError) {
         if (txError instanceof Error && txError.message === ALREADY_CANCELLED) {
@@ -688,17 +703,6 @@ export function registerDeliveryOrderRoutes(app: Express) {
       }
 
       const [updated] = await db.select().from(deliveryOrders).where(eq(deliveryOrders.id, id));
-
-      writeAuditLog({
-        actor: req.user!.id,
-        actorName: req.user?.username || String(req.user!.id),
-        targetId: String(id),
-        targetType: 'delivery_order',
-        action: 'UPDATE',
-        details: stockReversed
-          ? `DO #${doRecord.orderNumber} cancelled — full stock reversed`
-          : `DO #${doRecord.orderNumber} cancelled — no stock to reverse`,
-      });
 
       res.json({ ...updated, do_number: updated.orderNumber });
     } catch (error) {

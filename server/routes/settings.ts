@@ -2,7 +2,7 @@ import type { Express } from "express";
 import { users, auditLog, storageObjects } from "@shared/schema";
 import { db } from "../db";
 import { eq, lt } from "drizzle-orm";
-import { requireAuth, requireRole, hashPassword, writeAuditLog, objectStorageClient, type AuthenticatedRequest } from "../middleware";
+import { requireAuth, requireRole, hashPassword, writeAuditLog, writeAuditLogSync, objectStorageClient, type AuthenticatedRequest } from "../middleware";
 import { businessStorage } from "../businessStorage";
 import { sendIfMissingConfirmation } from "../typedConfirmation";
 import {
@@ -264,15 +264,32 @@ export function registerSettingsRoutes(app: Express) {
         return res.status(400).json({ error: 'Cannot delete your own account' });
       }
 
-      const [deletedUser] = await db.delete(users)
-        .where(eq(users.id, userId))
-        .returning({ id: users.id, username: users.username });
+      // Task #375: delete the user and write the audit row in a single
+      // transaction. A user-delete audit gap is a serious investigation
+      // hole — if the audit DB hiccups, the deletion rolls back so the
+      // operator can retry rather than silently losing the record.
+      const deletedUser = await db.transaction(async (tx) => {
+        const [deleted] = await tx.delete(users)
+          .where(eq(users.id, userId))
+          .returning({ id: users.id, username: users.username });
+
+        if (!deleted) return null;
+
+        await writeAuditLogSync(tx, {
+          actor: req.user!.id,
+          actorName: req.user?.username || String(req.user!.id),
+          targetId: userId,
+          targetType: 'user',
+          action: 'DELETE',
+          details: `User @${deleted.username} deleted`,
+        });
+        return deleted;
+      });
 
       if (!deletedUser) {
         return res.status(404).json({ error: 'User not found' });
       }
 
-      writeAuditLog({ actor: req.user!.id, actorName: req.user?.username || String(req.user!.id), targetId: userId, targetType: 'user', action: 'DELETE', details: `User @${deletedUser.username} deleted` });
       res.json({ success: true, deletedUser });
     } catch (error) {
       console.error('Error deleting user:', error);

@@ -16,7 +16,7 @@ import { execSync } from 'child_process';
 import { createWriteStream, unlink } from 'fs';
 import { tmpdir } from 'os';
 import ExcelJS from 'exceljs';
-import { requireAuth, requireRole, writeAuditLog, objectStorageClient, validateUploadInput, validatePdfMagicBytes, validateImageMagicBytes, upload, setForceStorageDeleteFail, isForceStorageDeleteFailEnabled, MAX_UPLOAD_BYTES, MAX_UPLOAD_ERROR_MESSAGE, type AuthenticatedRequest } from "../middleware";
+import { requireAuth, requireRole, writeAuditLog, writeAuditLogSync, objectStorageClient, validateUploadInput, validatePdfMagicBytes, validateImageMagicBytes, upload, setForceStorageDeleteFail, isForceStorageDeleteFailEnabled, MAX_UPLOAD_BYTES, MAX_UPLOAD_ERROR_MESSAGE, type AuthenticatedRequest } from "../middleware";
 import { runBackup } from "../runBackup";
 import { withBackupLock } from "../backupLock";
 import {
@@ -597,9 +597,16 @@ export function registerSystemRoutes(app: Express) {
 
     try {
       const id = parseInt(req.params.id);
-      const [rbItem] = await db.select({ documentType: recycleBin.documentType, documentNumber: recycleBin.documentNumber }).from(recycleBin).where(eq(recycleBin.id, id));
-      await db.delete(recycleBin).where(eq(recycleBin.id, id));
-      writeAuditLog({ actor: req.user!.id, actorName: req.user?.username || String(req.user!.id), targetId: String(id), targetType: 'recycle_bin', action: 'DELETE', details: `Permanently deleted ${rbItem?.documentType} #${rbItem?.documentNumber}` });
+      // Task #375: wrap the destructive delete and its audit row in a
+      // single transaction so the audit trail can never silently drop
+      // a permanent-delete event. If the audit insert fails, the
+      // recycle-bin row is preserved.
+      const rbItem = await db.transaction(async (tx) => {
+        const [item] = await tx.select({ documentType: recycleBin.documentType, documentNumber: recycleBin.documentNumber }).from(recycleBin).where(eq(recycleBin.id, id));
+        await tx.delete(recycleBin).where(eq(recycleBin.id, id));
+        await writeAuditLogSync(tx, { actor: req.user!.id, actorName: req.user?.username || String(req.user!.id), targetId: String(id), targetType: 'recycle_bin', action: 'DELETE', details: `Permanently deleted ${item?.documentType} #${item?.documentNumber}` });
+        return item;
+      });
       res.json({ success: true, message: 'Permanently deleted from recycle bin' });
     } catch (error) {
       console.error('Error permanently deleting from recycle bin:', error);

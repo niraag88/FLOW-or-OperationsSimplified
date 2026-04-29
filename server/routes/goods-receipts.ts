@@ -3,7 +3,7 @@ import { goodsReceipts, goodsReceiptItems, purchaseOrders, purchaseOrderItems, s
 import { db } from "../db";
 import { eq, desc, sql, inArray, and } from "drizzle-orm";
 import { businessStorage } from "../businessStorage";
-import { requireAuth, writeAuditLog, updateProductStock, deleteStorageObjectSafely, type AuthenticatedRequest } from "../middleware";
+import { requireAuth, writeAuditLog, writeAuditLogSync, updateProductStock, deleteStorageObjectSafely, type AuthenticatedRequest } from "../middleware";
 
 type NegativeStockEntry = {
   productId: number;
@@ -442,20 +442,24 @@ export function registerGoodsReceiptRoutes(app: Express) {
             await tx.update(purchaseOrders)
               .set({ status: newPoStatus, updatedAt: new Date() })
               .where(eq(purchaseOrders.id, grn.poId));
+
+            // Task #375: GRN cancellation reverses stock movements (or is a
+            // no-op for itemless GRNs) and is destructive enough that the
+            // audit trail must commit atomically with the status flip.
+            await writeAuditLogSync(tx, {
+              actor: req.user!.id,
+              actorName: req.user?.username || String(req.user!.id),
+              targetId: String(grnId),
+              targetType: 'goods_receipt',
+              action: 'CANCEL',
+              details: `GRN ${grn.receiptNumber} cancelled (no line items, nothing to reverse)`,
+            });
           }
         });
         if (updatedRows === 0) {
           return res.status(409).json({ error: 'Goods receipt is already cancelled' });
         }
         await recalculatePOPaymentStatus(grn.poId);
-        writeAuditLog({
-          actor: req.user!.id,
-          actorName: req.user?.username || String(req.user!.id),
-          targetId: String(grnId),
-          targetType: 'goods_receipt',
-          action: 'CANCEL',
-          details: `GRN ${grn.receiptNumber} cancelled (no line items, nothing to reverse)`,
-        });
         return res.json({ success: true, grnId, reversedProducts: [], negativeStock: [] });
       }
 
@@ -611,6 +615,30 @@ export function registerGoodsReceiptRoutes(app: Express) {
           await tx.update(purchaseOrders)
             .set({ status: newPoStatus, updatedAt: new Date() })
             .where(eq(purchaseOrders.id, grn.poId));
+
+          // Task #375: write the audit row inside the same transaction
+          // as the stock reversal + status flip + PO recompute. The
+          // audit detail string needs the PO number and the per-product
+          // reversal summary, so we build both inside the tx instead of
+          // re-querying after — that keeps the durability contract: a
+          // failed audit insert rolls back the stock movements, the
+          // PO-item adjustments, and the status change atomically.
+          const [auditPoRow] = await tx.select({ poNumber: purchaseOrders.poNumber }).from(purchaseOrders).where(eq(purchaseOrders.id, grn.poId));
+          const productList = reversedSummary
+            .map(p => `${p.productName} (id=${p.productId}, qty=-${p.reversedQty}, ${p.previousStock}->${p.newStock})`)
+            .join('; ');
+          const negativeNote = negativeStock.length > 0
+            ? ` NEGATIVE-STOCK CONFIRMED for ${negativeStock.length} product(s)`
+            : '';
+          const paidNote = grn.paymentStatus === 'paid' ? ' [paid-GRN ack]' : '';
+          await writeAuditLogSync(tx, {
+            actor: req.user!.id,
+            actorName: req.user?.username || String(req.user!.id),
+            targetId: String(grnId),
+            targetType: 'goods_receipt',
+            action: 'CANCEL',
+            details: `GRN ${grn.receiptNumber} cancelled (PO ${auditPoRow?.poNumber || `#${grn.poId}`}). Reversed ${reversedSummary.length} product(s): ${productList}.${negativeNote}${paidNote}`,
+          });
         });
       } catch (txErr) {
         if (txErr instanceof GrnCancelNegativeStockError) {
@@ -639,23 +667,6 @@ export function registerGoodsReceiptRoutes(app: Express) {
 
       // After-tx work: recalc PO payment status (cancelled GRNs are excluded by the helper).
       await recalculatePOPaymentStatus(grn.poId);
-
-      const [poRow] = await db.select({ poNumber: purchaseOrders.poNumber }).from(purchaseOrders).where(eq(purchaseOrders.id, grn.poId));
-      const productList = reversedSummary
-        .map(p => `${p.productName} (id=${p.productId}, qty=-${p.reversedQty}, ${p.previousStock}->${p.newStock})`)
-        .join('; ');
-      const negativeNote = negativeStock.length > 0
-        ? ` NEGATIVE-STOCK CONFIRMED for ${negativeStock.length} product(s)`
-        : '';
-      const paidNote = grn.paymentStatus === 'paid' ? ' [paid-GRN ack]' : '';
-      writeAuditLog({
-        actor: req.user!.id,
-        actorName: req.user?.username || String(req.user!.id),
-        targetId: String(grnId),
-        targetType: 'goods_receipt',
-        action: 'CANCEL',
-        details: `GRN ${grn.receiptNumber} cancelled (PO ${poRow?.poNumber || `#${grn.poId}`}). Reversed ${reversedSummary.length} product(s): ${productList}.${negativeNote}${paidNote}`,
-      });
 
       res.json({ success: true, grnId, reversedProducts: reversedSummary, negativeStock });
     } catch (error) {

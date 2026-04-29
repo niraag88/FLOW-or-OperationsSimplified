@@ -4,7 +4,7 @@ import { type InsertInvoice } from "@shared/schema";
 import { db } from "../db";
 import { eq } from "drizzle-orm";
 import { businessStorage } from "../businessStorage";
-import { requireAuth, writeAuditLog, updateProductStock, deleteStorageObjectSafely, type AuthenticatedRequest } from "../middleware";
+import { requireAuth, writeAuditLog, writeAuditLogSync, updateProductStock, deleteStorageObjectSafely, type AuthenticatedRequest } from "../middleware";
 import { resolveDocumentTotals, isTotalsError, normalizeTaxTreatment, resolveAuthoritativeTaxTreatment } from "../utils/totals";
 
 export function registerInvoiceRoutes(app: Express) {
@@ -987,6 +987,22 @@ export function registerInvoiceRoutes(app: Express) {
 
           // Flip status only after every reversal has succeeded.
           await tx.update(invoices).set({ status: 'cancelled' }).where(eq(invoices.id, id));
+
+          // Task #375: write the audit row inside the same transaction so a
+          // DB hiccup that loses the audit insert also rolls back the
+          // status flip and the stock reversal — the audit trail is the
+          // legal record of a destructive action and must never be
+          // silently dropped.
+          await writeAuditLogSync(tx, {
+            actor: req.user!.id,
+            actorName: req.user?.username || String(req.user!.id),
+            targetId: String(id),
+            targetType: 'invoice',
+            action: 'UPDATE',
+            details: stockReversed
+              ? `Invoice #${invoice.invoiceNumber} cancelled — full stock reversed`
+              : `Invoice #${invoice.invoiceNumber} cancelled — no stock to reverse`,
+          });
         });
       } catch (txError) {
         if (txError instanceof Error && txError.message === ALREADY_CANCELLED) {
@@ -994,17 +1010,6 @@ export function registerInvoiceRoutes(app: Express) {
         }
         throw txError;
       }
-
-      writeAuditLog({
-        actor: req.user!.id,
-        actorName: req.user?.username || String(req.user!.id),
-        targetId: String(id),
-        targetType: 'invoice',
-        action: 'UPDATE',
-        details: stockReversed
-          ? `Invoice #${invoice.invoiceNumber} cancelled — full stock reversed`
-          : `Invoice #${invoice.invoiceNumber} cancelled — no stock to reverse`,
-      });
 
       const [updated] = await db.select().from(invoices).where(eq(invoices.id, id));
       res.json(updated);
