@@ -242,6 +242,115 @@ test.describe('Invoice DELETE guard — delivered invoices must use Cancel (Task
     expect(lookup.status).toBe(404);
   });
 
+  test('DELETE on a submitted (non-stockDeducted) invoice still soft-deletes to the recycle bin', async () => {
+    // Mirror of the draft control above for the second non-blocked
+    // status. Created as draft via the public API, then promoted to
+    // 'submitted' so we don't trip the delivery flow that would set
+    // stockDeducted.
+    const create = await apiPost(
+      '/api/invoices',
+      {
+        customer_id: created.customerId,
+        invoice_date: '2026-04-26',
+        status: 'draft',
+        tax_amount: '5',
+        total_amount: '105',
+        items: [
+          {
+            product_id: created.productId,
+            quantity: 1,
+            unit_price: 100,
+            line_total: 100,
+            description: 'RF1 submitted',
+          },
+        ],
+      },
+      cookie,
+    );
+    expect(create.status).toBe(201);
+    const submittedId = (create.data as { id: number }).id;
+
+    const promote = await apiPut(
+      `/api/invoices/${submittedId}`,
+      {
+        customer_id: created.customerId,
+        status: 'submitted',
+        invoice_date: '2026-04-26',
+        tax_amount: '5',
+        total_amount: '105',
+        items: [
+          {
+            product_id: created.productId,
+            quantity: 1,
+            unit_price: 100,
+            line_total: 100,
+            description: 'RF1 submitted',
+          },
+        ],
+      },
+      cookie,
+    );
+    expect(promote.status).toBe(200);
+
+    // Confirm we're in the right shape before testing the gate.
+    const before = (await apiGet(`/api/invoices/${submittedId}`, cookie)) as {
+      status?: string;
+      stockDeducted?: boolean;
+    };
+    expect(before.status).toBe('submitted');
+    expect(before.stockDeducted).toBeFalsy();
+
+    const status = await apiDelete(`/api/invoices/${submittedId}`, cookie);
+    expect(status).toBe(200);
+    expect(await recycleBinHasInvoice(submittedId, cookie)).toBe(true);
+  });
+
+  test('DELETE on a cancelled invoice returns the new {error, message} envelope', async () => {
+    // Acceptance for the API-shape consistency tweak: both delete-
+    // rejection branches now share the {error: <code>, message: <text>}
+    // envelope so clients can switch on the stable code while still
+    // surfacing a friendly message. We seed by creating + cancelling a
+    // fresh invoice, then attempting to delete it.
+    const create = await apiPost(
+      '/api/invoices',
+      {
+        customer_id: created.customerId,
+        invoice_date: '2026-04-26',
+        status: 'draft',
+        tax_amount: '5',
+        total_amount: '105',
+        items: [
+          {
+            product_id: created.productId,
+            quantity: 1,
+            unit_price: 100,
+            line_total: 100,
+            description: 'RF1 cancelled',
+          },
+        ],
+      },
+      cookie,
+    );
+    expect(create.status).toBe(201);
+    const cancelledId = (create.data as { id: number }).id;
+
+    const cancel = await fetch(`${BASE_URL}/api/invoices/${cancelledId}/cancel`, {
+      method: 'PATCH',
+      headers: { Cookie: cookie, 'Content-Type': 'application/json' },
+      body: '{}',
+    });
+    expect(cancel.status).toBe(200);
+
+    const r = await fetch(`${BASE_URL}/api/invoices/${cancelledId}`, {
+      method: 'DELETE',
+      headers: { Cookie: cookie },
+    });
+    expect(r.status).toBe(400);
+    const body = (await r.json()) as { error?: string; message?: string };
+    expect(body.error).toBe('invoice_already_cancelled');
+    expect(body.message).toMatch(/audit/i);
+  });
+
   test('defence-in-depth: DELETE on a non-delivered invoice with stockDeducted=true is also rejected', async () => {
     test.skip(!pool, 'DATABASE_URL not available — direct DB access required');
 
