@@ -367,7 +367,6 @@ export default function GoodsReceiptsTab({
             closedDelivery={closedDelivery}
             setClosedDelivery={setClosedDelivery}
             closedFiltersActive={closedFiltersActive}
-            goodsReceipts={goodsReceipts}
             setQuickViewPoId={setQuickViewPoId}
             onViewAndPrint={handleViewAndPrint}
             onExportToXLSX={handleExportToXLSX}

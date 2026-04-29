@@ -255,7 +255,6 @@ export function OutOfStockTab({
             setPage={setOutOfStockPage}
             perPage={outOfStockPerPage}
             setPerPage={setOutOfStockPerPage}
-            type="out-of-stock"
             itemName="products"
           />
         </CardContent>

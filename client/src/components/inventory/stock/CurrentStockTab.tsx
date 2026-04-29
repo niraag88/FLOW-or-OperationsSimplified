@@ -375,7 +375,6 @@ export function CurrentStockTab({
             setPage={setCurrentStockPage}
             perPage={stockLevelsPerPage}
             setPerPage={setStockLevelsPerPage}
-            type="current-stock"
             itemName="products"
           />
         </CardContent>

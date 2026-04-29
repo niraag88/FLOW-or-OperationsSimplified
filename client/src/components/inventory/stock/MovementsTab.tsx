@@ -396,7 +396,6 @@ export function MovementsTab({
               setPage={setMovementsPage}
               perPage={movementsPerPage}
               setPerPage={setMovementsPerPage}
-              type="movements"
               itemName="movements"
             />
           )}

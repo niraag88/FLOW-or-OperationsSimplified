@@ -309,7 +309,6 @@ export function LowStockTab({
             setPage={setLowStockPage}
             perPage={lowStockPerPage}
             setPerPage={setLowStockPerPage}
-            type="low-stock"
             itemName="products"
           />
         </CardContent>

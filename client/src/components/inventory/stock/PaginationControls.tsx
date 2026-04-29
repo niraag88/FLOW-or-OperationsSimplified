@@ -8,11 +8,10 @@ interface PaginationControlsProps {
   setPage: React.Dispatch<React.SetStateAction<number>>;
   perPage: number;
   setPerPage: React.Dispatch<React.SetStateAction<number>>;
-  type: string;
   itemName: string;
 }
 
-export function PaginationControls({ paginationData, currentPage, setPage, perPage, setPerPage, type: _type, itemName }: PaginationControlsProps) {
+export function PaginationControls({ paginationData, currentPage, setPage, perPage, setPerPage, itemName }: PaginationControlsProps) {
   if (paginationData.totalItems === 0) return null;
 
   return (

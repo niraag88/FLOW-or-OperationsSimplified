@@ -26,7 +26,6 @@ import {
 } from "lucide-react";
 import { format } from "date-fns";
 import { formatCurrency } from "@/utils/currency";
-import type { GoodsReceipt } from "@shared/schema";
 import type { PORow, POStats } from "./types";
 
 interface ClosedPOsSectionProps {
@@ -44,7 +43,6 @@ interface ClosedPOsSectionProps {
   closedDelivery: string;
   setClosedDelivery: React.Dispatch<React.SetStateAction<string>>;
   closedFiltersActive: boolean;
-  goodsReceipts: GoodsReceipt[];
   setQuickViewPoId: (id: number | null) => void;
   onViewAndPrint: (po: PORow) => void;
   onExportToXLSX: (po: PORow) => void;
@@ -71,7 +69,6 @@ export default function ClosedPOsSection({
   closedDelivery,
   setClosedDelivery,
   closedFiltersActive,
-  goodsReceipts,
   setQuickViewPoId,
   onViewAndPrint,
   onExportToXLSX,
@@ -178,8 +175,6 @@ export default function ClosedPOsSection({
             </thead>
             <tbody>
               {filteredClosedPOs.map((po: PORow) => {
-                const poGRNs = (goodsReceipts || []).filter((grn: GoodsReceipt) => (grn.poId ?? (grn as Record<string, unknown>).purchase_order_id) === po.id);
-                void poGRNs;
                 const ordQty = getTotalOrderedQuantity(po);
                 const recQty = getTotalReceivedQuantity(po);
                 const isPartial = ordQty > 0 && recQty < ordQty;
