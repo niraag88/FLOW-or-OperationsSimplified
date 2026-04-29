@@ -31,9 +31,12 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { eq } from 'drizzle-orm';
+import { promises as fsPromises } from 'fs';
+import path from 'path';
+import os from 'os';
 import { db, pool } from '../../server/db';
 import { auditLog } from '../../shared/schema';
-import { writeAuditLogSync, writeAuditLog } from '../../server/middleware';
+import { writeAuditLogSync, writeAuditLog, spoolAuditRow, replayAuditSpool } from '../../server/middleware';
 
 test('writeAuditLogSync — failed audit insert rolls back the surrounding transaction', async () => {
   // Unique marker so concurrent test runs cannot see each other's rows
@@ -140,6 +143,94 @@ test('writeAuditLog (async) — eventually persists the row on the happy path', 
   assert.equal(rows.length, 1, 'expected async writeAuditLog to persist within 2s on happy path');
 
   await db.delete(auditLog).where(eq(auditLog.targetType, markerType));
+});
+
+test('audit-spool — concurrent appends during replay are not lost', async () => {
+  // Reproduces the race fix: replayAuditSpool() snapshots the file
+  // by atomic rename + processes outside the lock + re-appends still-
+  // pending lines under the lock. Concurrent spoolAuditRow() calls
+  // landing during the snapshot processing must end up in the live
+  // spool file (NOT silently overwritten by the replay's rewrite).
+  //
+  // The test pre-populates the spool with N rows, then races a
+  // replayAuditSpool() against N more spoolAuditRow() calls. After
+  // both settle (and a follow-up replay drains anything still on
+  // disk) the DB must contain exactly 2N audit rows for the
+  // unique markerType — proof that no row was lost to the race.
+  const runId = `${Date.now()}-${Math.random().toString(36).slice(2)}`;
+  const markerType = `audit-spool-race-${runId}`;
+  const spoolPath = path.join(os.tmpdir(), `audit-spool-race-${runId}.jsonl`);
+  const previousSpoolPath = process.env.AUDIT_SPOOL_PATH;
+  process.env.AUDIT_SPOOL_PATH = spoolPath;
+
+  const N = 25;
+
+  // Pre-populate the spool file with N rows (simulates the state
+  // after an outage where N async writes failed and were spooled).
+  for (let i = 0; i < N; i++) {
+    await spoolAuditRow({
+      actor: 'race-test',
+      actorName: 'race-test',
+      targetId: `pre-${i}`,
+      targetType: markerType,
+      action: 'CREATE',
+      details: `pre-replay row ${i}`,
+    });
+  }
+
+  // Sanity: spool file has N lines.
+  const preReplay = (await fsPromises.readFile(spoolPath, 'utf8')).split('\n').filter(Boolean);
+  assert.equal(preReplay.length, N, `expected spool to contain ${N} pre-rows`);
+
+  // Race: kick off the replay AND fire N more spoolAuditRow calls
+  // in parallel. The replay is intentionally slow (each row is a
+  // real DB insert) so the appends interleave with its processing.
+  const replayPromise = replayAuditSpool();
+  const concurrentAppends: Promise<void>[] = [];
+  for (let i = 0; i < N; i++) {
+    concurrentAppends.push(
+      spoolAuditRow({
+        actor: 'race-test',
+        actorName: 'race-test',
+        targetId: `concurrent-${i}`,
+        targetType: markerType,
+        action: 'CREATE',
+        details: `concurrent-append row ${i}`,
+      }),
+    );
+  }
+  const [firstReplayResult] = await Promise.all([replayPromise, ...concurrentAppends]);
+
+  // Drain whatever the concurrent appends left behind.
+  let pending = 0;
+  let drainedTotal = 0;
+  // Loop until the spool stabilises — should converge in 1-2 passes.
+  for (let i = 0; i < 5; i++) {
+    const r = await replayAuditSpool();
+    drainedTotal += r.replayed;
+    pending = r.pending;
+    if (r.replayed === 0 && r.pending === 0) break;
+  }
+
+  // The DB must have exactly 2N rows for our markerType.
+  const rows = await db
+    .select({ id: auditLog.id })
+    .from(auditLog)
+    .where(eq(auditLog.targetType, markerType));
+  assert.equal(
+    rows.length,
+    2 * N,
+    `expected ${2 * N} audit rows after race + drain (first replay: ${firstReplayResult.replayed}, drained later: ${drainedTotal}, still pending on disk: ${pending}); got ${rows.length}`,
+  );
+
+  // Cleanup: DB rows + spool file + restore env.
+  await db.delete(auditLog).where(eq(auditLog.targetType, markerType));
+  await fsPromises.unlink(spoolPath).catch(() => {});
+  if (previousSpoolPath === undefined) {
+    delete process.env.AUDIT_SPOOL_PATH;
+  } else {
+    process.env.AUDIT_SPOOL_PATH = previousSpoolPath;
+  }
 });
 
 test.after(async () => {

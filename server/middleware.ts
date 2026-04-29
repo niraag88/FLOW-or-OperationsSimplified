@@ -217,12 +217,17 @@ export type DbClient = typeof db | Parameters<Parameters<typeof db.transaction>[
 //
 // If the async path exhausts its retries the row is appended to a
 // disk-spool file (audit-spool.jsonl by default; override via
-// AUDIT_SPOOL_PATH). A periodic replay worker drains the spool back
+// getAuditSpoolPath()). A periodic replay worker drains the spool back
 // into the DB once it recovers — so even an extended Neon outage
 // does not silently lose audit rows.
 const AUDIT_LOG_RETRY_ATTEMPTS = 3;
 const AUDIT_LOG_RETRY_BASE_MS = 100;
-const AUDIT_SPOOL_PATH = process.env.AUDIT_SPOOL_PATH || path.join(process.cwd(), 'audit-spool.jsonl');
+// Resolved on each call (not cached at module-load) so tests can
+// point the spool at a temp path via process.env.AUDIT_SPOOL_PATH
+// without re-importing the module.
+function getAuditSpoolPath(): string {
+  return process.env.AUDIT_SPOOL_PATH || path.join(process.cwd(), 'audit-spool.jsonl');
+}
 const AUDIT_SPOOL_REPLAY_INTERVAL_MS = 60_000;
 const AUDIT_SPOOL_REPLAY_INITIAL_DELAY_MS = 30_000;
 
@@ -246,58 +251,87 @@ export async function writeAuditLogSync(tx: DbClient, auditData: InsertAuditLog)
   await tx.insert(auditLog).values(auditData);
 }
 
-// Serialize spool appends across concurrent writeAuditLog callers.
-// Node is single-threaded so a chained promise is enough — no need for
-// fcntl-style file locks.
-let spoolWriteQueue: Promise<void> = Promise.resolve();
+// All spool-file I/O (appends + the rename/write steps of replay) is
+// serialised through this single chained-promise queue. Node is
+// single-threaded so this acts as a process-wide mutex — without it,
+// a concurrent append landing between replay's read and replay's
+// rewrite could be silently overwritten.
+let spoolIoQueue: Promise<void> = Promise.resolve();
 
-async function spoolAuditRow(data: InsertAuditLog): Promise<void> {
-  const next = spoolWriteQueue
-    .catch(() => {})
-    .then(async () => {
-      const line = JSON.stringify({ data, spooledAt: new Date().toISOString() }) + '\n';
-      try {
-        await fsPromises.appendFile(AUDIT_SPOOL_PATH, line, 'utf8');
-      } catch (writeErr) {
-        // The DB is down AND the disk write failed — nothing left to
-        // do but log loudly. Operationally this is the audit-log
-        // equivalent of a hardware failure.
-        console.error(
-          'CRITICAL: Audit-log disk-spool write failed; row will be lost:',
-          writeErr,
-          { auditData: data },
-        );
-      }
-    });
-  spoolWriteQueue = next;
-  return next;
+async function withSpoolLock<T>(op: () => Promise<T>): Promise<T> {
+  const previous = spoolIoQueue;
+  let release!: () => void;
+  const gate = new Promise<void>((r) => { release = r; });
+  spoolIoQueue = previous.then(() => gate);
+  await previous.catch(() => {});
+  try {
+    return await op();
+  } finally {
+    release();
+  }
+}
+
+// Exported for the concurrency regression test in
+// tests/unit/auditLogDurability.test.ts. Production callers should NOT
+// invoke this directly — let the writeAuditLog retry path decide when
+// to spool. Exposing it here keeps the test honest: the test
+// exercises the same lock/append code path that production uses.
+export async function spoolAuditRow(data: InsertAuditLog): Promise<void> {
+  await withSpoolLock(async () => {
+    const line = JSON.stringify({ data, spooledAt: new Date().toISOString() }) + '\n';
+    try {
+      await fsPromises.appendFile(getAuditSpoolPath(), line, 'utf8');
+    } catch (writeErr) {
+      // The DB is down AND the disk write failed — nothing left to
+      // do but log loudly. Operationally this is the audit-log
+      // equivalent of a hardware failure.
+      console.error(
+        'CRITICAL: Audit-log disk-spool write failed; row will be lost:',
+        writeErr,
+        { auditData: data },
+      );
+    }
+  });
 }
 
 let spoolReplayInFlight = false;
 
 // Drain the on-disk spool back into the audit_log table. Returns the
 // number of rows replayed and the number that are still pending. Safe
-// to call concurrently — the in-flight guard short-circuits parallel
-// invocations.
+// under concurrent appends:
+//
+//   1. Atomically rename the live spool to a per-replay snapshot file
+//      (under withSpoolLock). New failed writes that race the replay
+//      land in a fresh AUDIT_SPOOL_PATH file — they are not visible
+//      to this replay run and they are not at risk of being clobbered.
+//   2. Process the snapshot (DB inserts) WITHOUT holding the lock,
+//      so spool appends are not blocked on a slow Neon recovery.
+//   3. Re-append still-failing lines back to the live spool file
+//      under withSpoolLock, then unlink the snapshot.
+//
+// The in-flight guard short-circuits overlapping replay calls.
 export async function replayAuditSpool(): Promise<{ replayed: number; pending: number }> {
   if (spoolReplayInFlight) return { replayed: 0, pending: 0 };
   spoolReplayInFlight = true;
+  const snapshotPath = `${getAuditSpoolPath()}.replay-${Date.now()}-${process.pid}`;
   try {
-    let content: string;
-    try {
-      content = await fsPromises.readFile(AUDIT_SPOOL_PATH, 'utf8');
-    } catch (readErr: unknown) {
-      if ((readErr as NodeJS.ErrnoException)?.code === 'ENOENT') {
-        return { replayed: 0, pending: 0 };
+    let snapshotExists = false;
+    await withSpoolLock(async () => {
+      try {
+        await fsPromises.rename(getAuditSpoolPath(), snapshotPath);
+        snapshotExists = true;
+      } catch (renameErr: unknown) {
+        if ((renameErr as NodeJS.ErrnoException)?.code === 'ENOENT') {
+          // Spool file doesn't exist — nothing to replay.
+          return;
+        }
+        throw renameErr;
       }
-      throw readErr;
-    }
+    });
+    if (!snapshotExists) return { replayed: 0, pending: 0 };
+
+    const content = await fsPromises.readFile(snapshotPath, 'utf8');
     const lines = content.split('\n').filter((l) => l.trim().length > 0);
-    if (lines.length === 0) {
-      // Empty spool file — clean it up.
-      await fsPromises.writeFile(AUDIT_SPOOL_PATH, '', 'utf8');
-      return { replayed: 0, pending: 0 };
-    }
     const stillPending: string[] = [];
     let replayed = 0;
     for (const line of lines) {
@@ -307,23 +341,50 @@ export async function replayAuditSpool(): Promise<{ replayed: number; pending: n
         await db.insert(auditLog).values(data);
         replayed++;
       } catch (replayErr) {
-        // DB still down or row malformed — keep it on disk and try
-        // again next tick. Better to retry forever than to silently
-        // drop a sensitive audit row.
+        // DB still down or row malformed — keep it for the next
+        // replay. Better to retry forever than to silently drop a
+        // sensitive audit row.
         stillPending.push(line);
       }
     }
-    await fsPromises.writeFile(
-      AUDIT_SPOOL_PATH,
-      stillPending.length ? stillPending.join('\n') + '\n' : '',
-      'utf8',
-    );
+    if (stillPending.length > 0) {
+      await withSpoolLock(async () => {
+        // Re-append to the live spool (which may have grown during
+        // replay). appendFile is atomic per call on POSIX, and
+        // serialised with concurrent appends via withSpoolLock.
+        await fsPromises.appendFile(
+          getAuditSpoolPath(),
+          stillPending.join('\n') + '\n',
+          'utf8',
+        );
+      });
+    }
+    // Snapshot processed — remove it. unlink failures are non-fatal:
+    // the snapshot path is unique (timestamp + pid) and a leftover
+    // file just wastes a few bytes on disk.
+    await fsPromises.unlink(snapshotPath).catch(() => {});
     if (replayed > 0) {
       console.log(
         `[audit-spool] Replayed ${replayed} buffered audit row(s); ${stillPending.length} still pending`,
       );
     }
     return { replayed, pending: stillPending.length };
+  } catch (replayErr) {
+    // If something blew up between rename and re-append, try to put
+    // the snapshot back so we don't lose the rows.
+    try {
+      await fsPromises.access(snapshotPath);
+      await withSpoolLock(async () => {
+        const snapshotContent = await fsPromises.readFile(snapshotPath, 'utf8').catch(() => '');
+        if (snapshotContent.length > 0) {
+          await fsPromises.appendFile(getAuditSpoolPath(), snapshotContent, 'utf8').catch(() => {});
+        }
+        await fsPromises.unlink(snapshotPath).catch(() => {});
+      });
+    } catch {
+      /* snapshot already gone or unreadable — nothing to recover */
+    }
+    throw replayErr;
   } finally {
     spoolReplayInFlight = false;
   }
