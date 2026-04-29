@@ -200,6 +200,81 @@ test.describe('Destructive-DB-op shared advisory lock (Task #368, RF-5)', () => 
     }
   });
 
+  test('cloud restore (POST /api/ops/backup-runs/:id/restore) is blocked by the shared lock', async () => {
+    // Trigger a real backup so we have a successful backup_runs row
+    // whose .sql.gz exists in object storage. Without one, the route
+    // would short-circuit at the run-lookup or storage-existence check
+    // BEFORE reaching the lock — and we'd be testing nothing about the
+    // shared lock. Backups are read-only against the DB, so this is
+    // safe on a disposable test database.
+    const backupResp = await fetch(`${BASE_URL}/api/ops/run-backups`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', Cookie: cookie },
+      body: JSON.stringify({}),
+    });
+    expect(
+      backupResp.status,
+      'precondition: a backup must succeed so we have a backupRunId to restore',
+    ).toBeLessThan(400);
+
+    // Find the most recent successful backup run via the public list
+    // endpoint. (We could query the DB directly via `pool`, but going
+    // through the API matches what a real client would do and proves
+    // the row is visible to the very route we're about to hit.)
+    const listResp = await fetch(`${BASE_URL}/api/ops/backup-runs`, {
+      headers: { Cookie: cookie },
+    });
+    expect(listResp.status).toBe(200);
+    const listBody = (await listResp.json()) as {
+      runs?: Array<{ id: number; success: boolean | null; dbStorageKey: string | null }>;
+    };
+    const successfulRun = (listBody.runs ?? []).find(
+      (r) => r.success === true && r.dbStorageKey,
+    );
+    expect(
+      successfulRun,
+      'a fully-successful backup with a dbStorageKey must be available after run-backups',
+    ).toBeTruthy();
+
+    // Hold the lock externally so the cloud-restore call cannot acquire
+    // it. Without the lock, this would actually wipe + replace the
+    // disposable test database (covered separately by 14-restore-roundtrip).
+    const lockClient = await pool.connect();
+    try {
+      const lockRes = await lockClient.query<{ locked: boolean }>(
+        'SELECT pg_try_advisory_lock($1) AS locked',
+        [DESTRUCTIVE_DB_OP_LOCK_KEY],
+      );
+      expect(
+        lockRes.rows[0]?.locked,
+        'external client must successfully acquire the shared lock first',
+      ).toBe(true);
+      lockHeld = true;
+
+      const resp = await fetch(
+        `${BASE_URL}/api/ops/backup-runs/${successfulRun!.id}/restore`,
+        {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json', Cookie: cookie },
+          body: JSON.stringify({ confirmation: RESTORE_PHRASE }),
+        },
+      );
+      expect(
+        resp.status,
+        'cloud restore must be blocked by the shared lock',
+      ).toBe(409);
+      const respBody = (await resp.json()) as { error?: string };
+      expect(respBody.error).toBe('destructive_db_op_in_progress');
+    } finally {
+      try {
+        await lockClient.query('SELECT pg_advisory_unlock($1)', [DESTRUCTIVE_DB_OP_LOCK_KEY]);
+      } finally {
+        lockClient.release();
+        lockHeld = false;
+      }
+    }
+  });
+
   test('factory-reset and restore-upload both succeed pre-conditions when the shared lock is FREE', async () => {
     // Sanity check: when the lock is NOT held, both endpoints should at
     // least pass their preflight checks. We do NOT actually fire a real
