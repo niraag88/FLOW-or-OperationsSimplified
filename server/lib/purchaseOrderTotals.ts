@@ -1,9 +1,3 @@
-// Purchase-order totals + line-item validation, centralised so both POST
-// and PUT to /api/purchase-orders compute the same numbers from the same
-// trusted inputs. The route handlers MUST ignore client-supplied
-// lineTotal / totalAmount / grandTotal and use the values returned here
-// instead — that is the whole point of this helper. See task-351.
-
 export class PurchaseOrderRequestError extends Error {
   constructor(
     public readonly statusCode: number,
@@ -45,11 +39,8 @@ function coerceFiniteNumber(value: unknown): number | null {
   if (typeof value === "string") {
     const trimmed = value.trim();
     if (trimmed === "") return null;
-    // parseFloat (NOT Number) so we exactly mirror the prior route
-    // semantics: `parseFloat("4.5abc") === 4.5`, `parseFloat("0x10") === 0`,
-    // `parseFloat("abc") === NaN`. Number() would treat "0x10" as 16 and
-    // reject "12abc" outright — both would silently change the persisted
-    // total or 400 a payload that today's clients send successfully.
+    // parseFloat (NOT Number) preserves prior route coercion semantics:
+    // "4.5abc" -> 4.5, "12abc" -> 12, "0x10" -> 0, "abc" -> NaN.
     const n = parseFloat(trimmed);
     return Number.isFinite(n) ? n : null;
   }
@@ -58,6 +49,12 @@ function coerceFiniteNumber(value: unknown): number | null {
 
 function round2(value: number): number {
   return Math.round(value * 100) / 100;
+}
+
+function unitPriceWasProvided(value: unknown): boolean {
+  if (value === undefined || value === null) return false;
+  if (typeof value === "string" && value.trim() === "") return false;
+  return true;
 }
 
 export function computePurchaseOrderTotals(
@@ -71,15 +68,34 @@ export function computePurchaseOrderTotals(
   if (Array.isArray(rawItems)) {
     for (const raw of rawItems) {
       const qty = coerceFiniteNumber(raw?.quantity);
-      // Reject negative quantities outright. Lines without a productId
-      // or with quantity <= 0 / non-integer are silently skipped — this
-      // matches the today behaviour where `if (productId && qty > 0)`
-      // filtered them out before the insert.
       if (qty !== null && qty < 0) {
         throw new PurchaseOrderRequestError(400, {
           error: "Quantity cannot be negative",
         });
       }
+
+      // Validate unitPrice on every line where the caller actually
+      // supplied one, even if the line will later be skipped for a
+      // missing productId or non-positive qty. A non-numeric or
+      // negative price must reject the whole request, not be hidden
+      // behind a silent skip.
+      if (unitPriceWasProvided(raw?.unitPrice)) {
+        const probe = coerceFiniteNumber(raw?.unitPrice);
+        if (probe === null) {
+          throw new PurchaseOrderRequestError(400, {
+            error: "Unit price must be a number",
+          });
+        }
+        if (probe < 0) {
+          throw new PurchaseOrderRequestError(400, {
+            error: "Unit price cannot be negative",
+          });
+        }
+      }
+
+      // Lines without a productId or with quantity <= 0 / non-integer
+      // are silently skipped — same as today's `if (productId && qty > 0)`
+      // filter that previously sat in the route.
       if (
         !raw?.productId ||
         qty === null ||
@@ -89,17 +105,7 @@ export function computePurchaseOrderTotals(
         continue;
       }
 
-      const unitPrice = coerceFiniteNumber(raw?.unitPrice);
-      if (unitPrice === null) {
-        throw new PurchaseOrderRequestError(400, {
-          error: "Unit price must be a number",
-        });
-      }
-      if (unitPrice < 0) {
-        throw new PurchaseOrderRequestError(400, {
-          error: "Unit price cannot be negative",
-        });
-      }
+      const unitPrice = coerceFiniteNumber(raw?.unitPrice) ?? 0;
 
       const productIdNum =
         typeof raw.productId === "number"
@@ -125,10 +131,8 @@ export function computePurchaseOrderTotals(
 
   totalAmount = round2(totalAmount);
 
-  // Mirror the today fxRate fallback exactly: `parseFloat(...) || 4.85`
-  // — i.e. NaN, empty, and zero all fall back to 4.85; a negative number
-  // is preserved (negative-fx scenarios are not policed by this task,
-  // see task-351 scope).
+  // Mirror prior fxRate fallback exactly: parseFloat(...) || 4.85.
+  // NaN, empty, and zero all fall back to the default; negatives pass through.
   const fxParsed = coerceFiniteNumber(fxRateToAed);
   const fxRate =
     fxParsed !== null && fxParsed !== 0 ? fxParsed : PO_DEFAULT_FX_RATE_TO_AED;

@@ -11,9 +11,7 @@ import {
 } from "../lib/purchaseOrderTotals";
 
 // Strip client-supplied totals from the validated header payload before
-// it is persisted. POST and PUT both recompute these on the server from
-// quantity * unitPrice (see computePurchaseOrderTotals + task-351); the
-// raw client values must NEVER reach the database.
+// persisting. POST and PUT recompute these via computePurchaseOrderTotals.
 function stripClientTotals<T extends Record<string, unknown>>(data: T): T {
   const {
     totalAmount: _ignT,
@@ -182,34 +180,23 @@ export function registerPurchaseOrderRoutes(app: Express) {
       let updatedPO: typeof purchaseOrders.$inferSelect;
 
       if (hasItems) {
-        // Header update + receivedQuantity validation + items
-        // delete/insert + totals update all run in ONE transaction so a
-        // mid-write failure rolls back the entire request and leaves the
-        // PO header AND items intact (task-351).
+        // Header + items + totals run in one transaction so any failure
+        // (e.g. received-quantity validation) rolls back atomically.
         updatedPO = await db.transaction(async (tx) => {
           const [currentPO] = await tx.select().from(purchaseOrders).where(eq(purchaseOrders.id, poId));
           if (!currentPO) {
             throw new PurchaseOrderRequestError(404, { error: 'Purchase order not found' });
           }
 
-          // Effective currency / fxRate for the totals helper: prefer
-          // body, then pre-update header. We read these BEFORE the
-          // header update so a single source of truth drives totals.
           const effectiveCurrency = (validatedData.currency ?? currentPO.currency) ?? null;
           const effectiveFxRate = validatedData.fxRateToAed ?? currentPO.fxRateToAed;
 
-          // Server-recomputed totals + per-item validation (throws
-          // PurchaseOrderRequestError on negative qty / bad unit price
-          // → tx rolls back).
           const computed = computePurchaseOrderTotals(
             req.body.items,
             effectiveCurrency,
             effectiveFxRate,
           );
 
-          // Read existing item state inside the tx so the
-          // received-qty contract is checked against the same snapshot
-          // that we delete from.
           const existingItems = await tx
             .select({ productId: purchaseOrderItems.productId, receivedQuantity: purchaseOrderItems.receivedQuantity })
             .from(purchaseOrderItems)
@@ -220,7 +207,6 @@ export function registerPurchaseOrderRoutes(app: Express) {
             receivedQtyByProduct.set(ei.productId, Math.max(existing, ei.receivedQuantity ?? 0));
           }
 
-          // Validate: no received product line may be removed.
           const incomingProductIds = new Set(computed.items.map((it) => it.productId));
           for (const [productId, received] of receivedQtyByProduct.entries()) {
             if (received > 0 && !incomingProductIds.has(productId)) {
@@ -229,8 +215,6 @@ export function registerPurchaseOrderRoutes(app: Express) {
               });
             }
           }
-          // Validate: no received product line may be reduced below the
-          // received quantity.
           for (const item of computed.items) {
             const prevReceived = receivedQtyByProduct.get(item.productId) ?? 0;
             if (item.quantity < prevReceived) {
@@ -240,14 +224,12 @@ export function registerPurchaseOrderRoutes(app: Express) {
             }
           }
 
-          // 1. Header update (validatedData has totals stripped).
           const [headerRow] = await tx
             .update(purchaseOrders)
             .set({ ...validatedData, updatedAt: new Date() })
             .where(eq(purchaseOrders.id, poId))
             .returning();
 
-          // 2. Replace items, preserving receivedQuantity per product.
           await tx.delete(purchaseOrderItems).where(eq(purchaseOrderItems.poId, poId));
           for (const item of computed.items) {
             const prevReceived = receivedQtyByProduct.get(item.productId) ?? 0;
@@ -263,7 +245,6 @@ export function registerPurchaseOrderRoutes(app: Express) {
             });
           }
 
-          // 3. Totals update from server-recomputed values.
           const [finalRow] = await tx
             .update(purchaseOrders)
             .set({

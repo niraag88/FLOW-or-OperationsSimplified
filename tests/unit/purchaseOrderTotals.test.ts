@@ -96,7 +96,7 @@ test("rejects negative unit price with the today-compatible error message", () =
 });
 
 test("rejects truly non-numeric unit price (parseFloat returns NaN)", () => {
-  for (const bad of ["not-a-number", "abc", "   "]) {
+  for (const bad of ["not-a-number", "abc", "abc123"]) {
     assert.throws(
       () =>
         computePurchaseOrderTotals(
@@ -113,6 +113,54 @@ test("rejects truly non-numeric unit price (parseFloat returns NaN)", () => {
       `unitPrice=${JSON.stringify(bad)} should be rejected`,
     );
   }
+});
+
+test("rejects invalid unitPrice on a would-be-skipped line — invalidates the whole request", () => {
+  // Even when a line would normally be silently skipped (no productId,
+  // qty=0, or non-integer qty), an invalid unitPrice on that line must
+  // still abort the entire request rather than slip through.
+  for (const skippedLine of [
+    { quantity: 1, unitPrice: "abc" },               // missing productId
+    { productId: 1, quantity: 0, unitPrice: "abc" }, // zero qty
+    { productId: 1, quantity: 1.5, unitPrice: "abc" }, // non-integer qty
+  ]) {
+    assert.throws(
+      () =>
+        computePurchaseOrderTotals(
+          [
+            skippedLine,
+            { productId: 2, quantity: 3, unitPrice: 10 }, // valid line in same payload
+          ],
+          "AED",
+          null,
+        ),
+      (err: unknown) => {
+        assert.ok(err instanceof PurchaseOrderRequestError);
+        assert.equal(err.statusCode, 400);
+        assert.equal(err.responseBody.error, "Unit price must be a number");
+        return true;
+      },
+      `payload with skipped line ${JSON.stringify(skippedLine)} must reject for bad unitPrice`,
+    );
+  }
+
+  // Same for negative unitPrice on a skipped line.
+  assert.throws(
+    () =>
+      computePurchaseOrderTotals(
+        [
+          { productId: 1, quantity: 0, unitPrice: -5 },
+          { productId: 2, quantity: 3, unitPrice: 10 },
+        ],
+        "AED",
+        null,
+      ),
+    (err: unknown) => {
+      assert.ok(err instanceof PurchaseOrderRequestError);
+      assert.equal(err.responseBody.error, "Unit price cannot be negative");
+      return true;
+    },
+  );
 });
 
 test("preserves prior parseFloat() coercion semantics for partially-numeric strings", () => {
