@@ -12,7 +12,7 @@ import { Alert, AlertDescription } from '@/components/ui/alert';
 import { Switch } from '@/components/ui/switch';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { Tabs, TabsList, TabsTrigger, TabsContent } from '@/components/ui/tabs';
-import { UserPlus, Edit, Trash2, Shield, Users, CheckCircle, XCircle, ClipboardList, AlertTriangle, RotateCcw } from 'lucide-react';
+import { UserPlus, Edit, Trash2, Shield, Users, CheckCircle, XCircle, ClipboardList, AlertTriangle, RotateCcw, AlertCircle, Save } from 'lucide-react';
 import { formatDate } from '@/utils/dateUtils';
 import { apiRequest } from '@/lib/queryClient';
 import { useToast } from '@/hooks/use-toast';
@@ -189,6 +189,49 @@ export default function UserManagement() {
       await deleteUserMutation.mutateAsync(userId);
     }
   };
+
+  // ─── Backup-freshness warning for the factory-reset dialog (Task #336) ───
+  // INFORMATIONAL ONLY. Nothing here gates the destructive submit button —
+  // that button continues to be enabled solely by the typed phrase matching
+  // FACTORY_RESET_CONFIRMATION_PHRASE. The query just gives the admin
+  // context (latest backup timestamp + a yellow nag if it's stale or
+  // missing) and exposes a one-click "Take a backup now" convenience.
+  interface LatestBackupResp {
+    lastSuccessfulBackupAt: string | null;
+    freshnessWindowHours: number;
+    isFresh: boolean;
+  }
+  const {
+    data: latestBackup,
+    isLoading: latestBackupLoading,
+    refetch: refetchLatestBackup,
+  } = useQuery<LatestBackupResp>({
+    queryKey: ['/api/ops/latest-backup'],
+    enabled: isAdmin && showResetConfirm,
+    refetchOnWindowFocus: false,
+  });
+
+  const takeBackupMutation = useMutation({
+    mutationFn: async () => {
+      const response = await apiRequest('POST', '/api/ops/run-backups');
+      return await response.json();
+    },
+    onSuccess: () => {
+      toast({
+        title: 'Backup taken',
+        description: 'A fresh backup was created successfully.',
+      });
+      queryClient.invalidateQueries({ queryKey: ['/api/ops/backup-runs'] });
+      refetchLatestBackup();
+    },
+    onError: (error: Error) => {
+      toast({
+        title: 'Backup failed',
+        description: getServerError(error, 'Could not create a backup right now.'),
+        variant: 'destructive',
+      });
+    },
+  });
 
   const handleFactoryReset = async () => {
     setIsResetting(true);
@@ -607,6 +650,69 @@ export default function UserManagement() {
               <span className="font-semibold text-gray-900">This cannot be undone.</span> You will be logged out immediately after the reset.
             </DialogDescription>
           </DialogHeader>
+          {/*
+            Backup-freshness panel (Task #336). PURELY INFORMATIONAL.
+            Shows the latest successful backup timestamp inline; renders a
+            yellow warning + one-click "Take a backup now" when the latest
+            successful backup is missing or older than the freshness window.
+            None of this gates the destructive submit button — that button
+            stays enabled the moment the typed phrase matches.
+          */}
+          <div
+            data-testid="factory-reset-backup-freshness"
+            className="rounded-lg border border-gray-200 bg-gray-50 p-3 text-sm text-gray-700 space-y-2"
+          >
+            <div className="flex items-start gap-2">
+              <Save className="h-4 w-4 mt-0.5 text-gray-500 shrink-0" />
+              <div className="flex-1">
+                <span className="font-medium text-gray-900">Latest successful backup:</span>{' '}
+                {latestBackupLoading ? (
+                  <span className="text-gray-500">Checking…</span>
+                ) : latestBackup?.lastSuccessfulBackupAt ? (
+                  <span data-testid="factory-reset-latest-backup-at">
+                    {formatDate(latestBackup.lastSuccessfulBackupAt)}
+                  </span>
+                ) : (
+                  <span data-testid="factory-reset-latest-backup-at" className="italic text-gray-500">
+                    no backup found
+                  </span>
+                )}
+              </div>
+            </div>
+          </div>
+          {!latestBackupLoading && latestBackup && !latestBackup.isFresh && (
+            <div
+              data-testid="factory-reset-backup-warning"
+              className="rounded-lg border border-yellow-300 bg-yellow-50 p-3 space-y-3"
+            >
+              <div className="flex items-start gap-2">
+                <AlertCircle className="h-5 w-5 text-yellow-700 shrink-0 mt-0.5" />
+                <div className="text-sm text-yellow-900 space-y-1">
+                  <p className="font-semibold">No recent backup</p>
+                  <p>
+                    {latestBackup.lastSuccessfulBackupAt
+                      ? `The most recent successful backup is older than ${latestBackup.freshnessWindowHours} hours.`
+                      : 'There is no successful backup on record.'}
+                    {' '}If you proceed, anything that hasn't been backed up will be lost permanently.
+                  </p>
+                  <p className="text-xs text-yellow-800">
+                    This is a heads-up only — it does not block the reset.
+                  </p>
+                </div>
+              </div>
+              <Button
+                type="button"
+                variant="outline"
+                onClick={() => takeBackupMutation.mutate()}
+                disabled={takeBackupMutation.isPending || isResetting}
+                data-testid="button-take-backup-now"
+                className="border-yellow-400 bg-white text-yellow-900 hover:bg-yellow-100"
+              >
+                <Save className="h-4 w-4 mr-2" />
+                {takeBackupMutation.isPending ? 'Taking backup…' : 'Take a backup now'}
+              </Button>
+            </div>
+          )}
           <div className="space-y-2 pt-2">
             <Label htmlFor="factory-reset-confirm-input" className="text-sm font-semibold text-gray-900">
               To confirm, type the phrase below exactly:

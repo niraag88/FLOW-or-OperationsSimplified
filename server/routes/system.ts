@@ -677,6 +677,55 @@ export function registerSystemRoutes(app: Express) {
     }
   });
 
+  /**
+   * GET /api/ops/latest-backup — informational backup-freshness lookup.
+   *
+   * Used by the factory-reset confirmation dialog (Task #336) to surface a
+   * yellow warning panel when the last successful backup is missing or older
+   * than `freshnessWindowHours`.
+   *
+   * INFORMATIONAL ONLY. Nothing about this endpoint or its consumers gates
+   * the destructive POST /api/ops/factory-reset call. The four-wall defence
+   * (Task #331) remains the only enforcement boundary; this endpoint exists
+   * solely to give the admin context before they choose to proceed.
+   *
+   * Response shape (always 200 for an authenticated Admin):
+   *   {
+   *     lastSuccessfulBackupAt: string | null,  // ISO timestamp of most recent fully-successful backup, or null
+   *     freshnessWindowHours:   number,         // currently 24
+   *     isFresh:                boolean,        // true iff lastSuccessfulBackupAt exists AND is younger than the window
+   *   }
+   */
+  const BACKUP_FRESHNESS_WINDOW_HOURS = 24;
+  app.get('/api/ops/latest-backup', requireAuth(['Admin']), async (req: AuthenticatedRequest, res) => {
+    try {
+      const [latest] = await db
+        .select({ ranAt: backupRuns.ranAt })
+        .from(backupRuns)
+        .where(eq(backupRuns.success, true))
+        .orderBy(desc(backupRuns.ranAt))
+        .limit(1);
+
+      const lastSuccessfulBackupAt = latest?.ranAt ?? null;
+      let isFresh = false;
+      if (lastSuccessfulBackupAt) {
+        const ageMs = Date.now() - new Date(lastSuccessfulBackupAt).getTime();
+        isFresh = ageMs >= 0 && ageMs < BACKUP_FRESHNESS_WINDOW_HOURS * 60 * 60 * 1000;
+      }
+
+      res.json({
+        lastSuccessfulBackupAt: lastSuccessfulBackupAt
+          ? new Date(lastSuccessfulBackupAt).toISOString()
+          : null,
+        freshnessWindowHours: BACKUP_FRESHNESS_WINDOW_HOURS,
+        isFresh,
+      });
+    } catch (error) {
+      console.error('Error fetching latest-backup freshness:', error);
+      res.status(500).json({ error: 'Failed to fetch latest-backup freshness' });
+    }
+  });
+
   app.get('/api/ops/backup-runs/:id/download', requireAuth(['Admin']), async (req: AuthenticatedRequest, res) => {
     try {
       const runId = parseInt(req.params.id, 10);
