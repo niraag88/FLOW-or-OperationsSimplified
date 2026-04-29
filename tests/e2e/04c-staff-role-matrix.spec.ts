@@ -352,6 +352,23 @@ test.describe('Staff role matrix (Task #370)', () => {
     expect(r.status).not.toBe(403);
   });
 
+  test('Staff can DELETE /api/delivery-orders/:id/scan-key (gate accepts → not 403)', async () => {
+    // Drive against a non-existent id so we don't disturb fixture state.
+    const r = await api('DELETE', '/api/delivery-orders/999999/scan-key', staffCookie);
+    expect(r.status).not.toBe(401);
+    expect(r.status).not.toBe(403);
+  });
+
+  test('Staff can PATCH /api/delivery-orders/:id/cancel (gate accepts → not 403)', async () => {
+    // Drive against a non-existent id so we don't consume the fixture DO
+    // (which the FORBIDDEN DELETE test still needs as a target). Gate runs
+    // before the 404 lookup, so 403 here would mean Staff was wrongly
+    // clamped out of the cancel flow.
+    const r = await api('PATCH', '/api/delivery-orders/999999/cancel', staffCookie, {});
+    expect(r.status).not.toBe(401);
+    expect(r.status).not.toBe(403);
+  });
+
   test('Staff can POST /api/quotations (gate accepts → not 403)', async () => {
     const r = await api('POST', '/api/quotations', staffCookie, {
       customer_id: fixtureCustomerId,
@@ -471,11 +488,6 @@ test.describe('Staff role matrix (Task #370)', () => {
 
   test('Staff CANNOT DELETE /api/delivery-orders/:id (403)', async () => {
     const r = await api('DELETE', `/api/delivery-orders/${fixtureDoId}`, staffCookie);
-    expect(r.status).toBe(403);
-  });
-
-  test('Staff CANNOT PATCH /api/delivery-orders/:id/cancel (403)', async () => {
-    const r = await api('PATCH', `/api/delivery-orders/${fixtureDoId}/cancel`, staffCookie, {});
     expect(r.status).toBe(403);
   });
 

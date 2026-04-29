@@ -605,7 +605,7 @@ export function registerDeliveryOrderRoutes(app: Express) {
   // own stock_movements rows) is reversed exactly once per product, then the
   // DO flips to `cancelled`. Submitted DOs cancel without stock movement.
   // Draft DOs must be deleted, not cancelled.
-  app.patch('/api/delivery-orders/:id/cancel', requireAuth(['Admin', 'Manager']), async (req: AuthenticatedRequest, res) => {
+  app.patch('/api/delivery-orders/:id/cancel', requireAuth(['Admin', 'Manager', 'Staff']), async (req: AuthenticatedRequest, res) => {
     try {
       const id = parseInt(req.params.id);
       if (isNaN(id)) return res.status(400).json({ error: 'Invalid ID' });
