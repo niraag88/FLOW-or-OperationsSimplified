@@ -85,12 +85,18 @@ test.describe('Restore round-trip (seed → backup → reset → restore)', () =
   let backupRunId: number;
   let backupFilePath: string;
   let tmpDir: string;
+  // Captured at beforeAll so the backup_runs lookup can constrain by
+  // ran_at >= testStartTime. Without this, a concurrent backup (e.g.
+  // a scheduler firing during the same disposable-DB run) could
+  // hand us a different row than the one our manual POST created.
+  let testStartTime: Date;
 
   test.beforeAll(async () => {
     gateFactoryResetTests('Restore round-trip spec (14-restore-roundtrip.spec.ts)');
     pool = new Pool({ connectionString: process.env.DATABASE_URL });
     cookie = await apiLogin();
     tmpDir = mkdtempSync(join(tmpdir(), 'restore-roundtrip-'));
+    testStartTime = new Date();
   });
 
   test.afterAll(async () => {
@@ -295,10 +301,14 @@ test.describe('Restore round-trip (seed → backup → reset → restore)', () =
     );
 
     // Financial year (year column is unique). Use a far-future year to avoid
-    // colliding with anything the standard seed might create.
+    // colliding with anything the standard seed might create. ON CONFLICT
+    // DO NOTHING makes the spec rerun-safe on a reused disposable DB:
+    // if the row already exists from a previous run the count is already
+    // non-zero, which is all the snapshot assertion needs.
     await pool!.query(
       `INSERT INTO financial_years (year, start_date, end_date, status)
-       VALUES (2099, '2099-01-01', '2099-12-31', 'Open')`,
+       VALUES (2099, '2099-01-01', '2099-12-31', 'Open')
+       ON CONFLICT (year) DO NOTHING`,
     );
 
     // Signed token (filtered separately by the upload flow; insert one
@@ -352,11 +362,15 @@ test.describe('Restore round-trip (seed → backup → reset → restore)', () =
     expect(body.success).toBe(true);
     expect(body.dbBackup?.success).toBe(true);
 
-    // The route does not echo a backup_run id — query the freshly-inserted row.
+    // The route does not echo a backup_run id — query the freshly-inserted
+    // row. Constrain by ran_at >= testStartTime so a concurrent backup
+    // (e.g. a scheduler firing during this disposable-DB run) cannot hand
+    // us a row from a different POST.
     const { rows } = await pool!.query<{ id: number }>(
       `SELECT id FROM backup_runs
-        WHERE success = true AND db_storage_key IS NOT NULL
+        WHERE success = true AND db_storage_key IS NOT NULL AND ran_at >= $1
         ORDER BY ran_at DESC LIMIT 1`,
+      [testStartTime],
     );
     backupRunId = rows[0]?.id ?? 0;
     expect(backupRunId).toBeGreaterThan(0);
