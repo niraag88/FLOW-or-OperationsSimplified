@@ -1,3 +1,34 @@
+/**
+ * CSRF protection (Task #374) — server-side enforcement via the
+ * double-submit cookie pattern (csrf-csrf v4).
+ *
+ * Architectural decisions:
+ *   - Mounted at the APP ROOT (not under /api) in server/routes.ts so
+ *     req.path retains its full pathname; mounting under a prefix would
+ *     strip the prefix and break the skip-list checks below.
+ *   - Cookie name `flow.x-csrf-token`, header `X-CSRF-Token`,
+ *     sameSite=lax, httpOnly, secure-in-prod — matches the session
+ *     cookie posture so behaviour is consistent across requests.
+ *   - getSessionIdentifier = req.sessionID so each authenticated session
+ *     has its own bound CSRF token; falls back to 'anonymous' for
+ *     unauth requests, which will fail token validation anyway.
+ *
+ * Skip-list (deliberate exemptions):
+ *   - Anything outside /api/ — Vite dev server, static assets, React SPA;
+ *     none of these reach an Express handler we own.
+ *   - /api/auth/login — chicken-and-egg: a fresh visitor has no session
+ *     yet, so cannot have a paired CSRF token.
+ *   - /api/auth/logout — idempotent, requires no body, low CSRF risk.
+ *   - /api/storage/upload/:token — uses signed-token auth (NOT session
+ *     auth), so the CSRF threat model does not apply. The signed token
+ *     itself is unguessable and single-use, providing the equivalent of
+ *     CSRF protection. External upload scripts (e.g. backup uploaders)
+ *     intentionally hit this endpoint without a browser session.
+ *
+ * Adding a new public mutating route does NOT require any CSRF wiring —
+ * the middleware covers everything by default. Skipping requires a
+ * deliberate addition to SKIP_PATHS or SIGNED_UPLOAD_PATH_REGEX.
+ */
 import { doubleCsrf, type DoubleCsrfUtilities } from 'csrf-csrf';
 import type { Request } from 'express';
 

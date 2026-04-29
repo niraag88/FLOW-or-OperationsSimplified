@@ -95,4 +95,26 @@ test.describe('CSRF protection', () => {
     });
     expect(res.status).not.toBe(403);
   });
+
+  test('CSRF gate is route-agnostic — applies to POST/DELETE on unrelated routes', async () => {
+    // Demonstrates the protection is enforced uniformly across mutating
+    // /api/* routes (not just the single PUT exercised above). We use
+    // POST /api/brands and DELETE /api/products as two unrelated routes.
+    const sessionCookie = await apiLogin();
+
+    // POST without CSRF → 403
+    const postNoCsrf = await rawFetch(`${BASE_URL}/api/brands`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', Cookie: sessionCookie },
+      body: JSON.stringify({ name: 'Route Agnostic Brand' }),
+    });
+    expect(postNoCsrf.status).toBe(403);
+
+    // DELETE without CSRF → 403
+    const delNoCsrf = await rawFetch(`${BASE_URL}/api/products/999999`, {
+      method: 'DELETE',
+      headers: { Cookie: sessionCookie },
+    });
+    expect(delNoCsrf.status).toBe(403);
+  });
 });
