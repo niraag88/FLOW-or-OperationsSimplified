@@ -68,21 +68,40 @@ export function registerBrandRoutes(app: Express) {
   app.delete('/api/brands/:id', requireAuth(), async (req: AuthenticatedRequest, res) => {
     try {
       const brandId = parseInt(req.params.id);
+      if (isNaN(brandId)) return res.status(400).json({ error: 'Invalid ID' });
       const [brandToDelete] = await db.select().from(brandsTable).where(eq(brandsTable.id, brandId));
       if (!brandToDelete) return res.status(404).json({ error: 'Brand not found' });
 
-      await db.insert(recycleBin).values({
-        documentType: 'Brand',
-        documentId: String(brandId),
-        documentNumber: brandToDelete.name,
-        documentData: JSON.stringify({ header: brandToDelete, items: [] }),
-        deletedBy: req.user?.username || 'unknown',
-        deletedDate: new Date(),
-        reason: 'Deleted from UI',
-        originalStatus: brandToDelete.isActive ? 'Active' : 'Inactive',
-        canRestore: true,
-      });
-      await businessStorage.deleteBrand(brandId);
+      // Task #365 (RF-2): the recycle-bin insert and the live delete
+      // run in a single transaction. If the live delete raises a FK
+      // error (e.g. brand still attached to a product or PO) the
+      // transaction rolls back the recycle-bin row, leaving the
+      // database exactly as it was — no orphan "deleted" entry.
+      try {
+        await db.transaction(async (tx) => {
+          await tx.insert(recycleBin).values({
+            documentType: 'Brand',
+            documentId: String(brandId),
+            documentNumber: brandToDelete.name,
+            documentData: JSON.stringify({ header: brandToDelete, items: [] }),
+            deletedBy: req.user?.username || 'unknown',
+            deletedDate: new Date(),
+            reason: 'Deleted from UI',
+            originalStatus: brandToDelete.isActive ? 'Active' : 'Inactive',
+            canRestore: true,
+          });
+          await tx.delete(brandsTable).where(eq(brandsTable.id, brandId));
+        });
+      } catch (deleteErr: unknown) {
+        const isObj = typeof deleteErr === 'object' && deleteErr !== null;
+        const causeObj = isObj && 'cause' in deleteErr && typeof (deleteErr as { cause: unknown }).cause === 'object' && (deleteErr as { cause: unknown }).cause !== null ? (deleteErr as { cause: Record<string, unknown> }).cause : null;
+        const errCode = (isObj && 'code' in deleteErr ? String((deleteErr as { code: unknown }).code) : '') || (causeObj && 'code' in causeObj ? String(causeObj.code) : '');
+        const errMsg = isObj && 'message' in deleteErr ? String((deleteErr as { message: unknown }).message) : '';
+        if (errCode === '23503' || errMsg.includes('foreign key') || errMsg.includes('violates foreign key')) {
+          return res.status(400).json({ error: 'Cannot delete brand — it is referenced by one or more products or purchase orders. Remove or reassign those records first.' });
+        }
+        throw deleteErr;
+      }
       writeAuditLog({ actor: req.user!.id, actorName: req.user?.username || String(req.user!.id), targetId: String(brandId), targetType: 'brand', action: 'DELETE', details: `Brand '${brandToDelete.name}' moved to recycle bin` });
       res.json({ success: true });
     } catch (error) {

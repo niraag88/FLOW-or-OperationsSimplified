@@ -92,20 +92,39 @@ export function registerCustomerRoutes(app: Express) {
   app.delete('/api/customers/:id', requireAuth(), async (req: AuthenticatedRequest, res) => {
     try {
       const customerId = parseInt(req.params.id);
+      if (isNaN(customerId)) return res.status(400).json({ error: 'Invalid ID' });
       const [customerToDelete] = await db.select().from(customers).where(eq(customers.id, customerId));
       if (!customerToDelete) return res.status(404).json({ error: 'Customer not found' });
-      await db.insert(recycleBin).values({
-        documentType: 'Customer',
-        documentId: String(customerId),
-        documentNumber: customerToDelete.name,
-        documentData: JSON.stringify({ header: customerToDelete, items: [] }),
-        deletedBy: req.user?.username || 'unknown',
-        deletedDate: new Date(),
-        reason: 'Deleted from UI',
-        originalStatus: customerToDelete.isActive ? 'Active' : 'Inactive',
-        canRestore: true,
-      });
-      await db.delete(customers).where(eq(customers.id, customerId));
+
+      // Task #365 (RF-2): the recycle-bin insert and the live delete
+      // run in a single transaction. If the live delete raises a FK
+      // error (e.g. customer still attached to an invoice, quotation
+      // or DO) the transaction rolls back the recycle-bin row.
+      try {
+        await db.transaction(async (tx) => {
+          await tx.insert(recycleBin).values({
+            documentType: 'Customer',
+            documentId: String(customerId),
+            documentNumber: customerToDelete.name,
+            documentData: JSON.stringify({ header: customerToDelete, items: [] }),
+            deletedBy: req.user?.username || 'unknown',
+            deletedDate: new Date(),
+            reason: 'Deleted from UI',
+            originalStatus: customerToDelete.isActive ? 'Active' : 'Inactive',
+            canRestore: true,
+          });
+          await tx.delete(customers).where(eq(customers.id, customerId));
+        });
+      } catch (deleteErr: unknown) {
+        const isObj = typeof deleteErr === 'object' && deleteErr !== null;
+        const causeObj = isObj && 'cause' in deleteErr && typeof (deleteErr as { cause: unknown }).cause === 'object' && (deleteErr as { cause: unknown }).cause !== null ? (deleteErr as { cause: Record<string, unknown> }).cause : null;
+        const errCode = (isObj && 'code' in deleteErr ? String((deleteErr as { code: unknown }).code) : '') || (causeObj && 'code' in causeObj ? String(causeObj.code) : '');
+        const errMsg = isObj && 'message' in deleteErr ? String((deleteErr as { message: unknown }).message) : '';
+        if (errCode === '23503' || errMsg.includes('foreign key') || errMsg.includes('violates foreign key')) {
+          return res.status(400).json({ error: 'Cannot delete customer — it is referenced by one or more invoices, quotations or delivery orders. Cancel or reassign those documents first.' });
+        }
+        throw deleteErr;
+      }
       writeAuditLog({ actor: req.user!.id, actorName: req.user?.username || String(req.user!.id), targetId: String(customerId), targetType: 'customer', action: 'DELETE', details: `Customer '${customerToDelete.name}' moved to recycle bin` });
       res.json({ success: true });
     } catch (error) {

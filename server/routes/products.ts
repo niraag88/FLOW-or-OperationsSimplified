@@ -351,6 +351,10 @@ export function registerProductRoutes(app: Express) {
       const [productToDelete] = await db.select().from(products).where(eq(products.id, productId));
       if (!productToDelete) return res.status(404).json({ error: 'Product not found' });
 
+      // Task #365 (RF-2) audit: this handler already wraps the
+      // recycle-bin insert and the live delete in a single
+      // transaction, and on FK error (pgCode 23503) it falls back to
+      // deactivation instead of returning an error. No change needed.
       let binEntryId: number | null = null;
       try {
         await db.transaction(async (tx) => {
