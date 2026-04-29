@@ -432,7 +432,10 @@ export const writeAuditLog = (auditData: InsertAuditLog): void => {
       } catch (err) {
         lastErr = err;
         if (attempt < AUDIT_LOG_RETRY_ATTEMPTS - 1) {
-          // Exponential backoff: 100ms, 200ms, 400ms…
+          // Exponential backoff between attempts. With 3 total
+          // attempts and base = 100ms, the sleeps are 100ms then
+          // 200ms (no sleep after the final attempt before falling
+          // through to the disk-spool path).
           const delayMs = AUDIT_LOG_RETRY_BASE_MS * Math.pow(2, attempt);
           await new Promise((resolve) => setTimeout(resolve, delayMs));
         }
