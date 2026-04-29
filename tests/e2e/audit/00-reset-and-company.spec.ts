@@ -10,13 +10,21 @@
  */
 import { test, expect } from '@playwright/test';
 import { BASE_URL, apiLogin, browserLogin } from './audit-helpers';
+import { gateFactoryResetTests, FACTORY_RESET_CONFIRMATION_PHRASE } from '../factory-reset-gate';
 
+/**
+ * Wall 4 of the four-wall defence (Task #331): the entire describe is skipped
+ * unless ALLOW_FACTORY_RESET_TESTS=true AND DATABASE_URL contains a known
+ * disposable marker. The two factory-reset POSTs below now also send the
+ * required confirmation phrase in the body so they reach the helper.
+ */
 test.describe('Phase 0 — Reset & Company Setup', () => {
   test.setTimeout(120000);
 
   let cookie: string;
 
   test.beforeAll(async () => {
+    gateFactoryResetTests('Phase 0 — Reset & Company Setup (audit/00-reset-and-company.spec.ts)');
     cookie = await apiLogin();
   });
 
@@ -27,9 +35,13 @@ test.describe('Phase 0 — Reset & Company Setup', () => {
     expect([401, 403]).toContain(resp.status);
   });
 
-  test('0.2 admin factory reset succeeds (200, ok=true)', async () => {
-    test.info().annotations.push({ type: 'action', description: 'POST /api/ops/factory-reset with valid admin cookie' });
-    const resp = await fetch(`${BASE_URL}/api/ops/factory-reset`, { method: 'POST', headers: { Cookie: cookie } });
+  test('0.2 admin factory reset succeeds (200, ok=true) with correct confirmation phrase', async () => {
+    test.info().annotations.push({ type: 'action', description: 'POST /api/ops/factory-reset with valid admin cookie + confirmation body' });
+    const resp = await fetch(`${BASE_URL}/api/ops/factory-reset`, {
+      method: 'POST',
+      headers: { Cookie: cookie, 'Content-Type': 'application/json' },
+      body: JSON.stringify({ confirmation: FACTORY_RESET_CONFIRMATION_PHRASE }),
+    });
     const body = await resp.json() as { ok?: boolean; message?: string };
     test.info().annotations.push({ type: 'result', description: `HTTP ${resp.status} — body.ok=${body.ok}` });
     expect(resp.status).toBe(200);
@@ -39,7 +51,11 @@ test.describe('Phase 0 — Reset & Company Setup', () => {
   test('0.3 idempotent reset: second factory reset also returns 200 ok=true', async () => {
     test.info().annotations.push({ type: 'action', description: 'POST /api/ops/factory-reset a second time to verify idempotency' });
     cookie = await apiLogin();
-    const resp = await fetch(`${BASE_URL}/api/ops/factory-reset`, { method: 'POST', headers: { Cookie: cookie } });
+    const resp = await fetch(`${BASE_URL}/api/ops/factory-reset`, {
+      method: 'POST',
+      headers: { Cookie: cookie, 'Content-Type': 'application/json' },
+      body: JSON.stringify({ confirmation: FACTORY_RESET_CONFIRMATION_PHRASE }),
+    });
     const body = await resp.json() as { ok?: boolean };
     test.info().annotations.push({ type: 'result', description: `HTTP ${resp.status} — body.ok=${body.ok}` });
     expect(resp.status).toBe(200);

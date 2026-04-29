@@ -11,23 +11,73 @@
  * Usage:
  *   npx tsx scripts/delete-dummy-data.ts              # live delete (seed/e2e only)
  *   npx tsx scripts/delete-dummy-data.ts --dry-run    # show counts only, no changes
- *   npx tsx scripts/delete-dummy-data.ts --all-user-data          # FULL factory reset
- *   npx tsx scripts/delete-dummy-data.ts --all-user-data --dry-run # preview full reset
+ *   npx tsx scripts/delete-dummy-data.ts --all-user-data --confirm-phrase="<phrase>"
+ *   npx tsx scripts/delete-dummy-data.ts --all-user-data --dry-run    # preview full reset
  *
  * --all-user-data wipes EVERYTHING (equivalent to POST /api/ops/factory-reset).
  * It deletes all business tables in FK-safe order, then re-inserts a blank
- * company_settings row.  The users table and ops schema are preserved.
+ * company_settings row.  Only Admin users in the users table are preserved;
+ * the ops schema is preserved.
+ *
+ * ─── Wall 4 of the four-wall defence (Task #331) ──────────────────────────────
+ * Live --all-user-data REQUIRES --confirm-phrase="<exact phrase>" matching
+ * FACTORY_RESET_CONFIRMATION_PHRASE. Before running, the script prints the
+ * parsed host of DATABASE_URL and pauses with a 5-second countdown that the
+ * operator can interrupt with Ctrl-C. Dry-run mode does NOT require the
+ * phrase because it never deletes anything (it only counts rows).
  *
  * Safe to run multiple times (idempotent).
  */
 
 import pkg from 'pg';
 const { Pool } = pkg;
-import { FACTORY_RESET_TABLES, executeFactoryReset } from '../server/factoryReset.js';
+import {
+  FACTORY_RESET_TABLES,
+  executeFactoryReset,
+  FACTORY_RESET_CONFIRMATION_PHRASE,
+} from '../server/factoryReset.js';
 
 const pool = new Pool({ connectionString: process.env.DATABASE_URL });
 const DRY_RUN = process.argv.includes('--dry-run');
 const ALL_USER_DATA = process.argv.includes('--all-user-data');
+
+/**
+ * Pull the value of a `--key="value"` or `--key=value` style argv flag.
+ * Returns undefined if the flag is not present.
+ */
+function getArgValue(name: string): string | undefined {
+  const prefix = `--${name}=`;
+  const hit = process.argv.find((a) => a.startsWith(prefix));
+  if (!hit) return undefined;
+  let v = hit.slice(prefix.length);
+  if ((v.startsWith('"') && v.endsWith('"')) || (v.startsWith("'") && v.endsWith("'"))) {
+    v = v.slice(1, -1);
+  }
+  return v;
+}
+
+const CONFIRM_PHRASE_ARG = getArgValue('confirm-phrase');
+
+function parseDatabaseHost(): string {
+  try {
+    const u = new URL(process.env.DATABASE_URL ?? '');
+    return u.host || '(unknown)';
+  } catch {
+    return '(unparseable DATABASE_URL)';
+  }
+}
+
+async function sleep(ms: number): Promise<void> {
+  return new Promise((r) => setTimeout(r, ms));
+}
+
+async function countdown(seconds: number, host: string): Promise<void> {
+  for (let i = seconds; i > 0; i--) {
+    process.stdout.write(`\r  ⏳  Wiping ${host} in ${i}s — press Ctrl-C to abort...   `);
+    await sleep(1000);
+  }
+  process.stdout.write('\r  ⏳  Starting wipe now...                                     \n');
+}
 
 export { executeFactoryReset };
 
@@ -46,7 +96,13 @@ async function runCliFactoryReset(
   dryRun = false,
 ): Promise<{ tablesCleared: string[]; rowsDeleted: number }> {
   if (!dryRun) {
-    return executeFactoryReset(client, { id: 'cli', name: 'CLI:delete-dummy-data' });
+    // CONFIRM_PHRASE_ARG is validated up front in main() before we reach here,
+    // but we forward it so the helper's own guard (Wall 1) also sees it.
+    return executeFactoryReset(
+      client,
+      { id: 'cli', name: 'CLI:delete-dummy-data' },
+      { confirmation: CONFIRM_PHRASE_ARG ?? '', databaseHost: parseDatabaseHost() },
+    );
   }
 
   // Dry-run: count rows without deleting; use shared table list for consistency
@@ -100,10 +156,32 @@ async function main() {
   if (ALL_USER_DATA) {
     const mode = DRY_RUN ? '=== DRY RUN — FULL FACTORY RESET (no data will be deleted) ===' : '=== FULL FACTORY RESET — deleting ALL business data ===';
     console.log(mode);
+
     if (!DRY_RUN) {
+      // Wall 4: refuse to detonate without the exact phrase on argv.
+      if (CONFIRM_PHRASE_ARG !== FACTORY_RESET_CONFIRMATION_PHRASE) {
+        console.error('');
+        console.error('  ✗  Refusing to run --all-user-data without the confirmation phrase.');
+        console.error('');
+        console.error('     This script wipes EVERY product, order, invoice, customer, GRN,');
+        console.error('     audit log, and non-Admin user account. To proceed you must pass:');
+        console.error('');
+        console.error(`       --confirm-phrase="${FACTORY_RESET_CONFIRMATION_PHRASE}"`);
+        console.error('');
+        console.error('     If you only want to preview what would be deleted, re-run with');
+        console.error('     --dry-run (no phrase required).');
+        console.error('');
+        await pool.end();
+        process.exit(2);
+      }
+
+      const host = parseDatabaseHost();
       console.log('  ⚠  This will wipe EVERY product, order, invoice, and customer record.');
-      console.log('  ⚠  Users and ops.restore_runs are preserved.');
+      console.log('  ⚠  Only Admin users and ops.restore_runs are preserved.');
+      console.log(`  ⚠  Target database host: ${host}`);
+      await countdown(5, host);
     }
+
     const client = await pool.connect();
     try {
       const { rowsDeleted } = await runCliFactoryReset(client, DRY_RUN);

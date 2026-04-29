@@ -17,6 +17,7 @@ import { formatDate } from '@/utils/dateUtils';
 import { apiRequest } from '@/lib/queryClient';
 import { useToast } from '@/hooks/use-toast';
 import AuditLogTable from '@/components/user-management/AuditLogTable';
+import { FACTORY_RESET_CONFIRMATION_PHRASE } from '@shared/factoryResetPhrase';
 
 interface User {
   id: string;
@@ -69,6 +70,7 @@ export default function UserManagement() {
   const [editPassword, setEditPassword] = useState('');
   const [showResetConfirm, setShowResetConfirm] = useState(false);
   const [isResetting, setIsResetting] = useState(false);
+  const [resetConfirmText, setResetConfirmText] = useState('');
   const [createForm, setCreateForm] = useState<CreateUserData>({
     username: '',
     password: '',
@@ -194,12 +196,15 @@ export default function UserManagement() {
       const res = await fetch('/api/ops/factory-reset', {
         method: 'POST',
         credentials: 'include',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ confirmation: FACTORY_RESET_CONFIRMATION_PHRASE }),
       });
       if (!res.ok) {
         const body = await res.json().catch(() => ({}));
-        throw new Error(body.error || 'Factory reset failed');
+        throw new Error(body.message || body.error || 'Factory reset failed');
       }
       setShowResetConfirm(false);
+      setResetConfirmText('');
       sessionStorage.setItem('factoryResetComplete', '1');
       await logout();
       window.location.href = '/';
@@ -581,7 +586,15 @@ export default function UserManagement() {
       </Tabs>
 
       {/* Factory Reset Confirmation Dialog */}
-      <Dialog open={showResetConfirm} onOpenChange={(open) => { if (!open && !isResetting) setShowResetConfirm(false); }}>
+      <Dialog
+        open={showResetConfirm}
+        onOpenChange={(open) => {
+          if (!open && !isResetting) {
+            setShowResetConfirm(false);
+            setResetConfirmText('');
+          }
+        }}
+      >
         <DialogContent className="max-w-md">
           <DialogHeader>
             <DialogTitle className="flex items-center gap-2 text-red-700">
@@ -594,10 +607,35 @@ export default function UserManagement() {
               <span className="font-semibold text-gray-900">This cannot be undone.</span> You will be logged out immediately after the reset.
             </DialogDescription>
           </DialogHeader>
+          <div className="space-y-2 pt-2">
+            <Label htmlFor="factory-reset-confirm-input" className="text-sm font-semibold text-gray-900">
+              To confirm, type the phrase below exactly:
+            </Label>
+            <code
+              data-testid="factory-reset-phrase"
+              className="block break-words rounded border border-red-300 bg-red-50 px-2 py-1 text-xs font-mono text-red-800"
+            >
+              {FACTORY_RESET_CONFIRMATION_PHRASE}
+            </code>
+            <Input
+              id="factory-reset-confirm-input"
+              data-testid="input-factory-reset-confirm"
+              type="text"
+              autoComplete="off"
+              autoCapitalize="off"
+              autoCorrect="off"
+              spellCheck={false}
+              value={resetConfirmText}
+              onChange={(e) => setResetConfirmText(e.target.value)}
+              disabled={isResetting}
+              placeholder="Type the phrase here"
+              className="font-mono text-sm"
+            />
+          </div>
           <DialogFooter className="flex flex-col-reverse sm:flex-row gap-2 pt-2">
             <Button
               variant="outline"
-              onClick={() => setShowResetConfirm(false)}
+              onClick={() => { setShowResetConfirm(false); setResetConfirmText(''); }}
               disabled={isResetting}
             >
               No, cancel
@@ -605,7 +643,8 @@ export default function UserManagement() {
             <Button
               variant="destructive"
               onClick={handleFactoryReset}
-              disabled={isResetting}
+              disabled={isResetting || resetConfirmText !== FACTORY_RESET_CONFIRMATION_PHRASE}
+              data-testid="button-confirm-factory-reset"
               className="flex items-center gap-2"
             >
               {isResetting ? (

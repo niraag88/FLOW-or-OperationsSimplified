@@ -3026,6 +3026,13 @@ test.describe('System', () => {
     const { status } = await api('POST', '/api/ops/factory-reset', '');
     expect(status).toBe(401);
   });
+
+  test('POST /api/ops/factory-reset Admin with no body → 400 (confirmation required)', async () => {
+    const { status, data } = await api('POST', '/api/ops/factory-reset', adminCookie);
+    expect(status).toBe(400);
+    expect((data as { error?: string }).error).toBe('factory_reset_confirmation_required');
+    note('POST /api/ops/factory-reset Admin with no body → 400 — Wall 2 of four-wall defence (Task #331)');
+  });
 });
 
 // ── Edge Cases ────────────────────────────────────────────────────────────────
@@ -3218,7 +3225,24 @@ test.describe('Cleanup', () => {
   });
 
   test('POST /api/ops/factory-reset by Admin → 200 (run last, after all test data is cleaned up)', async () => {
-    const { status, data } = await api('POST', '/api/ops/factory-reset', adminCookie);
+    // Wall 4 of the four-wall defence (Task #331): this destructive call is
+    // skipped unless ALLOW_FACTORY_RESET_TESTS=true AND DATABASE_URL contains
+    // a known disposable marker. See tests/e2e/factory-reset-gate.ts.
+    const { shouldAllowFactoryResetTests, FACTORY_RESET_CONFIRMATION_PHRASE } = await import('./factory-reset-gate');
+    const decision = shouldAllowFactoryResetTests();
+    if (!decision.allow) {
+      // eslint-disable-next-line no-console
+      console.log(`[factory-reset-gate] SKIPPING api-audit cleanup factory-reset — ${decision.reason}`);
+      note(`POST /api/ops/factory-reset Admin: SKIPPED (gated) — ${decision.reason}`);
+      test.skip(true, `factory-reset gate refused: ${decision.reason}`);
+      return;
+    }
+    const { status, data } = await api(
+      'POST',
+      '/api/ops/factory-reset',
+      adminCookie,
+      { confirmation: FACTORY_RESET_CONFIRMATION_PHRASE },
+    );
     if (status === 200) {
       const result = data as { ok?: boolean; message?: string };
       expect(result.ok).toBe(true);

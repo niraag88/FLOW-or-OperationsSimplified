@@ -1,7 +1,11 @@
 import type { Express } from "express";
 import { auditLog, recycleBin, storageObjects, invoices, deliveryOrders, quotations, purchaseOrders, invoiceLineItems, deliveryOrderItems, quotationItems, purchaseOrderItems, products, brands, suppliers, customers, financialYears, backupRuns, restoreRuns, users } from "@shared/schema";
 import { db, pool } from "../db";
-import { executeFactoryReset } from "../factoryReset";
+import {
+  executeFactoryReset,
+  FACTORY_RESET_CONFIRMATION_PHRASE,
+  FactoryResetConfirmationError,
+} from "../factoryReset";
 import { eq, desc, sum, inArray } from "drizzle-orm";
 import { Readable } from 'stream';
 import { execSync } from 'child_process';
@@ -1015,22 +1019,85 @@ export function registerSystemRoutes(app: Express) {
    *
    * Wipes ALL business data from the public schema and re-inserts a blank
    * company_settings row.  The ops schema (restore_runs) is intentionally
-   * untouched.  Users table is preserved — only the Admin can call this.
+   * untouched.  Users table partially preserved (only Admin role retained).
    *
    * Deletion order respects FK constraints (children before parents).
+   *
+   * ─── Wall 2 of the four-wall defence (Task #331) ─────────────────────────
+   * Body MUST contain { confirmation: "<exact phrase>" }. Any deviation
+   * (missing, wrong text, wrong casing, extra whitespace) is rejected with
+   * 400 BEFORE the helper is invoked. This stops the historical bug where
+   * a bare POST with no body wiped the database. The phrase is exported
+   * from server/factoryReset.ts as FACTORY_RESET_CONFIRMATION_PHRASE.
    */
   app.post('/api/ops/factory-reset', requireRole('Admin'), async (req: AuthenticatedRequest, res) => {
-    const client = await pool.connect();
-    try {
-      await executeFactoryReset(client, {
-        id: String(req.user!.id),
-        name: req.user!.username,
+    const body = (req.body ?? {}) as { confirmation?: unknown };
+    const confirmation = typeof body.confirmation === 'string' ? body.confirmation : '';
+
+    if (confirmation !== FACTORY_RESET_CONFIRMATION_PHRASE) {
+      // NOTE: do NOT echo the expected phrase back in the error body. The
+      // phrase is shown in the UI dialog and lives at shared/factoryResetPhrase.ts;
+      // a script must obtain it deliberately, not auto-recover from a 400.
+      return res.status(400).json({
+        error: 'factory_reset_confirmation_required',
+        message:
+          'Factory reset refused: the request body must include the exact ' +
+          'confirmation phrase shown in the dialog. This is a deliberate ' +
+          'guard against accidental data loss.',
       });
+    }
+
+    let databaseHost: string | undefined;
+    try {
+      databaseHost = new URL(process.env.DATABASE_URL ?? '').host || undefined;
+    } catch {
+      databaseHost = undefined;
+    }
+
+    const client = await pool.connect();
+    // Postgres session-level advisory lock — prevents two concurrent
+    // factory-reset requests from interleaving. The lock key (-31) is a
+    // stable arbitrary integer dedicated to this operation; releasing on
+    // any exit path (including server crash) is automatic when the
+    // connection drops because session locks live on the connection.
+    const FACTORY_RESET_LOCK_KEY = -31;
+    let lockAcquired = false;
+    try {
+      const lockResult = await client.query<{ locked: boolean }>(
+        'SELECT pg_try_advisory_lock($1) AS locked',
+        [FACTORY_RESET_LOCK_KEY],
+      );
+      lockAcquired = lockResult.rows[0]?.locked === true;
+      if (!lockAcquired) {
+        return res.status(409).json({
+          error: 'factory_reset_in_progress',
+          message:
+            'Another factory reset is already running. Wait for it to finish, ' +
+            'then try again.',
+        });
+      }
+
+      await executeFactoryReset(
+        client,
+        { id: String(req.user!.id), name: req.user!.username },
+        { confirmation, databaseHost },
+      );
       res.json({ ok: true, message: 'Factory reset complete. All business data has been wiped.' });
     } catch (error: any) {
+      if (error instanceof FactoryResetConfirmationError) {
+        return res.status(400).json({
+          error: 'factory_reset_confirmation_required',
+          message: error.message,
+        });
+      }
       console.error('Factory reset failed:', error);
       res.status(500).json({ error: 'Factory reset failed', details: error.message });
     } finally {
+      if (lockAcquired) {
+        await client
+          .query('SELECT pg_advisory_unlock($1)', [FACTORY_RESET_LOCK_KEY])
+          .catch(() => {});
+      }
       client.release();
     }
   });

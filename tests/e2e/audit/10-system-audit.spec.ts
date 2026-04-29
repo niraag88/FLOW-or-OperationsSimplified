@@ -12,6 +12,7 @@
  */
 import { test, expect } from '@playwright/test';
 import { BASE_URL, apiLogin, apiPost, browserLogin, loadState, saveState } from './audit-helpers';
+import { gateFactoryResetTests } from '../factory-reset-gate';
 
 interface AuditLogEntry { action: string; }
 interface PurchaseOrderResponse { id: number; status: string; poNumber?: string; }
@@ -28,6 +29,11 @@ test.describe('Phase 10 — Audit Log & Recycle Bin', () => {
   let permDeletePoNumber: string;
 
   test.beforeAll(async () => {
+    // Wall 4: this spec asserts a FACTORY_RESET row exists in the audit log,
+    // which is only true after Phase 0 ran a real reset. Phase 0 is itself
+    // gated by gateFactoryResetTests, so this dependent assertion must skip
+    // under the same conditions to keep CI green on non-disposable DBs.
+    gateFactoryResetTests('Phase 10 — Audit Log & Recycle Bin (audit/10-system-audit.spec.ts)');
     cookie = await apiLogin();
   });
 
