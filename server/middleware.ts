@@ -53,6 +53,27 @@ setInterval(async () => {
   }
 }, 5 * 60 * 1000);
 
+/**
+ * HTML-escape a value for safe interpolation into a server-rendered HTML
+ * template (e.g. the PDF generators below). Maps the five HTML
+ * metacharacters (& < > " ') to their entity equivalents and treats
+ * null/undefined as ''.
+ *
+ * Returns '' (not '-') for nullish input so existing
+ * `${escapeHtml(x) || '-'}` patterns at the callsite still work.
+ *
+ * Reusable for any future server-rendered PDF (Invoice/PO/Quotation).
+ */
+export function escapeHtml(value: unknown): string {
+  if (value === null || value === undefined) return '';
+  return String(value)
+    .replace(/&/g, '&amp;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;')
+    .replace(/"/g, '&quot;')
+    .replace(/'/g, '&#39;');
+}
+
 export async function generateDOPDF(
   deliveryOrder: any,
   items: Array<{ productCode: string | null; description: string | null; quantity: number; unitPrice: string; lineTotal: string }>,
@@ -67,13 +88,13 @@ export async function generateDOPDF(
   const fmt = (n: string | number | null | undefined) =>
     Number(n || 0).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
 
-  const currency = deliveryOrder.currency || 'AED';
+  const currency = escapeHtml(deliveryOrder.currency || 'AED');
 
   const itemRows = items.map((item, idx) => `
     <tr>
       <td class="text-center">${idx + 1}</td>
-      <td>${item.productCode || '-'}</td>
-      <td>${item.description || '-'}</td>
+      <td>${escapeHtml(item.productCode) || '-'}</td>
+      <td>${escapeHtml(item.description) || '-'}</td>
       <td class="text-right">${item.quantity}</td>
       <td class="text-right">${fmt(item.unitPrice)}</td>
       <td class="text-right">${fmt(item.lineTotal)}</td>
@@ -89,7 +110,7 @@ export async function generateDOPDF(
     <html>
     <head>
       <meta charset="utf-8">
-      <title>Delivery Order ${deliveryOrder.orderNumber}</title>
+      <title>Delivery Order ${escapeHtml(deliveryOrder.orderNumber)}</title>
       <style>
         body { font-family: Arial, sans-serif; margin: 0; padding: 20px; font-size: 13px; }
         .header { display: flex; justify-content: space-between; margin-bottom: 24px; border-bottom: 2px solid #333; padding-bottom: 16px; }
@@ -118,27 +139,27 @@ export async function generateDOPDF(
         <div>
           <h1 class="do-title">DELIVERY ORDER</h1>
           <div class="do-details">
-            <p>DO Number: <strong>${deliveryOrder.orderNumber}</strong></p>
-            <p>Order Date: <strong>${formatDate(deliveryOrder.orderDate)}</strong></p>
-            ${deliveryOrder.reference ? `<p>Reference: <strong>${deliveryOrder.reference}</strong></p>` : ''}
+            <p>DO Number: <strong>${escapeHtml(deliveryOrder.orderNumber)}</strong></p>
+            <p>Order Date: <strong>${escapeHtml(formatDate(deliveryOrder.orderDate))}</strong></p>
+            ${deliveryOrder.reference ? `<p>Reference: <strong>${escapeHtml(deliveryOrder.reference)}</strong></p>` : ''}
           </div>
         </div>
         <div class="company-info">
-          <h2>${company?.name || ''}</h2>
-          ${company?.address ? `<p>${company.address}</p>` : ''}
-          ${company?.phone ? `<p>Tel: ${company.phone}</p>` : ''}
-          ${company?.email ? `<p>Email: ${company.email}</p>` : ''}
+          <h2>${escapeHtml(company?.name) || ''}</h2>
+          ${company?.address ? `<p>${escapeHtml(company.address)}</p>` : ''}
+          ${company?.phone ? `<p>Tel: ${escapeHtml(company.phone)}</p>` : ''}
+          ${company?.email ? `<p>Email: ${escapeHtml(company.email)}</p>` : ''}
         </div>
       </div>
 
       <div class="section grid">
         <div>
           <strong>Deliver To:</strong><br/>
-          ${deliveryOrder.customerName}<br/>
-          ${deliveryOrder.deliveryAddress || ''}
+          ${escapeHtml(deliveryOrder.customerName)}<br/>
+          ${escapeHtml(deliveryOrder.deliveryAddress) || ''}
         </div>
         <div>
-          <strong>Status:</strong> ${deliveryOrder.status}<br/>
+          <strong>Status:</strong> ${escapeHtml(deliveryOrder.status)}<br/>
         </div>
       </div>
 
@@ -172,7 +193,7 @@ export async function generateDOPDF(
         </tbody>
       </table>
 
-      ${deliveryOrder.notes ? `<div class="section" style="margin-top:20px"><strong>Remarks:</strong><br/>${deliveryOrder.notes}</div>` : ''}
+      ${deliveryOrder.notes ? `<div class="section" style="margin-top:20px"><strong>Remarks:</strong><br/>${escapeHtml(deliveryOrder.notes)}</div>` : ''}
 
       <div class="signature-section">
         <div class="signature-box"><p>Delivered By</p></div>
