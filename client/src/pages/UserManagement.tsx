@@ -197,7 +197,7 @@ export default function UserManagement() {
         method: 'POST',
         credentials: 'include',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ confirmation: FACTORY_RESET_CONFIRMATION_PHRASE }),
+        body: JSON.stringify({ confirmation: resetConfirmText }),
       });
       if (!res.ok) {
         const body = await res.json().catch(() => ({}));
