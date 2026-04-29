@@ -135,13 +135,8 @@ export const CompanySettings = {
 
 interface RecycleBinEntity extends ApiEntity {
   restore(id: number | string): Promise<unknown>;
-  /**
-   * Permanently delete a recycle-bin row. The server requires a typed
-   * confirmation phrase from `shared/destructiveActionPhrases.ts`
-   * (RECYCLE_BIN_PERMANENT_DELETE_PHRASE) — see Task #337. Single-item,
-   * bulk, and "Clear All" UI flows all reuse this method, sending the
-   * SAME phrase the user typed once into the typed-confirmation dialog.
-   */
+  // Server requires the typed confirmation phrase
+  // (RECYCLE_BIN_PERMANENT_DELETE_PHRASE).
   deletePermanent(id: number | string, confirmation: string): Promise<unknown>;
 }
 

@@ -476,16 +476,8 @@ export function registerSystemRoutes(app: Express) {
   // recycle-bin payloads from a client would let any logged-in user inject
   // bogus recovery rows referencing documents they never owned (Task #319).
 
-  /**
-   * DELETE /api/recycle-bin/:id — permanently remove a single recycle-bin
-   * row. Used by single-item, bulk-selected, and "Clear All" UI flows
-   * (each loops over this endpoint). Once this row is gone the original
-   * document cannot be restored, so the typed-phrase guard from Task #337
-   * is mandatory: the request body must include
-   *   { confirmation: RECYCLE_BIN_PERMANENT_DELETE_PHRASE }
-   * or the helper returns 400 BEFORE the DELETE is issued. The expected
-   * phrase is never echoed back in the error response.
-   */
+  // DELETE /api/recycle-bin/:id — permanent delete. Requires the typed
+  // confirmation phrase in the body.
   app.delete('/api/recycle-bin/:id', requireAuth(['Admin', 'Manager']), async (req: AuthenticatedRequest, res) => {
     if (!sendIfMissingConfirmation(
       res,
@@ -895,16 +887,8 @@ export function registerSystemRoutes(app: Express) {
     }
   }
 
-  /**
-   * POST /api/ops/backup-runs/:id/restore — restore from a stored cloud backup.
-   *
-   * Typed-phrase guard (Task #337): the body MUST include
-   *   { confirmation: RESTORE_PHRASE }
-   * — replacing the entire current database with the contents of the
-   * backup file is irreversible. The check runs BEFORE the schema lookup
-   * so a bare POST never reaches the destructive `runRestore()` helper.
-   * The expected phrase is never echoed back in the error response.
-   */
+  // POST /api/ops/backup-runs/:id/restore — restore from a stored cloud
+  // backup. Requires the typed confirmation phrase in the body.
   app.post('/api/ops/backup-runs/:id/restore', requireAuth(['Admin']), async (req: AuthenticatedRequest, res) => {
     if (!sendIfMissingConfirmation(
       res,
@@ -938,27 +922,10 @@ export function registerSystemRoutes(app: Express) {
     });
   });
 
-  /**
-   * POST /api/ops/restore-upload — restore from an uploaded .sql.gz file.
-   *
-   * Buffers the upload to a temp file on disk before calling runRestore().
-   * This ensures the busboy fileSize limit check completes BEFORE any
-   * destructive DROP SCHEMA action begins, eliminating the race condition
-   * where a truncated oversized file could start a restore.
-   *
-   * Flow:
-   *   1. bb.on('field'): collect the `confirmation` typed-phrase field
-   *   2. bb.on('file'): pipe fileStream → temp file; track hitSizeLimit flag
-   *   3. bb.on('finish'): verify the confirmation phrase from Task #337
-   *      BEFORE invoking runRestore — a missing/wrong phrase always
-   *      returns 400 and the buffered file is cleaned up. Only after
-   *      the phrase passes does the destructive replay start.
-   *   4. cleanupTemp() is called in all exit paths including bb.on('error')
-   *
-   * Typed-phrase guard (Task #337): the multipart payload MUST include a
-   * text field `confirmation` whose value equals RESTORE_PHRASE. The
-   * expected phrase is never echoed back in the error response.
-   */
+  // POST /api/ops/restore-upload — restore from an uploaded .sql.gz file.
+  // The upload is buffered to a temp file before runRestore is invoked so
+  // the file-size check completes before any destructive action begins.
+  // Requires a multipart `confirmation` field with the typed phrase.
   app.post('/api/ops/restore-upload', requireAuth(['Admin']), async (req: AuthenticatedRequest, res) => {
     const contentType = req.headers['content-type'] || '';
     if (!contentType.includes('multipart/form-data')) {
@@ -1054,22 +1021,20 @@ export function registerSystemRoutes(app: Express) {
         return;
       }
 
-      // Wall 1 of the typed-phrase guard for restore (Task #337). Runs
-      // AFTER the upload is buffered (so we know the field events have
-      // fired) but BEFORE any destructive action. Missing/wrong phrase
-      // returns 400 and the buffered file is cleaned up.
-      if (confirmationField !== RESTORE_PHRASE) {
+      // Task #337 typed-phrase guard. Same shared helper as the JSON
+      // routes — the multipart `confirmation` field captured above is
+      // wrapped into a body-shaped object so the helper sees the same
+      // shape it expects from `req.body`.
+      if (
+        !sendIfMissingConfirmation(
+          res,
+          { confirmation: confirmationField },
+          RESTORE_PHRASE,
+          'restore_confirmation_required',
+          'Emergency restore from uploaded file',
+        )
+      ) {
         cleanupTemp();
-        if (!res.headersSent) {
-          res.status(400).json({
-            error: 'restore_confirmation_required',
-            message:
-              'Emergency restore from uploaded file refused: the multipart ' +
-              'payload must include a `confirmation` text field whose value ' +
-              'matches the phrase shown in the dialog. This is a deliberate ' +
-              'guard against accidental data loss.',
-          });
-        }
         return;
       }
 

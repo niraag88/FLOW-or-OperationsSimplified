@@ -22,10 +22,6 @@ const initialSettings = {
 export default function RetentionSettings({ currentUser }: RetentionSettingsProps) {
   const [settings, setSettings] = useState(initialSettings);
   const [loading, setLoading] = useState(false);
-  // Typed-phrase confirmation gate (Task #337). The "Run now" button only
-  // opens this dialog; the actual purge runs after the admin types the
-  // confirmation phrase. The scheduled background retention job is
-  // unaffected because it does not go through this HTTP endpoint.
   const [showPurgeConfirm, setShowPurgeConfirm] = useState(false);
   const [purgePending, setPurgePending] = useState(false);
   const { toast } = useToast();
@@ -165,12 +161,6 @@ export default function RetentionSettings({ currentUser }: RetentionSettingsProp
         </div>
       </CardFooter>
 
-      {/*
-        Typed-phrase confirmation gate (Task #337). The destructive
-        button enables only after the admin types RETENTION_PURGE_PHRASE
-        verbatim. The same phrase is forwarded to the server, which
-        also rejects the request without it.
-      */}
       <TypedConfirmDialog
         open={showPurgeConfirm}
         onClose={() => {

@@ -223,8 +223,7 @@ test.describe('Phase 10 — Audit Log & Recycle Bin', () => {
     test.info().annotations.push({ type: 'result', description: `PO-${permDeletePoId} in recycle bin: ${!!permEntry}` });
     expect(permEntry).toBeTruthy();
 
-    // Task #337 typed-confirmation guard: must include the phrase in
-    // the JSON body, otherwise the server returns 400.
+    // Server requires the typed confirmation phrase in the body.
     const delResp = await fetch(`${BASE_URL}/api/recycle-bin/${permEntry!.id}`, {
       method: 'DELETE',
       headers: { Cookie: cookie, 'Content-Type': 'application/json' },

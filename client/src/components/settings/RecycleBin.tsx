@@ -82,10 +82,6 @@ export default function RecycleBinComponent() {
     }
   };
 
-  // Each handler accepts the typed phrase from TypedConfirmDialog and
-  // forwards it on every iteration of its loop. The user types the phrase
-  // ONCE per dialog opening; the loop then sends that same phrase with
-  // every per-row request the server-side guard checks (Task #337).
   const handleBulkPermanentDelete = async (typedPhrase: string) => {
     setBulkDeletePending(true);
     try {

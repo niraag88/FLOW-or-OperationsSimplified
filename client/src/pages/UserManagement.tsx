@@ -73,9 +73,6 @@ export default function UserManagement() {
   const [showResetConfirm, setShowResetConfirm] = useState(false);
   const [isResetting, setIsResetting] = useState(false);
   const [resetConfirmText, setResetConfirmText] = useState('');
-  // Tracks which user account is awaiting typed-phrase confirmation
-  // before deletion. Null while no dialog is open. Replaces the old
-  // browser `confirm()` call (Task #337).
   const [userPendingDelete, setUserPendingDelete] = useState<User | null>(null);
   const [createForm, setCreateForm] = useState<CreateUserData>({
     username: '',
@@ -159,10 +156,6 @@ export default function UserManagement() {
     },
   });
 
-  // Delete user mutation. The DELETE request now carries a typed
-  // confirmation phrase in its JSON body — the server-side guard
-  // installed by Task #337 returns 400 without it. The phrase the user
-  // typed in the confirmation dialog is forwarded verbatim.
   const deleteUserMutation = useMutation({
     mutationFn: async ({ userId, confirmation }: { userId: string; confirmation: string }) => {
       await apiRequest('DELETE', `/api/users/${userId}`, { confirmation });
@@ -194,9 +187,6 @@ export default function UserManagement() {
     await updateUserMutation.mutateAsync({ ...editingUser, password: editPassword });
   };
 
-  // Open the typed-phrase confirmation dialog for the given user.
-  // Actual deletion happens in confirmDeleteUser once the admin types
-  // the phrase exactly (Task #337).
   const handleDeleteUser = (u: User) => {
     setUserPendingDelete(u);
   };
@@ -901,12 +891,6 @@ export default function UserManagement() {
         </Dialog>
       )}
 
-      {/*
-        Typed-phrase delete-user dialog (Task #337). The destructive
-        button enables only after the admin types USER_DELETE_PHRASE
-        verbatim. The same phrase is forwarded to the server, which
-        also rejects the request without it.
-      */}
       <TypedConfirmDialog
         open={userPendingDelete !== null}
         onClose={() => {

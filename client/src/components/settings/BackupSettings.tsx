@@ -38,21 +38,9 @@ function StatusBadge({ success }: { success: boolean }) {
     : <Badge variant="destructive"><XCircle className="w-3 h-3 mr-1 inline" />Failed</Badge>;
 }
 
-/*
- * Emergency-restore confirmation panel (Task #337 migration).
- *
- * The previous bespoke RestoreConfirmModal was replaced by the shared
- * TypedConfirmDialog so the typed-phrase pattern works the same way for
- * every destructive admin action. The "Take Fresh Backup First" button
- * and the latest-backup status panel survive as the dialog's `extra`
- * slot — informational only, NOT part of the disable predicate.
- *
- * The legacy "I confirm I have taken a backup" checkbox was removed.
- * The typed phrase (`RESTORE_PHRASE`) is now the SOLE safeguard, which
- * matches factory-reset and prevents the dual-gate confusion of a
- * dialog that looks like the checkbox controls the button when the
- * server-side guard already requires the typed phrase.
- */
+// Informational panel rendered as the `extra` slot of TypedConfirmDialog
+// for the emergency-restore flow. Never participates in the disable
+// predicate — the typed phrase is the sole safeguard.
 interface RestoreConfirmExtraProps {
   filename: string;
   run?: any;

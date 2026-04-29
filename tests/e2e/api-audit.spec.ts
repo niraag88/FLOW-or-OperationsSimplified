@@ -293,9 +293,8 @@ test.describe('Users', () => {
   });
 
   test('DELETE /api/users/:id self-delete → 400', async () => {
-    // Sends the typed-confirmation phrase (Task #337) so the request
-    // passes the typed-confirmation guard and reaches the original
-    // self-delete check, which is what this test asserts.
+    // Phrase is included so the request passes the typed-confirmation
+    // guard and reaches the self-delete check this test asserts.
     const meResp = await api('GET', '/api/auth/me', adminCookie);
     const adminId = ((meResp.data as { user?: { id: string } })?.user)?.id;
     if (!adminId) return;

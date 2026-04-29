@@ -66,15 +66,10 @@ export function registerSettingsRoutes(app: Express) {
     }
   });
 
-  /**
-   * POST /api/settings/retention/purge — runs the retention policy now.
-   * Permanently deletes audit-log rows older than the configured retention
-   * window AND old `exports/` storage objects. The scheduled background
-   * job calls the same logic without going through HTTP, so it is
-   * unaffected by this guard. Typed-phrase guard from Task #337 protects
-   * only the manual "Run now" button. See
-   * `shared/destructiveActionPhrases.ts` for the exact phrase.
-   */
+  // POST /api/settings/retention/purge — manual "Run now" for the
+  // retention sweep. Requires the typed confirmation phrase. The
+  // scheduled background sweep calls the same logic without HTTP and
+  // is unaffected.
   app.post('/api/settings/retention/purge', requireAuth(['Admin']), async (req: AuthenticatedRequest, res) => {
     if (!sendIfMissingConfirmation(
       res,
@@ -251,15 +246,8 @@ export function registerSettingsRoutes(app: Express) {
     }
   });
 
-  /**
-   * DELETE /api/users/:id — Admin user-account delete. There is no recycle
-   * bin for user accounts, so the typed-phrase guard from Task #337 is
-   * mandatory: the request body must include
-   *   { confirmation: USER_DELETE_PHRASE }
-   * The check runs BEFORE the self-delete check so a bare DELETE never
-   * reaches the database. The expected phrase is never echoed back in
-   * the error response.
-   */
+  // DELETE /api/users/:id — Admin user-account delete. Requires the typed
+  // confirmation phrase. The guard runs BEFORE the self-delete check.
   app.delete('/api/users/:id', requireRole('Admin'), async (req: AuthenticatedRequest, res) => {
     if (!sendIfMissingConfirmation(
       res,

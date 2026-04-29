@@ -155,10 +155,8 @@ test.describe('Admin route gates (Task #319)', () => {
     expect(anon.status).toBe(401);
     const staff = await api('POST', path, staffCookie, {});
     expect(staff.status).toBe(403);
-    // Admin call with the typed-confirmation phrase (Task #337) AND a
-    // non-existent run id must hit the "not found" branch (404), proving
-    // both the role-gate AND the typed-confirmation guard accept the
-    // admin request without actually executing a restore.
+    // Admin needs the typed-confirmation phrase to pass the new guard;
+    // the unknown run id then falls through to the 404 branch.
     const admin = await api('POST', path, adminCookie, { confirmation: 'EMERGENCY RESTORE' });
     expect(admin.status).toBe(404);
   });

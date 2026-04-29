@@ -416,10 +416,8 @@ test.describe('Restore round-trip (seed → backup → reset → restore)', () =
     const buf = readFileSync(backupFilePath);
     const blob = new Blob([buf], { type: 'application/gzip' });
     const fd = new FormData();
-    // Task #337 typed-confirmation guard for restore-upload. The
-    // server's busboy `field` listener captures `confirmation` before
-    // runRestore() is called. Append the field BEFORE the file so the
-    // phrase is parsed in time even if buffering is disabled.
+    // Append the typed-confirmation field BEFORE the file so busboy
+    // captures it before the file event fires.
     fd.append('confirmation', RESTORE_PHRASE);
     fd.append('file', blob, `backup-${backupRunId}.sql.gz`);
 
