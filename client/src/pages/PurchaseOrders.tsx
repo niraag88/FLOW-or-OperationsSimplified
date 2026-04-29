@@ -3,6 +3,7 @@ import React, { useState, useEffect, useRef } from "react";
 import { useQuery, keepPreviousData } from "@tanstack/react-query";
 import { queryClient } from "@/lib/queryClient";
 import { useAuth } from "@/hooks/useAuth";
+import { useToast } from "@/hooks/use-toast";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
@@ -53,6 +54,7 @@ export default function PurchaseOrders() {
   const [financialYears, setFinancialYears] = useState<FinancialYear[]>([]);
   const [financialYearsLoaded, setFinancialYearsLoaded] = useState(false);
   const hasFetchedPOsRef = useRef(false);
+  const { toast } = useToast();
 
   // Separate refresh counter only for the GRN tab (raw fetches)
   const [grnRefreshCount, setGrnRefreshCount] = useState(0);
@@ -127,14 +129,28 @@ export default function PurchaseOrders() {
         const grns = Array.isArray(data) ? data : [];
         setGoodsReceipts(grns as SchemaGoodsReceipt[]);
       })
-      .catch(() => {});
+      .catch((err) => {
+        console.error('Failed to load goods receipts:', err);
+        toast({
+          title: 'Could not load goods receipts',
+          description: 'Check your connection and try again. The Goods Receipts tab may be empty or stale.',
+          variant: 'destructive',
+        });
+      });
   };
 
   const fetchAllPOsForGRNTab = () => {
     fetch('/api/purchase-orders?status=submitted,closed', { credentials: 'include' })
       .then(r => r.json())
       .then(result => setAllPOs(Array.isArray(result) ? result : (result.data || [])))
-      .catch(() => {});
+      .catch((err) => {
+        console.error('Failed to load purchase orders for goods-receipts tab:', err);
+        toast({
+          title: 'Could not load purchase orders',
+          description: 'The supplier list inside the Goods Receipts tab may be incomplete. Check your connection and try again.',
+          variant: 'destructive',
+        });
+      });
   };
 
   // On first goods-receipts tab open: fetch submitted+closed POs (lazy, once) and GRNs
