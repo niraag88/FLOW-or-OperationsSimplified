@@ -174,6 +174,9 @@ export default function ScheduledBackupCard() {
         <CardDescription>
           Take database backups automatically on a cadence you choose. Old backups beyond the retention count are pruned automatically. Times are in Asia/Dubai (GST).
         </CardDescription>
+        <p className="text-xs text-gray-500 mt-2">
+          Note: scheduled backups run from the app process, so they may be delayed if the app was asleep or restarting at the scheduled time. The stale-backup banner will warn you if no successful backup has run within your alert window.
+        </p>
       </CardHeader>
       <CardContent className="space-y-6">
         {isLoading ? (

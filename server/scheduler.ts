@@ -135,6 +135,23 @@ export function startBackupScheduler() {
     intervalHandle.unref();
   }
   console.log(`Backup scheduler started (tick every ${TICK_INTERVAL_MS / 1000}s)`);
+
+  // Startup catch-up tick (Task #350): if the app was asleep / restarted
+  // while a scheduled backup was overdue, the next interval tick is up
+  // to TICK_INTERVAL_MS away. Fire one tick asynchronously now so an
+  // overdue schedule runs within seconds of startup. The tick itself
+  // already respects nextDueAt — a non-overdue schedule returns "skipped"
+  // — and is gated by the same withBackupLock() advisory lock used by
+  // the interval and manual paths, so a startup tick can never overlap
+  // with a manual click that lands during boot. Errors are swallowed +
+  // logged identically to the interval branch so they never crash boot.
+  void backupSchedulerTick()
+    .then((outcome) => {
+      console.log(`Backup scheduler startup catch-up tick: ${outcome}`);
+    })
+    .catch((err) => {
+      console.error("backupSchedulerTick (startup catch-up) threw:", err);
+    });
 }
 
 export function stopBackupScheduler() {
