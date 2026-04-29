@@ -1027,6 +1027,23 @@ export function registerInvoiceRoutes(app: Express) {
       if (invoiceHeader.status === 'cancelled') {
         return res.status(400).json({ error: 'Cancelled invoices cannot be deleted. The document is retained for audit purposes.' });
       }
+      // Task #363 (RF-1): Block delete on delivered invoices and on any
+      // invoice whose stock has already been deducted. Such invoices have
+      // produced stock movements that the recycle-bin path does not
+      // reverse — they must go through PATCH /api/invoices/:id/cancel,
+      // which is the all-or-nothing inventory reversal contract documented
+      // above the cancel handler. Defence-in-depth: we check
+      // stockDeducted in addition to status === 'delivered' so a future
+      // status that retains stock effects (or a row that drifted out of
+      // sync) is still caught here. The frontend hides the Delete option
+      // for these rows, so this gate only fires for direct API callers
+      // and as a backstop against UI bugs.
+      if (invoiceHeader.status === 'delivered' || invoiceHeader.stockDeducted) {
+        return res.status(400).json({
+          error: 'invoice_delete_requires_cancel',
+          message: 'Delivered invoices have already produced stock movements. Use Cancel Invoice to reverse stock and retain the audit record — they cannot be moved to the recycle bin.',
+        });
+      }
       const lineItems = await db.select().from(invoiceLineItems).where(eq(invoiceLineItems.invoiceId, id));
 
       await db.transaction(async (tx) => {
