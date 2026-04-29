@@ -1,6 +1,6 @@
 {
-  "id": "17acfa89-c5e3-43bc-a01a-fe6b82183356",
-  "prevId": "fdb6ff73-e221-4c2b-b90d-69f915a80d07",
+  "id": "954794f8-a452-4e58-9796-35443bcaea23",
+  "prevId": "1a194e30-846e-45a1-bd7e-c54b8b5847dd",
   "version": "7",
   "dialect": "postgresql",
   "tables": {
@@ -120,12 +120,6 @@
         "triggered_by": {
           "name": "triggered_by",
           "type": "varchar",
-          "primaryKey": false,
-          "notNull": false
-        },
-        "triggered_by_label": {
-          "name": "triggered_by_label",
-          "type": "text",
           "primaryKey": false,
           "notNull": false
         },
@@ -547,51 +541,6 @@
           "primaryKey": false,
           "notNull": false,
           "default": 30
-        },
-        "backup_schedule_enabled": {
-          "name": "backup_schedule_enabled",
-          "type": "boolean",
-          "primaryKey": false,
-          "notNull": true,
-          "default": false
-        },
-        "backup_schedule_frequency": {
-          "name": "backup_schedule_frequency",
-          "type": "text",
-          "primaryKey": false,
-          "notNull": false
-        },
-        "backup_schedule_time_of_day": {
-          "name": "backup_schedule_time_of_day",
-          "type": "text",
-          "primaryKey": false,
-          "notNull": false
-        },
-        "backup_schedule_retention_count": {
-          "name": "backup_schedule_retention_count",
-          "type": "integer",
-          "primaryKey": false,
-          "notNull": true,
-          "default": 7
-        },
-        "backup_schedule_alert_threshold_days": {
-          "name": "backup_schedule_alert_threshold_days",
-          "type": "integer",
-          "primaryKey": false,
-          "notNull": true,
-          "default": 2
-        },
-        "backup_schedule_next_due_at": {
-          "name": "backup_schedule_next_due_at",
-          "type": "timestamp",
-          "primaryKey": false,
-          "notNull": false
-        },
-        "backup_schedule_last_run_at": {
-          "name": "backup_schedule_last_run_at",
-          "type": "timestamp",
-          "primaryKey": false,
-          "notNull": false
         }
       },
       "indexes": {},
@@ -613,16 +562,7 @@
       "compositePrimaryKeys": {},
       "uniqueConstraints": {},
       "policies": {},
-      "checkConstraints": {
-        "company_settings_backup_retention_range_chk": {
-          "name": "company_settings_backup_retention_range_chk",
-          "value": "\"company_settings\".\"backup_schedule_retention_count\" BETWEEN 1 AND 14"
-        },
-        "company_settings_backup_alert_range_chk": {
-          "name": "company_settings_backup_alert_range_chk",
-          "value": "\"company_settings\".\"backup_schedule_alert_threshold_days\" BETWEEN 1 AND 14"
-        }
-      },
+      "checkConstraints": {},
       "isRLSEnabled": false
     },
     "public.customers": {
