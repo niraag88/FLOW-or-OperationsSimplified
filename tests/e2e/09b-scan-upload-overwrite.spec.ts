@@ -151,6 +151,49 @@ test.describe('Scan upload — doc-bound overwrite is rejected (Task #367)', () 
     expect(body.error).toBe('A scan already exists at that key. Use the replace flow.');
   });
 
+  test('replace flow stays usable: PATCH new key → DELETE scan-key clears the row → re-upload to the same key succeeds', async () => {
+    // The audited replace flow is the ONLY sanctioned way to swap an
+    // existing scan. After Task #367 it must continue to work end-to-end:
+    // upload a scan, bind it to the invoice, run the dedicated DELETE
+    // route (which clears storage AND the storage_objects row AND the
+    // invoice's scanKey, with an audit-log entry), then re-upload to the
+    // same key. The new collision check must NOT fire on the second
+    // upload because the row no longer exists.
+    const ts = Date.now() + 10;
+    const key = `invoices/${invoiceYear}/${invoiceNumber}/${ts}-replace.png`;
+
+    const first = await uploadScan(cookie, key, PNG_BYTES);
+    expect(first.status).toBe(200);
+
+    // Bind the key to the invoice so the dedicated scan-key DELETE route
+    // can clean it up (storage + storage_objects row + invoice.scanKey).
+    const patch = await fetch(`${BASE_URL}/api/invoices/${invoiceId}/scan-key`, {
+      method: 'PATCH',
+      headers: { 'Content-Type': 'application/json', Cookie: cookie },
+      body: JSON.stringify({ scanKey: key }),
+    });
+    expect(patch.status).toBe(200);
+
+    // Run the audited remove path.
+    const del = await fetch(`${BASE_URL}/api/invoices/${invoiceId}/scan-key`, {
+      method: 'DELETE',
+      headers: { Cookie: cookie },
+    });
+    expect(del.status).toBe(200);
+
+    // storage_objects row must be gone after the remove.
+    const row = await fetch(
+      `${BASE_URL}/api/__test__/storage-object-row?key=${encodeURIComponent(key)}`,
+      { headers: { Cookie: cookie } },
+    ).then((rr) => rr.json() as Promise<{ exists: boolean }>);
+    expect(row.exists).toBe(false);
+
+    // Re-upload to the SAME key must succeed (collision check passes
+    // because the row was cleared by the audited replace flow).
+    const second = await uploadScan(cookie, key, PNG_BYTES);
+    expect(second.status).toBe(200);
+  });
+
   test('anonymous GRN staging collision (Task #353) is preserved with its original message', async () => {
     // Pin the year segment to the current year — the staging branch
     // requires it. Use a flat key (no folder) so the parser treats it as
