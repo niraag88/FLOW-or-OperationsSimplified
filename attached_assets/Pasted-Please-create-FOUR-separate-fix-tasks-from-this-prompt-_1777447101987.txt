@@ -1,0 +1,152 @@
+Please create FOUR separate fix tasks from this prompt. Do not combine them into one broad refactor.
+
+Context:
+Codex reviewed the latest GitHub state and found four “Fix Now” backup/restore safety issues. These should be handled separately and safely.
+
+General guardrails for all four tasks:
+- Do not touch invoice, delivery order, PO, GRN, VAT, stock, PDF, print, or export layouts.
+- Do not run factory reset.
+- Do not run restore against live data.
+- Do not add migrations unless absolutely necessary. These tasks should not need schema changes.
+- Keep changes narrow and testable.
+- Preserve the existing backup/restore UI layout unless the specific task requires a tiny wording/body change.
+
+TASK 1 — Fix Now 1: Scheduled-backup tests must not create or prune real backups by default
+
+Problem:
+tests/e2e/13-scheduled-backups.spec.ts says only the live scheduler test is destructive, but some default tests still call POST /api/ops/run-backups and set retentionCount=1. That can create real backup files and prune/delete older backups during a normal test run.
+
+Affected file:
+- tests/e2e/13-scheduled-backups.spec.ts
+
+Current risky behavior:
+- Default test run triggers real manual backups.
+- Default test run sets retention to 1 and runs two backups, which can prune previous successful backups.
+- This is too close to the earlier factory-reset test incident.
+
+Desired behavior:
+- Default scheduled-backup tests must only test safe API contract behavior: GET shape, PUT validation, schedule save/disable.
+- Any test that creates backup files, runs the scheduler, or tests pruning must be skipped unless explicitly opted in.
+
+Exact rules:
+- Move or guard these tests behind the destructive flag:
+  - “manual run records triggered_by_label = the admin username”
+  - “retention pruning deletes successful runs beyond the configured count”
+  - live scheduler tick test
+- Use RUN_DESTRUCTIVE_BACKUP_TEST=1 for all real backup-writing tests.
+- Ideally add a second safety gate similar to factory-reset-gate: only allow destructive backup tests when DATABASE_URL database name looks disposable, e.g. contains test/disposable/ephemeral at a word boundary.
+- Update the file comment so it truthfully says default tests do not create backups or prune storage.
+
+Acceptance criteria:
+- Running the e2e scheduled-backup spec without RUN_DESTRUCTIVE_BACKUP_TEST=1 does not call /api/ops/run-backups.
+- Running it by default does not create backup files.
+- Running it by default does not set retention to 1 and prune backup history.
+- Destructive backup tests still exist, but are clearly opt-in.
+
+TASK 2 — Fix Now 2: Enforce restore confirmation on the server, not only in the UI
+
+Problem:
+The restore UI asks the admin to type “EMERGENCY RESTORE”, but the backend restore endpoints do not require that phrase. A direct Admin API call can restore/replace the database without confirmation.
+
+Affected files:
+- server/routes/system.ts
+- client/src/components/settings/BackupSettings.tsx
+- tests covering backup/restore routes, if present or appropriate
+
+Current risky behavior:
+- POST /api/ops/backup-runs/:id/restore can run without a confirmation body.
+- POST /api/ops/restore-upload can run without a confirmation field.
+- The safety phrase exists only in the frontend modal.
+
+Desired behavior:
+- Both restore endpoints must reject requests unless the server receives the exact phrase:
+  EMERGENCY RESTORE
+- The server should enforce this before opening/downloading/staging/restoring anything.
+
+Exact rules:
+- For cloud restore endpoint, require JSON body { confirmation: "EMERGENCY RESTORE" }.
+- For upload restore endpoint, require multipart field confirmation = "EMERGENCY RESTORE".
+- If missing/wrong, return 400 with error like restore_confirmation_required.
+- Do not echo the expected phrase back in the error body.
+- Update the frontend restore calls to send the phrase after the user types it.
+- Keep the existing modal and visual flow. Only wire the existing typed phrase into the request.
+
+Edge cases:
+- Wrong casing should fail.
+- Extra spaces should fail.
+- Missing body should fail before any storage download.
+- Missing multipart confirmation should fail before calling restoreBackup.
+
+Acceptance criteria:
+- Cloud restore without phrase returns 400 and does not call restoreBackup.
+- Upload restore without phrase returns 400 and does not stage/restore.
+- UI restore still works when the user types the exact phrase.
+- No PDF/export/business-document code is touched.
+
+TASK 3 — Fix Now 3: Serialize manual backups and scheduled backups through the same advisory lock
+
+Problem:
+The scheduler uses a Postgres advisory lock, but manual POST /api/ops/run-backups calls runBackup directly without that lock. A manual backup and scheduled backup can overlap.
+
+Affected files:
+- server/scheduler.ts
+- server/routes/system.ts
+- server/runBackup.ts, only if needed for a small shared helper
+
+Current risky behavior:
+- Scheduled backup has lock protection.
+- Manual backup bypasses that protection.
+- Two backups close together can collide on same-second filenames/temp files and pruning.
+
+Desired behavior:
+- All backup runs, scheduled and manual, must use the same “only one backup at a time” lock.
+- If a backup is already running, manual endpoint should return 409 with a clear message.
+- Scheduler should skip/return locked exactly as now if another backup is running.
+
+Exact rules:
+- Extract or share the existing scheduler advisory-lock pattern so manual and scheduled use the same lock key.
+- Hold the lock for the full runBackup duration.
+- Do not hold the lock only while checking schedule.
+- Manual route should not wait indefinitely. Use try-lock behavior.
+- If lock unavailable on manual run, return 409 backup_already_running.
+- Scheduled run can continue returning "locked" internally.
+
+Acceptance criteria:
+- Two simultaneous manual backup requests: one runs, the other gets 409.
+- Manual backup during scheduled backup gets 409.
+- Scheduled backup during manual backup skips with locked behavior.
+- No schema change.
+
+TASK 4 — Fix Now 4: Make object manifest listing match the actual object-storage API
+
+Problem:
+scripts/writeManifest.js expects objectStorageClient.list() to return value.objects and value.nextContinuationToken, but server/routes/system.ts treats the same API as returning value as an array. If the route pattern is correct, manifests may show zero objects while still reporting success.
+
+Affected files:
+- scripts/writeManifest.js
+- tests for backup manifest if available, or add a small unit/mock test if practical
+
+Current risky behavior:
+- A backup can succeed with an empty or incomplete object manifest.
+- The DB dump may be fine, but the object-storage manifest becomes untrustworthy.
+
+Desired behavior:
+- writeManifest.js must correctly handle the actual Replit object-storage list() return shape.
+- It should support both possible shapes defensively if needed:
+  - result.value as an array
+  - result.value.objects with pagination
+- It should not silently produce an empty manifest if objects exist.
+
+Exact rules:
+- Align writeManifest.js with the API shape already used successfully in server/routes/system.ts.
+- If pagination is supported by the SDK, keep it, but do not assume value.objects unless verified.
+- If list() returns an array, collect that array.
+- If list() returns { objects, nextContinuationToken }, collect objects and continue pagination.
+- Keep manifest format the same: generatedAt, totalObjects, totalSize, totals, objects.
+- If list() returns an unknown shape, fail the manifest backup with a clear error instead of reporting success.
+
+Acceptance criteria:
+- Manifest backup records real object count when storage contains objects.
+- Empty storage correctly reports zero.
+- Unknown list response shape fails clearly.
+- Manual/scheduled backup result should only mark manifestSuccess true when the manifest is trustworthy.
