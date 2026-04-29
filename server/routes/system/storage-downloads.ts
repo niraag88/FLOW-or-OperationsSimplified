@@ -10,6 +10,7 @@ import {
   objectStorageClient,
   type AuthenticatedRequest,
 } from "../../middleware";
+import { logger } from "../../logger";
 
 export function registerStorageDownloadRoutes(app: Express) {
   app.get('/api/storage/signed-get', requireAuth(), async (req: AuthenticatedRequest, res) => {
@@ -43,7 +44,7 @@ export function registerStorageDownloadRoutes(app: Express) {
 
       res.json({ url: `/api/storage/download/${token}` });
     } catch (error) {
-      console.error('Error generating download URL:', error);
+      logger.error('Error generating download URL:', error);
       res.status(500).json({ error: 'Failed to generate download URL' });
     }
   });
@@ -83,12 +84,12 @@ export function registerStorageDownloadRoutes(app: Express) {
 
       const stream = objectStorageClient.downloadAsStream(tokenData.key);
       stream.on('error', (err: Error) => {
-        console.error('Error streaming file from storage:', err);
+        logger.error('Error streaming file from storage:', err);
         if (!res.headersSent) res.status(500).json({ error: 'Failed to download file' });
       });
       stream.pipe(res);
     } catch (error) {
-      console.error('Error downloading file:', error);
+      logger.error('Error downloading file:', error);
       res.status(500).json({ error: 'Failed to download file' });
     }
   });
@@ -118,7 +119,7 @@ export function registerStorageDownloadRoutes(app: Express) {
 
       res.json({ objects: formattedObjects });
     } catch (error) {
-      console.error('Error listing objects:', error);
+      logger.error('Error listing objects:', error);
       res.status(500).json({ error: 'Failed to list objects' });
     }
   });
@@ -129,7 +130,7 @@ export function registerStorageDownloadRoutes(app: Express) {
       const bytes = parseInt(result.rows[0].bytes);
       res.json({ bytes, pretty: `${(bytes / 1024 / 1024).toFixed(1)} MB` });
     } catch (error) {
-      console.error('Error getting database size:', error);
+      logger.error('Error getting database size:', error);
       res.status(500).json({ error: 'Failed to get database size' });
     }
   });
@@ -140,7 +141,7 @@ export function registerStorageDownloadRoutes(app: Express) {
       const totalSize = Number(result?.total ?? 0);
       res.json({ bytes: totalSize });
     } catch (error) {
-      console.error('Error calculating total size:', error);
+      logger.error('Error calculating total size:', error);
       res.status(500).json({ error: 'Failed to calculate total size' });
     }
   });
@@ -151,7 +152,7 @@ export function registerStorageDownloadRoutes(app: Express) {
       const bytes = parseInt(output.split('\t')[0]);
       res.json({ bytes });
     } catch (error) {
-      console.error('Error getting app size:', error);
+      logger.error('Error getting app size:', error);
       res.status(500).json({ error: 'Failed to get app size' });
     }
   });
@@ -172,7 +173,7 @@ export function registerStorageDownloadRoutes(app: Express) {
         message: 'Object exists - detailed metadata not available with current client'
       });
     } catch (error) {
-      console.error('Error getting object info:', error);
+      logger.error('Error getting object info:', error);
       res.status(500).json({ error: 'Failed to get object information' });
     }
   });
@@ -189,7 +190,7 @@ export function registerStorageDownloadRoutes(app: Express) {
 
       res.json({ success: true, message: 'Object deleted successfully' });
     } catch (error) {
-      console.error('Error deleting object:', error);
+      logger.error('Error deleting object:', error);
       res.status(500).json({ error: 'Failed to delete object' });
     }
   });

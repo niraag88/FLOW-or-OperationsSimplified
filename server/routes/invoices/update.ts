@@ -5,6 +5,7 @@ import { eq } from "drizzle-orm";
 import { businessStorage } from "../../businessStorage";
 import { requireAuth, writeAuditLog, updateProductStock, type AuthenticatedRequest } from "../../middleware";
 import { resolveDocumentTotals, isTotalsError, normalizeTaxTreatment, resolveAuthoritativeTaxTreatment } from "../../utils/totals";
+import { logger } from "../../logger";
 
 export function registerInvoiceUpdateRoutes(app: Express) {
   app.put('/api/invoices/:id', requireAuth(['Admin', 'Manager', 'Staff']), async (req: AuthenticatedRequest, res) => {
@@ -406,7 +407,7 @@ export function registerInvoiceUpdateRoutes(app: Express) {
       });
       res.json({ ...updated, items: body.items || [] });
     } catch (error) {
-      console.error('Error updating invoice:', error);
+      logger.error('Error updating invoice:', error);
       if (error instanceof Error) {
         res.status(400).json({ error: error.message });
       } else {

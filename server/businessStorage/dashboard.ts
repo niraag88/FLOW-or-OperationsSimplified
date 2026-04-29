@@ -10,6 +10,7 @@ import { getSuppliers } from "./suppliers";
 import { getPurchaseOrders } from "./purchase-orders";
 import { getStockCounts } from "./stock-counts";
 import { getCompanySettings } from "./company-settings";
+import { logger } from "../logger";
 
 // Dashboard statistics
 export async function getDashboardStats() {
@@ -124,7 +125,7 @@ export async function getDashboardData() {
       }
     };
   } catch (error) {
-    console.error('Error fetching dashboard data:', error);
+    logger.error('Error fetching dashboard data:', error);
     throw error;
   }
 }

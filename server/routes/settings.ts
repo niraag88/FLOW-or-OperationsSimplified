@@ -9,6 +9,7 @@ import {
   USER_DELETE_PHRASE,
   RETENTION_PURGE_PHRASE,
 } from "../../shared/destructiveActionPhrases";
+import { logger } from "../logger";
 
 export function registerSettingsRoutes(app: Express) {
   app.get('/api/company-settings', requireAuth(), async (req: AuthenticatedRequest, res) => {
@@ -16,7 +17,7 @@ export function registerSettingsRoutes(app: Express) {
       const settings = await businessStorage.getCompanySettings();
       res.json(settings || {});
     } catch (error) {
-      console.error('Error fetching company settings:', error);
+      logger.error('Error fetching company settings:', error);
       res.status(500).json({ error: 'Failed to fetch company settings' });
     }
   });
@@ -30,7 +31,7 @@ export function registerSettingsRoutes(app: Express) {
       writeAuditLog({ actor: req.user!.id, actorName: req.user?.username || String(req.user!.id), targetId: 'company', targetType: 'company_settings', action: 'UPDATE', details: 'Company settings updated' });
       res.json(settings);
     } catch (error) {
-      console.error('Error updating company settings:', error);
+      logger.error('Error updating company settings:', error);
       res.status(500).json({ error: 'Failed to update company settings' });
     }
   });
@@ -44,7 +45,7 @@ export function registerSettingsRoutes(app: Express) {
         lifecycle_cold_storage_after_days: settings?.retentionColdStorageDays ?? 30,
       });
     } catch (error) {
-      console.error('Error fetching retention settings:', error);
+      logger.error('Error fetching retention settings:', error);
       res.status(500).json({ error: 'Failed to fetch retention settings' });
     }
   });
@@ -61,7 +62,7 @@ export function registerSettingsRoutes(app: Express) {
       writeAuditLog({ actor: req.user!.id, actorName: req.user?.username || String(req.user!.id), targetId: 'company', targetType: 'company_settings', action: 'UPDATE', details: 'Retention settings updated' });
       res.json({ success: true });
     } catch (error) {
-      console.error('Error saving retention settings:', error);
+      logger.error('Error saving retention settings:', error);
       res.status(500).json({ error: 'Failed to save retention settings' });
     }
   });
@@ -116,7 +117,7 @@ export function registerSettingsRoutes(app: Express) {
       writeAuditLog({ actor: req.user!.id, actorName: req.user?.username || String(req.user!.id), targetId: 'retention', targetType: 'retention_purge', action: 'DELETE', details: `Retention purge: ${deletedAuditLogs.length} audit logs (>${auditLogRetentionDays}d), ${storageFilesDeleted} export files (>${exportRetentionDays}d)` });
       res.json({ success: true, auditLogsDeleted: deletedAuditLogs.length, storageFilesDeleted, auditLogRetentionDays, exportRetentionDays });
     } catch (error) {
-      console.error('Error running retention purge:', error);
+      logger.error('Error running retention purge:', error);
       res.status(500).json({ error: 'Failed to run retention purge' });
     }
   });
@@ -138,7 +139,7 @@ export function registerSettingsRoutes(app: Express) {
 
       res.json({ users: allUsers });
     } catch (error) {
-      console.error('Error fetching users:', error);
+      logger.error('Error fetching users:', error);
       res.status(500).json({ error: 'Failed to fetch users' });
     }
   });
@@ -182,7 +183,7 @@ export function registerSettingsRoutes(app: Express) {
       writeAuditLog({ actor: req.user!.id, actorName: req.user?.username || String(req.user!.id), targetId: newUser.id, targetType: 'user', action: 'CREATE', details: `User @${newUser.username} (${newUser.role}) created` });
       res.status(201).json({ user: newUser });
     } catch (error) {
-      console.error('Error creating user:', error);
+      logger.error('Error creating user:', error);
       res.status(500).json({ error: 'Failed to create user' });
     }
   });
@@ -241,7 +242,7 @@ export function registerSettingsRoutes(app: Express) {
       writeAuditLog({ actor: req.user!.id, actorName: req.user?.username || String(req.user!.id), targetId: userId, targetType: 'user', action: 'UPDATE', details: `User @${updatedUser.username} updated` });
       res.json({ user: updatedUser });
     } catch (error) {
-      console.error('Error updating user:', error);
+      logger.error('Error updating user:', error);
       res.status(500).json({ error: 'Failed to update user' });
     }
   });
@@ -292,7 +293,7 @@ export function registerSettingsRoutes(app: Express) {
 
       res.json({ success: true, deletedUser });
     } catch (error) {
-      console.error('Error deleting user:', error);
+      logger.error('Error deleting user:', error);
       res.status(500).json({ error: 'Failed to delete user' });
     }
   });
@@ -331,7 +332,7 @@ export function registerSettingsRoutes(app: Express) {
       writeAuditLog({ actor: req.user!.id, actorName: req.user?.username || String(req.user!.id), targetId: userId, targetType: 'user', action: 'UPDATE', details: `Password changed for user @${updatedUser.username}` });
       res.json({ success: true, message: 'Password updated successfully' });
     } catch (error) {
-      console.error('Error changing user password:', error);
+      logger.error('Error changing user password:', error);
       res.status(500).json({ error: 'Failed to change password' });
     }
   });

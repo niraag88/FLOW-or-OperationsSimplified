@@ -6,6 +6,7 @@ import { db } from "../db";
 import { eq } from "drizzle-orm";
 import { businessStorage } from "../businessStorage";
 import { requireAuth, writeAuditLog, type AuthenticatedRequest } from "../middleware";
+import { logger } from "../logger";
 
 export function registerBrandRoutes(app: Express) {
   app.get('/api/brands', requireAuth(), async (req: AuthenticatedRequest, res) => {
@@ -13,7 +14,7 @@ export function registerBrandRoutes(app: Express) {
       const result = await businessStorage.getBrands();
       res.json(result);
     } catch (error) {
-      console.error('Error fetching brands:', error);
+      logger.error('Error fetching brands:', error);
       res.status(500).json({ error: 'Failed to fetch brands' });
     }
   });
@@ -34,7 +35,7 @@ export function registerBrandRoutes(app: Express) {
       if (errCode === '23505') {
         return res.status(409).json({ error: 'A brand with that name already exists.' });
       }
-      console.error('Error creating brand:', error);
+      logger.error('Error creating brand:', error);
       res.status(500).json({ error: 'Failed to create brand' });
     }
   });
@@ -47,7 +48,7 @@ export function registerBrandRoutes(app: Express) {
       writeAuditLog({ actor: req.user!.id, actorName: req.user?.username || String(req.user!.id), targetId: String(brandId), targetType: 'brand', action: 'UPDATE', details: `Brand '${brand.name}' updated` });
       res.json(brand);
     } catch (error) {
-      console.error('Error updating brand:', error);
+      logger.error('Error updating brand:', error);
       res.status(500).json({ error: 'Failed to update brand' });
     }
   });
@@ -60,7 +61,7 @@ export function registerBrandRoutes(app: Express) {
       if (!brand) return res.status(404).json({ error: 'Brand not found' });
       res.json(brand);
     } catch (error) {
-      console.error('Error fetching brand:', error);
+      logger.error('Error fetching brand:', error);
       res.status(500).json({ error: 'Failed to fetch brand' });
     }
   });
@@ -105,7 +106,7 @@ export function registerBrandRoutes(app: Express) {
       writeAuditLog({ actor: req.user!.id, actorName: req.user?.username || String(req.user!.id), targetId: String(brandId), targetType: 'brand', action: 'DELETE', details: `Brand '${brandToDelete.name}' moved to recycle bin` });
       res.json({ success: true });
     } catch (error) {
-      console.error('Error deleting brand:', error);
+      logger.error('Error deleting brand:', error);
       res.status(500).json({ error: 'Failed to delete brand' });
     }
   });

@@ -3,6 +3,7 @@ import { goodsReceipts, goodsReceiptItems, purchaseOrders, products, suppliers }
 import { db } from "../../db";
 import { eq, desc, sql, inArray } from "drizzle-orm";
 import { requireAuth, type AuthenticatedRequest } from "../../middleware";
+import { logger } from "../../logger";
 
 export function registerGoodsReceiptListRoutes(app: Express) {
   app.get('/api/goods-receipts', requireAuth(), async (req: AuthenticatedRequest, res) => {
@@ -74,7 +75,7 @@ export function registerGoodsReceiptListRoutes(app: Express) {
 
       res.json(receiptsWithItems);
     } catch (error) {
-      console.error('Error fetching goods receipts:', error);
+      logger.error('Error fetching goods receipts:', error);
       res.status(500).json({ error: 'Failed to fetch goods receipts' });
     }
   });

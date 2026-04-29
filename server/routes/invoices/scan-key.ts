@@ -3,6 +3,7 @@ import { invoices, storageObjects } from "@shared/schema";
 import { db } from "../../db";
 import { eq } from "drizzle-orm";
 import { requireAuth, writeAuditLog, deleteStorageObjectSafely, type AuthenticatedRequest } from "../../middleware";
+import { logger } from "../../logger";
 
 export function registerInvoiceScanKeyRoutes(app: Express) {
   app.patch('/api/invoices/:id/scan-key', requireAuth(['Admin', 'Manager', 'Staff']), async (req: AuthenticatedRequest, res) => {
@@ -18,7 +19,7 @@ export function registerInvoiceScanKeyRoutes(app: Express) {
       writeAuditLog({ actor: req.user!.id, actorName: req.user?.username || String(req.user!.id), targetId: String(id), targetType: 'invoice', action: 'UPLOAD', details: `Scan attached to Invoice #${updated.invoiceNumber}` });
       res.json(updated);
     } catch (error) {
-      console.error('Error updating invoice scan key:', error);
+      logger.error('Error updating invoice scan key:', error);
       res.status(500).json({ error: 'Failed to update scan key' });
     }
   });
@@ -34,7 +35,7 @@ export function registerInvoiceScanKeyRoutes(app: Express) {
       if (invoice.scanKey) {
         const storageResult = await deleteStorageObjectSafely(invoice.scanKey);
         if (!storageResult.ok) {
-          console.error(
+          logger.error(
             `Failed to delete invoice scan from storage: type=invoice id=${id} key=${invoice.scanKey} error=${storageResult.error}`
           );
           return res.status(502).json({ error: 'Could not delete file from storage. Please try again.' });
@@ -46,7 +47,7 @@ export function registerInvoiceScanKeyRoutes(app: Express) {
       writeAuditLog({ actor: req.user!.id, actorName: req.user?.username || String(req.user!.id), targetId: String(id), targetType: 'invoice', action: 'REMOVE_FILE', details: `Scan removed from Invoice #${invoice.invoiceNumber}` });
       res.json(updated);
     } catch (error) {
-      console.error('Error removing invoice scan key:', error);
+      logger.error('Error removing invoice scan key:', error);
       res.status(500).json({ error: 'Failed to remove file' });
     }
   });

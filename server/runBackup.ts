@@ -15,6 +15,7 @@ import { db } from "./db";
 import { backupRuns, companySettings } from "@shared/schema";
 import { desc, eq } from "drizzle-orm";
 import { writeAuditLog, deleteStorageObjectSafely } from "./middleware";
+import { logger } from "./logger";
 
 export type BackupActor = {
   id: string | null;
@@ -65,7 +66,7 @@ export async function runBackup(actor: BackupActor): Promise<BackupRunResult> {
     [dbResult, manifestResult] = await Promise.all([uploadBackup(), writeManifest()]);
   } catch (err) {
     topError = err instanceof Error ? err.message : String(err);
-    console.error("runBackup: backup pipeline threw:", err);
+    logger.error("runBackup: backup pipeline threw:", err);
   }
 
   const success = !!(dbResult?.success && manifestResult?.success);
@@ -94,7 +95,7 @@ export async function runBackup(actor: BackupActor): Promise<BackupRunResult> {
           : null),
     });
   } catch (insertErr) {
-    console.error("runBackup: failed to insert backup_runs row:", insertErr);
+    logger.error("runBackup: failed to insert backup_runs row:", insertErr);
   }
 
   try {
@@ -107,7 +108,7 @@ export async function runBackup(actor: BackupActor): Promise<BackupRunResult> {
       details: `${actor.username === "scheduler" ? "Scheduled" : "Manual"} backup ${success ? "succeeded" : "failed"}`,
     });
   } catch (auditErr) {
-    console.error("runBackup: failed to write audit log:", auditErr);
+    logger.error("runBackup: failed to write audit log:", auditErr);
   }
 
   let prunedCount = 0;
@@ -115,7 +116,7 @@ export async function runBackup(actor: BackupActor): Promise<BackupRunResult> {
     try {
       prunedCount = await pruneOldBackups();
     } catch (pruneErr) {
-      console.error("runBackup: prune threw:", pruneErr);
+      logger.error("runBackup: prune threw:", pruneErr);
     }
   }
 
@@ -177,7 +178,7 @@ export async function pruneOldBackups(): Promise<number> {
       await db.delete(backupRuns).where(eq(backupRuns.id, row.id));
       deleted++;
     } catch (rowErr) {
-      console.error(`pruneOldBackups: failed to delete backup_runs row ${row.id}:`, rowErr);
+      logger.error(`pruneOldBackups: failed to delete backup_runs row ${row.id}:`, rowErr);
     }
   }
   return deleted;
@@ -209,7 +210,7 @@ export async function tryDeleteBackupRowObjects(
     const result = await deleteStorageObjectSafely(row.dbStorageKey);
     if (!result.ok) {
       allGone = false;
-      console.error(
+      logger.error(
         `pruneOldBackups: failed to delete storage object ${row.dbStorageKey}, retaining backup_runs row ${row.id} for retry: ${result.error}`
       );
     }
@@ -218,7 +219,7 @@ export async function tryDeleteBackupRowObjects(
     const result = await deleteStorageObjectSafely(row.manifestStorageKey);
     if (!result.ok) {
       allGone = false;
-      console.error(
+      logger.error(
         `pruneOldBackups: failed to delete manifest object ${row.manifestStorageKey}, retaining backup_runs row ${row.id} for retry: ${result.error}`
       );
     }

@@ -4,6 +4,7 @@ import { db } from "../../db";
 import { eq, inArray } from "drizzle-orm";
 import { businessStorage } from "../../businessStorage";
 import { requireAuth, type AuthenticatedRequest } from "../../middleware";
+import { logger } from "../../logger";
 
 export function registerPurchaseOrderDetailRoutes(app: Express) {
   app.get('/api/purchase-orders/:id/detail', requireAuth(), async (req: AuthenticatedRequest, res) => {
@@ -101,7 +102,7 @@ export function registerPurchaseOrderDetailRoutes(app: Express) {
         },
       });
     } catch (error) {
-      console.error('Error fetching PO detail:', error);
+      logger.error('Error fetching PO detail:', error);
       res.status(500).json({ error: 'Failed to fetch purchase order detail' });
     }
   });
@@ -135,7 +136,7 @@ export function registerPurchaseOrderDetailRoutes(app: Express) {
 
       res.json(items);
     } catch (error) {
-      console.error('Error fetching PO items:', error);
+      logger.error('Error fetching PO items:', error);
       res.status(500).json({ error: 'Failed to fetch purchase order items' });
     }
   });

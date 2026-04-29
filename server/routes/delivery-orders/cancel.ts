@@ -3,6 +3,7 @@ import { deliveryOrders, stockMovements } from "@shared/schema";
 import { db } from "../../db";
 import { and, eq } from "drizzle-orm";
 import { requireAuth, writeAuditLogSync, updateProductStock, type AuthenticatedRequest } from "../../middleware";
+import { logger } from "../../logger";
 
 export function registerDeliveryOrderCancelRoutes(app: Express) {
   // PATCH /api/delivery-orders/:id/cancel
@@ -112,7 +113,7 @@ export function registerDeliveryOrderCancelRoutes(app: Express) {
 
       res.json({ ...updated, do_number: updated.orderNumber });
     } catch (error) {
-      console.error('Error cancelling delivery order:', error);
+      logger.error('Error cancelling delivery order:', error);
       res.status(500).json({ error: 'Failed to cancel delivery order' });
     }
   });

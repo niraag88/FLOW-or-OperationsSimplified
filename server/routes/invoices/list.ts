@@ -4,6 +4,7 @@ import { db } from "../../db";
 import { eq } from "drizzle-orm";
 import { businessStorage } from "../../businessStorage";
 import { requireAuth, type AuthenticatedRequest } from "../../middleware";
+import { logger } from "../../logger";
 
 export function registerInvoiceListRoutes(app: Express) {
   app.get('/api/invoices', requireAuth(), async (req: AuthenticatedRequest, res) => {
@@ -23,7 +24,7 @@ export function registerInvoiceListRoutes(app: Express) {
       });
       res.json(result);
     } catch (error) {
-      console.error('Error fetching invoices:', error);
+      logger.error('Error fetching invoices:', error);
       res.status(500).json({ error: 'Failed to fetch invoices' });
     }
   });
@@ -33,7 +34,7 @@ export function registerInvoiceListRoutes(app: Express) {
       const nextNumber = await businessStorage.getNextInvoiceNumber();
       res.json({ nextNumber });
     } catch (error) {
-      console.error('Error getting next invoice number:', error);
+      logger.error('Error getting next invoice number:', error);
       res.status(500).json({ error: 'Failed to get next invoice number' });
     }
   });
@@ -162,7 +163,7 @@ export function registerInvoiceListRoutes(app: Express) {
 
       res.json(invoiceWithItems);
     } catch (error) {
-      console.error('Error fetching invoice:', error);
+      logger.error('Error fetching invoice:', error);
       res.status(500).json({ error: 'Failed to fetch invoice' });
     }
   });

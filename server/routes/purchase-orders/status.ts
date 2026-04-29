@@ -3,6 +3,7 @@ import { purchaseOrders } from "@shared/schema";
 import { db } from "../../db";
 import { eq } from "drizzle-orm";
 import { requireAuth, writeAuditLog, type AuthenticatedRequest } from "../../middleware";
+import { logger } from "../../logger";
 
 export function registerPurchaseOrderStatusRoutes(app: Express) {
   app.patch('/api/purchase-orders/:id/status', requireAuth(['Admin', 'Manager']), async (req: AuthenticatedRequest, res) => {
@@ -27,7 +28,7 @@ export function registerPurchaseOrderStatusRoutes(app: Express) {
       writeAuditLog({ actor: req.user!.id, actorName: req.user?.username || String(req.user!.id), targetId: String(id), targetType: 'purchase_order', action: 'UPDATE', details: `PO #${updated.poNumber} status changed from ${existing.status} to ${status}` });
       res.json(updated);
     } catch (error) {
-      console.error('Error updating PO status:', error);
+      logger.error('Error updating PO status:', error);
       res.status(500).json({ error: 'Failed to update purchase order status' });
     }
   });

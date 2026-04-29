@@ -3,6 +3,7 @@ import { deliveryOrders, deliveryOrderItems, recycleBin } from "@shared/schema";
 import { db } from "../../db";
 import { eq } from "drizzle-orm";
 import { requireAuth, writeAuditLog, type AuthenticatedRequest } from "../../middleware";
+import { logger } from "../../logger";
 
 export function registerDeliveryOrderDeleteRoutes(app: Express) {
   app.delete('/api/delivery-orders/:id', requireAuth(['Admin', 'Manager']), async (req: AuthenticatedRequest, res) => {
@@ -43,7 +44,7 @@ export function registerDeliveryOrderDeleteRoutes(app: Express) {
       writeAuditLog({ actor: req.user!.id, actorName: req.user?.username || String(req.user!.id), targetId: String(id), targetType: 'delivery_order', action: 'DELETE', details: `DO #${doHeader.orderNumber} moved to recycle bin` });
       res.json({ success: true });
     } catch (error) {
-      console.error('Error deleting delivery order:', error);
+      logger.error('Error deleting delivery order:', error);
       res.status(500).json({ error: 'Failed to delete delivery order' });
     }
   });

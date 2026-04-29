@@ -6,6 +6,7 @@ import { db } from "../db";
 import { eq } from "drizzle-orm";
 import { businessStorage } from "../businessStorage";
 import { requireAuth, writeAuditLog, type AuthenticatedRequest } from "../middleware";
+import { logger } from "../logger";
 
 // Tighten the bare insert schema with format/length guards so malformed
 // emails and 10KB-payload names can't reach the DB (Task #320). Empty
@@ -35,7 +36,7 @@ export function registerCustomerRoutes(app: Express) {
       if (!customer) return res.status(404).json({ error: 'Customer not found' });
       res.json(customer);
     } catch (error) {
-      console.error('Error fetching customer:', error);
+      logger.error('Error fetching customer:', error);
       res.status(500).json({ error: 'Failed to fetch customer' });
     }
   });
@@ -45,7 +46,7 @@ export function registerCustomerRoutes(app: Express) {
       const result = await businessStorage.getCustomers();
       res.json(result);
     } catch (error) {
-      console.error('Error fetching customers:', error);
+      logger.error('Error fetching customers:', error);
       res.status(500).json({ error: 'Failed to fetch customers' });
     }
   });
@@ -60,7 +61,7 @@ export function registerCustomerRoutes(app: Express) {
       if (error instanceof ZodError) {
         return res.status(400).json({ error: 'Validation failed', details: error.errors });
       }
-      console.error('Error creating customer:', error);
+      logger.error('Error creating customer:', error);
       res.status(500).json({ error: 'Failed to create customer' });
     }
   });
@@ -84,7 +85,7 @@ export function registerCustomerRoutes(app: Express) {
       if (error instanceof ZodError) {
         return res.status(400).json({ error: 'Validation failed', details: error.errors });
       }
-      console.error('Error updating customer:', error);
+      logger.error('Error updating customer:', error);
       res.status(500).json({ error: 'Failed to update customer' });
     }
   });
@@ -128,7 +129,7 @@ export function registerCustomerRoutes(app: Express) {
       writeAuditLog({ actor: req.user!.id, actorName: req.user?.username || String(req.user!.id), targetId: String(customerId), targetType: 'customer', action: 'DELETE', details: `Customer '${customerToDelete.name}' moved to recycle bin` });
       res.json({ success: true });
     } catch (error) {
-      console.error('Error deleting customer:', error);
+      logger.error('Error deleting customer:', error);
       res.status(500).json({ error: 'Failed to delete customer' });
     }
   });

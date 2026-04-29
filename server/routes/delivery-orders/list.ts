@@ -4,6 +4,7 @@ import { db } from "../../db";
 import { eq } from "drizzle-orm";
 import { businessStorage } from "../../businessStorage";
 import { requireAuth, type AuthenticatedRequest } from "../../middleware";
+import { logger } from "../../logger";
 
 export function registerDeliveryOrderListRoutes(app: Express) {
   app.get('/api/delivery-orders', requireAuth(), async (req: AuthenticatedRequest, res) => {
@@ -34,7 +35,7 @@ export function registerDeliveryOrderListRoutes(app: Express) {
         res.json({ data: (result as any).data.map(mapDO), total: (result as any).total });
       }
     } catch (error) {
-      console.error('Error fetching delivery orders:', error);
+      logger.error('Error fetching delivery orders:', error);
       res.status(500).json({ error: 'Failed to fetch delivery orders' });
     }
   });
@@ -44,7 +45,7 @@ export function registerDeliveryOrderListRoutes(app: Express) {
       const nextNumber = await businessStorage.getNextDoNumber();
       res.json({ nextNumber });
     } catch (error) {
-      console.error('Error getting next delivery order number:', error);
+      logger.error('Error getting next delivery order number:', error);
       res.status(500).json({ error: 'Failed to get next delivery order number' });
     }
   });
@@ -150,7 +151,7 @@ export function registerDeliveryOrderListRoutes(app: Express) {
         }))
       });
     } catch (error) {
-      console.error('Error fetching delivery order:', error);
+      logger.error('Error fetching delivery order:', error);
       res.status(500).json({ error: 'Failed to fetch delivery order' });
     }
   });

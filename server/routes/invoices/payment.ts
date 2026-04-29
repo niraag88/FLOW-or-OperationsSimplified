@@ -3,6 +3,7 @@ import { invoices, invoiceLineItems } from "@shared/schema";
 import { db } from "../../db";
 import { eq } from "drizzle-orm";
 import { requireAuth, writeAuditLog, updateProductStock, type AuthenticatedRequest } from "../../middleware";
+import { logger } from "../../logger";
 
 export function registerInvoicePaymentRoutes(app: Express) {
   app.patch('/api/invoices/:id/payment', requireAuth(['Admin', 'Manager', 'Staff']), async (req: AuthenticatedRequest, res) => {
@@ -36,7 +37,7 @@ export function registerInvoicePaymentRoutes(app: Express) {
       writeAuditLog({ actor: req.user!.id, actorName: req.user?.username || String(req.user!.id), targetId: String(id), targetType: 'invoice', action: 'UPDATE', details: `Payment status set to ${paymentStatus} on Invoice #${updated.invoiceNumber}` });
       res.json(updated);
     } catch (error) {
-      console.error('Error updating invoice payment status:', error);
+      logger.error('Error updating invoice payment status:', error);
       res.status(500).json({ error: 'Failed to update payment status' });
     }
   });
@@ -83,7 +84,7 @@ export function registerInvoicePaymentRoutes(app: Express) {
         message: `Stock deducted for ${items.length} products from Invoice #${invoice.invoiceNumber}`
       });
     } catch (error) {
-      console.error('Error processing invoice sale:', error);
+      logger.error('Error processing invoice sale:', error);
       res.status(500).json({ error: 'Failed to process invoice sale' });
     }
   });

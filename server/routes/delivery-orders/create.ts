@@ -4,6 +4,7 @@ import { db } from "../../db";
 import { businessStorage } from "../../businessStorage";
 import { requireAuth, writeAuditLog, updateProductStock, type AuthenticatedRequest } from "../../middleware";
 import { resolveDocumentTotals, isTotalsError, resolveAuthoritativeTaxTreatment } from "../../utils/totals";
+import { logger } from "../../logger";
 
 export function registerDeliveryOrderCreateRoutes(app: Express) {
   app.post('/api/delivery-orders', requireAuth(['Admin', 'Manager', 'Staff']), async (req: AuthenticatedRequest, res) => {
@@ -121,7 +122,7 @@ export function registerDeliveryOrderCreateRoutes(app: Express) {
       writeAuditLog({ actor: req.user!.id, actorName: req.user?.username || String(req.user!.id), targetId: String(doRecord.id), targetType: 'delivery_order', action: 'CREATE', details: `DO #${doRecord.orderNumber} created for ${customerName}${newStatus === 'delivered' ? ' — stock deducted' : ''}` });
       res.status(201).json({ ...doRecord, do_number: doRecord.orderNumber, items: body.items || [] });
     } catch (error) {
-      console.error('Error creating delivery order:', error);
+      logger.error('Error creating delivery order:', error);
       if (error instanceof Error) {
         res.status(400).json({ error: error.message });
       } else {

@@ -3,6 +3,7 @@ import { goodsReceipts } from "@shared/schema";
 import { db } from "../../db";
 import { eq } from "drizzle-orm";
 import { requireAuth, type AuthenticatedRequest } from "../../middleware";
+import { logger } from "../../logger";
 
 export function registerGoodsReceiptDeleteRoutes(app: Express) {
   // DELETE /api/goods-receipts/:id
@@ -34,7 +35,7 @@ export function registerGoodsReceiptDeleteRoutes(app: Express) {
         message: 'Confirmed goods receipts cannot be deleted — cancel the GRN first to reverse stock. The cancelled receipt will be retained for audit.',
       });
     } catch (error) {
-      console.error('Error deleting goods receipt:', error);
+      logger.error('Error deleting goods receipt:', error);
       res.status(500).json({ error: 'Failed to delete goods receipt' });
     }
   });

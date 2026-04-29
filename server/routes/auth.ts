@@ -5,6 +5,7 @@ import { db } from "../db";
 import { eq } from "drizzle-orm";
 import { requireAuth, comparePassword, type AuthenticatedRequest } from "../middleware";
 import { generateCsrfToken } from "../csrf";
+import { logger } from "../logger";
 
 export function registerAuthRoutes(app: Express, loginLimiter: RateLimitRequestHandler) {
   app.post('/api/auth/login', loginLimiter, async (req: AuthenticatedRequest, res) => {
@@ -34,13 +35,13 @@ export function registerAuthRoutes(app: Express, loginLimiter: RateLimitRequestH
 
       req.session.save((saveErr) => {
         if (saveErr) {
-          console.error('Session save error during login:', saveErr);
+          logger.error('Session save error during login:', saveErr);
           return res.status(500).json({ error: 'Login failed' });
         }
         res.json({ user: userInfo });
       });
     } catch (error) {
-      console.error('Login error:', error);
+      logger.error('Login error:', error);
       res.status(500).json({ error: 'Login failed' });
     }
   });
@@ -48,7 +49,7 @@ export function registerAuthRoutes(app: Express, loginLimiter: RateLimitRequestH
   app.post('/api/auth/logout', (req: AuthenticatedRequest, res) => {
     req.session.destroy((err) => {
       if (err) {
-        console.error('Session destroy error during logout:', err);
+        logger.error('Session destroy error during logout:', err);
         return res.status(500).json({ error: 'Logout failed' });
       }
       res.json({ success: true });

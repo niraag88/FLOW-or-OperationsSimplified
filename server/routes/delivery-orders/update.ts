@@ -5,6 +5,7 @@ import { eq } from "drizzle-orm";
 import { businessStorage } from "../../businessStorage";
 import { requireAuth, writeAuditLog, updateProductStock, type AuthenticatedRequest } from "../../middleware";
 import { resolveDocumentTotals, isTotalsError, normalizeTaxTreatment, resolveAuthoritativeTaxTreatment } from "../../utils/totals";
+import { logger } from "../../logger";
 
 export function registerDeliveryOrderUpdateRoutes(app: Express) {
   app.put('/api/delivery-orders/:id', requireAuth(['Admin', 'Manager', 'Staff']), async (req: AuthenticatedRequest, res) => {
@@ -317,7 +318,7 @@ export function registerDeliveryOrderUpdateRoutes(app: Express) {
       writeAuditLog({ actor: req.user!.id, actorName: req.user?.username || String(req.user!.id), targetId: String(id), targetType: 'delivery_order', action: 'UPDATE', details: `DO #${updated.orderNumber} updated (status: ${updated.status})${becomingDelivered ? ' — stock deducted' : ''}` });
       res.json({ ...updated, do_number: updated.orderNumber, items: body.items || [] });
     } catch (error) {
-      console.error('Error updating delivery order:', error);
+      logger.error('Error updating delivery order:', error);
       if (error instanceof Error) {
         res.status(400).json({ error: error.message });
       } else {

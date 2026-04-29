@@ -4,6 +4,7 @@ import { db } from "../db";
 import { eq } from "drizzle-orm";
 import { businessStorage } from "../businessStorage";
 import { requireAuth, generateDOPDF, type AuthenticatedRequest } from "../middleware";
+import { logger } from "../logger";
 
 export function registerExportRoutes(app: Express) {
   app.get('/api/export/invoice', requireAuth(), async (req, res) => {
@@ -120,7 +121,7 @@ export function registerExportRoutes(app: Express) {
         message: 'Invoice data for print view'
       });
     } catch (error) {
-      console.error('Error exporting invoice:', error);
+      logger.error('Error exporting invoice:', error);
       res.status(500).json({ error: 'Failed to export invoice' });
     }
   });
@@ -207,7 +208,7 @@ export function registerExportRoutes(app: Express) {
 
       res.send(pdfBuffer);
     } catch (error) {
-      console.error('Error exporting delivery order:', error);
+      logger.error('Error exporting delivery order:', error);
       res.status(500).json({ error: 'Failed to export delivery order' });
     }
   });
@@ -294,7 +295,7 @@ export function registerExportRoutes(app: Express) {
         message: 'Use frontend PDF generation'
       });
     } catch (error) {
-      console.error('Error exporting purchase order:', error);
+      logger.error('Error exporting purchase order:', error);
       res.status(500).json({ error: 'Failed to export purchase order' });
     }
   });
@@ -386,7 +387,7 @@ export function registerExportRoutes(app: Express) {
         message: 'Quotation data for print view'
       });
     } catch (error) {
-      console.error('Error exporting quotation:', error);
+      logger.error('Error exporting quotation:', error);
       res.status(500).json({ error: 'Failed to export quotation' });
     }
   });
@@ -418,7 +419,7 @@ export function registerExportRoutes(app: Express) {
 
       res.json({ invoices: data, company });
     } catch (error) {
-      console.error('Error exporting invoices list:', error);
+      logger.error('Error exporting invoices list:', error);
       res.status(500).json({ error: 'Failed to export invoices list' });
     }
   });
@@ -447,7 +448,7 @@ export function registerExportRoutes(app: Express) {
 
       res.json({ quotations: allQuotations, company });
     } catch (error) {
-      console.error('Error exporting quotations list:', error);
+      logger.error('Error exporting quotations list:', error);
       res.status(500).json({ error: 'Failed to export quotations list' });
     }
   });

@@ -46,6 +46,7 @@ import { pool } from "./db";
 import { runBackup } from "./runBackup";
 import { recordScheduledRunAttempt, recordScheduledRunSuccess } from "./backupSchedule";
 import { withBackupLock } from "./backupLock";
+import { logger } from "./logger";
 
 const TICK_INTERVAL_MS = 60_000;
 
@@ -85,13 +86,13 @@ export async function backupSchedulerTick(now: Date = new Date()): Promise<"ran"
       const result = await runBackup({ id: null, username: "scheduler" });
       succeeded = result.success === true;
       if (!succeeded) {
-        console.error(
+        logger.error(
           "Scheduled backup failed:",
           result.errorMessage || result.dbBackup.error || result.manifestBackup.error
         );
       }
     } catch (err) {
-      console.error("Scheduled backup threw unexpectedly:", err);
+      logger.error("Scheduled backup threw unexpectedly:", err);
     }
 
     // Always record that an attempt was made (success or failure) so the
@@ -99,7 +100,7 @@ export async function backupSchedulerTick(now: Date = new Date()): Promise<"ran"
     try {
       await recordScheduledRunAttempt(runStartedAt);
     } catch (err) {
-      console.error("recordScheduledRunAttempt failed:", err);
+      logger.error("recordScheduledRunAttempt failed:", err);
     }
 
     // Only advance nextDueAt on success — failures retry next tick.
@@ -107,7 +108,7 @@ export async function backupSchedulerTick(now: Date = new Date()): Promise<"ran"
       try {
         await recordScheduledRunSuccess(runStartedAt);
       } catch (err) {
-        console.error("recordScheduledRunSuccess failed:", err);
+        logger.error("recordScheduledRunSuccess failed:", err);
       }
     }
     return "ran";
@@ -122,19 +123,19 @@ export async function backupSchedulerTick(now: Date = new Date()): Promise<"ran"
 export function startBackupScheduler() {
   if (intervalHandle) return;
   if (process.env.DISABLE_BACKUP_SCHEDULER === "1") {
-    console.log("Backup scheduler disabled via DISABLE_BACKUP_SCHEDULER=1");
+    logger.info("Backup scheduler disabled via DISABLE_BACKUP_SCHEDULER=1");
     return;
   }
   intervalHandle = setInterval(() => {
     backupSchedulerTick().catch((err) => {
-      console.error("backupSchedulerTick threw:", err);
+      logger.error("backupSchedulerTick threw:", err);
     });
   }, TICK_INTERVAL_MS);
   // Don't keep the event loop alive solely for the scheduler
   if (intervalHandle && typeof intervalHandle.unref === "function") {
     intervalHandle.unref();
   }
-  console.log(`Backup scheduler started (tick every ${TICK_INTERVAL_MS / 1000}s)`);
+  logger.info(`Backup scheduler started (tick every ${TICK_INTERVAL_MS / 1000}s)`);
 
   // Startup catch-up tick (Task #350): if the app was asleep / restarted
   // while a scheduled backup was overdue, the next interval tick is up
@@ -147,10 +148,10 @@ export function startBackupScheduler() {
   // logged identically to the interval branch so they never crash boot.
   void backupSchedulerTick()
     .then((outcome) => {
-      console.log(`Backup scheduler startup catch-up tick: ${outcome}`);
+      logger.info(`Backup scheduler startup catch-up tick: ${outcome}`);
     })
     .catch((err) => {
-      console.error("backupSchedulerTick (startup catch-up) threw:", err);
+      logger.error("backupSchedulerTick (startup catch-up) threw:", err);
     });
 }
 

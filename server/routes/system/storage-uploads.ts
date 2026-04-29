@@ -14,6 +14,7 @@ import {
   MAX_UPLOAD_ERROR_MESSAGE,
   type AuthenticatedRequest,
 } from "../../middleware";
+import { logger } from "../../logger";
 
 export function registerStorageUploadRoutes(app: Express) {
   app.post('/api/storage/sign-upload', requireAuth(['Admin', 'Staff', 'Manager']), async (req: AuthenticatedRequest, res) => {
@@ -49,7 +50,7 @@ export function registerStorageUploadRoutes(app: Express) {
         }
       });
     } catch (error) {
-      console.error('Error generating upload URL:', error);
+      logger.error('Error generating upload URL:', error);
       res.status(500).json({ error: 'Failed to generate upload URL' });
     }
   });
@@ -142,12 +143,12 @@ export function registerStorageUploadRoutes(app: Express) {
           .values({ key: tokenData.key, sizeBytes: fileData.length })
           .onConflictDoUpdate({ target: storageObjects.key, set: { sizeBytes: fileData.length, uploadedAt: new Date() } });
       } catch (trackErr) {
-        console.error('Could not record storage size for', tokenData.key, '— size reporting may be inaccurate:', trackErr);
+        logger.error('Could not record storage size for', tokenData.key, '— size reporting may be inaccurate:', trackErr);
       }
 
       res.json({ success: true, key: tokenData.key });
     } catch (error) {
-      console.error('Error uploading file:', error);
+      logger.error('Error uploading file:', error);
       res.status(500).json({ error: 'Failed to upload file' });
     }
   });
@@ -301,12 +302,12 @@ export function registerStorageUploadRoutes(app: Express) {
           .values({ key: storageKey, sizeBytes: req.file.size })
           .onConflictDoUpdate({ target: storageObjects.key, set: { sizeBytes: req.file.size, uploadedAt: new Date() } });
       } catch (trackErr) {
-        console.error('Could not record storage size for', storageKey, '— size reporting may be inaccurate:', trackErr);
+        logger.error('Could not record storage size for', storageKey, '— size reporting may be inaccurate:', trackErr);
       }
 
       res.json({ success: true, key: storageKey });
     } catch (error) {
-      console.error('Error uploading scan:', error);
+      logger.error('Error uploading scan:', error);
       res.status(500).json({ error: 'Failed to upload scan' });
     }
   });

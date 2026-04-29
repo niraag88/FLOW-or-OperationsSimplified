@@ -5,6 +5,7 @@ import { eq, sql, inArray } from "drizzle-orm";
 import { businessStorage } from "../../businessStorage";
 import { requireAuth, writeAuditLog, updateProductStock, type AuthenticatedRequest } from "../../middleware";
 import { OverReceiveError, recalculatePOPaymentStatus } from "./helpers";
+import { logger } from "../../logger";
 
 export function registerGoodsReceiptMutationRoutes(app: Express) {
   app.patch('/api/goods-receipts/:id/reference', requireAuth(['Admin', 'Manager']), async (req: AuthenticatedRequest, res) => {
@@ -42,7 +43,7 @@ export function registerGoodsReceiptMutationRoutes(app: Express) {
 
       res.json(updated);
     } catch (error) {
-      console.error('Error updating GRN reference:', error);
+      logger.error('Error updating GRN reference:', error);
       res.status(500).json({ error: 'Failed to update reference' });
     }
   });
@@ -94,7 +95,7 @@ export function registerGoodsReceiptMutationRoutes(app: Express) {
 
       res.json(updated);
     } catch (error) {
-      console.error('Error updating GRN payment:', error);
+      logger.error('Error updating GRN payment:', error);
       res.status(500).json({ error: 'Failed to update payment' });
     }
   });
@@ -284,7 +285,7 @@ export function registerGoodsReceiptMutationRoutes(app: Express) {
       if (error instanceof OverReceiveError) {
         return res.status(400).json({ error: 'Over-receive not allowed', details: error.details });
       }
-      console.error('Error creating goods receipt:', error);
+      logger.error('Error creating goods receipt:', error);
       res.status(500).json({ error: 'Failed to create goods receipt' });
     }
   });

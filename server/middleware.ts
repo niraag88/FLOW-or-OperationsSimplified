@@ -9,6 +9,7 @@ import session from 'express-session';
 import connectPg from 'connect-pg-simple';
 import { promises as fsPromises } from 'fs';
 import path from 'path';
+import { logger } from "./logger";
 
 export const objectStorageClient = new Client({
   bucketId: process.env.DEFAULT_OBJECT_STORAGE_BUCKET_ID
@@ -51,7 +52,7 @@ let signedTokenCleanupTimer: NodeJS.Timeout | null = setInterval(async () => {
   try {
     await pool.query('DELETE FROM signed_tokens WHERE expires < $1', [Date.now()]);
   } catch (err) {
-    console.error('Failed to clean up expired signed tokens:', err);
+    logger.error('Failed to clean up expired signed tokens:', err);
   }
 }, 5 * 60 * 1000);
 signedTokenCleanupTimer.unref?.();
@@ -165,7 +166,7 @@ export const requireAuth = (allowedRoles: Array<"Admin" | "Manager" | "Staff"> =
       req.user = user;
       next();
     } catch (error) {
-      console.error('Auth middleware error:', error);
+      logger.error('Auth middleware error:', error);
       return res.status(500).json({ error: 'Authentication error' });
     }
   };
@@ -195,7 +196,7 @@ export const requireRole = (role: "Admin" | "Manager" | "Staff") => {
       req.user = user;
       next();
     } catch (error) {
-      console.error('Role auth middleware error:', error);
+      logger.error('Role auth middleware error:', error);
       return res.status(500).json({ error: 'Authentication error' });
     }
   };
@@ -218,7 +219,7 @@ export type DbClient = typeof db | Parameters<Parameters<typeof db.transaction>[
 //     For non-sensitive bookkeeping (CRUD on ordinary entities). Uses a
 //     small retry-with-backoff window so a brief Neon hiccup doesn't
 //     silently swallow the row. Only after every retry has failed do
-//     we fall through to console.error — which still preserves the
+//     we fall through to logger.error — which still preserves the
 //     pre-#375 behaviour (the request itself is not failed).
 //
 // Adding a new sensitive route MUST use writeAuditLogSync. Bare
@@ -294,7 +295,7 @@ export async function spoolAuditRow(data: InsertAuditLog): Promise<void> {
       // The DB is down AND the disk write failed — nothing left to
       // do but log loudly. Operationally this is the audit-log
       // equivalent of a hardware failure.
-      console.error(
+      logger.error(
         'CRITICAL: Audit-log disk-spool write failed; row will be lost:',
         writeErr,
         { auditData: data },
@@ -373,7 +374,7 @@ export async function replayAuditSpool(): Promise<{ replayed: number; pending: n
     // file just wastes a few bytes on disk.
     await fsPromises.unlink(snapshotPath).catch(() => {});
     if (replayed > 0) {
-      console.log(
+      logger.info(
         `[audit-spool] Replayed ${replayed} buffered audit row(s); ${stillPending.length} still pending`,
       );
     }
@@ -408,13 +409,13 @@ export function startAuditSpoolReplayTimer(): void {
   spoolReplayInitialTimer = setTimeout(() => {
     spoolReplayInitialTimer = null;
     void replayAuditSpool().catch((err) =>
-      console.error('[audit-spool] initial replay error:', err),
+      logger.error('[audit-spool] initial replay error:', err),
     );
   }, AUDIT_SPOOL_REPLAY_INITIAL_DELAY_MS);
   spoolReplayInitialTimer.unref?.();
   spoolReplayTimer = setInterval(() => {
     void replayAuditSpool().catch((err) =>
-      console.error('[audit-spool] periodic replay error:', err),
+      logger.error('[audit-spool] periodic replay error:', err),
     );
   }, AUDIT_SPOOL_REPLAY_INTERVAL_MS);
   spoolReplayTimer.unref?.();
@@ -452,7 +453,7 @@ export const writeAuditLog = (auditData: InsertAuditLog): void => {
     }
     // All in-memory retries exhausted — spool to disk and let the
     // periodic replay worker drain it once the DB recovers.
-    console.error(
+    logger.error(
       `Audit log write failed after ${AUDIT_LOG_RETRY_ATTEMPTS} attempts; spooling to disk:`,
       lastErr,
       { auditData },

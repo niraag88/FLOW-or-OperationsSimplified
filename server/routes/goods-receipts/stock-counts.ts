@@ -3,6 +3,7 @@ import { stockCounts, stockCountItems, stockMovements, products } from "@shared/
 import { db } from "../../db";
 import { eq, desc, inArray, and } from "drizzle-orm";
 import { requireAuth, writeAuditLog, updateProductStock, type AuthenticatedRequest } from "../../middleware";
+import { logger } from "../../logger";
 
 export function registerStockCountRoutes(app: Express) {
   app.get('/api/stock-counts', requireAuth(), async (req: AuthenticatedRequest, res) => {
@@ -18,7 +19,7 @@ export function registerStockCountRoutes(app: Express) {
 
       res.json(stockCountsList);
     } catch (error) {
-      console.error('Error fetching stock counts:', error);
+      logger.error('Error fetching stock counts:', error);
       res.status(500).json({ error: 'Failed to fetch stock counts' });
     }
   });
@@ -37,7 +38,7 @@ export function registerStockCountRoutes(app: Express) {
 
       res.json({ ...stockCount, items });
     } catch (error) {
-      console.error('Error fetching stock count:', error);
+      logger.error('Error fetching stock count:', error);
       res.status(500).json({ error: 'Failed to fetch stock count' });
     }
   });
@@ -127,7 +128,7 @@ export function registerStockCountRoutes(app: Express) {
         message: `Stock count saved. ${correctionsApplied} product${correctionsApplied !== 1 ? 's' : ''} adjusted to match physical count.`
       });
     } catch (error) {
-      console.error('Error creating stock count:', error);
+      logger.error('Error creating stock count:', error);
       res.status(500).json({ error: 'Failed to create stock count' });
     }
   });
@@ -163,7 +164,7 @@ export function registerStockCountRoutes(app: Express) {
       writeAuditLog({ actor: req.user!.id, actorName: req.user?.username || String(req.user!.id), targetId: String(stockCountId), targetType: 'stock_count', action: 'DELETE', details: `Stock count #${stockCountId} deleted` });
       res.json({ success: true });
     } catch (error) {
-      console.error('Error deleting stock count:', error);
+      logger.error('Error deleting stock count:', error);
       res.status(500).json({ error: 'Failed to delete stock count' });
     }
   });

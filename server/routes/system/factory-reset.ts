@@ -12,6 +12,7 @@ import {
   withDestructiveDbLock,
   DestructiveDbOpInProgressError,
 } from "../../destructiveDbLock";
+import { logger } from "../../logger";
 
 export function registerFactoryResetRoutes(app: Express) {
   /**
@@ -89,7 +90,7 @@ export function registerFactoryResetRoutes(app: Express) {
           message: error.message,
         });
       }
-      console.error('Factory reset failed:', error);
+      logger.error('Factory reset failed:', error);
       res.status(500).json({ error: 'Factory reset failed', details: error.message });
     }
   });

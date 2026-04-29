@@ -3,6 +3,7 @@ import { deliveryOrders, storageObjects } from "@shared/schema";
 import { db } from "../../db";
 import { eq } from "drizzle-orm";
 import { requireAuth, writeAuditLog, deleteStorageObjectSafely, type AuthenticatedRequest } from "../../middleware";
+import { logger } from "../../logger";
 
 export function registerDeliveryOrderScanKeyRoutes(app: Express) {
   app.patch('/api/delivery-orders/:id/scan-key', requireAuth(['Admin', 'Manager', 'Staff']), async (req: AuthenticatedRequest, res) => {
@@ -18,7 +19,7 @@ export function registerDeliveryOrderScanKeyRoutes(app: Express) {
       writeAuditLog({ actor: req.user!.id, actorName: req.user?.username || String(req.user!.id), targetId: String(id), targetType: 'delivery_order', action: 'UPLOAD', details: `Scan attached to DO #${updated.orderNumber}` });
       res.json(updated);
     } catch (error) {
-      console.error('Error updating delivery order scan key:', error);
+      logger.error('Error updating delivery order scan key:', error);
       res.status(500).json({ error: 'Failed to update scan key' });
     }
   });
@@ -34,7 +35,7 @@ export function registerDeliveryOrderScanKeyRoutes(app: Express) {
       if (doRecord.scanKey) {
         const storageResult = await deleteStorageObjectSafely(doRecord.scanKey);
         if (!storageResult.ok) {
-          console.error(
+          logger.error(
             `Failed to delete delivery-order scan from storage: type=delivery_order id=${id} key=${doRecord.scanKey} error=${storageResult.error}`
           );
           return res.status(502).json({ error: 'Could not delete file from storage. Please try again.' });
@@ -46,7 +47,7 @@ export function registerDeliveryOrderScanKeyRoutes(app: Express) {
       writeAuditLog({ actor: req.user!.id, actorName: req.user?.username || String(req.user!.id), targetId: String(id), targetType: 'delivery_order', action: 'REMOVE_FILE', details: `Scan removed from DO #${doRecord.orderNumber}` });
       res.json(updated);
     } catch (error) {
-      console.error('Error removing delivery order scan key:', error);
+      logger.error('Error removing delivery order scan key:', error);
       res.status(500).json({ error: 'Failed to remove file' });
     }
   });

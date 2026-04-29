@@ -10,6 +10,7 @@ import {
   parseFxRateOrDefault,
   PurchaseOrderRequestError,
 } from "../../lib/purchaseOrderTotals";
+import { logger } from "../../logger";
 
 // Strip client-supplied totals from the validated header payload before
 // persisting. POST and PUT recompute these via computePurchaseOrderTotals.
@@ -142,7 +143,7 @@ export function registerPurchaseOrderCreateUpdateRoutes(app: Express) {
       if (error instanceof PurchaseOrderRequestError) {
         return res.status(error.statusCode).json(error.responseBody);
       }
-      console.error('Error creating purchase order:', error);
+      logger.error('Error creating purchase order:', error);
       res.status(500).json({ error: 'Failed to create purchase order' });
     }
   });
@@ -317,7 +318,7 @@ export function registerPurchaseOrderCreateUpdateRoutes(app: Express) {
       if (error instanceof PurchaseOrderRequestError) {
         return res.status(error.statusCode).json(error.responseBody);
       }
-      console.error('Error updating purchase order:', error);
+      logger.error('Error updating purchase order:', error);
       res.status(500).json({ error: 'Failed to update purchase order' });
     }
   });

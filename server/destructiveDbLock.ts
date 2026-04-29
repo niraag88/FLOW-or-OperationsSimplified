@@ -37,6 +37,7 @@
  */
 import type { PoolClient } from "pg";
 import { pool } from "./db";
+import { logger } from "./logger";
 
 /**
  * The single shared advisory-lock key for every wholesale-DB destructive
@@ -124,7 +125,7 @@ export async function withDestructiveDbLock<T>(
         // Connection-level release happens automatically anyway; log so a
         // genuinely persistent advisory-unlock failure (which would block
         // the next caller until the connection is recycled) is visible.
-        console.error("pg_advisory_unlock (destructive-db) failed:", err);
+        logger.error("pg_advisory_unlock (destructive-db) failed:", err);
       }
     }
     client.release();

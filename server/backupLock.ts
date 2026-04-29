@@ -20,6 +20,7 @@
  * the helper narrow makes it trivial to reason about lock lifetime.
  */
 import { pool } from "./db";
+import { logger } from "./logger";
 
 /**
  * The advisory-lock key shared by every backup-run path. Originally
@@ -69,7 +70,7 @@ export async function withBackupLock<T>(
         ]);
       } catch (err) {
         // Connection-level release happens automatically anyway.
-        console.error("pg_advisory_unlock failed:", err);
+        logger.error("pg_advisory_unlock failed:", err);
       }
     }
     client.release();

@@ -3,6 +3,7 @@ import { purchaseOrders, storageObjects } from "@shared/schema";
 import { db } from "../../db";
 import { eq } from "drizzle-orm";
 import { requireAuth, writeAuditLog, deleteStorageObjectSafely, type AuthenticatedRequest } from "../../middleware";
+import { logger } from "../../logger";
 
 export function registerPurchaseOrderScanKeyRoutes(app: Express) {
   app.patch('/api/purchase-orders/:id/scan-key', requireAuth(['Admin', 'Manager', 'Staff']), async (req: AuthenticatedRequest, res) => {
@@ -20,7 +21,7 @@ export function registerPurchaseOrderScanKeyRoutes(app: Express) {
       if (!updated) return res.status(404).json({ error: 'Purchase order not found' });
       res.json(updated);
     } catch (error) {
-      console.error('Error saving PO scan key:', error);
+      logger.error('Error saving PO scan key:', error);
       res.status(500).json({ error: 'Failed to save file' });
     }
   });
@@ -34,7 +35,7 @@ export function registerPurchaseOrderScanKeyRoutes(app: Express) {
       if (po.supplierScanKey) {
         const storageResult = await deleteStorageObjectSafely(po.supplierScanKey);
         if (!storageResult.ok) {
-          console.error(
+          logger.error(
             `Failed to delete purchase-order supplier scan from storage: type=purchase_order id=${id} key=${po.supplierScanKey} error=${storageResult.error}`
           );
           return res.status(502).json({ error: 'Could not delete file from storage. Please try again.' });
@@ -59,7 +60,7 @@ export function registerPurchaseOrderScanKeyRoutes(app: Express) {
 
       res.json(updated);
     } catch (error) {
-      console.error('Error removing PO scan key:', error);
+      logger.error('Error removing PO scan key:', error);
       res.status(500).json({ error: 'Failed to remove file' });
     }
   });

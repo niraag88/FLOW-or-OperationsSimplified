@@ -5,6 +5,7 @@ import { db } from "../db";
 import { eq } from "drizzle-orm";
 import { businessStorage } from "../businessStorage";
 import { requireAuth, writeAuditLog, type AuthenticatedRequest } from "../middleware";
+import { logger } from "../logger";
 
 export function registerQuotationRoutes(app: Express) {
   app.get('/api/quotations', requireAuth(), async (req: AuthenticatedRequest, res) => {
@@ -22,7 +23,7 @@ export function registerQuotationRoutes(app: Express) {
       });
       res.json(result);
     } catch (error) {
-      console.error('Error fetching quotations:', error);
+      logger.error('Error fetching quotations:', error);
       res.status(500).json({ error: 'Failed to fetch quotations' });
     }
   });
@@ -85,7 +86,7 @@ export function registerQuotationRoutes(app: Express) {
       writeAuditLog({ actor: req.user!.id, actorName: req.user?.username || String(req.user!.id), targetId: String(quotation.id), targetType: 'quotation', action: 'CREATE', details: `Quotation #${quotation.quoteNumber} created for ${quoteCustomerName}` });
       res.status(201).json(quotation);
     } catch (error) {
-      console.error('Error creating quotation:', error);
+      logger.error('Error creating quotation:', error);
       res.status(500).json({ error: 'Failed to create quotation' });
     }
   });
@@ -95,7 +96,7 @@ export function registerQuotationRoutes(app: Express) {
       const nextNumber = await businessStorage.getNextQuotationNumber();
       res.json({ nextNumber });
     } catch (error) {
-      console.error('Error getting next quotation number:', error);
+      logger.error('Error getting next quotation number:', error);
       res.status(500).json({ error: 'Failed to get next quotation number' });
     }
   });
@@ -109,7 +110,7 @@ export function registerQuotationRoutes(app: Express) {
       }
       res.json(quotation);
     } catch (error) {
-      console.error('Error fetching quotation:', error);
+      logger.error('Error fetching quotation:', error);
       res.status(500).json({ error: 'Failed to fetch quotation' });
     }
   });
@@ -136,7 +137,7 @@ export function registerQuotationRoutes(app: Express) {
 
       res.json(items);
     } catch (error) {
-      console.error('Error fetching quotation items:', error);
+      logger.error('Error fetching quotation items:', error);
       res.status(500).json({ error: 'Failed to fetch quotation items' });
     }
   });
@@ -155,7 +156,7 @@ export function registerQuotationRoutes(app: Express) {
       writeAuditLog({ actor: req.user!.id, actorName: req.user?.username || String(req.user!.id), targetId: String(id), targetType: 'quotation', action: 'UPDATE', details: `Quotation #${existing.quoteNumber} marked as converted (invoice created)` });
       res.json(updatedQuote);
     } catch (error) {
-      console.error('Error converting quotation:', error);
+      logger.error('Error converting quotation:', error);
       res.status(500).json({ error: 'Failed to convert quotation' });
     }
   });
@@ -222,7 +223,7 @@ export function registerQuotationRoutes(app: Express) {
       writeAuditLog({ actor: req.user!.id, actorName: req.user?.username || String(req.user!.id), targetId: String(id), targetType: 'quotation', action: 'UPDATE', details: `Quotation #${updatedQuote.quoteNumber} updated (status: ${updatedQuote.status})` });
       res.json(updatedQuote);
     } catch (error) {
-      console.error('Error updating quotation:', error);
+      logger.error('Error updating quotation:', error);
       res.status(500).json({ error: 'Failed to update quotation' });
     }
   });
@@ -259,7 +260,7 @@ export function registerQuotationRoutes(app: Express) {
       writeAuditLog({ actor: req.user!.id, actorName: req.user?.username || String(req.user!.id), targetId: String(id), targetType: 'quotation', action: 'DELETE', details: `Quotation #${quoteHeader.quoteNumber} moved to recycle bin` });
       res.json({ success: true });
     } catch (error) {
-      console.error('Error deleting quotation:', error);
+      logger.error('Error deleting quotation:', error);
       res.status(500).json({ error: 'Failed to delete quotation' });
     }
   });

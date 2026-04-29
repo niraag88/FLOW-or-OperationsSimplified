@@ -6,6 +6,7 @@ import { eq } from "drizzle-orm";
 import { businessStorage } from "../../businessStorage";
 import { requireAuth, writeAuditLog, updateProductStock, type AuthenticatedRequest } from "../../middleware";
 import { resolveDocumentTotals, isTotalsError, resolveAuthoritativeTaxTreatment } from "../../utils/totals";
+import { logger } from "../../logger";
 
 export function registerInvoiceCreateRoutes(app: Express) {
   app.post('/api/invoices/from-quotation', requireAuth(['Admin', 'Manager', 'Staff']), async (req: AuthenticatedRequest, res) => {
@@ -53,7 +54,7 @@ export function registerInvoiceCreateRoutes(app: Express) {
 
       res.status(201).json(invoice);
     } catch (error) {
-      console.error('Error creating invoice from quotation:', error);
+      logger.error('Error creating invoice from quotation:', error);
       if (error instanceof Error) {
         res.status(400).json({ error: error.message });
       } else {
@@ -183,7 +184,7 @@ export function registerInvoiceCreateRoutes(app: Express) {
       writeAuditLog({ actor: req.user!.id, actorName: req.user?.username || String(req.user!.id), targetId: String(invoice.id), targetType: 'invoice', action: 'CREATE', details: `Invoice #${invoice.invoiceNumber} created for ${customerName}${body.status === 'delivered' ? ' — stock deducted' : ''}` });
       res.status(201).json({ ...invoice, items: body.items || [] });
     } catch (error) {
-      console.error('Error creating invoice:', error);
+      logger.error('Error creating invoice:', error);
       if (error instanceof Error) {
         res.status(400).json({ error: error.message });
       } else {

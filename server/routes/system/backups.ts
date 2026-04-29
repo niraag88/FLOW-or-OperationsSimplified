@@ -11,6 +11,7 @@ import {
 import { runBackup } from "../../runBackup";
 import { withBackupLock } from "../../backupLock";
 import { getBackupSchedule, updateBackupSchedule, BackupScheduleInputSchema } from "../../backupSchedule";
+import { logger } from "../../logger";
 
 export function registerBackupRoutes(app: Express) {
   app.get('/api/ops/backup-status', requireAuth(['Admin']), async (req, res) => {
@@ -44,7 +45,7 @@ export function registerBackupRoutes(app: Express) {
         } : null
       });
     } catch (error) {
-      console.error('Error getting backup status:', error);
+      logger.error('Error getting backup status:', error);
       res.status(500).json({ error: 'Failed to get backup status' });
     }
   });
@@ -71,11 +72,11 @@ export function registerBackupRoutes(app: Express) {
       if (result.success) {
         res.status(200).json(result);
       } else {
-        console.error('Backup failed:', { db: result.dbBackup, manifest: result.manifestBackup, err: result.errorMessage });
+        logger.error('Backup failed:', { db: result.dbBackup, manifest: result.manifestBackup, err: result.errorMessage });
         res.status(500).json(result);
       }
     } catch (error) {
-      console.error('Error running backups:', error);
+      logger.error('Error running backups:', error);
       const errMsg = error instanceof Error ? error.message : 'Unknown error';
       res.status(500).json({ success: false, error: errMsg, timestamp: new Date().toISOString() });
     }
@@ -86,7 +87,7 @@ export function registerBackupRoutes(app: Express) {
       const schedule = await getBackupSchedule();
       res.json(schedule);
     } catch (error) {
-      console.error('Error fetching backup schedule:', error);
+      logger.error('Error fetching backup schedule:', error);
       res.status(500).json({ error: 'Failed to fetch backup schedule' });
     }
   });
@@ -113,7 +114,7 @@ export function registerBackupRoutes(app: Express) {
       });
       res.json(updated);
     } catch (error) {
-      console.error('Error updating backup schedule:', error);
+      logger.error('Error updating backup schedule:', error);
       res.status(500).json({ error: 'Failed to update backup schedule' });
     }
   });
@@ -123,7 +124,7 @@ export function registerBackupRoutes(app: Express) {
       const runs = await db.select().from(backupRuns).orderBy(desc(backupRuns.ranAt)).limit(20);
       res.json({ runs });
     } catch (error) {
-      console.error('Error fetching backup runs:', error);
+      logger.error('Error fetching backup runs:', error);
       res.status(500).json({ error: 'Failed to fetch backup runs' });
     }
   });
@@ -172,7 +173,7 @@ export function registerBackupRoutes(app: Express) {
         isFresh,
       });
     } catch (error) {
-      console.error('Error fetching latest-backup freshness:', error);
+      logger.error('Error fetching latest-backup freshness:', error);
       res.status(500).json({ error: 'Failed to fetch latest-backup freshness' });
     }
   });
@@ -201,12 +202,12 @@ export function registerBackupRoutes(app: Express) {
 
       const stream = objectStorageClient.downloadAsStream(run.dbStorageKey);
       stream.on('error', (err: Error) => {
-        console.error('Error streaming backup file from storage:', err);
+        logger.error('Error streaming backup file from storage:', err);
         if (!res.headersSent) res.status(500).json({ error: 'Failed to stream backup file from storage' });
       });
       stream.pipe(res);
     } catch (error) {
-      console.error('Error downloading backup:', error);
+      logger.error('Error downloading backup:', error);
       res.status(500).json({ error: 'Failed to download backup' });
     }
   });

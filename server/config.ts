@@ -11,6 +11,7 @@
  */
 
 import { z } from 'zod';
+import { logger } from "./logger";
 
 /**
  * Schema describing the environment contract.
@@ -118,11 +119,11 @@ export function validateConfigOrExit(env: NodeJS.ProcessEnv = process.env): Conf
   if (!result.ok) {
     // Use stderr + a clear banner so the failure is impossible to miss
     // in deploy logs. Never print the offending values — only names.
-    console.error(
+    logger.error(
       '\nFATAL: Environment validation failed. The server cannot start.\n',
     );
-    for (const line of result.errors) console.error(line);
-    console.error('\nFix the variables above in your environment and restart.\n');
+    for (const line of result.errors) logger.error(line);
+    logger.error('\nFix the variables above in your environment and restart.\n');
     process.exit(1);
   }
   cachedConfig = result.config;

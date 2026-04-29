@@ -9,6 +9,7 @@ import {
   recalculatePOPaymentStatus,
   type NegativeStockEntry,
 } from "./helpers";
+import { logger } from "../../logger";
 
 export function registerGoodsReceiptCancelRoutes(app: Express) {
   // PATCH /api/goods-receipts/:id/cancel
@@ -317,7 +318,7 @@ export function registerGoodsReceiptCancelRoutes(app: Express) {
 
       res.json({ success: true, grnId, reversedProducts: reversedSummary, negativeStock });
     } catch (error) {
-      console.error('Error cancelling goods receipt:', error);
+      logger.error('Error cancelling goods receipt:', error);
       res.status(500).json({ error: 'Failed to cancel goods receipt' });
     }
   });

@@ -6,6 +6,7 @@ import { db } from "../db";
 import { eq } from "drizzle-orm";
 import { businessStorage } from "../businessStorage";
 import { requireAuth, writeAuditLog, type AuthenticatedRequest } from "../middleware";
+import { logger } from "../logger";
 
 export function registerSupplierRoutes(app: Express) {
   app.get('/api/suppliers', requireAuth(), async (req: AuthenticatedRequest, res) => {
@@ -13,7 +14,7 @@ export function registerSupplierRoutes(app: Express) {
       const result = await businessStorage.getSuppliers();
       res.json(result);
     } catch (error) {
-      console.error('Error fetching suppliers:', error);
+      logger.error('Error fetching suppliers:', error);
       res.status(500).json({ error: 'Failed to fetch suppliers' });
     }
   });
@@ -28,7 +29,7 @@ export function registerSupplierRoutes(app: Express) {
       if (error instanceof ZodError) {
         return res.status(400).json({ error: 'Validation failed', details: error.errors });
       }
-      console.error('Error creating supplier:', error);
+      logger.error('Error creating supplier:', error);
       res.status(500).json({ error: 'Failed to create supplier' });
     }
   });
@@ -41,7 +42,7 @@ export function registerSupplierRoutes(app: Express) {
       writeAuditLog({ actor: req.user!.id, actorName: req.user?.username || String(req.user!.id), targetId: String(supplierId), targetType: 'supplier', action: 'UPDATE', details: `Supplier '${supplier.name}' updated` });
       res.json(supplier);
     } catch (error) {
-      console.error('Error updating supplier:', error);
+      logger.error('Error updating supplier:', error);
       res.status(500).json({ error: 'Failed to update supplier' });
     }
   });
@@ -87,7 +88,7 @@ export function registerSupplierRoutes(app: Express) {
       writeAuditLog({ actor: req.user!.id, actorName: req.user?.username || String(req.user!.id), targetId: String(supplierId), targetType: 'supplier', action: 'DELETE', details: `Supplier '${supplierToDelete.name}' moved to recycle bin` });
       res.json({ success: true });
     } catch (error) {
-      console.error('Error deleting supplier:', error);
+      logger.error('Error deleting supplier:', error);
       res.status(500).json({ error: 'Failed to delete supplier' });
     }
   });

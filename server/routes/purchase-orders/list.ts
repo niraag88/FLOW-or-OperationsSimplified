@@ -1,6 +1,7 @@
 import type { Express } from "express";
 import { businessStorage } from "../../businessStorage";
 import { requireAuth, type AuthenticatedRequest } from "../../middleware";
+import { logger } from "../../logger";
 
 export function registerPurchaseOrderListRoutes(app: Express) {
   app.get('/api/purchase-orders', requireAuth(['Admin', 'Manager']), async (req: AuthenticatedRequest, res) => {
@@ -19,7 +20,7 @@ export function registerPurchaseOrderListRoutes(app: Express) {
       });
       res.json(result);
     } catch (error) {
-      console.error('Error fetching purchase orders:', error);
+      logger.error('Error fetching purchase orders:', error);
       res.status(500).json({ error: 'Failed to fetch purchase orders' });
     }
   });
@@ -29,7 +30,7 @@ export function registerPurchaseOrderListRoutes(app: Express) {
       const nextNumber = await businessStorage.getNextPoNumber();
       res.json({ nextNumber });
     } catch (error) {
-      console.error('Error getting next PO number:', error);
+      logger.error('Error getting next PO number:', error);
       res.status(500).json({ error: 'Failed to get next PO number' });
     }
   });

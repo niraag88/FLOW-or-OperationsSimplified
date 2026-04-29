@@ -22,6 +22,7 @@ import { setupVite, serveStatic, log } from "./vite";
 import { MAX_UPLOAD_ERROR_MESSAGE, startAuditSpoolReplayTimer, stopBackgroundJobs } from "./middleware";
 import { pool } from "./db";
 import { startBackupScheduler } from "./scheduler";
+import { logger } from "./logger";
 
 const app = express();
 app.use(helmet({
@@ -65,7 +66,7 @@ app.use(async (err: any, req: Request, res: Response, next: NextFunction) => {
         try {
           await pool.query('DELETE FROM signed_tokens WHERE token = $1', [token]);
         } catch (delErr) {
-          console.error('Failed to consume signed token after multer reject:', delErr);
+          logger.error('Failed to consume signed token after multer reject:', delErr);
         }
       }
       if (!res.headersSent) {
@@ -88,7 +89,7 @@ app.use(async (err: any, req: Request, res: Response, next: NextFunction) => {
   if (!res.headersSent) {
     res.status(status).json({ message });
   }
-  console.error(err);
+  logger.error(err);
 });
 
 // importantly only setup vite in development and after

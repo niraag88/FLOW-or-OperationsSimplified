@@ -5,18 +5,34 @@ import { createServer as createViteServer, createLogger } from "vite";
 import { type Server } from "http";
 import viteConfig from "../vite.config";
 import { nanoid } from "nanoid";
+import { logger } from "./logger";
 
 const viteLogger = createLogger();
 
+// Backwards-compatible request/boot logger.
+//
+// Production: routes through the structured logger so each request line
+// becomes a single JSON object with `source` as a top-level meta field
+// (queryable in log aggregators).
+//
+// Development: keeps the EXACT pre-#386 human format
+//   `h:mm:ss AM [express] METHOD /api... ...`
+// so eyeballing the dev console (and any local greps for `[express]`)
+// continues to work unchanged. Going through `logger.info` in dev would
+// have produced `[INFO]` instead of `[express]` and appended the source
+// as a JSON tail — an avoidable cosmetic regression.
 export function log(message: string, source = "express") {
+  if (process.env.NODE_ENV === "production") {
+    logger.info(message, { source });
+    return;
+  }
   const formattedTime = new Date().toLocaleTimeString("en-US", {
     hour: "numeric",
     minute: "2-digit",
     second: "2-digit",
     hour12: true,
   });
-
-  console.log(`${formattedTime} [${source}] ${message}`);
+  process.stdout.write(`${formattedTime} [${source}] ${message}\n`);
 }
 
 export async function setupVite(app: Express, server: Server) {

@@ -7,6 +7,7 @@ import { db } from "../db";
 import { eq } from "drizzle-orm";
 import { businessStorage } from "../businessStorage";
 import { requireAuth, writeAuditLog, type AuthenticatedRequest } from "../middleware";
+import { logger } from "../logger";
 
 export function registerProductRoutes(app: Express) {
   app.get('/api/products/filter-options', requireAuth(), async (req: AuthenticatedRequest, res) => {
@@ -14,7 +15,7 @@ export function registerProductRoutes(app: Express) {
       const result = await businessStorage.getProductFilterOptions();
       res.json(result);
     } catch (error) {
-      console.error('Error fetching product filter options:', error);
+      logger.error('Error fetching product filter options:', error);
       res.status(500).json({ error: 'Failed to fetch filter options' });
     }
   });
@@ -32,7 +33,7 @@ export function registerProductRoutes(app: Express) {
       const stockData = await businessStorage.getProductsWithStockAnalysis(lowStockThreshold);
       res.json(stockData);
     } catch (error) {
-      console.error('Error fetching stock analysis:', error);
+      logger.error('Error fetching stock analysis:', error);
       res.status(500).json({ error: 'Failed to fetch stock analysis' });
     }
   });
@@ -130,7 +131,7 @@ export function registerProductRoutes(app: Express) {
       await wb.xlsx.write(res);
       res.end();
     } catch (error) {
-      console.error('Error generating bulk template:', error);
+      logger.error('Error generating bulk template:', error);
       if (!res.headersSent) res.status(500).json({ error: 'Failed to generate template' });
     }
   });
@@ -271,7 +272,7 @@ export function registerProductRoutes(app: Express) {
 
       res.status(201).json({ created: createdProducts.length, failed: failed.length, errors: failed });
     } catch (error) {
-      console.error('Error bulk-creating products:', error);
+      logger.error('Error bulk-creating products:', error);
       res.status(500).json({ error: 'Failed to bulk-create products' });
     }
   });
@@ -296,7 +297,7 @@ export function registerProductRoutes(app: Express) {
       const result = await businessStorage.getProducts({ page, pageSize, search, category, brandNames, sizes });
       res.json(result);
     } catch (error) {
-      console.error('Error fetching products:', error);
+      logger.error('Error fetching products:', error);
       res.status(500).json({ error: 'Failed to fetch products' });
     }
   });
@@ -311,7 +312,7 @@ export function registerProductRoutes(app: Express) {
       if (error instanceof ZodError) {
         return res.status(400).json({ error: 'Validation failed', details: error.errors });
       }
-      console.error('Error creating product:', error);
+      logger.error('Error creating product:', error);
       res.status(500).json({ error: 'Failed to create product' });
     }
   });
@@ -327,7 +328,7 @@ export function registerProductRoutes(app: Express) {
 
       res.json(product);
     } catch (error) {
-      console.error('Error fetching product:', error);
+      logger.error('Error fetching product:', error);
       res.status(500).json({ error: 'Failed to fetch product' });
     }
   });
@@ -340,7 +341,7 @@ export function registerProductRoutes(app: Express) {
       writeAuditLog({ actor: req.user!.id, actorName: req.user?.username || String(req.user!.id), targetId: String(productId), targetType: 'product', action: 'UPDATE', details: `Product '${product.name}' updated` });
       res.json(product);
     } catch (error) {
-      console.error('Error updating product:', error);
+      logger.error('Error updating product:', error);
       res.status(500).json({ error: 'Failed to update product' });
     }
   });
@@ -388,7 +389,7 @@ export function registerProductRoutes(app: Express) {
       writeAuditLog({ actor: req.user!.id, actorName: req.user?.username || String(req.user!.id), targetId: String(productId), targetType: 'product', action: 'DELETE', details: `Product '${productToDelete?.name || productId}' (SKU: ${productToDelete?.sku || '?'}) soft-deleted to recycle bin (bin id: ${binEntryId})` });
       res.json({ success: true, message: 'Product deleted successfully' });
     } catch (error) {
-      console.error('Error deleting product:', error);
+      logger.error('Error deleting product:', error);
       res.status(500).json({ error: 'Failed to delete product' });
     }
   });
@@ -481,7 +482,7 @@ export function registerProductRoutes(app: Express) {
         productName: product.name,
       });
     } catch (error) {
-      console.error('Error adjusting stock:', error);
+      logger.error('Error adjusting stock:', error);
       res.status(500).json({ error: 'Failed to adjust stock' });
     }
   });

@@ -2,6 +2,7 @@ import { Pool, neonConfig } from '@neondatabase/serverless';
 import { drizzle } from 'drizzle-orm/neon-serverless';
 import ws from "ws";
 import * as schema from "@shared/schema";
+import { logger } from "./logger";
 
 neonConfig.webSocketConstructor = ws;
 
@@ -15,7 +16,7 @@ export const pool = new Pool({ connectionString: process.env.DATABASE_URL });
 
 // Add error handling to prevent application crashes on connection drops
 pool.on('error', (err) => {
-  console.error('Database pool error:', err);
+  logger.error('Database pool error:', err);
   // Don't throw here, just log the error - let individual queries handle retries
 });
 

@@ -3,6 +3,7 @@ import { goodsReceipts, storageObjects } from "@shared/schema";
 import { db } from "../../db";
 import { eq } from "drizzle-orm";
 import { requireAuth, deleteStorageObjectSafely, type AuthenticatedRequest } from "../../middleware";
+import { logger } from "../../logger";
 
 export function registerGoodsReceiptScanKeyRoutes(app: Express) {
   app.patch('/api/goods-receipts/:id/scan-key', requireAuth(['Admin', 'Manager', 'Staff']), async (req: AuthenticatedRequest, res) => {
@@ -26,7 +27,7 @@ export function registerGoodsReceiptScanKeyRoutes(app: Express) {
       if (!updated) return res.status(404).json({ error: 'Goods receipt not found' });
       res.json(updated);
     } catch (error) {
-      console.error('Error saving GRN scan key:', error);
+      logger.error('Error saving GRN scan key:', error);
       res.status(500).json({ error: 'Failed to save document' });
     }
   });
@@ -46,7 +47,7 @@ export function registerGoodsReceiptScanKeyRoutes(app: Express) {
       if (existingKey) {
         const storageResult = await deleteStorageObjectSafely(existingKey);
         if (!storageResult.ok) {
-          console.error(
+          logger.error(
             `Failed to delete goods-receipt scan from storage: type=goods_receipt id=${id} slot=${slotNum} key=${existingKey} error=${storageResult.error}`
           );
           return res.status(502).json({ error: 'Could not delete document from storage. Please try again.' });
@@ -60,7 +61,7 @@ export function registerGoodsReceiptScanKeyRoutes(app: Express) {
         .returning();
       res.json(updated);
     } catch (error) {
-      console.error('Error removing GRN scan key:', error);
+      logger.error('Error removing GRN scan key:', error);
       res.status(500).json({ error: 'Failed to remove document' });
     }
   });

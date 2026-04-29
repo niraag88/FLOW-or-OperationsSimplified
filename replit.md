@@ -1,5 +1,5 @@
 # Overview
-FLOW is a full-stack web platform for UAE companies, managing product, customer, supplier, purchasing, sales (Quotations, Invoices, Delivery Orders), and inventory with AED currency and 5% VAT support. It aims to boost operational efficiency, financial oversight, and provide a scalable, user-friendly experience.
+FLOW is a full-stack web platform designed for businesses in the UAE. It streamlines product, customer, supplier, purchasing, sales (Quotations, Invoices, Delivery Orders), and inventory management, incorporating AED currency and 5% VAT support. The platform aims to enhance operational efficiency, improve financial oversight, and offer a scalable, user-friendly solution.
 
 # User Preferences
 Preferred communication style: Simple, everyday language.
@@ -14,59 +14,31 @@ Preferred communication style: Simple, everyday language.
 # System Architecture
 
 ## Frontend Architecture
-The frontend is built with React and TypeScript, using Vite, shadcn/ui, Radix UI, Tailwind CSS, React Router, TanStack Query, React Hook Form, and Zod for a modern, type-safe, and performant user interface.
+The frontend is built with React and TypeScript, utilizing Vite, shadcn/ui, Radix UI, Tailwind CSS, React Router, TanStack Query, React Hook Form, and Zod for a modern, type-safe, and performant user experience. UI/UX design emphasizes professional, A4-portrait optimized external documents with company branding using a `POTemplate` pattern.
 
 ## Backend Architecture
-The backend is an Express.js application in TypeScript, leveraging PostgreSQL with Drizzle ORM for data persistence. It uses session-based authentication with a PostgreSQL store and features modularized routes for maintainability. ESBuild is used for production bundling.
+The backend is an Express.js application in TypeScript, using PostgreSQL with Drizzle ORM. It features session-based authentication with a PostgreSQL store and modularized routes. ESBuild handles production bundling.
 
 ## Database Layer
-PostgreSQL, hosted on Neon Database, is managed via Drizzle ORM for type-safe database interactions, with schema evolution handled through versioned Drizzle migrations.
+PostgreSQL, hosted on Neon Database, is managed via Drizzle ORM for type-safe interactions and schema migrations.
 
 ## Authentication & Authorization
-The system employs session-based authentication with a PostgreSQL session store and a standard username/password system, with a demo mode enabled via the Base44 SDK shim. Write routes carry an explicit role list for authentication, distinguishing between Admin/Manager and Staff roles for various operations.
+The system uses session-based authentication with a PostgreSQL store and standard username/password. A demo mode is available via the Base44 SDK shim. Role-based authorization (Admin/Manager and Staff) controls access to write operations. Destructive admin actions require typed confirmation and employ advisory locks.
 
 ## Project Structure
-The project uses a monorepo structure, separating client, server, and shared code, with TypeScript path aliases for organized imports. Backend files are split into per-concern directories to improve maintainability and keep file sizes manageable.
+A monorepo structure separates client, server, and shared code, using TypeScript path aliases. Backend files are organized into per-concern directories to maintain manageability and reduce file size, with public import surfaces preserved. Frontend components are similarly split into smaller, focused files, delegating rendering to sub-components while retaining top-level state management.
 
-## Document Format Standards
-Internal documents use simple bordered data tables. External documents (POs, Quotations, Invoices, DOs) are professional, A4-portrait optimized with company branding, utilizing a `POTemplate` pattern.
-
-## Key Features & Implementations
-- **Enhanced Document Management**: Includes detailed delivery reconciliation and `supplier_scan_key` for Purchase Orders.
-- **Financial Features**: Supports multi-currency handling with `fxRateToAed` and derived PO payment statuses.
-- **API Improvements**: Server-side recycle-bin creation and robust invoice validation.
-- **Backup and Restore System**: Provides scheduled backups, full restore capabilities, and factory reset functionality with multi-layered protection.
-- **Goods Receipt (GRN) Management**: Detailed tracking, payment status, and an audit-preserving cancellation workflow. **Save & Close contract (Task #391):** `POST /api/goods-receipts` accepts an all-zero items payload **only** when `forceClose=true`; in that branch no GRN row is inserted — the PO is simply transitioned to `status='closed'` inside a transaction and an audit-log entry is written. Regular receives (without `forceClose`) still reject all-zero payloads with `400 no_received_quantity`.
-- **Cancellation Workflows**: Implements all-or-nothing cancellation contracts for Invoices and Delivery Orders, ensuring full stock reversal for delivered items.
-- **Quotation Status Enforcement**: Features a one-way status machine with strict transition validation.
-- **Invoice Stock Reconciliation**: Ensures accurate stock levels through inventory reconciliation on invoice edits.
-- **Security Hardening**: Audit-Log and Recycle-Bin writes are exclusively server-side, with Admin-only access to sensitive operations and storage routes.
-- **Destructive Admin Actions Guard**: A generalized pattern requiring typed confirmation phrases for irreversible admin actions, applying advisory locks for destructive database operations.
-- **Strict PO Numeric Validation**: All numeric fields on Purchase Order POST/PUT are strictly parsed and validated server-side.
-- **CSRF Protection**: Every state-changing API route is protected by the `csrf-csrf` double-submit cookie pattern. The frontend is patched to automatically attach CSRF tokens to mutating requests.
-- **Durable Audit Logging**: Sensitive admin actions utilize `writeAuditLogSync` which inserts within a transaction and rolls back on failure. Ordinary CRUD uses `writeAuditLog` with retries and a spooling mechanism for reliability during database outages.
-- **TypeScript Configuration**: The `tsconfig.json` module and target settings are specifically configured to support top-level `await` in the server entry points, crucial for synchronous environment variable validation.
-- **Backend File Layout (Task #380)**: Six previously-oversized backend files were split into per-concern directories so no `server/*.ts` file exceeds ~500 lines (hard cap 600). Public import surface is preserved verbatim — `server/routes.ts` and the 13 callers of `businessStorage` are unchanged. Each split target is a directory whose `index.ts` re-exports the original symbol so Node directory resolution keeps working:
-  - `server/routes/system/` (re-exports `registerSystemRoutes`) — `health.ts`, `storage-uploads.ts`, `storage-downloads.ts`, `audit-recycle.ts`, `backups.ts`, `restore.ts`, `factory-reset.ts`, `books.ts`. `restore.ts` resolves `restoreBackup.js` via `../../../scripts/restoreBackup.js` (one extra `..` because the file moved a directory deeper).
-  - `server/routes/invoices/` (re-exports `registerInvoiceRoutes`) — `list.ts`, `create.ts`, `update.ts`, `scan-key.ts`, `payment.ts`, `cancel-delete.ts`.
-  - `server/routes/goods-receipts/` (re-exports `registerGoodsReceiptRoutes`) — `helpers.ts` (re-exports `NegativeStockEntry`, `GrnCancelNegativeStockError`, `PoReceivedQtyUnderflowError`, `OverReceiveError`, `recalculatePOPaymentStatus`), `stock-counts.ts`, `list.ts`, `scan-key.ts`, `cancel.ts`, `delete.ts`, `mutations.ts`.
-  - `server/routes/delivery-orders/` (re-exports `registerDeliveryOrderRoutes`) — `list.ts`, `create.ts`, `update.ts`, `cancel.ts`, `scan-key.ts`, `delete.ts`.
-  - `server/routes/purchase-orders/` (re-exports `registerPurchaseOrderRoutes`) — `list.ts`, `create-update.ts` (holds the local `stripClientTotals` helper), `delete.ts`, `detail.ts`, `scan-key.ts`, `status.ts`.
-  - `server/businessStorage/` (re-exports the `businessStorage` singleton via `index.ts`) — composes per-domain modules `brands.ts`, `suppliers.ts`, `customers.ts`, `products.ts`, `purchase-orders.ts`, `quotations.ts`, `company-settings.ts`, `dashboard.ts`, `numbering.ts`, `stock-counts.ts`, `invoices.ts`, `delivery-orders.ts`. The `BusinessStorage` type is exported from the composer for type consumers. The original class was converted to a plain singleton and `this.X()` cross-method calls were rewritten as direct named-function imports (e.g. `numbering.ts` and `products.ts` import `getCompanySettings` / `updateCompanySettings`; `dashboard.ts` imports the read-side methods it composes; `quotations.ts::createInvoiceFromQuotation` calls the local `getQuotationWithItems` and `updateQuotation` directly). Adding a new business-storage method: add it to the appropriate per-domain file (or a new file) and append a namespace import to the spread in `server/businessStorage/index.ts`.
-  - **Audit-log durability contract (Task #375) preserved**: every `writeAuditLogSync` call inside a `db.transaction(...)` was moved as a single intact unit — invoice cancel (`server/routes/invoices/cancel-delete.ts`), GRN cancel both itemless and reversal paths (`server/routes/goods-receipts/cancel.ts`), DO cancel (`server/routes/delivery-orders/cancel.ts`), and recycle-bin permanent delete (`server/routes/system/audit-recycle.ts`). Adding a new destructive route MUST keep the audit insert inside the same transaction.
-- **Frontend File Layout (Task #381)**: Three previously-oversized client React components were split into per-concern sibling directories so no client file exceeds 500 lines (hard cap). Public import surface preserved verbatim — no caller imports were touched. Each top-level file remains the single owner of `useState`/`useEffect`/data-loading and delegates rendering to extracted sub-components via explicit props (no state lifted, no fetch URLs / query keys / request bodies changed):
-  - `client/src/components/inventory/StockTab.tsx` (shell, 339 lines, default export `StockTab` preserved) + `client/src/components/inventory/stock/` — `types.ts` (`StockProduct`, `StockMovement`, `StockData`, `CompanySettings`), `filterUtils.ts` (`applyAdvancedStockFilters`, `applyAdvancedMovementFilters`, `paginateData`), `PaginationControls.tsx`, `StockSummaryCards.tsx`, `CurrentStockTab.tsx`, `MovementsTab.tsx` (movement-row helpers co-located here), `LowStockTab.tsx`, `OutOfStockTab.tsx`. The `useEffect` that fires `onStockSubTabChange` stays in the shell with its original dependency array.
-  - `client/src/components/purchase-orders/GoodsReceiptsTab.tsx` (shell, 451 lines, default export `GoodsReceiptsTab` preserved) + `client/src/components/purchase-orders/grn/` — `types.ts` (`POItem`, `PORow`, `POStats`, `GoodsReceiptsTabProps`), `useGrnDocs.ts` (document-attachment hook), `exportColumns.ts`, `filterUtils.ts`, `poActions.ts`, `OpenPOsSection.tsx`, `ClosedPOsSection.tsx`, `ReceiveDialog.tsx`, `CloseConfirmDialog.tsx`, `DeleteConfirmDialog.tsx`. **Critical re-export:** `GoodsReceiptsTab.tsx` keeps `export type { PORow } from "./grn/types";` because `client/src/pages/PurchaseOrders.tsx` imports `PORow` from this path.
-  - `client/src/components/utils/export/` (replaces the deleted `client/src/components/utils/export.tsx`; resolves automatically via `index.ts`) — `shared.ts` (`downloadXLSX`, `fmtShort`), `generic.ts` (`exportToCsv`, `exportToXLSX`, `exportToPDF`), `quotation.ts`, `invoice.ts`, `delivery-order.ts`, `purchase-order-pdf.ts` (`exportPurchaseOrderToPDF`, jsPDF/autoTable usage left untouched per Task #01 ownership), `purchase-order-grn-print.ts` (`printPOGRNSummary`), `purchase-order-xlsx.ts` (`exportPODetailToXLSX`), `statement.ts`, `index.ts` re-exports all 10 public functions. All 14 `import { ... } from "../utils/export"` (or `@/components/utils/export`) call sites continue working without edits.
-
-# Accepted Security Risks
-
-- **`uuid` transitive vulnerability via `exceljs` (GHSA-w5hq-g745-h8pq, moderate, Task #385)** — `npm audit` flags the `uuid` package shipped under `exceljs@4.4.0` (currently `uuid@8.3.2`). The advisory describes a missing buffer-bounds check in `uuid.v3()`, `v5()`, and `v6()` **only when the caller passes a `buf` argument**. Verified that `exceljs` calls `uuid.v4()` exclusively (`node_modules/exceljs/lib/xlsx/xform/sheet/cf-ext/cf-rule-ext-xform.js`) with no `buf` argument, so the vulnerable code path is unreachable from our usage (bulk product import/export and Excel report generation in `client/src/pages/BulkAddProduct.tsx`, `server/routes/products.ts`). The advisory range is `<14.0.0`; `uuid` does not yet ship a v14, so a `package.json` `overrides` entry cannot clear the audit (the same advisory is also surfaced via `@google-cloud/storage` → `gaxios`/`teeny-request`, which already use `uuid@9.0.1`). Revisit when `uuid@14` ships or when `exceljs` cuts a release pinning to a patched `uuid`. Do not downgrade to `exceljs@3.4.0` — `npm audit`'s suggested "fix" is a major-version downgrade with breaking API changes.
-  - **Evidence (recorded 2026-04-29):**
-    - `npm audit --json` advisory source id `1116970`; severity `moderate`; CVSS string `null` (score 0); affected nodes `node_modules/uuid`, `node_modules/gaxios/node_modules/uuid`, `node_modules/teeny-request/node_modules/uuid`; `fixAvailable: false`.
-    - `npm ls uuid`: `exceljs@4.4.0 → uuid@8.3.2`; `@replit/object-storage@1.0.0 → @google-cloud/storage@7.19.0 → uuid@8.3.2 (deduped)` plus inner `gaxios@6.7.1 → uuid@9.0.1` and `teeny-request@9.0.0 → uuid@9.0.1`.
-    - exceljs call-path snippet (only `uuid` import in the package): `const {v4: uuidv4} = require('uuid');` in `node_modules/exceljs/lib/xlsx/xform/sheet/cf-ext/cf-rule-ext-xform.js` (lines 1, 43, 77 — all `${uuidv4()}` with no second argument).
-  - **Re-evaluation triggers:** (a) `uuid@14.x` published, (b) new `exceljs` release pinning a patched uuid, (c) the advisory metadata changes its `range` to exclude our installed version, or (d) any FLOW code path begins calling `uuid.v3/v5/v6` directly with a `buf` argument (none today).
+## Key Technical Implementations
+- **Document Management**: Enhanced delivery reconciliation and `supplier_scan_key` for Purchase Orders. Professional A4-portrait optimized documents with company branding.
+- **Financial Features**: Multi-currency support with `fxRateToAed` and derived PO payment statuses.
+- **API Robustness**: Server-side recycle-bin, robust invoice validation, and strict server-side numeric validation for Purchase Orders.
+- **Data Integrity & Security**: Comprehensive backup/restore and factory reset with multi-layered protection. Audit logging (both synchronous for critical actions and asynchronous with retries for CRUD) is exclusively server-side. CSRF protection is implemented for all state-changing API routes using the double-submit cookie pattern.
+- **Goods Receipt (GRN) Management**: Detailed tracking, payment status, and an audit-preserving cancellation workflow. Supports closing POs without GRN insertion for all-zero item payloads under specific conditions.
+- **Cancellation Workflows**: All-or-nothing cancellation for Invoices and Delivery Orders ensures full stock reversal.
+- **Quotation Status Enforcement**: Strict one-way status machine with transition validation.
+- **Invoice Stock Reconciliation**: Accurate inventory levels are maintained through reconciliation on invoice edits.
+- **Structured Logging**: A server-side logger provides JSON-formatted logs in production and human-readable output in development, mirroring `console.*` methods.
+- **TypeScript Configuration**: `tsconfig.json` supports top-level `await` for synchronous environment variable validation in server entry points.
 
 # External Dependencies
 

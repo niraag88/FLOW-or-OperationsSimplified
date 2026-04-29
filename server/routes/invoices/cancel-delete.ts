@@ -3,6 +3,7 @@ import { invoices, invoiceLineItems, recycleBin } from "@shared/schema";
 import { db } from "../../db";
 import { eq } from "drizzle-orm";
 import { requireAuth, writeAuditLog, writeAuditLogSync, updateProductStock, type AuthenticatedRequest } from "../../middleware";
+import { logger } from "../../logger";
 
 export function registerInvoiceCancelDeleteRoutes(app: Express) {
   // PATCH /api/invoices/:id/cancel
@@ -129,7 +130,7 @@ export function registerInvoiceCancelDeleteRoutes(app: Express) {
       const [updated] = await db.select().from(invoices).where(eq(invoices.id, id));
       res.json(updated);
     } catch (error) {
-      console.error('Error cancelling invoice:', error);
+      logger.error('Error cancelling invoice:', error);
       res.status(500).json({ error: 'Failed to cancel invoice' });
     }
   });
@@ -174,7 +175,7 @@ export function registerInvoiceCancelDeleteRoutes(app: Express) {
       writeAuditLog({ actor: req.user!.id, actorName: req.user?.username || String(req.user!.id), targetId: String(id), targetType: 'invoice', action: 'DELETE', details: `Invoice #${invoiceHeader.invoiceNumber} moved to recycle bin` });
       res.json({ success: true });
     } catch (error) {
-      console.error('Error deleting invoice:', error);
+      logger.error('Error deleting invoice:', error);
       res.status(500).json({ error: 'Failed to delete invoice' });
     }
   });

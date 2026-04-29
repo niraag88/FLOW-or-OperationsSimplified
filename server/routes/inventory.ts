@@ -4,6 +4,7 @@ import { db } from "../db";
 import { eq, desc } from "drizzle-orm";
 import { businessStorage } from "../businessStorage";
 import { requireAuth, type AuthenticatedRequest } from "../middleware";
+import { logger } from "../logger";
 
 export function registerInventoryRoutes(app: Express) {
   app.get('/api/dashboard', requireAuth(), async (req: AuthenticatedRequest, res) => {
@@ -11,7 +12,7 @@ export function registerInventoryRoutes(app: Express) {
       const dashboardData = await businessStorage.getDashboardData();
       res.json(dashboardData);
     } catch (error) {
-      console.error('Error fetching dashboard data:', error);
+      logger.error('Error fetching dashboard data:', error);
       res.status(500).json({ error: 'Failed to fetch dashboard data' });
     }
   });
@@ -21,7 +22,7 @@ export function registerInventoryRoutes(app: Express) {
       const stats = await businessStorage.getDashboardStats();
       res.json(stats);
     } catch (error) {
-      console.error('Error fetching dashboard stats:', error);
+      logger.error('Error fetching dashboard stats:', error);
       res.status(500).json({ error: 'Failed to fetch dashboard stats' });
     }
   });
@@ -36,7 +37,7 @@ export function registerInventoryRoutes(app: Express) {
 
       res.json(movements);
     } catch (error) {
-      console.error('Error fetching stock movements:', error);
+      logger.error('Error fetching stock movements:', error);
       res.status(500).json({ error: 'Failed to fetch stock movements' });
     }
   });
@@ -67,7 +68,7 @@ export function registerInventoryRoutes(app: Express) {
 
       res.json(movements);
     } catch (error) {
-      console.error('Error fetching stock movements:', error);
+      logger.error('Error fetching stock movements:', error);
       res.status(500).json({ error: 'Failed to fetch stock movements' });
     }
   });
@@ -127,7 +128,7 @@ export function registerInventoryRoutes(app: Express) {
         movements: results
       });
     } catch (error) {
-      console.error('Error creating bulk stock movements:', error);
+      logger.error('Error creating bulk stock movements:', error);
       res.status(500).json({ error: 'Failed to create stock movements' });
     }
   });

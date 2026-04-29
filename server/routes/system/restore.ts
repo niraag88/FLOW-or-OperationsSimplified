@@ -17,6 +17,7 @@ import {
   withDestructiveDbLock,
   DestructiveDbOpInProgressError,
 } from "../../destructiveDbLock";
+import { logger } from "../../logger";
 
 export function registerRestoreRoutes(app: Express) {
   // ─── Restore Endpoints ────────────────────────────────────────────────────
@@ -84,7 +85,7 @@ export function registerRestoreRoutes(app: Express) {
       }).returning({ id: restoreRuns.id });
       preCreatedId = inserted?.id ?? null;
     } catch (preErr) {
-      console.error('Could not pre-create ops.restore_runs record:', preErr);
+      logger.error('Could not pre-create ops.restore_runs record:', preErr);
     }
 
     // Step 2: Run the restore.
@@ -94,7 +95,7 @@ export function registerRestoreRoutes(app: Express) {
       const { restoreBackup } = await import('../../../scripts/restoreBackup.js');
       result = await restoreBackup(sqlGzInput);
     } catch (importOrRunError: any) {
-      console.error('Error during restore execution:', importOrRunError);
+      logger.error('Error during restore execution:', importOrRunError);
       result = { success: false, error: importOrRunError.message || 'Restore failed unexpectedly', durationMs: 0 };
     }
 
@@ -113,7 +114,7 @@ export function registerRestoreRoutes(app: Express) {
           })
           .where(eq(restoreRuns.id, preCreatedId));
       } catch (updateErr) {
-        console.error('Could not update ops.restore_runs record after restore:', updateErr);
+        logger.error('Could not update ops.restore_runs record after restore:', updateErr);
       }
     } else {
       // Pre-create failed — insert a new complete record now.
@@ -129,7 +130,7 @@ export function registerRestoreRoutes(app: Express) {
           durationMs: result.durationMs ?? null,
         });
       } catch (retryErr) {
-        console.error('Could not insert ops.restore_runs record after restore:', retryErr);
+        logger.error('Could not insert ops.restore_runs record after restore:', retryErr);
       }
     }
 
@@ -226,7 +227,7 @@ export function registerRestoreRoutes(app: Express) {
         tempPath = null;
         unlink(p, (err) => {
           if (err && (err as NodeJS.ErrnoException).code !== 'ENOENT') {
-            console.error('Failed to delete temp restore file:', err.message);
+            logger.error('Failed to delete temp restore file:', err.message);
           }
         });
       }
@@ -275,7 +276,7 @@ export function registerRestoreRoutes(app: Express) {
       try {
         await writePromise;
       } catch (err: any) {
-        console.error('Error staging upload to temp file:', err.message);
+        logger.error('Error staging upload to temp file:', err.message);
         cleanupTemp();
         if (!res.headersSent) res.status(500).json({ error: 'Failed to buffer uploaded file' });
         return;
@@ -321,7 +322,7 @@ export function registerRestoreRoutes(app: Express) {
     });
 
     bb.on('error', (err: Error) => {
-      console.error('Busboy parse error:', err);
+      logger.error('Busboy parse error:', err);
       cleanupTemp();
       if (!res.headersSent) res.status(400).json({ error: 'Failed to parse multipart upload' });
     });
@@ -360,7 +361,7 @@ export function registerRestoreRoutes(app: Express) {
         .limit(10);
       res.json({ runs: rows });
     } catch (error) {
-      console.error('Error fetching restore runs:', error);
+      logger.error('Error fetching restore runs:', error);
       res.status(500).json({ error: 'Failed to fetch restore history' });
     }
   });

@@ -3,6 +3,7 @@ import { purchaseOrders, purchaseOrderItems, goodsReceipts, recycleBin } from "@
 import { db } from "../../db";
 import { eq, sql } from "drizzle-orm";
 import { requireAuth, writeAuditLog, type AuthenticatedRequest } from "../../middleware";
+import { logger } from "../../logger";
 
 export function registerPurchaseOrderDeleteRoutes(app: Express) {
   app.delete('/api/purchase-orders/:id', requireAuth(['Admin', 'Manager']), async (req: AuthenticatedRequest, res) => {
@@ -43,7 +44,7 @@ export function registerPurchaseOrderDeleteRoutes(app: Express) {
       writeAuditLog({ actor: req.user!.id, actorName: req.user?.username || String(req.user!.id), targetId: String(poId), targetType: 'purchase_order', action: 'DELETE', details: `PO #${po.poNumber} deleted` });
       res.json({ success: true });
     } catch (error) {
-      console.error('Error deleting purchase order:', error);
+      logger.error('Error deleting purchase order:', error);
       res.status(500).json({ error: 'Failed to delete purchase order' });
     }
   });

@@ -10,6 +10,7 @@ import {
 } from "../../middleware";
 import { sendIfMissingConfirmation } from "../../typedConfirmation";
 import { RECYCLE_BIN_PERMANENT_DELETE_PHRASE } from "../../../shared/destructiveActionPhrases";
+import { logger } from "../../logger";
 
 export function registerAuditRecycleRoutes(app: Express) {
   app.get('/api/audit-logs', requireAuth(['Admin', 'Manager']), async (req: AuthenticatedRequest, res) => {
@@ -17,7 +18,7 @@ export function registerAuditRecycleRoutes(app: Express) {
       const logs = await db.select().from(auditLog).orderBy(desc(auditLog.timestamp)).limit(500);
       res.json(logs);
     } catch (error) {
-      console.error('Error fetching audit logs:', error);
+      logger.error('Error fetching audit logs:', error);
       res.status(500).json({ error: 'Failed to fetch audit logs' });
     }
   });
@@ -43,7 +44,7 @@ export function registerAuditRecycleRoutes(app: Express) {
       }));
       res.json(mapped);
     } catch (error) {
-      console.error('Error fetching recycle bin:', error);
+      logger.error('Error fetching recycle bin:', error);
       res.status(500).json({ error: 'Failed to fetch recycle bin' });
     }
   });
@@ -79,7 +80,7 @@ export function registerAuditRecycleRoutes(app: Express) {
       });
       res.json({ success: true, message: 'Permanently deleted from recycle bin' });
     } catch (error) {
-      console.error('Error permanently deleting from recycle bin:', error);
+      logger.error('Error permanently deleting from recycle bin:', error);
       res.status(500).json({ error: 'Failed to permanently delete' });
     }
   });
@@ -164,7 +165,7 @@ export function registerAuditRecycleRoutes(app: Express) {
       writeAuditLog({ actor: req.user!.id, actorName: req.user?.username || String(req.user!.id), targetId: String(id), targetType: 'recycle_bin', action: 'UPDATE', details: `Restored ${item.documentType} #${item.documentNumber} from recycle bin` });
       res.json({ success: true, message: `${item.documentNumber} has been restored successfully` });
     } catch (error: any) {
-      console.error('Error restoring document:', error);
+      logger.error('Error restoring document:', error);
       if (error?.code === 'SKU_CONFLICT') {
         return res.status(409).json({ error: error.message });
       }

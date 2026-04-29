@@ -8,6 +8,7 @@ import {
   writeAuditLog,
   type AuthenticatedRequest,
 } from "../../middleware";
+import { logger } from "../../logger";
 
 export function registerBooksRoutes(app: Express) {
   app.get('/api/books', requireAuth(), async (req, res) => {
@@ -15,7 +16,7 @@ export function registerBooksRoutes(app: Express) {
       const years = await db.select().from(financialYears).orderBy(desc(financialYears.year));
       res.json(years);
     } catch (error) {
-      console.error('Error fetching financial years:', error);
+      logger.error('Error fetching financial years:', error);
       res.status(500).json({ error: 'Failed to fetch financial years' });
     }
   });
@@ -40,7 +41,7 @@ export function registerBooksRoutes(app: Express) {
       writeAuditLog({ actor: req.user!.id, actorName: req.user!.username, targetId: String(created.id), targetType: 'financial_year', action: 'CREATE', details: `Financial year ${year} created` });
       res.status(201).json(created);
     } catch (error) {
-      console.error('Error creating financial year:', error);
+      logger.error('Error creating financial year:', error);
       res.status(500).json({ error: 'Failed to create financial year' });
     }
   });
@@ -61,7 +62,7 @@ export function registerBooksRoutes(app: Express) {
       writeAuditLog({ actor: req.user!.id, actorName: req.user!.username, targetId: String(id), targetType: 'financial_year', action: 'UPDATE', details: `Financial year ${updated.year} set to ${status}` });
       res.json(updated);
     } catch (error) {
-      console.error('Error updating financial year:', error);
+      logger.error('Error updating financial year:', error);
       res.status(500).json({ error: 'Failed to update financial year' });
     }
   });
@@ -177,7 +178,7 @@ export function registerBooksRoutes(app: Express) {
       res.setHeader('Content-Disposition', `attachment; filename="${filename}"`);
       res.send(Buffer.from(xlsxBuffer));
     } catch (error) {
-      console.error('Error exporting financial year:', error);
+      logger.error('Error exporting financial year:', error);
       res.status(500).json({ error: 'Failed to export financial year' });
     }
   });
