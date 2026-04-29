@@ -19,6 +19,7 @@ import { tmpdir } from 'os';
 import ExcelJS from 'exceljs';
 import { requireAuth, requireRole, writeAuditLog, objectStorageClient, validateUploadInput, validatePdfMagicBytes, validateImageMagicBytes, upload, setForceStorageDeleteFail, isForceStorageDeleteFailEnabled, MAX_UPLOAD_BYTES, MAX_UPLOAD_ERROR_MESSAGE, type AuthenticatedRequest } from "../middleware";
 import { runBackup } from "../runBackup";
+import { withBackupLock } from "../backupLock";
 import { getBackupSchedule, updateBackupSchedule, BackupScheduleInputSchema } from "../backupSchedule";
 import crypto from 'crypto';
 
@@ -628,10 +629,23 @@ export function registerSystemRoutes(app: Express) {
 
   app.post('/api/ops/run-backups', requireAuth(['Admin']), async (req: AuthenticatedRequest, res) => {
     try {
-      const result = await runBackup({
+      // Share the same advisory lock as the scheduled-backup tick so a
+      // manual backup and a scheduled backup can never overlap, and two
+      // simultaneous manual POSTs cannot collide on filenames or pruning.
+      // Try-lock semantics: never wait — return 409 immediately if the
+      // lock is held. (Task #345.)
+      const outcome = await withBackupLock(async () => runBackup({
         id: req.user!.id,
         username: req.user?.username || String(req.user!.id),
-      });
+      }));
+      if (!outcome.acquired) {
+        res.status(409).json({
+          error: 'backup_already_running',
+          message: 'Another backup is already in progress. Please wait for it to finish before starting a new one.',
+        });
+        return;
+      }
+      const result = outcome.result;
       if (result.success) {
         res.status(200).json(result);
       } else {

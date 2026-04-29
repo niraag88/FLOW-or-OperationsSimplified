@@ -1,5 +1,5 @@
 /**
- * In-app scheduled-backup runner (Task #325).
+ * In-app scheduled-backup runner (Task #325, Task #345).
  *
  * ACCEPTED DESIGN DEVIATION: the original task wording suggested a
  * `SELECT ... FOR UPDATE NOWAIT` row lock on company_settings. We
@@ -12,11 +12,17 @@
  * worker cannot leave the schedule wedged. This decision is also
  * recorded in replit.md.
  *
+ * As of Task #345 the lock is shared with the manual route
+ * (POST /api/ops/run-backups) via withBackupLock() in
+ * server/backupLock.ts, so a manual backup and a scheduled tick can
+ * never overlap.
+ *
  * Ticks once per minute. On each tick:
- *   1. Tries to acquire a Postgres session-level advisory lock that
- *      will be held for the entire duration of the backup. This is the
- *      only mechanism preventing two concurrent runs (covers a backup
- *      that takes longer than the tick interval).
+ *   1. Tries to acquire the shared backup advisory lock that will be
+ *      held for the entire duration of the backup. This is the only
+ *      mechanism preventing two concurrent runs (covers a backup that
+ *      takes longer than the tick interval, OR a manual backup that
+ *      lands while a scheduled tick is in flight).
  *   2. Reads companySettings.
  *   3. If enabled === false or nextDueAt > NOW(): releases the lock and
  *      no-ops.
@@ -39,33 +45,15 @@
 import { pool } from "./db";
 import { runBackup } from "./runBackup";
 import { recordScheduledRunAttempt, recordScheduledRunSuccess } from "./backupSchedule";
+import { withBackupLock } from "./backupLock";
 
 const TICK_INTERVAL_MS = 60_000;
-// Arbitrary 64-bit key chosen for this lock. Picked to avoid colliding
-// with any other advisory locks the app might use later. Stored as a
-// string so pg can pass it through as bigint without ES2020 BigInt
-// literal support.
-const SCHEDULER_ADVISORY_LOCK_KEY = "7325142586001";
 
 let intervalHandle: NodeJS.Timeout | null = null;
 
 export async function backupSchedulerTick(now: Date = new Date()): Promise<"ran" | "skipped" | "locked"> {
-  // Hold a single dedicated client for the lock + the run.
-  // pg_try_advisory_lock is a *session* lock — releasing requires the
-  // same connection, and connection death auto-releases.
-  const client = await pool.connect();
-  let lockAcquired = false;
-  try {
-    const lockRes = await client.query<{ locked: boolean }>(
-      "SELECT pg_try_advisory_lock($1) AS locked",
-      [SCHEDULER_ADVISORY_LOCK_KEY]
-    );
-    lockAcquired = lockRes.rows[0]?.locked === true;
-    if (!lockAcquired) {
-      return "locked";
-    }
-
-    const res = await client.query(
+  const outcome = await withBackupLock<"ran" | "skipped">(async () => {
+    const res = await pool.query(
       `SELECT id, backup_schedule_enabled, backup_schedule_next_due_at
          FROM company_settings
          ORDER BY id ASC
@@ -123,17 +111,12 @@ export async function backupSchedulerTick(now: Date = new Date()): Promise<"ran"
       }
     }
     return "ran";
-  } finally {
-    if (lockAcquired) {
-      try {
-        await client.query("SELECT pg_advisory_unlock($1)", [SCHEDULER_ADVISORY_LOCK_KEY]);
-      } catch (err) {
-        // Connection-level release happens automatically anyway.
-        console.error("pg_advisory_unlock failed:", err);
-      }
-    }
-    client.release();
+  });
+
+  if (!outcome.acquired) {
+    return "locked";
   }
+  return outcome.result;
 }
 
 export function startBackupScheduler() {
