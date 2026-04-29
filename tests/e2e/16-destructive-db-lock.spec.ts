@@ -129,7 +129,13 @@ test.describe('Destructive-DB-op shared advisory lock (Task #368, RF-5)', () => 
       // error code so existing scripts/clients that already check for it
       // keep working. The shared lock is an implementation detail.
       expect(body.error).toBe('factory_reset_in_progress');
-      expect(body.message ?? '').not.toBe('');
+      // Lock the EXACT user-facing message text so a future refactor
+      // can't silently regress the contract callers (and any
+      // operator-facing error UI) read.
+      expect(body.message).toBe(
+        'Another destructive database operation (factory reset or restore) ' +
+          'is already running. Wait for it to finish, then try again.',
+      );
     } finally {
       // Release for the next test.
       try {
@@ -189,7 +195,13 @@ test.describe('Destructive-DB-op shared advisory lock (Task #368, RF-5)', () => 
       const respBody = (await resp.json()) as { error?: string; message?: string };
       // Restore endpoints surface the helper's generic error code.
       expect(respBody.error).toBe('destructive_db_op_in_progress');
-      expect(respBody.message ?? '').not.toBe('');
+      // Lock the EXACT message text emitted by
+      // `DestructiveDbOpInProgressError` so a future refactor can't
+      // silently regress the contract.
+      expect(respBody.message).toBe(
+        'Another destructive database operation (factory reset or restore) ' +
+          'is already running. Try again in a moment.',
+      );
     } finally {
       try {
         await lockClient.query('SELECT pg_advisory_unlock($1)', [DESTRUCTIVE_DB_OP_LOCK_KEY]);
