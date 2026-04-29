@@ -42,39 +42,11 @@ import { pipeline } from 'node:stream/promises';
 
 import { apiLogin, apiPost, BASE_URL } from './helpers';
 import { gateFactoryResetTests, FACTORY_RESET_CONFIRMATION_PHRASE } from './factory-reset-gate';
-
-/**
- * Mirror of FACTORY_RESET_TABLES in server/factoryReset.ts. Kept as a
- * literal copy here so the test does not import from /server (which
- * would drag the express app into the test process).
- */
-const FACTORY_RESET_TABLES = [
-  'stock_movements',
-  'stock_count_items',
-  'stock_counts',
-  'goods_receipt_items',
-  'goods_receipts',
-  'purchase_order_items',
-  'purchase_orders',
-  'invoice_line_items',
-  'invoices',
-  'delivery_order_items',
-  'delivery_orders',
-  'quotation_items',
-  'quotations',
-  'products',
-  'customers',
-  'suppliers',
-  'brands',
-  'recycle_bin',
-  'storage_objects',
-  'audit_log',
-  'vat_returns',
-  'financial_years',
-  'backup_runs',
-  'signed_tokens',
-  'storage_monitoring',
-] as const;
+// Single source of truth for the wipe list. Importing from server/factoryReset
+// is safe because that file only re-exports the phrase from shared/ and a few
+// types from `pg` — no DB connections, no env reads, no Express side effects.
+// If the server's list ever changes, this test picks it up automatically.
+import { FACTORY_RESET_TABLES } from '../../server/factoryReset';
 
 /**
  * Tables where the post-restore count is allowed to be GREATER than the
@@ -203,15 +175,164 @@ test.describe('Restore round-trip (seed → backup → reset → restore)', () =
     fixtures = { brandId, supplierId, customerId, productId, productSku, invoiceId };
   });
 
+  test('seeds at least one row into every remaining factory-reset table', async () => {
+    // Many tables in FACTORY_RESET_TABLES (purchase orders, GRNs, delivery
+    // orders, quotations, stock counts, vat_returns, financial_years, etc.)
+    // are NOT touched by the API-driven seed above. Without rows in them the
+    // restore round-trip degenerates to "0 == 0" for those tables — which
+    // would silently miss a future restore regression that drops their data.
+    // We use raw SQL here (rather than chasing every public API contract) so
+    // the test stays robust to API changes and easy to maintain. The minimal
+    // required columns for each table are derived from shared/schema.ts.
+    const tag = `roundtrip-${Date.now()}`;
+
+    // createdBy on several tables references users.id (varchar). Pick any
+    // existing Admin (the gate ensures we are on a disposable DB so the
+    // admin user always exists from the standard seed).
+    const adminRows = await pool!.query<{ id: string }>(
+      `SELECT id FROM users WHERE role = 'Admin' LIMIT 1`,
+    );
+    const adminUserId = adminRows.rows[0]?.id;
+    expect(adminUserId, 'expected at least one Admin user to exist on the disposable DB').toBeTruthy();
+
+    // Purchase order + line item.
+    const po = await pool!.query<{ id: number }>(
+      `INSERT INTO purchase_orders (po_number, supplier_id, brand_id, status, created_by)
+       VALUES ($1, $2, $3, 'draft', $4) RETURNING id`,
+      [`PO-${tag}`, fixtures.supplierId, fixtures.brandId, adminUserId],
+    );
+    const poId = po.rows[0].id;
+    const poItem = await pool!.query<{ id: number }>(
+      `INSERT INTO purchase_order_items (po_id, product_id, quantity, unit_price, line_total)
+       VALUES ($1, $2, 5, '50.00', '250.00') RETURNING id`,
+      [poId, fixtures.productId],
+    );
+    const poItemId = poItem.rows[0].id;
+
+    // Goods receipt + line item against that PO.
+    const grn = await pool!.query<{ id: number }>(
+      `INSERT INTO goods_receipts (receipt_number, po_id, supplier_id, status, created_by)
+       VALUES ($1, $2, $3, 'confirmed', $4) RETURNING id`,
+      [`GRN-${tag}`, poId, fixtures.supplierId, adminUserId],
+    );
+    await pool!.query(
+      `INSERT INTO goods_receipt_items
+         (receipt_id, po_item_id, product_id, ordered_quantity, received_quantity, unit_price)
+       VALUES ($1, $2, $3, 5, 5, '50.00')`,
+      [grn.rows[0].id, poItemId, fixtures.productId],
+    );
+
+    // Delivery order + line item.
+    const doRow = await pool!.query<{ id: number }>(
+      `INSERT INTO delivery_orders
+         (order_number, customer_name, customer_id, delivery_address, status, total_amount, tax_amount)
+       VALUES ($1, $2, $3, '123 Test St, Dubai', 'draft', '300.00', '15.00') RETURNING id`,
+      [`DO-${tag}`, `Customer-${tag}`, fixtures.customerId],
+    );
+    await pool!.query(
+      `INSERT INTO delivery_order_items
+         (do_id, product_id, description, quantity, unit_price, line_total)
+       VALUES ($1, $2, $3, 3, '100.00', '300.00')`,
+      [doRow.rows[0].id, fixtures.productId, `Delivery line ${tag}`],
+    );
+
+    // Quotation + line item.
+    const quote = await pool!.query<{ id: number }>(
+      `INSERT INTO quotations
+         (quote_number, customer_id, status, valid_until, total_amount, vat_amount, grand_total, created_by)
+       VALUES ($1, $2, 'draft', NOW() + INTERVAL '30 days', '200.00', '10.00', '210.00', $3) RETURNING id`,
+      [`QT-${tag}`, fixtures.customerId, adminUserId],
+    );
+    await pool!.query(
+      `INSERT INTO quotation_items (quote_id, product_id, quantity, unit_price, line_total)
+       VALUES ($1, $2, 2, '100.00', '200.00')`,
+      [quote.rows[0].id, fixtures.productId],
+    );
+
+    // Stock count + item.
+    const stockCount = await pool!.query<{ id: number }>(
+      `INSERT INTO stock_counts (total_products, total_quantity, created_by)
+       VALUES (1, 50, $1) RETURNING id`,
+      [adminUserId],
+    );
+    await pool!.query(
+      `INSERT INTO stock_count_items
+         (stock_count_id, product_id, product_code, product_name, quantity)
+       VALUES ($1, $2, $3, $4, 50)`,
+      [stockCount.rows[0].id, fixtures.productId, fixtures.productSku, `Product ${tag}`],
+    );
+
+    // Stock movement (initial adjustment for the seed product).
+    await pool!.query(
+      `INSERT INTO stock_movements
+         (product_id, movement_type, reference_id, reference_type, quantity, previous_stock, new_stock, created_by)
+       VALUES ($1, 'initial', NULL, 'manual', 50, 0, 50, $2)`,
+      [fixtures.productId, adminUserId],
+    );
+
+    // Recycle bin entry.
+    await pool!.query(
+      `INSERT INTO recycle_bin
+         (document_type, document_id, document_number, document_data, deleted_by, original_status)
+       VALUES ('Invoice', '999999', $1, '{"placeholder":true}', 'roundtrip@test.local', 'draft')`,
+      [`INV-recycle-${tag}`],
+    );
+
+    // Storage object record.
+    await pool!.query(
+      `INSERT INTO storage_objects (key, size_bytes) VALUES ($1, 1024)`,
+      [`roundtrip/${tag}/placeholder.bin`],
+    );
+
+    // VAT return. created_by is NOT NULL on the live schema even though the
+    // Drizzle model file does not show it explicitly — verified directly
+    // against information_schema.columns when this spec was written.
+    await pool!.query(
+      `INSERT INTO vat_returns
+         (period_start, period_end, status, total_sales, total_purchases, vat_collected, vat_paid, net_vat, created_by)
+       VALUES (NOW() - INTERVAL '30 days', NOW(), 'draft', '500.00', '300.00', '25.00', '15.00', '10.00', $1)`,
+      [adminUserId],
+    );
+
+    // Financial year (year column is unique). Use a far-future year to avoid
+    // colliding with anything the standard seed might create.
+    await pool!.query(
+      `INSERT INTO financial_years (year, start_date, end_date, status)
+       VALUES (2099, '2099-01-01', '2099-12-31', 'Open')`,
+    );
+
+    // Signed token (filtered separately by the upload flow; insert one
+    // directly so the snapshot has a row to count).
+    await pool!.query(
+      `INSERT INTO signed_tokens (token, key, expires, type)
+       VALUES ($1, $2, $3, 'upload')`,
+      [`roundtrip-token-${tag}`, `roundtrip/${tag}/placeholder.bin`, Date.now() + 60_000],
+    );
+
+    // Storage monitoring entry.
+    await pool!.query(
+      `INSERT INTO storage_monitoring
+         (database_size, object_storage_size, total_documents, backup_status)
+       VALUES (1048576, 4096, 1, 'completed')`,
+    );
+  });
+
   test('snapshots row counts across the factory-reset table list', async () => {
     snapshotCounts = await countAllTables(pool!);
-    expect(snapshotCounts.brands).toBeGreaterThan(0);
-    expect(snapshotCounts.customers).toBeGreaterThan(0);
-    expect(snapshotCounts.suppliers).toBeGreaterThan(0);
-    expect(snapshotCounts.products).toBeGreaterThan(0);
-    expect(snapshotCounts.invoices).toBeGreaterThan(0);
-    expect(snapshotCounts.invoice_line_items).toBeGreaterThan(0);
-    expect(snapshotCounts.audit_log).toBeGreaterThan(0);
+    // Every table in the canonical wipe list must have at least one row by
+    // now — otherwise the restore round-trip cannot prove that table's
+    // payload survives. Enumerate explicitly so a future addition to
+    // FACTORY_RESET_TABLES surfaces here loudly. backup_runs is the only
+    // exception: it gets seeded by the run-backups call in the next test
+    // (the route inserts the run row itself).
+    const skipPreSeedAssertion = new Set<string>(['backup_runs']);
+    for (const table of FACTORY_RESET_TABLES) {
+      if (skipPreSeedAssertion.has(table)) continue;
+      expect(
+        snapshotCounts[table] ?? 0,
+        `seed gap: ${table} has no rows before backup. Add a fixture for it in the "seeds at least one row" test.`,
+      ).toBeGreaterThan(0);
+    }
 
     invoiceSnapshot = await fetchInvoiceSnapshot(cookie, fixtures.invoiceId);
     expect(invoiceSnapshot.itemCount).toBe(2);
