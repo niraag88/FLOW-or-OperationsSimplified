@@ -63,6 +63,7 @@ export function registerPurchaseOrderDetailRoutes(app: Express) {
       if (grnIds.length > 0) {
         grnItems = await db.select({
           receiptId: grnItemsTable.receiptId,
+          poItemId: grnItemsTable.poItemId,
           productId: grnItemsTable.productId,
           productName: products.name,
           productSku: products.sku,

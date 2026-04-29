@@ -157,6 +157,18 @@ export default function POQuickViewModal({ poId, open, onClose }: POQuickViewMod
   const currency = detail?.currency || "GBP";
   const recon = detail?.reconciliation;
 
+  const receivedQtyByPoItemId: Record<string, number> = {};
+  if (detail?.grns) {
+    for (const grn of detail.grns) {
+      if (!grn.items) continue;
+      for (const gi of grn.items) {
+        const key = String(gi.poItemId ?? "");
+        if (!key) continue;
+        receivedQtyByPoItemId[key] = (receivedQtyByPoItemId[key] || 0) + (parseFloat(gi.receivedQuantity) || 0);
+      }
+    }
+  }
+
   // Collect all documents in one list
   const allDocs: any[] = [];
   if (detail?.supplierScanKey) {
@@ -308,7 +320,7 @@ export default function POQuickViewModal({ poId, open, onClose }: POQuickViewMod
                       </TableHeader>
                       <TableBody>
                         {detail.items.map((item: any) => {
-                          const receivedQty = parseFloat(item.receivedQuantity) || 0;
+                          const receivedQty = receivedQtyByPoItemId[String(item.id ?? "")] || 0;
                           const orderedQty = parseFloat(item.quantity) || 0;
                           const isShort = orderedQty > 0 && receivedQty < orderedQty;
                           const unitPrice = parseFloat(item.unitPrice) || 0;
@@ -339,7 +351,14 @@ export default function POQuickViewModal({ poId, open, onClose }: POQuickViewMod
                     <div className="flex justify-end px-4 py-2.5 bg-gray-50 border-t">
                       <span className="text-sm font-semibold text-gray-700 mr-4">Received Total</span>
                       <span className="text-sm font-bold">
-                        {formatCurrency(recon.receivedTotal, currency)}
+                        {formatCurrency(
+                          (detail.items || []).reduce((s: number, it: any) => {
+                            const q = receivedQtyByPoItemId[String(it.id ?? "")] || 0;
+                            const p = parseFloat(it.unitPrice) || 0;
+                            return s + q * p;
+                          }, 0),
+                          currency
+                        )}
                       </span>
                     </div>
                   </div>

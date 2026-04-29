@@ -26,11 +26,23 @@ export const printPOGRNSummary = async (poId: any) => {
 
   const hasGrns = d.grns && d.grns.length > 0 && d.reconciliation?.hasGrns;
 
+  const receivedQtyByPoItemId: Record<string, number> = {};
+  if (hasGrns) {
+    for (const grn of d.grns) {
+      if (!grn.items) continue;
+      for (const gi of grn.items) {
+        const key = String(gi.poItemId ?? '');
+        if (!key) continue;
+        receivedQtyByPoItemId[key] = (receivedQtyByPoItemId[key] || 0) + (parseFloat(gi.receivedQuantity) || 0);
+      }
+    }
+  }
+
   const receivedRows = hasGrns ? (d.items || []).map((item: any) => {
-    const recQty = parseFloat(item.receivedQuantity) || 0;
+    const recQty = receivedQtyByPoItemId[String(item.id ?? '')] || 0;
     const ordQty = parseFloat(item.quantity) || 0;
     const unitPrice = parseFloat(item.unitPrice) || 0;
-    const short = recQty < ordQty;
+    const short = ordQty > 0 && recQty < ordQty;
     return `<tr${short ? ' class="short-row"' : ''}>
       <td>${productCell(item.productName, item.size, item.productSku)}</td>
       <td class="num">${recQty}${short ? ' ⚠' : ''}</td>
@@ -38,7 +50,11 @@ export const printPOGRNSummary = async (poId: any) => {
       <td class="num">${fmt(recQty * unitPrice)}</td>
     </tr>`;
   }).join('') : '';
-  const receivedTotal = hasGrns ? (d.items || []).reduce((s: any, i: any) => s + (parseFloat(i.receivedQuantity) || 0) * (parseFloat(i.unitPrice) || 0), 0) : 0;
+  const receivedTotal = hasGrns ? (d.items || []).reduce((s: any, i: any) => {
+    const q = receivedQtyByPoItemId[String(i.id ?? '')] || 0;
+    const p = parseFloat(i.unitPrice) || 0;
+    return s + q * p;
+  }, 0) : 0;
   const receivedFooter = `<tr class="footer-row"><td colspan="3" class="num-label">Received Total</td><td class="num"><strong>${fmt(receivedTotal)}</strong></td></tr>`;
 
   const grnSections = hasGrns ? d.grns.filter((g: any) => g.items && g.items.length > 0).map((grn: any) => {
