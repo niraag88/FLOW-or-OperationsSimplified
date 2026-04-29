@@ -1,5 +1,5 @@
 import type { Express } from "express";
-import { auditLog, recycleBin, storageObjects, invoices, deliveryOrders, quotations, purchaseOrders, invoiceLineItems, deliveryOrderItems, quotationItems, purchaseOrderItems, products, brands, suppliers, customers, financialYears, backupRuns, restoreRuns, users } from "@shared/schema";
+import { auditLog, recycleBin, storageObjects, invoices, deliveryOrders, quotations, purchaseOrders, invoiceLineItems, deliveryOrderItems, quotationItems, purchaseOrderItems, products, brands, suppliers, customers, financialYears, backupRuns, restoreRuns, users, goodsReceipts } from "@shared/schema";
 import { db, pool } from "../db";
 import {
   executeFactoryReset,
@@ -198,7 +198,7 @@ export function registerSystemRoutes(app: Express) {
     }
   });
 
-  app.post('/api/storage/upload-scan', requireAuth(), upload.single('file'), async (req, res) => {
+  app.post('/api/storage/upload-scan', requireAuth(['Admin', 'Manager', 'Staff']), upload.single('file'), async (req, res) => {
     try {
       if (!req.file) return res.status(400).json({ error: 'No file provided' });
 
@@ -221,6 +221,60 @@ export function registerSystemRoutes(app: Express) {
 
       if (!storageKey.match(/^(invoices|delivery|purchase-orders|goods-receipts)\/\d{4}\/([^\/]+\.(pdf|jpg|jpeg|png)|[^\/]+\/\d{10,}-[^\/]+\.(pdf|jpg|jpeg|png))$/)) {
         return res.status(400).json({ error: 'Invalid storage key format' });
+      }
+
+      // Verify the key references a real document of the matching type so a
+      // crafted key like `invoices/2026/INV-12345.pdf` cannot overwrite an
+      // unrelated document's scan. The role gate above already mirrors the
+      // four PATCH /<doc>/:id/scan-key routes (Admin/Manager/Staff). For
+      // anonymous-staging GRN keys (no embedded document identifier) we
+      // require the key to be unused so a guessed timestamp can't overwrite
+      // an existing scan.
+      const segments = storageKey.split('/');
+      const prefix = segments[0];
+      const rest = segments.slice(2);
+      const stripExt = (s: string) => s.replace(/\.(pdf|jpg|jpeg|png)$/i, '');
+
+      let docIdentifier: string | null = null;
+      if (rest.length === 1) {
+        // Flat: `<prefix>/<year>/<file>.<ext>` — identifier = filename without
+        // extension. For GRNs this format has no embedded identifier (the
+        // filename is `<timestamp>-<safeName>`), so leave it null.
+        if (prefix !== 'goods-receipts') docIdentifier = stripExt(rest[0]);
+      } else {
+        // Folder: `<prefix>/<year>/<folder>/<ts>-<file>.<ext>` — identifier =
+        // folder name. GRN folders are `<receiptNumber>-doc<slot>`.
+        docIdentifier = prefix === 'goods-receipts'
+          ? rest[0].replace(/-doc\d+$/, '')
+          : rest[0];
+      }
+
+      if (docIdentifier) {
+        let exists = false;
+        if (prefix === 'invoices') {
+          const row = await db.select({ id: invoices.id }).from(invoices).where(eq(invoices.invoiceNumber, docIdentifier)).limit(1);
+          exists = row.length > 0;
+        } else if (prefix === 'purchase-orders') {
+          const row = await db.select({ id: purchaseOrders.id }).from(purchaseOrders).where(eq(purchaseOrders.poNumber, docIdentifier)).limit(1);
+          exists = row.length > 0;
+        } else if (prefix === 'delivery') {
+          const row = await db.select({ id: deliveryOrders.id }).from(deliveryOrders).where(eq(deliveryOrders.orderNumber, docIdentifier)).limit(1);
+          exists = row.length > 0;
+        } else if (prefix === 'goods-receipts') {
+          const row = await db.select({ id: goodsReceipts.id }).from(goodsReceipts).where(eq(goodsReceipts.receiptNumber, docIdentifier)).limit(1);
+          exists = row.length > 0;
+        }
+        if (!exists) {
+          return res.status(404).json({ error: 'Referenced document not found' });
+        }
+      } else {
+        // Anonymous staging upload (GRN flat format only). Require the key
+        // is fresh — refuse if storage_objects already tracks it so a
+        // guessed timestamp cannot overwrite an existing scan.
+        const existing = await db.select({ key: storageObjects.key }).from(storageObjects).where(eq(storageObjects.key, storageKey)).limit(1);
+        if (existing.length > 0) {
+          return res.status(409).json({ error: 'Storage key already in use' });
+        }
       }
 
       if (req.file.size !== fileSize) {
