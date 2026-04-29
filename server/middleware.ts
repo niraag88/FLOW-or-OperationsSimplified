@@ -166,7 +166,11 @@ export const requireAuth = (allowedRoles: Array<"Admin" | "Manager" | "Staff"> =
       req.user = user;
       next();
     } catch (error) {
-      logger.error('Auth middleware error:', error);
+      logger.error('Auth middleware error:', error, {
+        operation: 'requireAuth',
+        userId: req.session?.userId,
+        path: req.path,
+      });
       return res.status(500).json({ error: 'Authentication error' });
     }
   };
@@ -196,7 +200,12 @@ export const requireRole = (role: "Admin" | "Manager" | "Staff") => {
       req.user = user;
       next();
     } catch (error) {
-      logger.error('Role auth middleware error:', error);
+      logger.error('Role auth middleware error:', error, {
+        operation: 'requireRole',
+        requiredRole: role,
+        userId: req.session?.userId,
+        path: req.path,
+      });
       return res.status(500).json({ error: 'Authentication error' });
     }
   };

@@ -90,7 +90,11 @@ export function registerFactoryResetRoutes(app: Express) {
           message: error.message,
         });
       }
-      logger.error('Factory reset failed:', error);
+      logger.error('Factory reset failed:', error, {
+        operation: 'factory_reset',
+        userId: req.user?.id,
+        actorName: req.user?.username,
+      });
       res.status(500).json({ error: 'Factory reset failed', details: error.message });
     }
   });

@@ -35,21 +35,32 @@ export function registerAuthRoutes(app: Express, loginLimiter: RateLimitRequestH
 
       req.session.save((saveErr) => {
         if (saveErr) {
-          logger.error('Session save error during login:', saveErr);
+          logger.error('Session save error during login:', saveErr, {
+            operation: 'login',
+            userId: user.id,
+            username: user.username,
+          });
           return res.status(500).json({ error: 'Login failed' });
         }
         res.json({ user: userInfo });
       });
     } catch (error) {
-      logger.error('Login error:', error);
+      logger.error('Login error:', error, {
+        operation: 'login',
+        username: typeof req.body?.username === 'string' ? req.body.username : undefined,
+      });
       res.status(500).json({ error: 'Login failed' });
     }
   });
 
   app.post('/api/auth/logout', (req: AuthenticatedRequest, res) => {
+    const sessionUserId = req.session?.userId;
     req.session.destroy((err) => {
       if (err) {
-        logger.error('Session destroy error during logout:', err);
+        logger.error('Session destroy error during logout:', err, {
+          operation: 'logout',
+          userId: sessionUserId,
+        });
         return res.status(500).json({ error: 'Logout failed' });
       }
       res.json({ success: true });
