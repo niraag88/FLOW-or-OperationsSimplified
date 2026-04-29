@@ -50,7 +50,7 @@ export function registerCustomerRoutes(app: Express) {
     }
   });
 
-  app.post('/api/customers', requireAuth(), async (req: AuthenticatedRequest, res) => {
+  app.post('/api/customers', requireAuth(['Admin', 'Manager', 'Staff']), async (req: AuthenticatedRequest, res) => {
     try {
       const validatedData = customerWriteSchema.parse(req.body);
       const customer = await businessStorage.createCustomer(validatedData);
@@ -65,7 +65,7 @@ export function registerCustomerRoutes(app: Express) {
     }
   });
 
-  app.put('/api/customers/:id', requireAuth(), async (req: AuthenticatedRequest, res) => {
+  app.put('/api/customers/:id', requireAuth(['Admin', 'Manager', 'Staff']), async (req: AuthenticatedRequest, res) => {
     try {
       // Strict digits-only check rejects "abc", "1abc", and negative IDs
       // before any DB work (Task #320).
@@ -89,7 +89,7 @@ export function registerCustomerRoutes(app: Express) {
     }
   });
 
-  app.delete('/api/customers/:id', requireAuth(), async (req: AuthenticatedRequest, res) => {
+  app.delete('/api/customers/:id', requireAuth(['Admin', 'Manager']), async (req: AuthenticatedRequest, res) => {
     try {
       const customerId = parseInt(req.params.id);
       if (isNaN(customerId)) return res.status(400).json({ error: 'Invalid ID' });

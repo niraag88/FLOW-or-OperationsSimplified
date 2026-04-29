@@ -72,7 +72,7 @@ export function registerInventoryRoutes(app: Express) {
     }
   });
 
-  app.post('/api/stock-movements/bulk', requireAuth(), async (req: AuthenticatedRequest, res) => {
+  app.post('/api/stock-movements/bulk', requireAuth(['Admin', 'Manager']), async (req: AuthenticatedRequest, res) => {
     try {
       const { movements } = req.body;
 

@@ -141,7 +141,7 @@ export function registerQuotationRoutes(app: Express) {
     }
   });
 
-  app.patch('/api/quotations/:id/convert', requireAuth(), async (req: AuthenticatedRequest, res) => {
+  app.patch('/api/quotations/:id/convert', requireAuth(['Admin', 'Manager', 'Staff']), async (req: AuthenticatedRequest, res) => {
     try {
       const id = parseInt(req.params.id);
       const [existing] = await db.select({ id: quotations.id, status: quotations.status, quoteNumber: quotations.quoteNumber })

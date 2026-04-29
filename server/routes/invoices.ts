@@ -169,7 +169,7 @@ export function registerInvoiceRoutes(app: Express) {
     }
   });
 
-  app.post('/api/invoices/from-quotation', requireAuth(), async (req: AuthenticatedRequest, res) => {
+  app.post('/api/invoices/from-quotation', requireAuth(['Admin', 'Manager', 'Staff']), async (req: AuthenticatedRequest, res) => {
     try {
       const { quotationId } = req.body;
 
@@ -353,7 +353,7 @@ export function registerInvoiceRoutes(app: Express) {
     }
   });
 
-  app.put('/api/invoices/:id', requireAuth(), async (req: AuthenticatedRequest, res) => {
+  app.put('/api/invoices/:id', requireAuth(['Admin', 'Manager', 'Staff']), async (req: AuthenticatedRequest, res) => {
     try {
       const id = parseInt(req.params.id);
       if (isNaN(id)) return res.status(400).json({ error: 'Invalid ID' });
@@ -843,7 +843,7 @@ export function registerInvoiceRoutes(app: Express) {
     }
   });
 
-  app.post('/api/invoices/:id/process-sale', requireAuth(), async (req: AuthenticatedRequest, res) => {
+  app.post('/api/invoices/:id/process-sale', requireAuth(['Admin', 'Manager']), async (req: AuthenticatedRequest, res) => {
     try {
       const invoiceId = parseInt(req.params.id);
       if (isNaN(invoiceId)) return res.status(400).json({ error: 'Invalid ID' });

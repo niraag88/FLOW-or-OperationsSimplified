@@ -18,7 +18,7 @@ export function registerSupplierRoutes(app: Express) {
     }
   });
 
-  app.post('/api/suppliers', requireAuth(), async (req: AuthenticatedRequest, res) => {
+  app.post('/api/suppliers', requireAuth(['Admin', 'Manager']), async (req: AuthenticatedRequest, res) => {
     try {
       const validatedData = insertSupplierSchema.parse(req.body);
       const supplier = await businessStorage.createSupplier(validatedData);
@@ -33,7 +33,7 @@ export function registerSupplierRoutes(app: Express) {
     }
   });
 
-  app.put('/api/suppliers/:id', requireAuth(), async (req: AuthenticatedRequest, res) => {
+  app.put('/api/suppliers/:id', requireAuth(['Admin', 'Manager']), async (req: AuthenticatedRequest, res) => {
     try {
       const supplierId = parseInt(req.params.id);
       const validatedData = insertSupplierSchema.partial().parse(req.body);
@@ -46,7 +46,7 @@ export function registerSupplierRoutes(app: Express) {
     }
   });
 
-  app.delete('/api/suppliers/:id', requireAuth(), async (req: AuthenticatedRequest, res) => {
+  app.delete('/api/suppliers/:id', requireAuth(['Admin', 'Manager']), async (req: AuthenticatedRequest, res) => {
     try {
       const supplierId = parseInt(req.params.id);
       if (isNaN(supplierId)) return res.status(400).json({ error: 'Invalid ID' });

@@ -135,7 +135,7 @@ export function registerProductRoutes(app: Express) {
     }
   });
 
-  app.post('/api/products/bulk', requireAuth(), async (req: AuthenticatedRequest, res) => {
+  app.post('/api/products/bulk', requireAuth(['Admin', 'Manager']), async (req: AuthenticatedRequest, res) => {
     try {
       const rows: Array<{
         brandName: string;
@@ -301,7 +301,7 @@ export function registerProductRoutes(app: Express) {
     }
   });
 
-  app.post('/api/products', requireAuth(), async (req: AuthenticatedRequest, res) => {
+  app.post('/api/products', requireAuth(['Admin', 'Manager']), async (req: AuthenticatedRequest, res) => {
     try {
       const validatedData = insertProductSchema.parse(req.body);
       const product = await businessStorage.createProduct(validatedData);
@@ -332,7 +332,7 @@ export function registerProductRoutes(app: Express) {
     }
   });
 
-  app.put('/api/products/:id', requireAuth(), async (req: AuthenticatedRequest, res) => {
+  app.put('/api/products/:id', requireAuth(['Admin', 'Manager']), async (req: AuthenticatedRequest, res) => {
     try {
       const productId = parseInt(req.params.id);
       const validatedData = insertProductSchema.partial().parse(req.body);
@@ -345,7 +345,7 @@ export function registerProductRoutes(app: Express) {
     }
   });
 
-  app.delete('/api/products/:id', requireAuth(), async (req: AuthenticatedRequest, res) => {
+  app.delete('/api/products/:id', requireAuth(['Admin', 'Manager']), async (req: AuthenticatedRequest, res) => {
     try {
       const productId = parseInt(req.params.id);
       const [productToDelete] = await db.select().from(products).where(eq(products.id, productId));
@@ -393,7 +393,7 @@ export function registerProductRoutes(app: Express) {
     }
   });
 
-  app.post('/api/products/:id/adjust-stock', requireAuth(), async (req: AuthenticatedRequest, res) => {
+  app.post('/api/products/:id/adjust-stock', requireAuth(['Admin', 'Manager']), async (req: AuthenticatedRequest, res) => {
     try {
       const productId = parseInt(req.params.id);
       if (isNaN(productId)) {

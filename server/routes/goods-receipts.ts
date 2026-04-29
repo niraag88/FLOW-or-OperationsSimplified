@@ -104,7 +104,7 @@ export function registerGoodsReceiptRoutes(app: Express) {
     }
   });
 
-  app.post('/api/stock-counts', requireAuth(), async (req: AuthenticatedRequest, res) => {
+  app.post('/api/stock-counts', requireAuth(['Admin', 'Manager']), async (req: AuthenticatedRequest, res) => {
     try {
       if (!req.user) {
         return res.status(401).json({ error: 'Authentication required' });
@@ -194,7 +194,7 @@ export function registerGoodsReceiptRoutes(app: Express) {
     }
   });
 
-  app.delete('/api/stock-counts/:id', requireAuth(), async (req: AuthenticatedRequest, res) => {
+  app.delete('/api/stock-counts/:id', requireAuth(['Admin', 'Manager']), async (req: AuthenticatedRequest, res) => {
     try {
       const stockCountId = parseInt(req.params.id);
       if (isNaN(stockCountId)) return res.status(400).json({ error: 'Invalid ID' });
