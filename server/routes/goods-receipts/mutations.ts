@@ -107,10 +107,13 @@ export function registerGoodsReceiptMutationRoutes(app: Express) {
         return res.status(400).json({ error: 'Purchase Order ID and items are required' });
       }
 
-      // Reject empty / zero-quantity payloads up front so we never create an
-      // itemless GRN header that would later be untracked by stock movements.
+      // Reject empty / zero-quantity payloads on a regular receive so we never create
+      // an itemless GRN header that would later be untracked by stock movements.
+      // BUT: when the user explicitly chose Save & Close, an all-zero payload is the
+      // legitimate "close this PO without receiving anything more" path — handle it
+      // below by closing the PO without inserting a GRN.
       const positiveItems = items.filter((it: any) => Number(it?.receivedQuantity) > 0);
-      if (positiveItems.length === 0) {
+      if (positiveItems.length === 0 && !forceClose) {
         return res.status(400).json({
           error: 'no_received_quantity',
           message: 'A goods receipt must include at least one line with a received quantity greater than zero.',
@@ -120,6 +123,42 @@ export function registerGoodsReceiptMutationRoutes(app: Express) {
       const [po] = await db.select().from(purchaseOrders).where(eq(purchaseOrders.id, poId));
       if (!po) {
         return res.status(404).json({ error: 'Purchase order not found' });
+      }
+
+      // Save & Close with no quantities to receive: just close the PO, no GRN created.
+      if (positiveItems.length === 0 && forceClose) {
+        let closed = false;
+        await db.transaction(async (tx) => {
+          // Lock the PO row to prevent concurrent close/delete/reopen races.
+          const [locked] = await tx.select({ id: purchaseOrders.id, status: purchaseOrders.status })
+            .from(purchaseOrders)
+            .where(eq(purchaseOrders.id, poId))
+            .for('update');
+          if (!locked) {
+            return; // PO disappeared between the read above and the lock
+          }
+          const updated = await tx.update(purchaseOrders)
+            .set({ status: 'closed', updatedAt: new Date() })
+            .where(eq(purchaseOrders.id, poId))
+            .returning({ id: purchaseOrders.id });
+          closed = updated.length === 1;
+        });
+        if (!closed) {
+          return res.status(409).json({ error: 'Failed to close PO — it may have been deleted or modified by another user.' });
+        }
+        await recalculatePOPaymentStatus(poId);
+        writeAuditLog({
+          actor: req.user!.id,
+          actorName: req.user?.username || String(req.user!.id),
+          targetId: String(poId),
+          targetType: 'purchase_order',
+          action: 'UPDATE',
+          details: `PO ${po.poNumber} closed (Save & Close, no further goods received)`,
+        });
+        return res.status(200).json({
+          poStatus: 'closed',
+          message: `PO ${po.poNumber} marked as closed`,
+        });
       }
 
       const receiptNumber = await businessStorage.generateGrnNumber();

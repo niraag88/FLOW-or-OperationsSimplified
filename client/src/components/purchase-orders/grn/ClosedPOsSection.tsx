@@ -79,8 +79,6 @@ export default function ClosedPOsSection({
   getTotalReceivedQuantity,
   getAedEquivalent,
 }: ClosedPOsSectionProps) {
-  if (closedPOs.length === 0) return null;
-
   return (
     <Collapsible open={showClosedReceipts} onOpenChange={setShowClosedReceipts}>
       <CollapsibleTrigger asChild>
@@ -100,6 +98,13 @@ export default function ClosedPOsSection({
         </Button>
       </CollapsibleTrigger>
       <CollapsibleContent className="mt-3">
+        {closedPOs.length === 0 ? (
+          <div className="text-center py-8 text-gray-500 border-2 border-dashed border-gray-200 rounded-lg">
+            <p className="font-semibold">No closed POs yet</p>
+            <p className="text-sm">Closed purchase orders will appear here once they are fully received or closed.</p>
+          </div>
+        ) : (
+        <>
         {/* Closed section filters */}
         <div className="flex flex-wrap items-center gap-2 mb-3">
           <Select value={closedSupplier} onValueChange={setClosedSupplier}>
@@ -288,6 +293,8 @@ export default function ClosedPOsSection({
             </tbody>
           </table>
         </div>
+        </>
+        )}
       </CollapsibleContent>
     </Collapsible>
   );

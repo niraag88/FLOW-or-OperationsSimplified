@@ -231,7 +231,7 @@ export default function GRNPaymentsLedger({ canEdit }: GRNPaymentsLedgerProps) {
                     const aedAmount = getAedAmount(grn);
                     return (
                       <tr key={grn.id} className="border-b transition-colors hover:bg-muted/30">
-                        <td className="p-3 align-middle font-mono font-medium text-xs" style={{ width: "110px" }}>
+                        <td className="p-3 align-middle font-medium" style={{ width: "110px" }}>
                           {grn.receiptNumber}
                         </td>
                         <td className="p-3 align-middle font-medium" style={{ width: "110px" }}>

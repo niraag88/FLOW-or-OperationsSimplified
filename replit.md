@@ -36,7 +36,7 @@ Internal documents use simple bordered data tables. External documents (POs, Quo
 - **Financial Features**: Supports multi-currency handling with `fxRateToAed` and derived PO payment statuses.
 - **API Improvements**: Server-side recycle-bin creation and robust invoice validation.
 - **Backup and Restore System**: Provides scheduled backups, full restore capabilities, and factory reset functionality with multi-layered protection.
-- **Goods Receipt (GRN) Management**: Detailed tracking, payment status, and an audit-preserving cancellation workflow.
+- **Goods Receipt (GRN) Management**: Detailed tracking, payment status, and an audit-preserving cancellation workflow. **Save & Close contract (Task #391):** `POST /api/goods-receipts` accepts an all-zero items payload **only** when `forceClose=true`; in that branch no GRN row is inserted — the PO is simply transitioned to `status='closed'` inside a transaction and an audit-log entry is written. Regular receives (without `forceClose`) still reject all-zero payloads with `400 no_received_quantity`.
 - **Cancellation Workflows**: Implements all-or-nothing cancellation contracts for Invoices and Delivery Orders, ensuring full stock reversal for delivered items.
 - **Quotation Status Enforcement**: Features a one-way status machine with strict transition validation.
 - **Invoice Stock Reconciliation**: Ensures accurate stock levels through inventory reconciliation on invoice edits.
