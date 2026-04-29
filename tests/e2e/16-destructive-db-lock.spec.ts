@@ -50,7 +50,7 @@ import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { gzipSync } from 'node:zlib';
 
-import { apiLogin, BASE_URL, ADMIN } from './helpers';
+import { apiLogin, BASE_URL } from './helpers';
 import {
   gateFactoryResetTests,
   FACTORY_RESET_CONFIRMATION_PHRASE,
