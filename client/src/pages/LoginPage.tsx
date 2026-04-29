@@ -109,6 +109,7 @@ export default function LoginPage() {
                   id="username"
                   name="username"
                   type="text"
+                  autoComplete="username"
                   placeholder="Enter your username"
                   value={formData.username}
                   onChange={handleInputChange}
@@ -124,6 +125,7 @@ export default function LoginPage() {
                   id="password"
                   name="password"
                   type="password"
+                  autoComplete="current-password"
                   placeholder="Enter your password"
                   value={formData.password}
                   onChange={handleInputChange}
