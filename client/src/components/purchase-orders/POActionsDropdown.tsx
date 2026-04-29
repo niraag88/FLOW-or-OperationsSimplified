@@ -166,6 +166,7 @@ export default function POActionsDropdown({ po, canEdit, onEdit, onRefresh, curr
         recordType="purchase-orders"
         recordId={po.id}
         documentNumber={poNumber}
+        documentYear={new Date(po.orderDate || po.order_date || po.createdAt || po.created_at || Date.now()).getUTCFullYear()}
         maxSizeMB={5}
       />
     </>

@@ -307,6 +307,7 @@ export default function DOActionsDropdown({ doOrder, canEdit, onEdit, onRefresh,
         recordType="delivery"
         recordId={doOrder.id}
         documentNumber={doNumber}
+        documentYear={new Date(doOrder.orderDate || doOrder.createdAt || Date.now()).getUTCFullYear()}
       />
     </>
   );

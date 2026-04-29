@@ -21,8 +21,9 @@ function getFileExtension(mimeType: string) {
   return ALLOWED_TYPES[mimeType as keyof typeof ALLOWED_TYPES]?.ext || 'pdf';
 }
 
-function buildStorageKey(recordType: string, documentNumber: string | undefined, file: File) {
-  const year = new Date().getFullYear();
+function buildStorageKey(recordType: string, documentNumber: string | undefined, file: File, documentYear?: number) {
+  // Use UTC to match the server's UTC year comparison in /api/storage/upload-scan.
+  const year = documentYear ?? new Date().getUTCFullYear();
   const safeName = (documentNumber || 'doc').replace(/[^a-zA-Z0-9\-_]/g, '-');
   const origName = file.name.replace(/[^a-zA-Z0-9._-]/g, '-').toLowerCase();
   return `${recordType}/${year}/${safeName}/${Date.now()}-${origName}`;
@@ -35,10 +36,11 @@ interface UploadFileDialogProps {
   recordType: string;
   recordId: number | string;
   documentNumber?: string;
+  documentYear?: number;
   maxSizeMB?: number;
 }
 
-export default function UploadFileDialog({ open, onClose, onSuccess, recordType, recordId, documentNumber, maxSizeMB = 5 }: UploadFileDialogProps) {
+export default function UploadFileDialog({ open, onClose, onSuccess, recordType, recordId, documentNumber, documentYear, maxSizeMB = 5 }: UploadFileDialogProps) {
   const { toast } = useToast();
   const [selectedFile, setSelectedFile] = useState<File | null>(null);
   const [uploading, setUploading] = useState(false);
@@ -72,7 +74,7 @@ export default function UploadFileDialog({ open, onClose, onSuccess, recordType,
     setError('');
 
     try {
-      const storageKey = buildStorageKey(recordType, documentNumber, selectedFile);
+      const storageKey = buildStorageKey(recordType, documentNumber, selectedFile, documentYear);
 
       const formData = new FormData();
       formData.append('file', selectedFile);

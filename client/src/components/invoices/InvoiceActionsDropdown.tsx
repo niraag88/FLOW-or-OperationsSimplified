@@ -356,6 +356,7 @@ export default function InvoiceActionsDropdown({ invoice, canEdit, canOverride, 
         recordType="invoices"
         recordId={invoice.id}
         documentNumber={invoiceNumber}
+        documentYear={new Date(invoice.invoiceDate || invoice.createdAt || Date.now()).getUTCFullYear()}
       />
     </>
   );

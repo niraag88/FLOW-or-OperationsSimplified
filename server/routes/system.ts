@@ -232,6 +232,7 @@ export function registerSystemRoutes(app: Express) {
       // an existing scan.
       const segments = storageKey.split('/');
       const prefix = segments[0];
+      const keyYear = parseInt(segments[1], 10);
       const rest = segments.slice(2);
       const stripExt = (s: string) => s.replace(/\.(pdf|jpg|jpeg|png)$/i, '');
 
@@ -250,27 +251,46 @@ export function registerSystemRoutes(app: Express) {
       }
 
       if (docIdentifier) {
-        let exists = false;
+        // Pull the doc's primary date so we can bind the key's year segment
+        // to the document. Fall back to createdAt if the business date is
+        // nullable (invoiceDate / orderDate on DOs).
+        let docDate: Date | null = null;
         if (prefix === 'invoices') {
-          const row = await db.select({ id: invoices.id }).from(invoices).where(eq(invoices.invoiceNumber, docIdentifier)).limit(1);
-          exists = row.length > 0;
+          const row = await db.select({ d: invoices.invoiceDate, c: invoices.createdAt })
+            .from(invoices).where(eq(invoices.invoiceNumber, docIdentifier)).limit(1);
+          if (row.length > 0) docDate = row[0].d ? new Date(row[0].d) : row[0].c;
         } else if (prefix === 'purchase-orders') {
-          const row = await db.select({ id: purchaseOrders.id }).from(purchaseOrders).where(eq(purchaseOrders.poNumber, docIdentifier)).limit(1);
-          exists = row.length > 0;
+          const row = await db.select({ d: purchaseOrders.orderDate, c: purchaseOrders.createdAt })
+            .from(purchaseOrders).where(eq(purchaseOrders.poNumber, docIdentifier)).limit(1);
+          if (row.length > 0) docDate = row[0].d ? new Date(row[0].d) : row[0].c;
         } else if (prefix === 'delivery') {
-          const row = await db.select({ id: deliveryOrders.id }).from(deliveryOrders).where(eq(deliveryOrders.orderNumber, docIdentifier)).limit(1);
-          exists = row.length > 0;
+          const row = await db.select({ d: deliveryOrders.orderDate, c: deliveryOrders.createdAt })
+            .from(deliveryOrders).where(eq(deliveryOrders.orderNumber, docIdentifier)).limit(1);
+          if (row.length > 0) docDate = row[0].d ? new Date(row[0].d) : row[0].c;
         } else if (prefix === 'goods-receipts') {
-          const row = await db.select({ id: goodsReceipts.id }).from(goodsReceipts).where(eq(goodsReceipts.receiptNumber, docIdentifier)).limit(1);
-          exists = row.length > 0;
+          const row = await db.select({ d: goodsReceipts.receivedDate, c: goodsReceipts.createdAt })
+            .from(goodsReceipts).where(eq(goodsReceipts.receiptNumber, docIdentifier)).limit(1);
+          if (row.length > 0) docDate = row[0].d ?? row[0].c;
         }
-        if (!exists) {
+        if (!docDate) {
           return res.status(404).json({ error: 'Referenced document not found' });
+        }
+        // Bind the key's year segment to the document's year so a crafted key
+        // like `invoices/1999/INV-123/...` is rejected even when INV-123
+        // exists (its scan key must live under its own year folder).
+        if (docDate.getUTCFullYear() !== keyYear) {
+          return res.status(404).json({ error: 'Storage key year does not match document year' });
         }
       } else {
         // Anonymous staging upload (GRN flat format only). Require the key
         // is fresh — refuse if storage_objects already tracks it so a
-        // guessed timestamp cannot overwrite an existing scan.
+        // guessed timestamp cannot overwrite an existing scan. Also pin the
+        // year segment to the current year so old/forged year folders are
+        // rejected (these keys have no document yet to bind to).
+        const nowYear = new Date().getUTCFullYear();
+        if (keyYear !== nowYear) {
+          return res.status(400).json({ error: 'Staging key year must be the current year' });
+        }
         const existing = await db.select({ key: storageObjects.key }).from(storageObjects).where(eq(storageObjects.key, storageKey)).limit(1);
         if (existing.length > 0) {
           return res.status(409).json({ error: 'Storage key already in use' });

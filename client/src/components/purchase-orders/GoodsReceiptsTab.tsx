@@ -110,7 +110,7 @@ export default function GoodsReceiptsTab({
   const [closedDelivery, setClosedDelivery] = useState('all');
   // GRN document attachment state
   const [pendingDocs, setPendingDocs] = useState<(File | null)[]>([null, null, null]);
-  const [attachGrnState, setAttachGrnState] = useState<{ grnId: number; slot: number; receiptNumber: string } | null>(null); // { grnId, slot, receiptNumber }
+  const [attachGrnState, setAttachGrnState] = useState<{ grnId: number; slot: number; receiptNumber: string; receivedDate?: string } | null>(null); // { grnId, slot, receiptNumber, receivedDate }
   const { toast } = useToast();
 
 
@@ -141,10 +141,13 @@ export default function GoodsReceiptsTab({
   };
 
   const uploadGrnDocToStorage = async (grnId: number, slot: number, file: File) => {
+    // The server pins the staging key year to the current year (the GRN we
+    // just created has receivedDate=now()), so build the key with the same
+    // current year here.
     const extMap = { 'application/pdf': 'pdf', 'image/png': 'png', 'image/jpeg': 'jpg', 'image/jpg': 'jpg' };
     const ext = extMap[file.type as keyof typeof extMap] || 'pdf';
     const safeName = file.name.replace(/\.[^.]+$/, '').replace(/[^a-zA-Z0-9._-]/g, '-').replace(/-+/g, '-').substring(0, 80);
-    const storageKey = `goods-receipts/${new Date().getFullYear()}/${Date.now()}-${safeName}.${ext}`;
+    const storageKey = `goods-receipts/${new Date().getUTCFullYear()}/${Date.now()}-${safeName}.${ext}`;
     const formData = new FormData();
     formData.append('file', file);
     const uploadResp = await fetch('/api/storage/upload-scan', {
@@ -1364,6 +1367,7 @@ export default function GoodsReceiptsTab({
           recordType="goods-receipts"
           recordId={attachGrnState.grnId}
           documentNumber={`${attachGrnState.receiptNumber}-doc${attachGrnState.slot}`}
+          documentYear={attachGrnState.receivedDate ? new Date(attachGrnState.receivedDate).getUTCFullYear() : new Date().getUTCFullYear()}
           maxSizeMB={5}
         />
       )}
