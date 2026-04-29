@@ -1,91 +1,54 @@
-
-import React, { useState, useCallback } from "react";
-import { Card, CardContent, CardHeader, CardTitle, CardFooter } from "@/components/ui/card";
-import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
-import { Badge } from "@/components/ui/badge";
-import { Button } from "@/components/ui/button";
-import { Input } from "@/components/ui/input";
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
-import { ShoppingCart, CheckCircle2, Package, Truck, MoreHorizontal, XCircle, ChevronDown, ChevronRight, Eye, Download, Trash2, FileText, FileSpreadsheet, AlertTriangle, Paperclip, X, RefreshCw } from "lucide-react";
+import { useState } from "react";
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { Skeleton } from "@/components/ui/skeleton";
+import { Truck } from "lucide-react";
 import UploadFileDialog from "../common/UploadFileDialog";
 import POQuickViewModal from "./POQuickViewModal";
-import {
-  DropdownMenu,
-  DropdownMenuContent,
-  DropdownMenuItem,
-  DropdownMenuTrigger,
-  DropdownMenuSeparator,
-} from "@/components/ui/dropdown-menu";
-import { Skeleton } from "@/components/ui/skeleton";
-import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible";
-import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
-import { Textarea } from "@/components/ui/textarea";
-import { Label } from "@/components/ui/label";
-import ExportDropdown from "../common/ExportDropdown";
-import { printPOGRNSummary, exportPODetailToXLSX } from "../utils/export";
-import { format } from "date-fns";
 import { useToast } from "@/hooks/use-toast";
-import SimpleConfirmDialog from "../common/SimpleConfirmDialog";
-import { formatCurrency } from "@/utils/currency";
 import { queryClient } from "@/lib/queryClient";
-import type { PurchaseOrder, GoodsReceipt } from "@shared/schema";
-interface POItem {
-  id: number;
-  productId?: number;
-  quantity?: number;
-  receivedQuantity?: number;
-  unitPrice?: string | number | null;
-  productName?: string;
-  productSku?: string;
-  brandName?: string;
-  size?: string | null;
-}
+import type { GoodsReceipt } from "@shared/schema";
 
-export interface PORow extends PurchaseOrder {
-  brandName?: string | null;
-  supplierName?: string | null;
-  items?: POItem[];
-  orderedQty?: number | null;
-  receivedQty?: number | null;
-  lineItems?: number | null;
-}
+import OpenPOsSection from "./grn/OpenPOsSection";
+import ClosedPOsSection from "./grn/ClosedPOsSection";
+import ReceiveDialog from "./grn/ReceiveDialog";
+import CloseConfirmDialog from "./grn/CloseConfirmDialog";
+import DeleteConfirmDialog from "./grn/DeleteConfirmDialog";
+import { useGrnDocs } from "./grn/useGrnDocs";
+import {
+  getAedEquivalent,
+  getLineItemsCount,
+  getTotalOrderedQuantity,
+  getTotalReceivedQuantity,
+} from "./grn/exportColumns";
+import {
+  uniqueSupplierOptions,
+  filterOpenPOs,
+  filterClosedPOs,
+  isOpenFiltersActive,
+  isClosedFiltersActive,
+} from "./grn/filterUtils";
+import {
+  makeViewAndPrint,
+  makeExportToXLSX,
+  makeReopenPO,
+  deletePORequest,
+  forceClosePORequest,
+} from "./grn/poActions";
+import type { GoodsReceiptsTabProps, PORow } from "./grn/types";
 
-interface POStats {
-  orderedQty?: number | null | unknown;
-  receivedQty?: number | null | unknown;
-  lineItems?: number | null | unknown;
-  totalAmount?: unknown;
-  currency?: string | null;
-  fxRateToAed?: unknown;
-}
+export type { PORow } from "./grn/types";
 
-interface GoodsReceiptsTabProps {
-  purchaseOrders: PORow[];
-  goodsReceipts: GoodsReceipt[];
-  loading: boolean;
-  canEdit: boolean;
-  currentUser?: { email?: string; role?: string } | null;
-  onRefresh: () => void;
-  showOpenReceipts: boolean;
-  setShowOpenReceipts: React.Dispatch<React.SetStateAction<boolean>>;
-  showClosedReceipts: boolean;
-  setShowClosedReceipts: React.Dispatch<React.SetStateAction<boolean>>;
-}
-
-export default function GoodsReceiptsTab({ 
-  purchaseOrders, 
-  goodsReceipts, 
-  loading, 
-  canEdit, 
-  currentUser, 
+export default function GoodsReceiptsTab({
+  purchaseOrders,
+  goodsReceipts,
+  loading,
+  canEdit,
   onRefresh,
   showOpenReceipts,
   setShowOpenReceipts,
   showClosedReceipts,
-  setShowClosedReceipts
+  setShowClosedReceipts,
 }: GoodsReceiptsTabProps) {
-  const [receivingQuantities, setReceivingQuantities] = useState<Record<string, number>>({});
   const [processingPOId, setProcessingPOId] = useState<number | null>(null);
   const [showCloseConfirm, setShowCloseConfirm] = useState(false);
   const [closingPO, setClosingPO] = useState<PORow | null>(null);
@@ -95,7 +58,6 @@ export default function GoodsReceiptsTab({
   const [receiveDate, setReceiveDate] = useState(() => new Date().toISOString().slice(0, 10));
   const [receiveRefNumber, setReceiveRefNumber] = useState('');
   const [receiveRefDate, setReceiveRefDate] = useState('');
-  // State is now managed by parent component for context-aware export
   const [showDeleteDialog, setShowDeleteDialog] = useState(false);
   const [deletingPO, setDeletingPO] = useState<PORow | null>(null);
   const [quickViewPoId, setQuickViewPoId] = useState<number | null>(null);
@@ -108,124 +70,18 @@ export default function GoodsReceiptsTab({
   const [closedDateFrom, setClosedDateFrom] = useState('');
   const [closedDateTo, setClosedDateTo] = useState('');
   const [closedDelivery, setClosedDelivery] = useState('all');
-  // GRN document attachment state
-  const [pendingDocs, setPendingDocs] = useState<(File | null)[]>([null, null, null]);
-  const [attachGrnState, setAttachGrnState] = useState<{ grnId: number; slot: number; receiptNumber: string; receivedDate?: string } | null>(null); // { grnId, slot, receiptNumber, receivedDate }
   const { toast } = useToast();
 
-
-  const ALLOWED_TYPES = ['application/pdf', 'image/jpeg', 'image/jpg', 'image/png'];
-  const MAX_DOC_SIZE = 5 * 1024 * 1024;
-
-  const updatePendingDoc = (idx: number, file: File | null) => {
-    setPendingDocs(prev => {
-      const arr = [...prev];
-      arr[idx] = file;
-      return arr;
-    });
-  };
-
-  const handlePendingDocSelect = (idx: number, e: React.ChangeEvent<HTMLInputElement>) => {
-    const file = e.target.files?.[0];
-    e.target.value = '';
-    if (!file) return;
-    if (!ALLOWED_TYPES.includes(file.type)) {
-      toast({ title: 'Invalid file', description: 'Only PDF, JPG, PNG allowed.', variant: 'destructive' });
-      return;
-    }
-    if (file.size > MAX_DOC_SIZE) {
-      toast({ title: 'File too large', description: 'Max 5 MB per document.', variant: 'destructive' });
-      return;
-    }
-    updatePendingDoc(idx, file);
-  };
-
-  const uploadGrnDocToStorage = async (grnId: number, slot: number, file: File) => {
-    // The server pins the staging key year to the current year (the GRN we
-    // just created has receivedDate=now()), so build the key with the same
-    // current year here.
-    const extMap = { 'application/pdf': 'pdf', 'image/png': 'png', 'image/jpeg': 'jpg', 'image/jpg': 'jpg' };
-    const ext = extMap[file.type as keyof typeof extMap] || 'pdf';
-    const safeName = file.name.replace(/\.[^.]+$/, '').replace(/[^a-zA-Z0-9._-]/g, '-').replace(/-+/g, '-').substring(0, 80);
-    const storageKey = `goods-receipts/${new Date().getUTCFullYear()}/${Date.now()}-${safeName}.${ext}`;
-    const formData = new FormData();
-    formData.append('file', file);
-    const uploadResp = await fetch('/api/storage/upload-scan', {
-      method: 'POST',
-      headers: {
-        'x-storage-key': storageKey,
-        'x-content-type': file.type,
-        'x-file-size': String(file.size),
-      },
-      body: formData,
-      credentials: 'include',
-    });
-    if (!uploadResp.ok) {
-      const err = await uploadResp.json();
-      throw new Error(err.error || 'Upload failed');
-    }
-    await fetch(`/api/goods-receipts/${grnId}/scan-key`, {
-      method: 'PATCH',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ scanKey: storageKey, slot }),
-      credentials: 'include',
-    });
-    return storageKey;
-  };
-
-  const handleGrnAttachSuccess = async (scanKey?: string) => {
-    if (!scanKey) return;
-    if (!attachGrnState) return;
-    await fetch(`/api/goods-receipts/${attachGrnState.grnId}/scan-key`, {
-      method: 'PATCH',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ scanKey, slot: attachGrnState.slot }),
-      credentials: 'include',
-    });
-    setAttachGrnState(null);
-    if (onRefresh) onRefresh();
-  };
-
-  const handleRemoveGrnDoc = async (grnId: number, slot: number) => {
-    try {
-      const resp = await fetch(`/api/goods-receipts/${grnId}/scan-key/${slot}`, {
-        method: 'DELETE',
-        credentials: 'include',
-      });
-      if (!resp.ok) throw new Error('Failed to remove');
-      toast({ title: 'Document removed' });
-      if (onRefresh) onRefresh();
-    } catch (e: unknown) {
-      toast({ title: 'Error', description: 'Could not remove the document.', variant: 'destructive' });
-    }
-  };
-
-  const handleViewGrnDoc = async (scanKey: string) => {
-    try {
-      const res = await fetch(`/api/storage/signed-get?key=${encodeURIComponent(scanKey)}`, { credentials: 'include' });
-      const data = await res.json();
-      if (!res.ok) throw new Error(data.error || 'Failed to get link');
-      window.open(data.url, '_blank');
-    } catch (e: unknown) {
-      toast({ title: 'Error', description: 'Could not retrieve the document.', variant: 'destructive' });
-    }
-  };
-
-  const getStatusColor = (status: string) => {
-    switch (status?.toLowerCase()) {
-      case 'draft': return 'bg-gray-100 text-gray-800';
-      case 'submitted': return 'bg-blue-100 text-blue-800';
-      case 'closed': return 'bg-green-100 text-green-800';
-      default: return 'bg-gray-100 text-gray-800';
-    }
-  };
-
-  const handleQuantityChange = (poId: number, itemIndex: number, quantity: number) => {
-    setReceivingQuantities((prev) => ({
-      ...prev,
-      [`${poId}-${itemIndex}`]: Math.floor(quantity) || 0
-    }));
-  };
+  const {
+    pendingDocs,
+    setPendingDocs,
+    attachGrnState,
+    setAttachGrnState,
+    updatePendingDoc,
+    handlePendingDocSelect,
+    uploadGrnDocToStorage,
+    handleGrnAttachSuccess,
+  } = useGrnDocs({ toast, onRefresh });
 
   const handleReceiveQuantityChange = (itemId: number, value: number) => {
     setReceiveQuantities((prev) => ({
@@ -234,197 +90,36 @@ export default function GoodsReceiptsTab({
     }));
   };
 
-  // These functions now simply return the server-provided data
-  const getLineItemsCount = (po: POStats): number => Number(po.lineItems) || 0;
-  const getTotalOrderedQuantity = (po: POStats): number => Number(po.orderedQty) || 0;
-  const getTotalReceivedQuantity = (po: POStats): number => Number(po.receivedQty) || 0;
-
-  // Handler functions for closed PO actions — delegate to shared utilities in export.jsx
-  const handleViewAndPrint = async (po: PORow) => {
-    try {
-      await printPOGRNSummary(po.id);
-    } catch {
-      toast({ title: 'Error', description: 'Could not load purchase order details for printing.', variant: 'destructive' });
-    }
-  };
-
-  const handleExportToXLSX = async (po: PORow) => {
-    try {
-      await exportPODetailToXLSX(po.id, po.poNumber);
-      toast({ title: "Export successful", description: `${po.poNumber} exported to Excel.` });
-    } catch (error: unknown) {
-      console.error('XLSX export error:', error);
-      toast({ title: "Export failed", description: "Could not export to Excel. Please try again.", variant: "destructive" });
-    }
-  };
+  // Handler functions for closed PO actions — delegate to shared utilities
+  const handleViewAndPrint = makeViewAndPrint(toast);
+  const handleExportToXLSX = makeExportToXLSX(toast);
+  const handleReopenPO = makeReopenPO(toast, onRefresh);
 
   const handleDeletePO = (po: PORow) => {
     setDeletingPO(po);
     setShowDeleteDialog(true);
   };
 
-  const handleReopenPO = async (po: PORow) => {
-    try {
-      const res = await fetch(`/api/purchase-orders/${po.id}/status`, {
-        method: 'PATCH',
-        headers: { 'Content-Type': 'application/json' },
-        credentials: 'include',
-        body: JSON.stringify({ status: 'submitted' }),
-      });
-      if (!res.ok) {
-        const body = await res.json().catch(() => ({}));
-        throw new Error(body.error || 'Failed to re-open purchase order');
-      }
-      toast({ title: 'PO Re-opened', description: `${po.poNumber} has been moved back to Open.` });
-      onRefresh();
-    } catch (error: unknown) {
-      toast({ title: 'Error', description: error instanceof Error ? error.message : 'Could not re-open the purchase order.', variant: 'destructive' });
-    }
-  };
-
   const confirmDeletePO = async () => {
     if (!deletingPO) return;
-    
     try {
-      const response = await fetch(`/api/purchase-orders/${deletingPO.id}`, {
-        method: 'DELETE',
-        credentials: 'include',
-      });
-      
-      if (!response.ok) {
-        const body = await response.json().catch(() => ({}));
-        throw new Error(body.error || 'Failed to delete the purchase order.');
-      }
-
+      await deletePORequest(deletingPO);
       toast({
         title: 'Purchase Order Deleted',
-        description: `${deletingPO.poNumber} has been moved to the recycle bin.`
+        description: `${deletingPO.poNumber} has been moved to the recycle bin.`,
       });
-
       setShowDeleteDialog(false);
       setDeletingPO(null);
-      
-      if (onRefresh) {
-        onRefresh();
-      }
+      if (onRefresh) onRefresh();
     } catch (error: unknown) {
       console.error('Error deleting purchase order:', error);
       toast({
         title: 'Delete Failed',
         description: error instanceof Error ? error.message : 'Failed to delete the purchase order. Please try again.',
-        variant: 'destructive'
+        variant: 'destructive',
       });
     }
   };
-
-  // Helper function to render purchase order table (used as fallback; main views use inline HTML tables)
-  const renderPOTable = (pos: PORow[], isClosedSection = false) => (
-    <Table>
-      <TableHeader>
-        <TableRow>
-          <TableHead className="w-[120px]">PO Number</TableHead>
-          <TableHead className="w-[130px]">Brand</TableHead>
-          <TableHead className="hidden sm:table-cell w-[100px]">Order Date</TableHead>
-          <TableHead className="hidden md:table-cell w-[110px] text-right">Total</TableHead>
-          <TableHead className="hidden sm:table-cell w-[110px] text-right">Total (AED)</TableHead>
-          <TableHead className="hidden lg:table-cell w-[80px]">Lines</TableHead>
-          <TableHead className="hidden md:table-cell w-[70px]">Ordered</TableHead>
-          <TableHead className="hidden md:table-cell w-[70px]">Received</TableHead>
-          {isClosedSection && <TableHead className="hidden sm:table-cell w-[90px]">Delivery</TableHead>}
-          <TableHead className="w-[90px]">Status</TableHead>
-          <TableHead className="w-[90px]">Actions</TableHead>
-        </TableRow>
-      </TableHeader>
-      <TableBody>
-        {pos.map((po: PORow) => {
-          const ordQty = getTotalOrderedQuantity(po);
-          const recQty = getTotalReceivedQuantity(po);
-          const isPartial = ordQty > 0 && recQty < ordQty;
-          return (
-          <TableRow key={po.id}>
-            <TableCell className="font-medium w-[120px]">{po.poNumber}</TableCell>
-            <TableCell className="w-[130px]">{po.brandName || 'Unknown Brand'}</TableCell>
-            <TableCell className="hidden sm:table-cell w-[100px]">
-              {po.orderDate && !isNaN(new Date(String(po.orderDate)).getTime()) ? format(new Date(String(po.orderDate)), 'dd/MM/yy') : '-'}
-            </TableCell>
-            <TableCell className="hidden md:table-cell w-[110px] text-right">{formatCurrency(parseFloat(String(po.totalAmount || 0)) || 0, String(po.currency || 'GBP'))}</TableCell>
-            <TableCell className="hidden sm:table-cell w-[110px] text-right">{formatCurrency(getAedEquivalent(po), 'AED')}</TableCell>
-            <TableCell className="hidden lg:table-cell w-[80px]">{getLineItemsCount(po)}</TableCell>
-            <TableCell className="hidden md:table-cell w-[70px]">{ordQty}</TableCell>
-            <TableCell className="hidden md:table-cell w-[70px]">{recQty}</TableCell>
-            {isClosedSection && (
-              <TableCell className="hidden sm:table-cell w-[90px]">
-                {ordQty > 0 && (isPartial ? (
-                  <Tooltip>
-                    <TooltipTrigger asChild>
-                      <span className="inline-flex items-center gap-0.5 text-xs font-semibold text-amber-800 bg-amber-100 border border-amber-300 rounded px-1.5 py-0.5 cursor-default">
-                        <AlertTriangle className="w-3 h-3" />Partial
-                      </span>
-                    </TooltipTrigger>
-                    <TooltipContent side="top">
-                      <p className="text-xs">{recQty} of {ordQty} units received</p>
-                    </TooltipContent>
-                  </Tooltip>
-                ) : (
-                  <span className="inline-flex items-center gap-0.5 text-xs font-semibold text-green-800 bg-green-100 border border-green-300 rounded px-1.5 py-0.5">
-                    <CheckCircle2 className="w-3 h-3" />Complete
-                  </span>
-                ))}
-              </TableCell>
-            )}
-            <TableCell className="w-[90px]">
-              <Badge 
-                variant="outline" 
-                className={po.status === 'closed' 
-                  ? "border-green-300 text-green-800 bg-green-50" 
-                  : "border-blue-300 text-blue-800 bg-blue-50"
-                }
-              >
-                {po.status?.toUpperCase()}
-              </Badge>
-            </TableCell>
-            <TableCell className="w-[90px]">
-              {isClosedSection ? (
-                <DropdownMenu>
-                  <DropdownMenuTrigger asChild>
-                    <Button variant="ghost" size="sm" className="h-8 w-8 p-0">
-                      <MoreHorizontal className="h-4 w-4" />
-                    </Button>
-                  </DropdownMenuTrigger>
-                  <DropdownMenuContent align="end">
-                    <DropdownMenuItem onClick={() => handleViewAndPrint(po)}>
-                      <FileText className="w-4 h-4 mr-2" />
-                      View & Print
-                    </DropdownMenuItem>
-                    <DropdownMenuItem onClick={() => handleExportToXLSX(po)}>
-                      <FileSpreadsheet className="w-4 h-4 mr-2" />
-                      Export to XLSX
-                    </DropdownMenuItem>
-                    <DropdownMenuItem 
-                      onClick={() => handleDeletePO(po)}
-                      className="text-red-600"
-                    >
-                      Delete
-                    </DropdownMenuItem>
-                  </DropdownMenuContent>
-                </DropdownMenu>
-              ) : (
-                <Button
-                  size="sm"
-                  onClick={() => openReceiveDialog(po)}
-                  disabled={!canEdit || processingPOId === po.id}
-                  className="bg-emerald-600 hover:bg-emerald-700"
-                >
-                  {processingPOId === po.id ? "Processing..." : "Receive"}
-                </Button>
-              )}
-            </TableCell>
-          </TableRow>
-          );
-        })}
-      </TableBody>
-    </Table>
-  );
 
   const openReceiveDialog = async (po: PORow) => {
     try {
@@ -434,17 +129,17 @@ export default function GoodsReceiptsTab({
         throw new Error('Failed to fetch purchase order items');
       }
       const items = await response.json();
-      
+
       // Set the selected PO with items
       setSelectedPOForReceive({ ...po, items });
-      
+
       // Initialize receive quantities to 0 for all items
       const initialQuantities: Record<string, number> = {};
       items.forEach((item: Record<string, any>) => {
         initialQuantities[item.id] = 0;
       });
       setReceiveQuantities(initialQuantities);
-      
+
     } catch (error: unknown) {
       console.error('Error fetching PO items:', error);
       toast({
@@ -533,7 +228,7 @@ export default function GoodsReceiptsTab({
       setReceiveDate(new Date().toISOString().slice(0, 10));
       setReceiveRefNumber('');
       setReceiveRefDate('');
-      
+
       // Invalidate cached data so Inventory and Dashboard reflect the new stock counts immediately
       queryClient.invalidateQueries({ queryKey: ['/api/products'] });
       queryClient.invalidateQueries({ queryKey: ['/api/dashboard'] });
@@ -555,7 +250,6 @@ export default function GoodsReceiptsTab({
     }
   };
 
-
   const getReceivedQuantityForItem = (poId: number, productId: number) => {
     const relatedGRNs = goodsReceipts.filter((grn: GoodsReceipt) => (grn.poId ?? (grn as Record<string, unknown>).purchase_order_id) === poId);
     let totalReceived = 0;
@@ -569,25 +263,11 @@ export default function GoodsReceiptsTab({
     return totalReceived;
   };
 
-  const handleForceCloseClick = (po: PORow) => {
-    setClosingPO(po);
-    setShowCloseConfirm(true);
-  };
-
   const handleConfirmForceClose = async () => {
     if (!closingPO || !canEdit) return;
     setProcessingPOId(closingPO.id);
     try {
-      const response = await fetch(`/api/purchase-orders/${closingPO.id}/status`, {
-        method: 'PATCH',
-        headers: { 'Content-Type': 'application/json' },
-        credentials: 'include',
-        body: JSON.stringify({ status: 'closed' }),
-      });
-      if (!response.ok) {
-        const body = await response.json().catch(() => ({}));
-        throw new Error(body.error || 'Failed to close purchase order');
-      }
+      await forceClosePORequest(closingPO);
       toast({ title: "Success", description: `${closingPO.poNumber} has been closed.` });
       onRefresh();
     } catch (error: unknown) {
@@ -625,144 +305,17 @@ export default function GoodsReceiptsTab({
   const openPOs: PORow[] = purchaseOrders.filter(po => po.status === 'submitted');
   const closedPOs: PORow[] = purchaseOrders.filter(po => po.status === 'closed');
 
-  // Unique supplier/brand lists for dropdowns
-  const openSupplierOptions = Array.from(new Set(
-    openPOs.map(po => po.supplierName || po.brandName).filter(Boolean)
-  )).sort();
-  const closedSupplierOptions = Array.from(new Set(
-    closedPOs.map(po => po.supplierName || po.brandName).filter(Boolean)
-  )).sort();
+  const openSupplierOptions = uniqueSupplierOptions(openPOs);
+  const closedSupplierOptions = uniqueSupplierOptions(closedPOs);
 
-  const filteredOpenPOs = openPOs.filter((po: PORow) => {
-    
-    if (openSupplier !== 'all') {
-      const name = po.supplierName || po.brandName;
-      if (name !== openSupplier) return false;
-    }
-    if (openDateFrom) {
-      if (!po.orderDate || new Date(po.orderDate) < new Date(openDateFrom)) return false;
-    }
-    if (openDateTo) {
-      if (!po.orderDate || new Date(po.orderDate) > new Date(openDateTo)) return false;
-    }
-    return true;
-  });
+  const openFilters = { openSupplier, openDateFrom, openDateTo };
+  const closedFilters = { closedSupplier, closedDateFrom, closedDateTo, closedDelivery };
 
-  const filteredClosedPOs = closedPOs.filter((po: PORow) => {
-    
-    if (closedSupplier !== 'all') {
-      const name = po.supplierName || po.brandName;
-      if (name !== closedSupplier) return false;
-    }
-    if (closedDateFrom) {
-      if (!po.orderDate || new Date(po.orderDate) < new Date(closedDateFrom)) return false;
-    }
-    if (closedDateTo) {
-      if (!po.orderDate || new Date(po.orderDate) > new Date(closedDateTo)) return false;
-    }
-    if (closedDelivery !== 'all') {
-      const ordQty = getTotalOrderedQuantity(po);
-      const recQty = getTotalReceivedQuantity(po);
-      const isPartial = ordQty > 0 && recQty < ordQty;
-      if (closedDelivery === 'short' && !isPartial) return false;
-      if (closedDelivery === 'complete' && isPartial) return false;
-    }
-    return true;
-  });
+  const filteredOpenPOs = filterOpenPOs(openPOs, openFilters);
+  const filteredClosedPOs = filterClosedPOs(closedPOs, closedFilters);
 
-  const openFiltersActive = openSupplier !== 'all' || !!openDateFrom || !!openDateTo;
-  const closedFiltersActive = closedSupplier !== 'all' || !!closedDateFrom || !!closedDateTo || closedDelivery !== 'all';
-
-  // Shared column transforms
-  const dateTransform = (date: unknown) => date && !isNaN(new Date(String(date)).getTime()) ? format(new Date(String(date)), 'dd/MM/yy') : '';
-  const totalTransform = (amount: unknown, row: Record<string, unknown>) => formatCurrency(Number(amount || 0), String(row?.currency || 'GBP'));
-  const getAedEquivalent = (po: POStats) => {
-    const amount = parseFloat(String(po.totalAmount || 0)) || 0;
-    const currency = String(po.currency || 'GBP');
-    if (currency === 'AED') return amount;
-    const rate = parseFloat(String(po.fxRateToAed || 0)) || 4.85;
-    return amount * rate;
-  };
-  const aedTransform = (_: unknown, row: Record<string, unknown>) => `AED ${getAedEquivalent(row).toFixed(2)}`;
-  const deliveryTransform = (_: unknown, row: Record<string, unknown>) => {
-    const ordQty = getTotalOrderedQuantity(row);
-    const recQty = getTotalReceivedQuantity(row);
-    return ordQty > 0 && recQty < ordQty ? 'Short Delivery' : 'Complete';
-  };
-
-  // Open section export columns (matches on-screen columns)
-  const openExportColumns = {
-    poNumber: "PO Number",
-    supplierName: { label: "Brand", transform: (v: unknown, row: Record<string, unknown>) => String(v || row?.brandName || '') },
-    orderDate: { label: "Order Date", transform: dateTransform },
-    totalAmount: { label: "Total", transform: totalTransform },
-    grandTotal: { label: "Total (AED)", transform: aedTransform },
-    lineItems: { label: "Line Items", transform: (_: unknown, row: Record<string, unknown>) => getLineItemsCount(row) },
-    orderedQty: { label: "Ordered", transform: (_: unknown, row: Record<string, unknown>) => getTotalOrderedQuantity(row) },
-    receivedQty: { label: "Received", transform: (_: unknown, row: Record<string, unknown>) => getTotalReceivedQuantity(row) },
-    status: { label: "Status", transform: (s: unknown) => typeof s === 'string' ? s.toUpperCase() : '' },
-  };
-
-  // Closed section export columns (matches on-screen columns)
-  const closedExportColumns = {
-    poNumber: "PO Number",
-    supplierName: { label: "Brand", transform: (v: unknown, row: Record<string, unknown>) => String(v || row?.brandName || '') },
-    orderDate: { label: "Order Date", transform: dateTransform },
-    totalAmount: { label: "Total", transform: totalTransform },
-    grandTotal: { label: "Total (AED)", transform: aedTransform },
-    lineItems: { label: "Lines", transform: (_: unknown, row: Record<string, unknown>) => getLineItemsCount(row) },
-    orderedQty: { label: "Ordered", transform: (_: unknown, row: Record<string, unknown>) => getTotalOrderedQuantity(row) },
-    receivedQty: { label: "Received", transform: (_: unknown, row: Record<string, unknown>) => getTotalReceivedQuantity(row) },
-    delivery: { label: "Delivery", transform: deliveryTransform },
-    status: { label: "Status", transform: (s: unknown) => typeof s === 'string' ? s.toUpperCase() : '' },
-  };
-
-  // Combined column set for when both sections are visible: superset of open + closed columns
-  const combinedExportColumns = {
-    poNumber: "PO Number",
-    supplierName: { label: "Brand", transform: (v: unknown, row: Record<string, unknown>) => String(v || row?.brandName || '') },
-    orderDate: { label: "Order Date", transform: dateTransform },
-    totalAmount: { label: "Total", transform: totalTransform },
-    grandTotal: { label: "Total (AED)", transform: aedTransform },
-    lineItems: { label: "Lines", transform: (_: unknown, row: Record<string, unknown>) => getLineItemsCount(row) },
-    orderedQty: { label: "Ordered", transform: (_: unknown, row: Record<string, unknown>) => getTotalOrderedQuantity(row) },
-    receivedQty: { label: "Received", transform: (_: unknown, row: Record<string, unknown>) => getTotalReceivedQuantity(row) },
-    status: { label: "Status", transform: (s: unknown) => typeof s === 'string' ? s.toUpperCase() : '' },
-    delivery: { label: "Delivery", transform: (_: unknown, row: Record<string, unknown>) => row.status === 'closed' ? deliveryTransform(null, row) : '' },
-  };
-
-  // Context-aware export — wired to filtered lists
-  const getContextAwareExportData = () => {
-    const deliveryLabel = closedDelivery !== 'all'
-      ? (closedDelivery === 'short' ? ' — Short Delivery' : ' — Complete')
-      : '';
-
-    if (showOpenReceipts && !showClosedReceipts) {
-      return {
-        exportData: filteredOpenPOs,
-        exportType: `Open Goods Receipts (${filteredOpenPOs.length} items${openFiltersActive ? ` of ${openPOs.length}` : ''})`,
-        itemCount: filteredOpenPOs.length,
-        columns: openExportColumns,
-      };
-    } else if (!showOpenReceipts && showClosedReceipts) {
-      return {
-        exportData: filteredClosedPOs,
-        exportType: `Closed Goods Receipts (${filteredClosedPOs.length} items${closedFiltersActive ? ` of ${closedPOs.length}${deliveryLabel}` : ''})`,
-        itemCount: filteredClosedPOs.length,
-        columns: closedExportColumns,
-      };
-    } else {
-      const combined = [...filteredOpenPOs, ...filteredClosedPOs];
-      return {
-        exportData: combined,
-        exportType: `All Goods Receipts (${combined.length} items)`,
-        itemCount: combined.length,
-        columns: combinedExportColumns,
-      };
-    }
-  };
-
-  const { exportData: contextExportData, exportType, itemCount, columns: goodsReceiptsColumns } = getContextAwareExportData();
+  const openFiltersActive = isOpenFiltersActive(openFilters);
+  const closedFiltersActive = isClosedFiltersActive(closedFilters);
 
   return (
     <>
@@ -777,585 +330,101 @@ export default function GoodsReceiptsTab({
           </p>
         </CardHeader>
         <CardContent>
-          {/* Open Purchase Orders Section - Collapsible */}
-          <div className="mb-6">
-            <Collapsible open={showOpenReceipts} onOpenChange={setShowOpenReceipts}>
-              <CollapsibleTrigger asChild>
-                <Button 
-                  variant="outline" 
-                  className="w-full justify-between text-left h-auto p-4 border-gray-300 mb-3"
-                >
-                  <div className="flex items-center gap-2">
-                    <Package className="w-5 h-5 text-blue-600" />
-                    <span className="font-semibold">Open ({openPOs.length})</span>
-                  </div>
-                  {showOpenReceipts ? (
-                    <ChevronDown className="w-4 h-4" />
-                  ) : (
-                    <ChevronRight className="w-4 h-4" />
-                  )}
-                </Button>
-              </CollapsibleTrigger>
-              <CollapsibleContent>
-                {/* Open section filters */}
-                <div className="mb-3 flex flex-wrap items-center gap-2">
-                  <Select value={openSupplier} onValueChange={setOpenSupplier}>
-                    <SelectTrigger className="h-8 w-44 text-sm">
-                      <SelectValue placeholder="All Brands" />
-                    </SelectTrigger>
-                    <SelectContent>
-                      <SelectItem value="all">All Brands</SelectItem>
-                      {(openSupplierOptions as string[]).map((s) => (
-                        <SelectItem key={s} value={s}>{s}</SelectItem>
-                      ))}
-                    </SelectContent>
-                  </Select>
-                  <Input
-                    type="date"
-                    value={openDateFrom}
-                    onChange={e => setOpenDateFrom(e.target.value)}
-                    className="h-8 w-36 text-sm"
-                    title="Order date from"
-                  />
-                  <span className="text-xs text-gray-400">to</span>
-                  <Input
-                    type="date"
-                    value={openDateTo}
-                    onChange={e => setOpenDateTo(e.target.value)}
-                    className="h-8 w-36 text-sm"
-                    title="Order date to"
-                  />
-                  {openFiltersActive && (
-                    <>
-                      <span className="text-xs text-gray-500">{filteredOpenPOs.length} of {openPOs.length}</span>
-                      <button
-                        onClick={() => { setOpenSupplier('all'); setOpenDateFrom(''); setOpenDateTo(''); }}
-                        className="text-xs text-blue-600 hover:text-blue-800 underline"
-                      >
-                        Clear
-                      </button>
-                    </>
-                  )}
-                </div>
-                {openPOs.length === 0 ? (
-                  <div className="text-center py-8 text-gray-500 border-2 border-dashed border-gray-200 rounded-lg">
-                    <ShoppingCart className="w-12 h-12 mx-auto mb-4 opacity-50" />
-                    <p className="font-semibold">No Submitted Purchase Orders</p>
-                    <p>There are no purchase orders awaiting goods receipt.</p>
-                  </div>
-                ) : filteredOpenPOs.length === 0 ? (
-                  <div className="text-center py-6 text-gray-500 border-2 border-dashed border-gray-200 rounded-lg">
-                    <p className="font-semibold">No results</p>
-                    <p className="text-sm">No open POs match your filters.</p>
-                  </div>
-                ) : (
-                  <div className="overflow-x-auto border rounded-lg">
-                    <table className="w-full text-sm" style={{tableLayout: 'fixed'}}>
-                      <thead>
-                        <tr className="border-b bg-muted/50">
-                          <th className="h-10 px-2 text-left align-middle font-medium text-muted-foreground" style={{width: '120px'}}>PO Number</th>
-                          <th className="h-10 px-2 text-left align-middle font-medium text-muted-foreground" style={{width: '140px'}}>Brand</th>
-                          <th className="h-10 px-2 text-left align-middle font-medium text-muted-foreground" style={{width: '100px'}}>Order Date</th>
-                          <th className="h-10 px-2 text-left align-middle font-medium text-muted-foreground" style={{width: '110px'}}>Total</th>
-                          <th className="h-10 px-2 text-left align-middle font-medium text-muted-foreground" style={{width: '110px'}}>Total (AED)</th>
-                          <th className="h-10 px-2 text-left align-middle font-medium text-muted-foreground" style={{width: '90px'}}>Line Items</th>
-                          <th className="h-10 px-2 text-left align-middle font-medium text-muted-foreground" style={{width: '80px'}}>Ordered</th>
-                          <th className="h-10 px-2 text-left align-middle font-medium text-muted-foreground" style={{width: '80px'}}>Received</th>
-                          <th className="h-10 px-2 text-left align-middle font-medium text-muted-foreground" style={{width: '90px'}}>Status</th>
-                          <th className="h-10 px-2 text-left align-middle font-medium text-muted-foreground" style={{width: '90px'}}>Actions</th>
-                        </tr>
-                      </thead>
-                      <tbody>
-                        {filteredOpenPOs.map((po: PORow) => (
-                          <tr key={po.id} className="border-b transition-colors hover:bg-muted/50">
-                            <td className="p-2 align-middle font-medium" style={{width: '120px'}}>{po.poNumber}</td>
-                            <td className="p-2 align-middle" style={{width: '140px'}}>{po.brandName || 'Unknown Brand'}</td>
-                            <td className="p-2 align-middle" style={{width: '100px'}}>
-                              {po.orderDate && !isNaN(new Date(po.orderDate).getTime()) ? 
-                                format(new Date(po.orderDate), 'dd/MM/yy') : 
-                                '-'
-                              }
-                            </td>
-                            <td className="p-2 align-middle" style={{width: '110px'}}>{formatCurrency(parseFloat(String(po.totalAmount || 0)) || 0, String(po.currency || 'GBP'))}</td>
-                            <td className="p-2 align-middle" style={{width: '110px'}}>{formatCurrency(getAedEquivalent(po), 'AED')}</td>
-                            <td className="p-2 align-middle" style={{width: '90px'}}>{getLineItemsCount(po)}</td>
-                            <td className="p-2 align-middle" style={{width: '80px'}}>{getTotalOrderedQuantity(po)}</td>
-                            <td className="p-2 align-middle" style={{width: '80px'}}>{getTotalReceivedQuantity(po)}</td>
-                            <td className="p-2 align-middle" style={{width: '90px'}}>
-                              <Badge 
-                                variant="outline" 
-                                className="border-blue-300 text-blue-800 bg-blue-50"
-                              >
-                                {po.status?.toUpperCase()}
-                              </Badge>
-                            </td>
-                            <td className="p-2 align-middle" style={{width: '90px'}}>
-                              <Button
-                                size="sm"
-                                onClick={() => openReceiveDialog(po)}
-                                disabled={!canEdit || processingPOId === po.id}
-                                className="bg-emerald-600 hover:bg-emerald-700"
-                              >
-                                {processingPOId === po.id ? "Processing..." : "Receive"}
-                              </Button>
-                            </td>
-                          </tr>
-                        ))}
-                      </tbody>
-                    </table>
-                  </div>
-                )}
-              </CollapsibleContent>
-            </Collapsible>
-          </div>
+          <OpenPOsSection
+            showOpenReceipts={showOpenReceipts}
+            setShowOpenReceipts={setShowOpenReceipts}
+            openPOs={openPOs}
+            filteredOpenPOs={filteredOpenPOs}
+            openSupplier={openSupplier}
+            setOpenSupplier={setOpenSupplier}
+            openSupplierOptions={openSupplierOptions}
+            openDateFrom={openDateFrom}
+            setOpenDateFrom={setOpenDateFrom}
+            openDateTo={openDateTo}
+            setOpenDateTo={setOpenDateTo}
+            openFiltersActive={openFiltersActive}
+            canEdit={canEdit}
+            processingPOId={processingPOId}
+            onReceive={openReceiveDialog}
+            getLineItemsCount={getLineItemsCount}
+            getTotalOrderedQuantity={getTotalOrderedQuantity}
+            getTotalReceivedQuantity={getTotalReceivedQuantity}
+            getAedEquivalent={getAedEquivalent}
+          />
 
-          {/* Closed Purchase Orders Section - Collapsible */}
-          {closedPOs.length > 0 && (
-            <Collapsible open={showClosedReceipts} onOpenChange={setShowClosedReceipts}>
-              <CollapsibleTrigger asChild>
-                <Button 
-                  variant="outline" 
-                  className="w-full justify-between text-left h-auto p-4 border-gray-300"
-                >
-                  <div className="flex items-center gap-2">
-                    <CheckCircle2 className="w-5 h-5 text-green-600" />
-                    <span className="font-semibold">Closed ({closedPOs.length})</span>
-                  </div>
-                  {showClosedReceipts ? (
-                    <ChevronDown className="w-4 h-4" />
-                  ) : (
-                    <ChevronRight className="w-4 h-4" />
-                  )}
-                </Button>
-              </CollapsibleTrigger>
-              <CollapsibleContent className="mt-3">
-                {/* Closed section filters */}
-                <div className="flex flex-wrap items-center gap-2 mb-3">
-                  <Select value={closedSupplier} onValueChange={setClosedSupplier}>
-                    <SelectTrigger className="h-8 w-44 text-sm">
-                      <SelectValue placeholder="All Brands" />
-                    </SelectTrigger>
-                    <SelectContent>
-                      <SelectItem value="all">All Brands</SelectItem>
-                      {(closedSupplierOptions as string[]).map((s) => (
-                        <SelectItem key={s} value={s}>{s}</SelectItem>
-                      ))}
-                    </SelectContent>
-                  </Select>
-                  <Input
-                    type="date"
-                    value={closedDateFrom}
-                    onChange={e => setClosedDateFrom(e.target.value)}
-                    className="h-8 w-36 text-sm"
-                    title="Order date from"
-                  />
-                  <span className="text-xs text-gray-400">to</span>
-                  <Input
-                    type="date"
-                    value={closedDateTo}
-                    onChange={e => setClosedDateTo(e.target.value)}
-                    className="h-8 w-36 text-sm"
-                    title="Order date to"
-                  />
-                  <Select value={closedDelivery} onValueChange={setClosedDelivery}>
-                    <SelectTrigger className="h-8 w-40 text-sm">
-                      <SelectValue />
-                    </SelectTrigger>
-                    <SelectContent>
-                      <SelectItem value="all">All Deliveries</SelectItem>
-                      <SelectItem value="short">Short Delivery</SelectItem>
-                      <SelectItem value="complete">Complete</SelectItem>
-                    </SelectContent>
-                  </Select>
-                  {closedFiltersActive && (
-                    <>
-                      <span className="text-xs text-gray-500">{filteredClosedPOs.length} of {closedPOs.length}</span>
-                      <button
-                        onClick={() => { setClosedSupplier('all'); setClosedDateFrom(''); setClosedDateTo(''); setClosedDelivery('all'); }}
-                        className="text-xs text-blue-600 hover:text-blue-800 underline"
-                      >
-                        Clear
-                      </button>
-                    </>
-                  )}
-                </div>
-                {filteredClosedPOs.length === 0 ? (
-                  <div className="text-center py-6 text-gray-500 border-2 border-dashed border-gray-200 rounded-lg">
-                    <p className="font-semibold">No results</p>
-                    <p className="text-sm">No closed POs match your filters.</p>
-                  </div>
-                ) : null}
-                <div className={filteredClosedPOs.length === 0 ? 'hidden' : 'overflow-x-auto border rounded-lg'}>
-                  <table className="w-full text-sm" style={{tableLayout: 'fixed'}}>
-                    <thead>
-                      <tr className="border-b bg-muted/50">
-                        <th className="h-10 px-2 text-left align-middle font-medium text-muted-foreground" style={{width: '130px'}}>PO Number</th>
-                        <th className="h-10 px-2 text-left align-middle font-medium text-muted-foreground" style={{width: '130px'}}>Brand</th>
-                        <th className="h-10 px-2 text-left align-middle font-medium text-muted-foreground" style={{width: '90px'}}>Order Date</th>
-                        <th className="h-10 px-2 text-left align-middle font-medium text-muted-foreground" style={{width: '110px'}}>Total</th>
-                        <th className="h-10 px-2 text-left align-middle font-medium text-muted-foreground" style={{width: '110px'}}>Total (AED)</th>
-                        <th className="h-10 px-2 text-left align-middle font-medium text-muted-foreground" style={{width: '70px'}}>Lines</th>
-                        <th className="h-10 px-2 text-left align-middle font-medium text-muted-foreground" style={{width: '70px'}}>Ordered</th>
-                        <th className="h-10 px-2 text-left align-middle font-medium text-muted-foreground" style={{width: '70px'}}>Received</th>
-                        <th className="h-10 px-2 text-left align-middle font-medium text-muted-foreground" style={{width: '90px'}}>Delivery</th>
-                        <th className="h-10 px-2 text-left align-middle font-medium text-muted-foreground" style={{width: '80px'}}>Status</th>
-                        <th className="h-10 px-2 text-left align-middle font-medium text-muted-foreground" style={{width: '80px'}}>Actions</th>
-                      </tr>
-                    </thead>
-                    <tbody>
-                      {filteredClosedPOs.map((po: PORow) => {
-                        const poGRNs = (goodsReceipts || []).filter((grn: GoodsReceipt) => (grn.poId ?? (grn as Record<string, unknown>).purchase_order_id) === po.id);
-                        const ordQty = getTotalOrderedQuantity(po);
-                        const recQty = getTotalReceivedQuantity(po);
-                        const isPartial = ordQty > 0 && recQty < ordQty;
-                        return (
-                          <React.Fragment key={po.id}>
-                            <tr className="border-b transition-colors hover:bg-muted/50">
-                              <td className="p-2 align-middle font-medium" style={{width: '130px'}}>
-                                <div className="flex items-center gap-1.5">
-                                  <button
-                                    onClick={() => setQuickViewPoId(Number(po.id))}
-                                    className="text-blue-600 hover:text-blue-800 hover:underline font-medium text-left"
-                                  >
-                                    {po.poNumber}
-                                  </button>
-                                  {isPartial && (
-                                    <Tooltip>
-                                      <TooltipTrigger asChild>
-                                        <span className="inline-flex cursor-default">
-                                          <AlertTriangle className="w-3.5 h-3.5 text-amber-500" />
-                                        </span>
-                                      </TooltipTrigger>
-                                      <TooltipContent side="top">
-                                        <p className="text-xs">Short delivery</p>
-                                      </TooltipContent>
-                                    </Tooltip>
-                                  )}
-                                </div>
-                              </td>
-                              <td className="p-2 align-middle" style={{width: '130px'}}>{po.brandName || 'Unknown Brand'}</td>
-                              <td className="p-2 align-middle" style={{width: '90px'}}>
-                                {po.orderDate && !isNaN(new Date(po.orderDate).getTime()) ? 
-                                  format(new Date(po.orderDate), 'dd/MM/yy') : 
-                                  '-'
-                                }
-                              </td>
-                              <td className="p-2 align-middle" style={{width: '110px'}}>{formatCurrency(po.totalAmount || 0, po.currency || 'GBP')}</td>
-                              <td className="p-2 align-middle" style={{width: '110px'}}>{formatCurrency(getAedEquivalent(po), 'AED')}</td>
-                              <td className="p-2 align-middle" style={{width: '70px'}}>{getLineItemsCount(po)}</td>
-                              <td className="p-2 align-middle" style={{width: '70px'}}>{ordQty}</td>
-                              <td className="p-2 align-middle" style={{width: '70px'}}>{recQty}</td>
-                              <td className="p-2 align-middle" style={{width: '90px'}}>
-                                {ordQty > 0 && (
-                                  isPartial ? (
-                                    <Tooltip>
-                                      <TooltipTrigger asChild>
-                                        <span className="inline-flex items-center gap-0.5 text-xs font-semibold text-amber-800 bg-amber-100 border border-amber-300 rounded px-1.5 py-0.5 cursor-default">
-                                          <AlertTriangle className="w-3 h-3" />
-                                          Partial
-                                        </span>
-                                      </TooltipTrigger>
-                                      <TooltipContent side="top">
-                                        <p className="text-xs">{recQty} of {ordQty} units received</p>
-                                      </TooltipContent>
-                                    </Tooltip>
-                                  ) : (
-                                    <span className="inline-flex items-center gap-0.5 text-xs font-semibold text-green-800 bg-green-100 border border-green-300 rounded px-1.5 py-0.5">
-                                      <CheckCircle2 className="w-3 h-3" />
-                                      Complete
-                                    </span>
-                                  )
-                                )}
-                              </td>
-                              <td className="p-2 align-middle" style={{width: '80px'}}>
-                                <Badge 
-                                  variant="outline" 
-                                  className="border-green-300 text-green-800 bg-green-50"
-                                >
-                                  {po.status?.toUpperCase()}
-                                </Badge>
-                              </td>
-                              <td className="p-2 align-middle" style={{width: '80px'}}>
-                                <DropdownMenu>
-                                  <DropdownMenuTrigger asChild>
-                                    <Button variant="ghost" size="sm" className="h-8 w-8 p-0">
-                                      <MoreHorizontal className="h-4 w-4" />
-                                    </Button>
-                                  </DropdownMenuTrigger>
-                                  <DropdownMenuContent align="end">
-                                    <DropdownMenuItem onClick={() => setQuickViewPoId(Number(po.id))}>
-                                      <Eye className="w-4 h-4 mr-2" />
-                                      View Details
-                                    </DropdownMenuItem>
-                                    <DropdownMenuItem onClick={() => handleViewAndPrint(po)}>
-                                      <FileText className="w-4 h-4 mr-2" />
-                                      View & Print
-                                    </DropdownMenuItem>
-                                    <DropdownMenuItem onClick={() => handleExportToXLSX(po)}>
-                                      <Download className="w-4 h-4 mr-2" />
-                                      Export to XLSX
-                                    </DropdownMenuItem>
-                                    <DropdownMenuSeparator />
-                                    <DropdownMenuItem onClick={() => handleReopenPO(po)}>
-                                      <RefreshCw className="w-4 h-4 mr-2" />
-                                      Re-open PO
-                                    </DropdownMenuItem>
-                                    <DropdownMenuSeparator />
-                                    <DropdownMenuItem 
-                                      onClick={() => handleDeletePO(po)}
-                                      className="text-red-600 focus:text-red-600"
-                                    >
-                                      <Trash2 className="w-4 h-4 mr-2" />
-                                      Delete
-                                    </DropdownMenuItem>
-                                  </DropdownMenuContent>
-                                </DropdownMenu>
-                              </td>
-                            </tr>
-                          </React.Fragment>
-                        );
-                      })}
-                    </tbody>
-                  </table>
-                </div>
-              </CollapsibleContent>
-            </Collapsible>
-          )}
+          <ClosedPOsSection
+            showClosedReceipts={showClosedReceipts}
+            setShowClosedReceipts={setShowClosedReceipts}
+            closedPOs={closedPOs}
+            filteredClosedPOs={filteredClosedPOs}
+            closedSupplier={closedSupplier}
+            setClosedSupplier={setClosedSupplier}
+            closedSupplierOptions={closedSupplierOptions}
+            closedDateFrom={closedDateFrom}
+            setClosedDateFrom={setClosedDateFrom}
+            closedDateTo={closedDateTo}
+            setClosedDateTo={setClosedDateTo}
+            closedDelivery={closedDelivery}
+            setClosedDelivery={setClosedDelivery}
+            closedFiltersActive={closedFiltersActive}
+            goodsReceipts={goodsReceipts}
+            setQuickViewPoId={setQuickViewPoId}
+            onViewAndPrint={handleViewAndPrint}
+            onExportToXLSX={handleExportToXLSX}
+            onReopenPO={handleReopenPO}
+            onDeletePO={handleDeletePO}
+            getLineItemsCount={getLineItemsCount}
+            getTotalOrderedQuantity={getTotalOrderedQuantity}
+            getTotalReceivedQuantity={getTotalReceivedQuantity}
+            getAedEquivalent={getAedEquivalent}
+          />
         </CardContent>
       </Card>
-      
-      {/* Delete Confirmation Dialog */}
-      <SimpleConfirmDialog
+
+      <DeleteConfirmDialog
         open={showDeleteDialog}
+        deletingPO={deletingPO}
         onClose={() => {
           setShowDeleteDialog(false);
           setDeletingPO(null);
         }}
         onConfirm={confirmDeletePO}
-        title="Delete Purchase Order"
-        description={`Are you sure you want to delete purchase order ${deletingPO?.poNumber}? This action will move it to the recycle bin where it can be restored later.`}
-        confirmText="Yes, Delete"
-        cancelText="No, Cancel"
-        confirmVariant="destructive"
       />
-      
-      {/* Receive Goods Dialog */}
-      <Dialog open={!!selectedPOForReceive} onOpenChange={() => {
-        setSelectedPOForReceive(null);
-        setReceiveQuantities({});
-        setReceiveNotes('');
-        setReceiveDate(new Date().toISOString().slice(0, 10));
-        setReceiveRefNumber('');
-        setReceiveRefDate('');
-        setPendingDocs([null, null, null]);
-      }}>
-        <DialogContent className="max-w-4xl max-h-[80vh] overflow-y-auto">
-          <DialogHeader>
-            <DialogTitle>
-              Receive Goods - {selectedPOForReceive?.brandName || 'Unknown Brand'} - {selectedPOForReceive?.poNumber}
-              {selectedPOForReceive?.orderDate && !isNaN(new Date(selectedPOForReceive.orderDate).getTime()) && ` - ${format(new Date(selectedPOForReceive.orderDate), 'dd/MM/yy')}`}
-            </DialogTitle>
-            <DialogDescription>
-              Enter the quantities received for each product. You can receive partial quantities and continue receiving more later.
-            </DialogDescription>
-          </DialogHeader>
 
-          <div className="space-y-4">
-            <Table>
-              <TableHeader>
-                <TableRow>
-                  <TableHead>Product</TableHead>
-                  <TableHead className="text-right">Ordered</TableHead>
-                  <TableHead className="text-right">Already Received</TableHead>
-                  <TableHead className="text-right">Remaining</TableHead>
-                  <TableHead className="text-right">Receiving Now</TableHead>
-                </TableRow>
-              </TableHeader>
-              <TableBody>
-                {selectedPOForReceive?.items?.map((item: POItem, index: number) => {
-                  const totalReceived = getReceivedQuantityForItem(selectedPOForReceive?.id ?? 0, item.productId ?? 0);
-                  const remaining = (item.quantity ?? 0) - totalReceived;
-                  
-                  return (
-                    <TableRow key={index}>
-                      <TableCell>
-                        <div>
-                          <p className="font-medium">{item.productName}</p>
-                          <p className="text-sm text-gray-500">{item.productSku} • {item.size}</p>
-                        </div>
-                      </TableCell>
-                      <TableCell className="text-right">{item.quantity}</TableCell>
-                      <TableCell className="text-right">{totalReceived}</TableCell>
-                      <TableCell className="text-right">
-                        <Badge variant={remaining > 0 ? "secondary" : "default"}>
-                          {remaining}
-                        </Badge>
-                      </TableCell>
-                      <TableCell className="text-right">
-                        <Input
-                          type="number"
-                          min="0"
-                          max={remaining}
-                          placeholder="0"
-                          value={receiveQuantities[item.id] || ''}
-                          onChange={(e) => handleReceiveQuantityChange(item.id, parseInt(e.target.value) || 0)}
-                          disabled={remaining <= 0}
-                          className="w-24 text-right ml-auto"
-                        />
-                      </TableCell>
-                    </TableRow>
-                  );
-                })}
-              </TableBody>
-            </Table>
+      <ReceiveDialog
+        selectedPOForReceive={selectedPOForReceive}
+        onClose={() => {
+          setSelectedPOForReceive(null);
+          setReceiveQuantities({});
+          setReceiveNotes('');
+          setReceiveDate(new Date().toISOString().slice(0, 10));
+          setReceiveRefNumber('');
+          setReceiveRefDate('');
+          setPendingDocs([null, null, null]);
+        }}
+        receiveQuantities={receiveQuantities}
+        onReceiveQuantityChange={handleReceiveQuantityChange}
+        receiveNotes={receiveNotes}
+        setReceiveNotes={setReceiveNotes}
+        receiveDate={receiveDate}
+        setReceiveDate={setReceiveDate}
+        receiveRefNumber={receiveRefNumber}
+        setReceiveRefNumber={setReceiveRefNumber}
+        receiveRefDate={receiveRefDate}
+        setReceiveRefDate={setReceiveRefDate}
+        pendingDocs={pendingDocs}
+        updatePendingDoc={updatePendingDoc}
+        handlePendingDocSelect={handlePendingDocSelect}
+        processingPOId={processingPOId}
+        getReceivedQuantityForItem={getReceivedQuantityForItem}
+        onSaveReceive={handleSaveReceive}
+      />
 
-            <div className="grid grid-cols-2 gap-4">
-              <div className="space-y-2">
-                <Label htmlFor="receive-date">Received Date</Label>
-                <Input
-                  id="receive-date"
-                  type="date"
-                  value={receiveDate}
-                  max={new Date().toISOString().slice(0, 10)}
-                  onChange={(e) => setReceiveDate(e.target.value)}
-                />
-              </div>
-              <div className="space-y-2">
-                <Label htmlFor="receive-notes">Notes (optional)</Label>
-                <Textarea
-                  id="receive-notes"
-                  placeholder="Add any notes about this goods receipt..."
-                  value={receiveNotes}
-                  onChange={(e) => setReceiveNotes(e.target.value)}
-                  rows={2}
-                />
-              </div>
-            </div>
-            <div className="grid grid-cols-2 gap-4">
-              <div className="space-y-2">
-                <Label htmlFor="receive-ref-number">Reference No. (optional)</Label>
-                <Input
-                  id="receive-ref-number"
-                  type="text"
-                  placeholder="e.g. REF-2024-001"
-                  value={receiveRefNumber}
-                  onChange={(e) => setReceiveRefNumber(e.target.value)}
-                />
-              </div>
-              <div className="space-y-2">
-                <Label htmlFor="receive-ref-date">Reference Date (optional)</Label>
-                <Input
-                  id="receive-ref-date"
-                  type="date"
-                  value={receiveRefDate}
-                  onChange={(e) => setReceiveRefDate(e.target.value)}
-                />
-              </div>
-            </div>
-
-            <div className="space-y-2 border-t pt-3">
-              <Label>Attach Delivery Documents (optional)</Label>
-              <p className="text-xs text-gray-500">Up to 3 documents — PDF, JPG, PNG, max 5 MB each. Attached automatically after saving.</p>
-              <div className="flex gap-2 flex-wrap">
-                {[0, 1, 2].map((idx: number) => {
-                  const slotLabel = `Supporting Documentation ${idx + 1}`;
-                  return (
-                    <div key={idx} className="flex-1 min-w-[160px]">
-                      {pendingDocs[idx] ? (
-                        <div className="flex items-center gap-2 p-2 rounded text-xs border bg-blue-50 border-blue-200">
-                          <FileText className="w-4 h-4 flex-shrink-0 text-blue-600" />
-                          <span className="flex-1 truncate text-blue-800">{pendingDocs[idx].name}</span>
-                          <button type="button" onClick={() => updatePendingDoc(idx, null)} className="text-gray-400 hover:text-red-500">
-                            <X className="w-3.5 h-3.5" />
-                          </button>
-                        </div>
-                      ) : (
-                        <label className="flex items-center gap-2 p-2 border border-dashed rounded text-xs cursor-pointer transition-colors border-gray-300 hover:border-blue-400 hover:bg-blue-50 text-gray-500">
-                          <Paperclip className="w-3.5 h-3.5 flex-shrink-0" />
-                          <span>{slotLabel}</span>
-                          <input
-                            type="file"
-                            accept=".pdf,.jpg,.jpeg,.png"
-                            className="hidden"
-                            onChange={(e) => handlePendingDocSelect(idx, e)}
-                          />
-                        </label>
-                      )}
-                    </div>
-                  );
-                })}
-              </div>
-            </div>
-          </div>
-
-          <DialogFooter className="flex gap-2">
-            <Button variant="outline" onClick={() => {
-              setSelectedPOForReceive(null);
-              setReceiveQuantities({});
-              setReceiveNotes('');
-              setReceiveDate(new Date().toISOString().slice(0, 10));
-              setReceiveRefNumber('');
-              setReceiveRefDate('');
-              setPendingDocs([null, null, null]);
-            }}>
-              Cancel
-            </Button>
-            
-            {/* Dynamic button logic based on whether all quantities match */}
-            {(() => {
-              const allItemsFullyReceived = selectedPOForReceive?.items?.every((item: POItem) => {
-                const totalReceived = getReceivedQuantityForItem(selectedPOForReceive?.id ?? 0, item.productId ?? 0);
-                const currentReceiving = receiveQuantities[item.id] || 0;
-                return (totalReceived + currentReceiving) >= (item.quantity ?? 0);
-              });
-
-              const hasQuantitiesToReceive = selectedPOForReceive?.items?.some((item: POItem) => receiveQuantities[item.id] > 0);
-
-              if (allItemsFullyReceived && hasQuantitiesToReceive) {
-                // All quantities match - only show "Save & Close"
-                return (
-                  <Button 
-                    onClick={() => handleSaveReceive(true)}
-                    disabled={processingPOId === selectedPOForReceive?.id}
-                    className="bg-emerald-600 hover:bg-emerald-700"
-                  >
-                    {processingPOId === selectedPOForReceive?.id ? "Processing..." : "Save & Close"}
-                  </Button>
-                );
-              } else {
-                // Not all quantities match - show both options
-                return (
-                  <>
-                    <Button 
-                      variant="outline"
-                      onClick={() => handleSaveReceive(false)}
-                      disabled={processingPOId === selectedPOForReceive?.id || !hasQuantitiesToReceive}
-                    >
-                      {processingPOId === selectedPOForReceive?.id ? "Processing..." : "Save"}
-                    </Button>
-                    <Button 
-                      onClick={() => handleSaveReceive(true)}
-                      disabled={processingPOId === selectedPOForReceive?.id}
-                      variant="destructive"
-                    >
-                      {processingPOId === selectedPOForReceive?.id ? "Processing..." : "Save & Close"}
-                    </Button>
-                  </>
-                );
-              }
-            })()}
-          </DialogFooter>
-        </DialogContent>
-      </Dialog>
-
-      <SimpleConfirmDialog
+      <CloseConfirmDialog
         open={showCloseConfirm}
+        closingPO={closingPO}
         onClose={() => setShowCloseConfirm(false)}
-        title="Force Close Purchase Order"
-        description={`Are you sure you want to manually close ${closingPO?.poNumber}? This should only be done if you are not expecting any more items. This action cannot be undone.`}
         onConfirm={handleConfirmForceClose}
-        confirmText="Yes, Close PO"
-        confirmVariant="destructive"
       />
 
       {/* GRN Document Attachment Dialog */}
