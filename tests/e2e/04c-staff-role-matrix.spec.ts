@@ -239,7 +239,7 @@ test.describe('Staff role matrix (Task #370)', () => {
     expect(r.status).not.toBe(403);
   });
 
-  test('Staff can POST /api/invoices (gate accepts → not 403)', async () => {
+  test('Staff can POST /api/invoices (201)', async () => {
     const r = await api('POST', '/api/invoices', staffCookie, {
       customer_id: fixtureCustomerId,
       invoice_date: '2026-04-15',
@@ -253,8 +253,7 @@ test.describe('Staff role matrix (Task #370)', () => {
         line_total: 50,
       }],
     });
-    expect(r.status).not.toBe(401);
-    expect(r.status).not.toBe(403);
+    expect(r.status).toBe(201);
   });
 
   test('Staff can PUT /api/invoices/:id (gate accepts → not 403)', async () => {
@@ -306,7 +305,7 @@ test.describe('Staff role matrix (Task #370)', () => {
     expect(r.status).not.toBe(403);
   });
 
-  test('Staff can POST /api/delivery-orders (gate accepts → not 403)', async () => {
+  test('Staff can POST /api/delivery-orders (201)', async () => {
     const r = await api('POST', '/api/delivery-orders', staffCookie, {
       customer_id: fixtureCustomerId,
       order_date: '2026-04-15',
@@ -320,8 +319,7 @@ test.describe('Staff role matrix (Task #370)', () => {
         line_total: 50,
       }],
     });
-    expect(r.status).not.toBe(401);
-    expect(r.status).not.toBe(403);
+    expect(r.status).toBe(201);
   });
 
   test('Staff can PUT /api/delivery-orders/:id (gate accepts → not 403)', async () => {
@@ -357,11 +355,11 @@ test.describe('Staff role matrix (Task #370)', () => {
     expect(r.status).not.toBe(403);
   });
 
-  test('Staff can POST /api/quotations (gate accepts → not 403)', async () => {
+  test('Staff can POST /api/quotations (201)', async () => {
     const r = await api('POST', '/api/quotations', staffCookie, {
-      customer_id: fixtureCustomerId,
-      quotation_date: '2026-04-15',
-      valid_until: '2026-05-15',
+      customerId: fixtureCustomerId,
+      quoteDate: '2026-04-15',
+      validUntil: '2026-05-15',
       status: 'draft',
       items: [{
         product_id: fixtureProductId,
@@ -372,8 +370,7 @@ test.describe('Staff role matrix (Task #370)', () => {
         line_total: 50,
       }],
     });
-    expect(r.status).not.toBe(401);
-    expect(r.status).not.toBe(403);
+    expect(r.status).toBe(201);
   });
 
   test('Staff can PATCH /api/quotations/:id/convert (gate accepts → not 403)', async () => {
