@@ -44,6 +44,7 @@ Internal documents use simple bordered data tables, while external documents (PO
 - **Server Route Reorganisation**: Modularized API routes for improved maintainability.
 - **Security Hardening**: Audit-Log and Recycle-Bin writes are exclusively server-side, with Admin-only access to sensitive operations and storage routes.
 - **Destructive Admin Actions Guard**: Generalised pattern requiring typed confirmation phrases for irreversible admin actions (e.g., factory reset, permanent delete, user delete, purge old data, emergency restore). This applies advisory locks for destructive database operations to prevent concurrent execution.
+- **Strict PO Numeric Validation (Task #369, RF-3B)**: All numeric fields on Purchase Order POST/PUT are strictly parsed at `server/lib/purchaseOrderTotals.ts`. Quantity, unit price, product ID, and FX rate reject partially-numeric strings (`"12abc"`, `"4.5abc"`, `"0x10"`), special-value strings (`"Infinity"`, `"NaN"`, `"abc"`), and exponent notation. `fxRateToAed` must be strictly positive when supplied; only genuinely blank values fall back to the default 4.85. Header-only PUT validates `fxRateToAed` via `parseFxRateOrDefault` BEFORE writing the header row, so a malformed fx can never partially save the header. Single source of truth for PO numeric coercion is the helper — routes import `parseFxRateOrDefault` instead of re-implementing `parseFloat(...) || default`.
 
 # External Dependencies
 

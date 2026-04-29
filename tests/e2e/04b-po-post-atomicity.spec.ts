@@ -247,4 +247,243 @@ test.describe('PO POST atomicity & zero-valid-line rejection (Task #366, RF-3)',
     expect(detailAfter.notes).toBe(notesBefore);
     expect(detailAfter.notes).not.toBe('RF-3 PUT zero-valid attempt');
   });
+
+  // ─── RF-3B: strict numeric validation on POST ───────────────────
+  // Each malformed-numeric POST must reject with 400 AND not create
+  // any PO row. Pre-RF-3B, parseFloat would silently coerce "12abc"
+  // -> 12, "4.5abc" -> 4.5, "0x10" -> 0, and "Infinity" / "NaN"
+  // would either fall back to defaults or pass through.
+  test('RF-3B: POST with malformed quantity / unitPrice / fxRateToAed → 400 + no PO created', async () => {
+    test.skip(!brandId || !product, 'Requires at least one brand and one product');
+
+    const cases: Array<{ label: string; overrides: Record<string, unknown>; expected: string }> = [
+      {
+        label: 'malformed quantity "12abc"',
+        overrides: {
+          items: [{ productId: product.id, description: product.name, quantity: '12abc', unitPrice: 10 }],
+        },
+        expected: 'Quantity must be a number',
+      },
+      {
+        label: 'malformed unitPrice "4.5abc"',
+        overrides: {
+          items: [{ productId: product.id, description: product.name, quantity: 1, unitPrice: '4.5abc' }],
+        },
+        expected: 'Unit price must be a number',
+      },
+      {
+        label: 'malformed unitPrice "0x10"',
+        overrides: {
+          items: [{ productId: product.id, description: product.name, quantity: 1, unitPrice: '0x10' }],
+        },
+        expected: 'Unit price must be a number',
+      },
+      {
+        label: 'fxRateToAed "Infinity"',
+        overrides: {
+          currency: 'GBP',
+          fxRateToAed: 'Infinity',
+          items: [{ productId: product.id, description: product.name, quantity: 1, unitPrice: 10 }],
+        },
+        expected: 'FX rate must be a positive number',
+      },
+      {
+        label: 'fxRateToAed "NaN"',
+        overrides: {
+          currency: 'GBP',
+          fxRateToAed: 'NaN',
+          items: [{ productId: product.id, description: product.name, quantity: 1, unitPrice: 10 }],
+        },
+        expected: 'FX rate must be a positive number',
+      },
+      {
+        label: 'fxRateToAed 0',
+        overrides: {
+          currency: 'GBP',
+          fxRateToAed: 0,
+          items: [{ productId: product.id, description: product.name, quantity: 1, unitPrice: 10 }],
+        },
+        expected: 'FX rate must be a positive number',
+      },
+      {
+        label: 'fxRateToAed -4.85',
+        overrides: {
+          currency: 'GBP',
+          fxRateToAed: -4.85,
+          items: [{ productId: product.id, description: product.name, quantity: 1, unitPrice: 10 }],
+        },
+        expected: 'FX rate must be a positive number',
+      },
+      {
+        label: 'malformed productId "12abc"',
+        overrides: {
+          items: [{ productId: '12abc', description: 'bad', quantity: 1, unitPrice: 10 }],
+        },
+        expected: 'Product ID must be a positive integer',
+      },
+    ];
+
+    for (const c of cases) {
+      const before = await poCount(cookie);
+      const beforeAudit = await poCreateAuditCount(cookie);
+
+      const { status, data } = await apiPost('/api/purchase-orders', {
+        brandId,
+        orderDate: '2026-04-29',
+        expectedDelivery: '2026-05-29',
+        status: 'draft',
+        notes: `RF-3B POST ${c.label}`,
+        ...c.overrides,
+      }, cookie);
+
+      expect(status, `${c.label}: status`).toBe(400);
+      expect((data as { error?: string }).error, `${c.label}: error`).toBe(c.expected);
+
+      const after = await poCount(cookie);
+      expect(after, `${c.label}: PO count must be unchanged`).toBe(before);
+      const afterAudit = await poCreateAuditCount(cookie);
+      expect(afterAudit, `${c.label}: audit count must be unchanged`).toBe(beforeAudit);
+    }
+  });
+
+  // ─── RF-3B: items-branch PUT with malformed numeric → 400 + no change ───
+  test('RF-3B: items-branch PUT with malformed unitPrice → 400 + PO unchanged', async () => {
+    test.skip(!brandId || !product, 'Requires at least one brand and one product');
+
+    // Seed a clean PO to attempt-edit.
+    const qty = 2;
+    const unit = productPrice(product);
+    const seedRes = await apiPost('/api/purchase-orders', {
+      brandId,
+      orderDate: '2026-04-29',
+      expectedDelivery: '2026-05-29',
+      status: 'draft',
+      notes: 'RF-3B items-PUT target',
+      items: [{
+        productId: product.id, description: product.name,
+        quantity: qty, unitPrice: unit, lineTotal: qty * unit,
+      }],
+    }, cookie);
+    expect(seedRes.status).toBe(201);
+    const seeded = seedRes.data as ApiPurchaseOrder;
+    createdPOIds.push(seeded.id);
+
+    const detailBefore = await apiGet(`/api/purchase-orders/${seeded.id}/detail`, cookie) as {
+      totalAmount?: string; notes?: string; items?: Array<unknown>;
+    };
+
+    const { status, data } = await apiPut(`/api/purchase-orders/${seeded.id}`, {
+      notes: 'RF-3B malformed PUT attempt',
+      items: [{
+        productId: product.id, description: product.name,
+        quantity: 1, unitPrice: '12abc',
+      }],
+    }, cookie);
+
+    expect(status).toBe(400);
+    expect((data as { error?: string }).error).toBe('Unit price must be a number');
+
+    const detailAfter = await apiGet(`/api/purchase-orders/${seeded.id}/detail`, cookie) as {
+      totalAmount?: string; notes?: string; items?: Array<unknown>;
+    };
+    expect(detailAfter.totalAmount).toBe(detailBefore.totalAmount);
+    expect(detailAfter.items?.length).toBe(detailBefore.items?.length);
+    // Notes must NOT have been written — header update is in the same tx.
+    expect(detailAfter.notes).toBe(detailBefore.notes);
+    expect(detailAfter.notes).not.toBe('RF-3B malformed PUT attempt');
+  });
+
+  // ─── RF-3B: header-only PUT with malformed fxRate → 400 + header unchanged ───
+  // The pre-RF-3B header-only branch wrote the header THEN re-validated
+  // fxRate with `parseFloat(...) || 4.85`, so a bad fxRate could partially
+  // save the header (notes, currency, etc.) and silently fall back to the
+  // default fx. After RF-3B the validation runs FIRST; on rejection
+  // nothing in the header row changes.
+  test('RF-3B: header-only PUT with malformed fxRateToAed → 400 + header unchanged', async () => {
+    test.skip(!brandId || !product, 'Requires at least one brand and one product');
+
+    // Seed a clean PO with a known currency / fx / notes baseline.
+    const qty = 1;
+    const unit = productPrice(product);
+    const seedRes = await apiPost('/api/purchase-orders', {
+      brandId,
+      orderDate: '2026-04-29',
+      expectedDelivery: '2026-05-29',
+      status: 'draft',
+      currency: 'GBP',
+      fxRateToAed: '4.5',
+      notes: 'RF-3B header-only baseline',
+      items: [{
+        productId: product.id, description: product.name,
+        quantity: qty, unitPrice: unit, lineTotal: qty * unit,
+      }],
+    }, cookie);
+    expect(seedRes.status).toBe(201);
+    const seeded = seedRes.data as ApiPurchaseOrder;
+    createdPOIds.push(seeded.id);
+
+    const detailBefore = await apiGet(`/api/purchase-orders/${seeded.id}/detail`, cookie) as {
+      totalAmount?: string; grandTotal?: string; currency?: string;
+      fxRateToAed?: string; notes?: string;
+    };
+
+    for (const badFx of ['Infinity', 'NaN', '12abc', '0', '-1'] as const) {
+      const { status, data } = await apiPut(`/api/purchase-orders/${seeded.id}`, {
+        // No items array -> header-only PUT branch.
+        notes: `RF-3B header-only attempt fx=${badFx}`,
+        fxRateToAed: badFx,
+      }, cookie);
+
+      expect(status, `fx=${badFx}: status`).toBe(400);
+      expect((data as { error?: string }).error, `fx=${badFx}: error`)
+        .toBe('FX rate must be a positive number');
+
+      const detailAfter = await apiGet(`/api/purchase-orders/${seeded.id}/detail`, cookie) as {
+        totalAmount?: string; grandTotal?: string; currency?: string;
+        fxRateToAed?: string; notes?: string;
+      };
+      // Nothing in the header row should have changed.
+      expect(detailAfter.notes, `fx=${badFx}: notes`).toBe(detailBefore.notes);
+      expect(detailAfter.currency, `fx=${badFx}: currency`).toBe(detailBefore.currency);
+      expect(detailAfter.fxRateToAed, `fx=${badFx}: fxRateToAed`).toBe(detailBefore.fxRateToAed);
+      expect(detailAfter.totalAmount, `fx=${badFx}: totalAmount`).toBe(detailBefore.totalAmount);
+      expect(detailAfter.grandTotal, `fx=${badFx}: grandTotal`).toBe(detailBefore.grandTotal);
+    }
+  });
+
+  // ─── RF-3B: header-only PUT with VALID fx still works ───────────────
+  test('RF-3B: header-only PUT with valid fxRateToAed updates grandTotal', async () => {
+    test.skip(!brandId || !product, 'Requires at least one brand and one product');
+
+    const qty = 2;
+    const unit = productPrice(product);
+    const seedRes = await apiPost('/api/purchase-orders', {
+      brandId,
+      orderDate: '2026-04-29',
+      expectedDelivery: '2026-05-29',
+      status: 'draft',
+      currency: 'GBP',
+      fxRateToAed: '4.5',
+      notes: 'RF-3B header-only valid baseline',
+      items: [{
+        productId: product.id, description: product.name,
+        quantity: qty, unitPrice: unit, lineTotal: qty * unit,
+      }],
+    }, cookie);
+    expect(seedRes.status).toBe(201);
+    const seeded = seedRes.data as ApiPurchaseOrder;
+    createdPOIds.push(seeded.id);
+
+    const { status } = await apiPut(`/api/purchase-orders/${seeded.id}`, {
+      fxRateToAed: '5',
+    }, cookie);
+    expect(status).toBe(200);
+
+    const detailAfter = await apiGet(`/api/purchase-orders/${seeded.id}/detail`, cookie) as {
+      totalAmount?: string; grandTotal?: string;
+    };
+    const totalNum = parseFloat(detailAfter.totalAmount ?? '0');
+    const expectedGrand = (totalNum * 5).toFixed(2);
+    expect(detailAfter.grandTotal).toBe(expectedGrand);
+  });
 });

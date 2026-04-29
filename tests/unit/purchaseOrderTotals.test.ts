@@ -3,6 +3,7 @@ import assert from "node:assert/strict";
 import {
   PurchaseOrderRequestError,
   computePurchaseOrderTotals,
+  parseFxRateOrDefault,
   PO_DEFAULT_FX_RATE_TO_AED,
 } from "../../server/lib/purchaseOrderTotals";
 
@@ -46,8 +47,11 @@ test("sums multiple lines and applies fxRate when currency is non-AED", () => {
   assert.equal(result.grandTotalStr, (46 * 4.5).toFixed(2)); // 207.00
 });
 
-test("falls back to default fxRate when fxRate is missing, empty, NaN, or zero", () => {
-  for (const fx of [undefined, null, "", "   ", "abc", 0, "0"] as const) {
+// Task #369 (RF-3B): only GENUINELY blank fxRate falls back to the default.
+// Non-blank but invalid (zero, negative, malformed, NaN, Infinity) MUST
+// reject with 400 — pre-RF-3B these silently coerced or fell back.
+test("falls back to default fxRate only when fxRate is genuinely blank", () => {
+  for (const fx of [undefined, null, "", "   "] as const) {
     const r = computePurchaseOrderTotals(
       [{ productId: 1, quantity: 1, unitPrice: 10 }],
       "GBP",
@@ -95,7 +99,7 @@ test("rejects negative unit price with the today-compatible error message", () =
   );
 });
 
-test("rejects truly non-numeric unit price (parseFloat returns NaN)", () => {
+test("rejects truly non-numeric unit price (parser returns null)", () => {
   for (const bad of ["not-a-number", "abc", "abc123"]) {
     assert.throws(
       () =>
@@ -162,39 +166,160 @@ test("rejects invalid unitPrice on a would-be-skipped line — invalidates the w
   );
 });
 
-test("preserves prior parseFloat() coercion semantics for partially-numeric strings", () => {
-  // parseFloat("12abc") === 12 — today's route accepts this, so we must too.
-  // Number("12abc") would be NaN and throw — this test pins that we did NOT
-  // tighten the contract for in-flight clients sending loosely-formatted
-  // numeric strings.
-  const r = computePurchaseOrderTotals(
-    [{ productId: 1, quantity: 1, unitPrice: "12abc" }],
-    "AED",
-    null,
-  );
-  assert.equal(r.items.length, 1);
-  assert.equal(r.items[0].unitPriceStr, "12.00");
-  assert.equal(r.items[0].lineTotalStr, "12.00");
+// Task #369 (RF-3B): the strict parser MUST reject every partially-numeric
+// string and special-value string that the old parseFloat-based helper
+// silently accepted. Pre-RF-3B these were passed through ("12abc" -> 12,
+// "4.5abc" -> 4.5, "0x10" -> 0); now they must each return a 400 with the
+// appropriate field-specific error message.
+test("RF-3B: rejects partially-numeric and special-value unit price strings", () => {
+  for (const bad of ["12abc", "4.5abc", "0x10", "Infinity", "NaN", "1e5", "0.5.5"]) {
+    assert.throws(
+      () =>
+        computePurchaseOrderTotals(
+          [{ productId: 1, quantity: 1, unitPrice: bad }],
+          "AED",
+          null,
+        ),
+      (err: unknown) => {
+        assert.ok(err instanceof PurchaseOrderRequestError);
+        assert.equal(err.statusCode, 400);
+        assert.equal(err.responseBody.error, "Unit price must be a number");
+        return true;
+      },
+      `unitPrice=${JSON.stringify(bad)} should be rejected by strict parser`,
+    );
+  }
 });
 
-test("preserves prior parseFloat() coercion semantics for fxRate edge cases", () => {
-  // parseFloat("4.5abc") === 4.5 — today's route used 4.5 as the fx, so
-  // grandTotal must still be totalAmount * 4.5 (NOT the default 4.85).
-  const r1 = computePurchaseOrderTotals(
-    [{ productId: 1, quantity: 1, unitPrice: 10 }],
-    "GBP",
-    "4.5abc",
-  );
-  assert.equal(r1.grandTotalStr, (10 * 4.5).toFixed(2));
+test("RF-3B: rejects partially-numeric and special-value quantity strings", () => {
+  for (const bad of ["12abc", "4.5abc", "0x10", "Infinity", "NaN", "abc"]) {
+    assert.throws(
+      () =>
+        computePurchaseOrderTotals(
+          [{ productId: 1, quantity: bad, unitPrice: 10 }],
+          "AED",
+          null,
+        ),
+      (err: unknown) => {
+        assert.ok(err instanceof PurchaseOrderRequestError);
+        assert.equal(err.statusCode, 400);
+        assert.equal(err.responseBody.error, "Quantity must be a number");
+        return true;
+      },
+      `quantity=${JSON.stringify(bad)} should be rejected by strict parser`,
+    );
+  }
+});
 
-  // parseFloat("0x10") === 0 → today's `0 || 4.85` falls back to 4.85.
-  // (Number("0x10") would be 16 — must NOT happen here.)
-  const r2 = computePurchaseOrderTotals(
-    [{ productId: 1, quantity: 1, unitPrice: 10 }],
+test("RF-3B: rejects partially-numeric and special-value fxRate strings", () => {
+  for (const bad of ["12abc", "4.5abc", "0x10", "Infinity", "NaN", "abc"]) {
+    assert.throws(
+      () =>
+        computePurchaseOrderTotals(
+          [{ productId: 1, quantity: 1, unitPrice: 10 }],
+          "GBP",
+          bad,
+        ),
+      (err: unknown) => {
+        assert.ok(err instanceof PurchaseOrderRequestError);
+        assert.equal(err.statusCode, 400);
+        assert.equal(err.responseBody.error, "FX rate must be a positive number");
+        return true;
+      },
+      `fxRate=${JSON.stringify(bad)} should be rejected by strict parser`,
+    );
+  }
+});
+
+test("RF-3B: rejects zero, negative, NaN, and Infinity fxRate (number form)", () => {
+  for (const bad of [0, -1, -4.85, NaN, Infinity, -Infinity, "0", "-1", "-4.85"] as Array<
+    number | string
+  >) {
+    assert.throws(
+      () =>
+        computePurchaseOrderTotals(
+          [{ productId: 1, quantity: 1, unitPrice: 10 }],
+          "GBP",
+          bad,
+        ),
+      (err: unknown) => {
+        assert.ok(err instanceof PurchaseOrderRequestError);
+        assert.equal(err.statusCode, 400);
+        assert.equal(err.responseBody.error, "FX rate must be a positive number");
+        return true;
+      },
+      `fxRate=${JSON.stringify(bad)} should reject as non-positive`,
+    );
+  }
+});
+
+test("RF-3B: rejects malformed productId on otherwise-valid line", () => {
+  for (const bad of ["12abc", "0x10", "abc", "Infinity", "NaN", "1.5", -1, 0]) {
+    assert.throws(
+      () =>
+        computePurchaseOrderTotals(
+          [{ productId: bad, quantity: 1, unitPrice: 10 }],
+          "AED",
+          null,
+        ),
+      (err: unknown) => {
+        assert.ok(err instanceof PurchaseOrderRequestError);
+        assert.equal(err.statusCode, 400);
+        assert.equal(
+          err.responseBody.error,
+          "Product ID must be a positive integer",
+        );
+        return true;
+      },
+      `productId=${JSON.stringify(bad)} should be rejected`,
+    );
+  }
+});
+
+test("RF-3B: clean numeric strings and whitespace-padded strings still parse", () => {
+  // These are all valid inputs the UI / clients legitimately send.
+  const r = computePurchaseOrderTotals(
+    [
+      { productId: "12", quantity: "2", unitPrice: "12.50" },
+      { productId: " 7 ", quantity: " 3 ", unitPrice: " 0.5 " },
+    ],
     "GBP",
-    "0x10",
+    " 4.5 ",
   );
-  assert.equal(r2.grandTotalStr, (10 * PO_DEFAULT_FX_RATE_TO_AED).toFixed(2));
+  assert.equal(r.items.length, 2);
+  assert.equal(r.items[0].productId, 12);
+  assert.equal(r.items[0].lineTotalStr, "25.00");
+  assert.equal(r.items[1].productId, 7);
+  assert.equal(r.items[1].lineTotalStr, "1.50");
+  assert.equal(r.totalAmountStr, "26.50");
+  assert.equal(r.grandTotalStr, (26.5 * 4.5).toFixed(2));
+});
+
+test("RF-3B: parseFxRateOrDefault contract — exported for header-only PUT", () => {
+  // Blank values fall back to default.
+  assert.equal(parseFxRateOrDefault(undefined), PO_DEFAULT_FX_RATE_TO_AED);
+  assert.equal(parseFxRateOrDefault(null), PO_DEFAULT_FX_RATE_TO_AED);
+  assert.equal(parseFxRateOrDefault(""), PO_DEFAULT_FX_RATE_TO_AED);
+  assert.equal(parseFxRateOrDefault("   "), PO_DEFAULT_FX_RATE_TO_AED);
+
+  // Clean numeric values pass through.
+  assert.equal(parseFxRateOrDefault(4.5), 4.5);
+  assert.equal(parseFxRateOrDefault("4.5"), 4.5);
+  assert.equal(parseFxRateOrDefault(" 4.5 "), 4.5);
+  assert.equal(parseFxRateOrDefault("12"), 12);
+
+  // Anything else throws PurchaseOrderRequestError(400).
+  for (const bad of [0, -1, NaN, Infinity, "0", "-1", "abc", "12abc", "Infinity", "NaN"]) {
+    assert.throws(
+      () => parseFxRateOrDefault(bad),
+      (err: unknown) => {
+        assert.ok(err instanceof PurchaseOrderRequestError);
+        assert.equal(err.statusCode, 400);
+        return true;
+      },
+      `parseFxRateOrDefault(${JSON.stringify(bad)}) should throw`,
+    );
+  }
 });
 
 test("silently skips lines without productId or with zero qty", () => {

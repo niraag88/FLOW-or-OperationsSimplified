@@ -7,6 +7,7 @@ import { businessStorage } from "../businessStorage";
 import { requireAuth, writeAuditLog, deleteStorageObjectSafely, type AuthenticatedRequest } from "../middleware";
 import {
   computePurchaseOrderTotals,
+  parseFxRateOrDefault,
   PurchaseOrderRequestError,
 } from "../lib/purchaseOrderTotals";
 
@@ -297,23 +298,47 @@ export function registerPurchaseOrderRoutes(app: Express) {
           return finalRow ?? headerRow;
         });
       } else {
-        // Header-only PUT: keep today's flow (no items touched, no
-        // totals recomputed from items). validatedData has client
-        // totals stripped, so a request body cannot poison
-        // totalAmount / grandTotal even on this path.
+        // Header-only PUT: validatedData has client totals stripped, so a
+        // request body cannot poison totalAmount / grandTotal even on this
+        // path.
+        //
+        // Task #369 (RF-3B): when fxRateToAed or currency change, validate
+        // the EFFECTIVE fxRate BEFORE any DB write so a malformed fxRate
+        // can never partially save the header (which previously silently
+        // fell back to the 4.85 default via `parseFloat(...) || 4.85`).
+        // Read currentPO first, validate via parseFxRateOrDefault (throws
+        // PurchaseOrderRequestError(400) on bad input), THEN write.
+        const fxOrCurrencyChanged =
+          req.body.fxRateToAed !== undefined || req.body.currency !== undefined;
+
+        let currentPO: typeof purchaseOrders.$inferSelect | undefined;
+        let validatedFxRate: number | null = null;
+        let newCurrency: string | null = null;
+
+        if (fxOrCurrencyChanged) {
+          [currentPO] = await db.select().from(purchaseOrders).where(eq(purchaseOrders.id, poId));
+          if (!currentPO) {
+            throw new PurchaseOrderRequestError(404, { error: 'Purchase order not found' });
+          }
+          newCurrency = req.body.currency ?? currentPO.currency ?? 'GBP';
+          // Use the effective value: caller's fxRateToAed if supplied,
+          // otherwise the stored value. parseFxRateOrDefault throws on
+          // any non-blank value that fails strict parsing or is <= 0.
+          const fxInput = req.body.fxRateToAed !== undefined
+            ? req.body.fxRateToAed
+            : currentPO.fxRateToAed;
+          validatedFxRate = parseFxRateOrDefault(fxInput);
+        }
+
         updatedPO = await businessStorage.updatePurchaseOrder(poId, validatedData);
 
-        if (req.body.fxRateToAed !== undefined || req.body.currency !== undefined) {
-          const [currentPO] = await db.select().from(purchaseOrders).where(eq(purchaseOrders.id, poId));
-          if (currentPO) {
-            const currentTotal = parseFloat(String(currentPO.totalAmount)) || 0;
-            const newFxRate = parseFloat(String(req.body.fxRateToAed ?? currentPO.fxRateToAed)) || 4.85;
-            const newCurrency = req.body.currency ?? currentPO.currency ?? 'GBP';
-            const recomputedGrandTotal = newCurrency === 'AED' ? currentTotal : currentTotal * newFxRate;
-            await db.update(purchaseOrders)
-              .set({ grandTotal: recomputedGrandTotal.toFixed(2) })
-              .where(eq(purchaseOrders.id, poId));
-          }
+        if (currentPO && validatedFxRate !== null && newCurrency !== null) {
+          const currentTotal = parseFloat(String(currentPO.totalAmount)) || 0;
+          const recomputedGrandTotal =
+            newCurrency === 'AED' ? currentTotal : currentTotal * validatedFxRate;
+          await db.update(purchaseOrders)
+            .set({ grandTotal: recomputedGrandTotal.toFixed(2) })
+            .where(eq(purchaseOrders.id, poId));
         }
       }
 
