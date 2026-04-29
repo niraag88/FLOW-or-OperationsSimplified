@@ -1289,6 +1289,15 @@ export function registerSystemRoutes(app: Express) {
 
       const fmtDate = (d: any) => d ? new Date(d).toLocaleDateString('en-GB') : '';
       const fmtNum = (n: any) => n ? parseFloat(String(n)).toFixed(2) : '0.00';
+      // Invoice `amount` is VAT-inclusive; subtotal = amount − vatAmount.
+      // Treat null / undefined / non-numeric inputs as 0 so the result is
+      // never NaN.
+      const safeNum = (n: any) => {
+        const v = parseFloat(String(n ?? ''));
+        return Number.isFinite(v) ? v : 0;
+      };
+      const fmtInvoiceSubtotal = (amount: any, vat: any) =>
+        (safeNum(amount) - safeNum(vat)).toFixed(2);
 
       const wb = new ExcelJS.Workbook();
 
@@ -1311,7 +1320,7 @@ export function registerSystemRoutes(app: Express) {
         'Customer': r.customerName,
         'Date': fmtDate(r.invoiceDate),
         'Status': r.status,
-        'Subtotal (AED)': fmtNum(r.amount),
+        'Subtotal (AED)': fmtInvoiceSubtotal(r.amount, r.vatAmount),
         'VAT (AED)': fmtNum(r.vatAmount),
         'Total (AED)': fmtNum(r.amount),
         'Reference': r.reference || '',
