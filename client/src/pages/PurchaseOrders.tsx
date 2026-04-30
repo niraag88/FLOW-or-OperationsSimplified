@@ -13,7 +13,6 @@ import { PurchaseOrder } from "@/api/entities";
 import POList from "../components/purchase-orders/POList";
 import POForm from "../components/purchase-orders/POForm";
 import GoodsReceiptsTab, { PORow } from "../components/purchase-orders/GoodsReceiptsTab";
-import GRNPaymentsLedger from "../components/purchase-orders/GRNPaymentsLedger";
 import type { GoodsReceipt as SchemaGoodsReceipt } from "@shared/schema";
 import POFilters from "../components/purchase-orders/POFilters";
 import ExportDropdown from "../components/common/ExportDropdown";
@@ -294,7 +293,6 @@ export default function PurchaseOrders() {
         </div>
         
         <div className="flex flex-wrap items-center gap-3">
-          {activeTab !== 'payments' && (
           <ExportDropdown 
             data={activeTab === 'purchase-orders' ? visiblePOs : getGoodsReceiptsExportData()}
             fetchAllData={activeTab === 'purchase-orders' ? fetchAllForExport : null}
@@ -320,7 +318,6 @@ export default function PurchaseOrders() {
             } : goodsReceiptsColumns}
             isLoading={loading}
           />
-          )}
           
           {canEdit && activeTab === "purchase-orders" && (
             <Button 
@@ -334,35 +331,32 @@ export default function PurchaseOrders() {
         </div>
       </div>
 
-      {/* Search and Filters — only shown on PO and GRN tabs */}
-      {activeTab !== "payments" && (
-        <div className="flex flex-col sm:flex-row gap-4">
-          <div className="relative flex-1 max-w-md">
-            <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 w-4 h-4" />
-            <Input
-              placeholder="Search PO numbers, notes..."
-              value={searchTerm}
-              onChange={(e) => setSearchTerm(e.target.value)}
-              className="pl-10"
-            />
-          </div>
-          
-          <div className="overflow-x-auto">
-            <POFilters 
-              filters={filters} 
-              onFiltersChange={setFilters}
-              onFilterChange={resetPagination}
-            />
-          </div>
+      {/* Search and Filters */}
+      <div className="flex flex-col sm:flex-row gap-4">
+        <div className="relative flex-1 max-w-md">
+          <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 w-4 h-4" />
+          <Input
+            placeholder="Search PO numbers, notes..."
+            value={searchTerm}
+            onChange={(e) => setSearchTerm(e.target.value)}
+            className="pl-10"
+          />
         </div>
-      )}
+        
+        <div className="overflow-x-auto">
+          <POFilters 
+            filters={filters} 
+            onFiltersChange={setFilters}
+            onFilterChange={resetPagination}
+          />
+        </div>
+      </div>
 
       {/* Tabs */}
       <Tabs value={activeTab} onValueChange={setActiveTab} className="w-full">
-        <TabsList className="grid w-full max-w-lg grid-cols-3">
+        <TabsList className="grid w-full max-w-md grid-cols-2">
           <TabsTrigger value="purchase-orders">Purchase Orders</TabsTrigger>
           <TabsTrigger value="goods-receipts">Goods Receipts</TabsTrigger>
-          <TabsTrigger value="payments">Payments</TabsTrigger>
         </TabsList>
 
         <TabsContent value="purchase-orders" className="mt-6">
@@ -472,10 +466,6 @@ export default function PurchaseOrders() {
             showClosedReceipts={showClosedReceipts}
             setShowClosedReceipts={setShowClosedReceipts}
           />
-        </TabsContent>
-
-        <TabsContent value="payments" className="mt-6">
-          <GRNPaymentsLedger canEdit={canEdit} />
         </TabsContent>
       </Tabs>
 
