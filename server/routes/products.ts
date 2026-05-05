@@ -242,19 +242,40 @@ export function registerProductRoutes(app: Express) {
       if (preValidated.length > 0) {
         await db.transaction(async (tx) => {
           for (const item of preValidated) {
-            const [product] = await tx.insert(products).values({
-              sku: item.sku,
-              brandId: item.brandId,
-              name: item.name,
-              size: item.size,
-              costPrice: item.costPrice,
-              costPriceCurrency: item.costPriceCurrency,
-              unitPrice: item.unitPrice,
-              stockQuantity: 0,
-              minStockLevel: 10,
-              isActive: true,
-            }).returning();
-            createdProducts.push(product);
+            try {
+              // Per-row savepoint: a unique-constraint clash on this
+              // row rolls back only the savepoint, leaving the outer
+              // tx alive so the rest of the batch can still land.
+              await tx.transaction(async (sp) => {
+                const [product] = await sp.insert(products).values({
+                  sku: item.sku,
+                  brandId: item.brandId,
+                  name: item.name,
+                  size: item.size,
+                  costPrice: item.costPrice,
+                  costPriceCurrency: item.costPriceCurrency,
+                  unitPrice: item.unitPrice,
+                  stockQuantity: 0,
+                  minStockLevel: 10,
+                  isActive: true,
+                }).returning();
+                createdProducts.push(product);
+              });
+            } catch (err) {
+              const code = (err as { code?: string } | null)?.code;
+              if (code === '23505') {
+                // Concurrent bulk import landed the same SKU between
+                // our pre-check and this insert — surface the same
+                // friendly message the pre-check would have produced.
+                failed.push({
+                  row: item.row,
+                  sku: item.sku,
+                  message: `Product code "${item.sku}" already exists`,
+                });
+                continue;
+              }
+              throw err;
+            }
           }
         });
 
@@ -414,38 +435,48 @@ export function registerProductRoutes(app: Express) {
         return res.status(400).json({ error: 'reason is required' });
       }
 
-      const [product] = await db.select().from(products).where(eq(products.id, productId));
-      if (!product) {
-        return res.status(404).json({ error: 'Product not found' });
-      }
+      // Lock the product row inside the tx and recompute newStock
+      // from the locked snapshot so two concurrent adjustments
+      // (e.g. +10 and +5) both apply instead of silently clobbering.
+      type AdjustResult =
+        | { kind: 'ok'; product: typeof products.$inferSelect; previousStock: number; newStock: number; quantityChange: number }
+        | { kind: 'not_found' }
+        | { kind: 'no_change' };
 
-      const previousStock = product.stockQuantity ?? 0;
-      let newStock: number;
-      let quantityChange: number;
+      const result = await db.transaction(async (tx): Promise<AdjustResult> => {
+        const [product] = await tx.select().from(products)
+          .where(eq(products.id, productId))
+          .for('update')
+          .limit(1);
+        if (!product) {
+          return { kind: 'not_found' };
+        }
 
-      switch (adjustmentType) {
-        case 'increase':
-          quantityChange = Math.round(qty);
-          newStock = previousStock + quantityChange;
-          break;
-        case 'decrease':
-          quantityChange = -Math.round(qty);
-          newStock = Math.max(0, previousStock + quantityChange);
-          quantityChange = newStock - previousStock;
-          break;
-        case 'correction':
-          newStock = Math.max(0, Math.round(qty));
-          quantityChange = newStock - previousStock;
-          break;
-        default:
-          return res.status(400).json({ error: 'Invalid adjustment type' });
-      }
+        const previousStock = product.stockQuantity ?? 0;
+        let newStock: number;
+        let quantityChange: number;
 
-      if (quantityChange === 0) {
-        return res.status(400).json({ error: 'Adjustment results in no stock change. Current stock is already at the requested level.' });
-      }
+        switch (adjustmentType) {
+          case 'increase':
+            quantityChange = Math.round(qty);
+            newStock = previousStock + quantityChange;
+            break;
+          case 'decrease':
+            quantityChange = -Math.round(qty);
+            newStock = Math.max(0, previousStock + quantityChange);
+            quantityChange = newStock - previousStock;
+            break;
+          case 'correction':
+          default:
+            newStock = Math.max(0, Math.round(qty));
+            quantityChange = newStock - previousStock;
+            break;
+        }
 
-      await db.transaction(async (tx) => {
+        if (quantityChange === 0) {
+          return { kind: 'no_change' };
+        }
+
         await tx.update(products)
           .set({ stockQuantity: newStock, updatedAt: new Date() })
           .where(eq(products.id, productId));
@@ -462,7 +493,18 @@ export function registerProductRoutes(app: Express) {
           notes: `${adjustmentType.charAt(0).toUpperCase() + adjustmentType.slice(1)} adjustment: ${reason.trim()}${referenceDocument ? ` | Ref: ${referenceDocument.trim()}` : ''}`,
           createdBy: req.user!.id,
         });
+
+        return { kind: 'ok', product, previousStock, newStock, quantityChange };
       });
+
+      if (result.kind === 'not_found') {
+        return res.status(404).json({ error: 'Product not found' });
+      }
+      if (result.kind === 'no_change') {
+        return res.status(400).json({ error: 'Adjustment results in no stock change. Current stock is already at the requested level.' });
+      }
+
+      const { product, previousStock, newStock, quantityChange } = result;
 
       writeAuditLog({
         actor: req.user!.id,
