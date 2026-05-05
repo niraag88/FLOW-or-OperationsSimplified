@@ -268,6 +268,16 @@ export const products = pgTable("products", {
   productsIsActiveIdx: index("products_is_active_idx").on(table.isActive),
   productsCategoryIdx: index("products_category_idx").on(table.category),
   productsBrandIdx: index("products_brand_id_idx").on(table.brandId),
+  // Defence-in-depth (Task #410, audit finding F14): catch every code path
+  // that would drive stock negative — including future routes that forget
+  // a route-layer guard, direct database scripts, and the bulk-stock
+  // endpoint. Ships AFTER the invoice/DO/bulk-stock atomicity fixes
+  // (#403, #404, #406) so a rejected write here can't strand a partial
+  // half-applied transaction in the calling route.
+  stockQuantityNonNegativeChk: check(
+    "products_stock_quantity_non_negative_chk",
+    sql`${table.stockQuantity} >= 0`
+  ),
 }));
 
 // Invoice Line Items table
