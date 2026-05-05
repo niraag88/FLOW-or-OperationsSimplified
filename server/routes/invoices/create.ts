@@ -1,11 +1,12 @@
 import type { Express } from "express";
-import { invoices, invoiceLineItems, auditLog } from "@shared/schema";
+import { invoices, invoiceLineItems, auditLog, products } from "@shared/schema";
 import { type InsertInvoice } from "@shared/schema";
 import { db } from "../../db";
-import { eq } from "drizzle-orm";
+import { eq, inArray } from "drizzle-orm";
 import { businessStorage } from "../../businessStorage";
 import { requireAuth, updateProductStock, type AuthenticatedRequest } from "../../middleware";
 import { resolveDocumentTotals, isTotalsError, resolveAuthoritativeTaxTreatment } from "../../utils/totals";
+import { isProductsStockNonNegativeViolation } from "../../utils/pgError";
 import { logger } from "../../logger";
 
 export function registerInvoiceCreateRoutes(app: Express) {
@@ -71,6 +72,8 @@ export function registerInvoiceCreateRoutes(app: Express) {
   });
 
   app.post('/api/invoices', requireAuth(['Admin', 'Manager', 'Staff']), async (req: AuthenticatedRequest, res) => {
+    type Shortfall = { name: string; sku: string; requested: number; available: number };
+    let shortfalls: Shortfall[] = [];
     try {
       const body = req.body;
 
@@ -150,7 +153,56 @@ export function registerInvoiceCreateRoutes(app: Express) {
         ...invoiceData,
         taxTreatment: resolved.taxTreatment,
       };
+      // Sentinel for friendly negative-stock 409 (Task #414).
+      const INSUFFICIENT_STOCK = '__inv_insufficient_stock__';
+
       const invoice = await db.transaction(async (tx) => {
+        // Lock-and-validate stock BEFORE any insert when this create
+        // would actually deduct stock (status === 'delivered'). Mirrors
+        // the lock-then-sentinel pattern used by invoice update so the
+        // user sees a clean 409 with the shortfall product names instead
+        // of a generic 500 from the products_stock_quantity_non_negative_chk
+        // CHECK constraint backstop.
+        if (body.status === 'delivered') {
+          const reqByProduct = new Map<number, number>();
+          for (const item of resolved.items) {
+            if (item.product_id == null) continue;
+            const pid = parseInt(String(item.product_id));
+            reqByProduct.set(pid, (reqByProduct.get(pid) ?? 0) + item.quantity);
+          }
+          const productIds = Array.from(reqByProduct.keys());
+          if (productIds.length > 0) {
+            const locked = await tx
+              .select({
+                id: products.id,
+                name: products.name,
+                sku: products.sku,
+                stockQuantity: products.stockQuantity,
+              })
+              .from(products)
+              .where(inArray(products.id, productIds))
+              .for('update');
+            const byId = new Map(locked.map(p => [p.id, p]));
+            const found: Shortfall[] = [];
+            for (const [pid, requested] of reqByProduct) {
+              const row = byId.get(pid);
+              const available = row?.stockQuantity ?? 0;
+              if (requested > available) {
+                found.push({
+                  name: row?.name ?? `Product #${pid}`,
+                  sku: row?.sku ?? '',
+                  requested,
+                  available,
+                });
+              }
+            }
+            if (found.length > 0) {
+              shortfalls = found;
+              throw new Error(INSUFFICIENT_STOCK);
+            }
+          }
+        }
+
         const [created] = await tx
           .insert(invoices)
           .values(insertPayload)
@@ -210,6 +262,26 @@ export function registerInvoiceCreateRoutes(app: Express) {
 
       res.status(201).json({ ...invoice, items: body.items || [] });
     } catch (error) {
+      // Friendly negative-stock 409 from the in-tx sentinel (Task #414).
+      if (error instanceof Error && error.message === '__inv_insufficient_stock__') {
+        const lines = shortfalls.map(s =>
+          `'${s.name}${s.sku ? ` (${s.sku})` : ''}' — only ${s.available} available, you tried to ship ${s.requested}.`
+        );
+        return res.status(409).json({
+          error: 'insufficient_stock',
+          message: `Not enough stock for ${lines.join(' ')}`,
+          shortfalls,
+        });
+      }
+      // Defensive backstop: rare race where stock changed between the
+      // pre-check and the deduct, caught by products_stock_quantity_non_negative_chk.
+      // Drizzle wraps pg errors as DrizzleQueryError, so walk the .cause chain.
+      if (isProductsStockNonNegativeViolation(error)) {
+        return res.status(409).json({
+          error: 'insufficient_stock',
+          message: 'Not enough stock to fulfil this invoice. Please refresh and try again.',
+        });
+      }
       logger.error('Error creating invoice:', error);
       if (error instanceof Error) {
         res.status(400).json({ error: error.message });
