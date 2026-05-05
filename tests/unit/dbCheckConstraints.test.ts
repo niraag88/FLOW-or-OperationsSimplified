@@ -92,6 +92,48 @@ test('DB accepts the lower-bound 1/1', async () => {
   assert.equal(r.ok, true);
 });
 
+// ─── products.stock_quantity >= 0 (Task #410, audit finding F14) ─────────
+
+test('CHECK constraint exists on products.stock_quantity', async () => {
+  const r = await pool.query<{ name: string }>(
+    `SELECT conname AS name FROM pg_constraint
+      WHERE conname = 'products_stock_quantity_non_negative_chk'`
+  );
+  assert.equal(r.rows.length, 1);
+});
+
+async function tryProductStock(stock: number): Promise<{ ok: boolean; sqlState?: string }> {
+  const client = await pool.connect();
+  try {
+    await client.query('BEGIN');
+    try {
+      await client.query(
+        `UPDATE products SET stock_quantity = $1
+          WHERE id = (SELECT id FROM products ORDER BY id ASC LIMIT 1)`,
+        [stock]
+      );
+      await client.query('ROLLBACK');
+      return { ok: true };
+    } catch (err: any) {
+      await client.query('ROLLBACK');
+      return { ok: false, sqlState: err?.code };
+    }
+  } finally {
+    client.release();
+  }
+}
+
+test('DB rejects stock_quantity = -1 with check_violation (23514)', async () => {
+  const r = await tryProductStock(-1);
+  assert.equal(r.ok, false);
+  assert.equal(r.sqlState, '23514');
+});
+
+test('DB accepts stock_quantity = 0', async () => {
+  const r = await tryProductStock(0);
+  assert.equal(r.ok, true);
+});
+
 test.after(async () => {
   await pool.end();
 });
