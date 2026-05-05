@@ -1,9 +1,9 @@
 import type { Express } from "express";
-import { products, brands, stockMovements } from "@shared/schema";
+import { products, brands, stockMovements, type InsertStockMovement } from "@shared/schema";
 import { db } from "../db";
 import { eq, desc } from "drizzle-orm";
 import { businessStorage } from "../businessStorage";
-import { requireAuth, type AuthenticatedRequest } from "../middleware";
+import { requireAuth, writeAuditLog, type AuthenticatedRequest } from "../middleware";
 import { logger } from "../logger";
 
 export function registerInventoryRoutes(app: Express) {
@@ -81,45 +81,79 @@ export function registerInventoryRoutes(app: Express) {
         return res.status(400).json({ error: 'Movements array is required' });
       }
 
-      const results: any[] = [];
+      // Single transaction for the whole batch: each per-product
+      // SELECT ... FOR UPDATE serialises against any concurrent
+      // stock-mutating route, so previousStock/newStock recorded
+      // on stock_movements always reflect what actually landed.
+      const audits: Array<{ productId: number; productName: string; productSku: string; quantityChange: number; previousStock: number; newStock: number }> = [];
+      const results = await db.transaction(async (tx) => {
+        const created: typeof stockMovements.$inferSelect[] = [];
 
-      for (const movement of movements) {
-        const { productId, quantity, movementType, notes } = movement;
+        for (const movement of movements) {
+          const { productId, quantity, movementType, notes } = movement;
 
-        if (!productId || !quantity || quantity <= 0) {
-          continue;
+          if (!productId || !quantity || quantity <= 0) {
+            continue;
+          }
+
+          const [product] = await tx.select().from(products)
+            .where(eq(products.id, productId))
+            .for('update')
+            .limit(1);
+
+          if (!product) {
+            continue;
+          }
+
+          const previousStock = product.stockQuantity || 0;
+          const quantityChange = movementType === 'out' ? -quantity : quantity;
+          const newStock = previousStock + quantityChange;
+
+          const insertValues: InsertStockMovement = {
+            productId,
+            movementType: movementType || 'adjustment',
+            quantity,
+            previousStock,
+            newStock,
+            unitCost: product.costPrice || '0.00',
+            notes: notes || 'Initial stock entry',
+            createdBy: req.user!.id,
+          };
+
+          const [stockMovement] = await tx.insert(stockMovements).values(insertValues).returning();
+
+          await tx.update(products)
+            .set({
+              stockQuantity: newStock,
+              updatedAt: new Date(),
+            })
+            .where(eq(products.id, productId));
+
+          created.push(stockMovement);
+          audits.push({
+            productId,
+            productName: product.name,
+            productSku: product.sku,
+            quantityChange,
+            previousStock,
+            newStock,
+          });
         }
 
-        const [product] = await db.select().from(products)
-          .where(eq(products.id, productId))
-          .limit(1);
+        return created;
+      });
 
-        if (!product) {
-          continue;
-        }
-
-        const previousStock = product.stockQuantity || 0;
-        const newStock = previousStock + quantity;
-
-        const [stockMovement] = await db.insert(stockMovements).values({
-          productId,
-          movementType: movementType || 'adjustment',
-          quantity,
-          previousStock,
-          newStock,
-          unitCost: product.costPrice || '0.00',
-          notes: notes || 'Initial stock entry',
-          createdBy: req.user!.id
-        }).returning();
-
-        await db.update(products)
-          .set({
-            stockQuantity: newStock,
-            updatedAt: new Date()
-          })
-          .where(eq(products.id, productId));
-
-        results.push(stockMovement);
+      // Emit audit rows only after the tx commits so a rolled-back
+      // batch leaves no audit-log evidence of writes that didn't land.
+      for (const a of audits) {
+        writeAuditLog({
+          actor: req.user!.id,
+          actorName: req.user?.username || String(req.user!.id),
+          targetId: String(a.productId),
+          targetType: 'product',
+          action: 'UPDATE',
+          details: `Bulk stock movement for '${a.productName}' (SKU: ${a.productSku}): ${a.quantityChange >= 0 ? '+' : ''}${a.quantityChange} — ${a.previousStock} → ${a.newStock}`,
+        });
       }
 
       res.json({
