@@ -1,10 +1,10 @@
 import type { Express } from "express";
-import { invoices, invoiceLineItems } from "@shared/schema";
+import { invoices, invoiceLineItems, auditLog } from "@shared/schema";
 import { type InsertInvoice } from "@shared/schema";
 import { db } from "../../db";
 import { eq } from "drizzle-orm";
 import { businessStorage } from "../../businessStorage";
-import { requireAuth, writeAuditLog, updateProductStock, type AuthenticatedRequest } from "../../middleware";
+import { requireAuth, updateProductStock, type AuthenticatedRequest } from "../../middleware";
 import { resolveDocumentTotals, isTotalsError, resolveAuthoritativeTaxTreatment } from "../../utils/totals";
 import { logger } from "../../logger";
 
@@ -23,33 +23,47 @@ export function registerInvoiceCreateRoutes(app: Express) {
         db.select().from(companySettings).limit(1),
       ]);
 
-      const invoice = await businessStorage.createInvoiceFromQuotation(
-        parseInt(quotationId),
-        nextNumber,
-        parseInt(req.user!.id),
-      );
+      // Task #403 (F16): one tx covers invoice header + items +
+      // taxTreatment + quotation status flip + companySnapshot update +
+      // audit-log row. A failure anywhere rolls all of it back so the
+      // database is never left with a half-converted quotation, an
+      // invoice with no items, an invoice that renders without
+      // company info, or a "converted" quotation whose invoice never
+      // landed. Audit row is written via tx.insert(auditLog) (mirrors
+      // the PO create-update tx in Task #366) so a successful create
+      // is always accompanied by its audit record.
+      const invoice = await db.transaction(async (tx) => {
+        const inv = await businessStorage.createInvoiceFromQuotation(
+          parseInt(quotationId),
+          nextNumber,
+          parseInt(req.user!.id),
+          tx,
+        );
 
-      if (companySettingsForSnapshot[0]) {
-        const cs = companySettingsForSnapshot[0];
-        const snapshot = {
-          companyName: cs.companyName,
-          address: cs.address,
-          phone: cs.phone,
-          email: cs.email,
-          vatNumber: cs.vatNumber,
-          taxNumber: cs.taxNumber,
-          logo: cs.logo,
-        };
-        await db.update(invoices).set({ companySnapshot: snapshot }).where(eq(invoices.id, invoice.id));
-      }
+        if (companySettingsForSnapshot[0]) {
+          const cs = companySettingsForSnapshot[0];
+          const snapshot = {
+            companyName: cs.companyName,
+            address: cs.address,
+            phone: cs.phone,
+            email: cs.email,
+            vatNumber: cs.vatNumber,
+            taxNumber: cs.taxNumber,
+            logo: cs.logo,
+          };
+          await tx.update(invoices).set({ companySnapshot: snapshot }).where(eq(invoices.id, inv.id));
+        }
 
-      writeAuditLog({
-        actor: req.user!.id,
-        actorName: req.user?.username || String(req.user!.id),
-        targetId: String(invoice.id),
-        targetType: 'invoice',
-        action: 'CREATE',
-        details: `Invoice #${invoice.invoiceNumber} created from Quotation id=${quotationId}`,
+        await tx.insert(auditLog).values({
+          actor: req.user!.id,
+          actorName: req.user?.username || String(req.user!.id),
+          targetId: String(inv.id),
+          targetType: 'invoice',
+          action: 'CREATE',
+          details: `Invoice #${inv.invoiceNumber} created from Quotation id=${quotationId}`,
+        });
+
+        return inv;
       });
 
       res.status(201).json(invoice);
@@ -137,51 +151,89 @@ export function registerInvoiceCreateRoutes(app: Express) {
         scanKey: undefined,
       };
 
-      const invoice = await businessStorage.createInvoice(invoiceData);
-      // Persist resolved tax treatment (column exists but is not in the
-      // InsertInvoice pick set).
-      await db.update(invoices).set({ taxTreatment: resolved.taxTreatment }).where(eq(invoices.id, invoice.id));
+      // Task #403 (F16): mirror the PO create-update pattern (Task
+      // #366). Header insert + taxTreatment update + line-items loop +
+      // companySnapshot update + (optional) delivered-stock deduction
+      // + audit-log row all run inside ONE db.transaction. Previously
+      // steps 1-4 ran on bare db calls; only the delivered-stock
+      // half had its own (nested) tx and the audit row was
+      // fire-and-forget. A failure mid-flight could leave a header
+      // with no items, an invoice with no companySnapshot, or a
+      // "delivered" header whose stock was never deducted, with
+      // nothing in the audit log to even prove the partial state
+      // happened. Now: every write rolls back together.
+      const invoice = await db.transaction(async (tx) => {
+        // Persist tax treatment in the same insert — the column is
+        // not part of InsertInvoice but is a valid column on the
+        // invoices table, so we cast through unknown to set it
+        // alongside the other header fields without a follow-up
+        // UPDATE.
+        const [created] = await tx
+          .insert(invoices)
+          .values({ ...invoiceData, taxTreatment: resolved.taxTreatment } as unknown as typeof invoices.$inferInsert)
+          .returning();
 
-      for (const item of resolved.items) {
-        await db.insert(invoiceLineItems).values({
-          invoiceId: invoice.id,
-          productId: item.product_id ? parseInt(String(item.product_id)) : null,
-          brandId: item.brand_id ? parseInt(String(item.brand_id)) : null,
-          productCode: (item.product_code as string) || null,
-          description: (item.description as string) || (item.product_name as string) || '',
-          quantity: item.quantity,
-          unitPrice: item.unit_price.toFixed(2),
-          lineTotal: item.line_total.toFixed(2),
-        });
-      }
+        for (const item of resolved.items) {
+          await tx.insert(invoiceLineItems).values({
+            invoiceId: created.id,
+            productId: item.product_id ? parseInt(String(item.product_id)) : null,
+            brandId: item.brand_id ? parseInt(String(item.brand_id)) : null,
+            productCode: (item.product_code as string) || null,
+            description: (item.description as string) || (item.product_name as string) || '',
+            quantity: item.quantity,
+            unitPrice: item.unit_price.toFixed(2),
+            lineTotal: item.line_total.toFixed(2),
+          });
+        }
 
-      if (invCompanySnapshot) {
-        await db.update(invoices).set({ companySnapshot: invCompanySnapshot }).where(eq(invoices.id, invoice.id));
-      }
+        if (invCompanySnapshot) {
+          await tx.update(invoices)
+            .set({ companySnapshot: invCompanySnapshot })
+            .where(eq(invoices.id, created.id));
+        }
 
-      if (body.status === 'delivered') {
-        await db.transaction(async (tx) => {
-          const items = await tx.select().from(invoiceLineItems).where(eq(invoiceLineItems.invoiceId, invoice.id));
-          for (const item of items) {
-            if (item.productId) {
+        if (body.status === 'delivered') {
+          // Stock deduction is folded into the same outer tx (was a
+          // separate nested db.transaction before #403). updateProductStock
+          // already accepts a tx so the UPDATE products.stock_quantity
+          // and the stock_movements INSERT it emits land atomically
+          // with the invoice writes above.
+          for (const item of resolved.items) {
+            if (item.product_id) {
               await updateProductStock(
-                item.productId,
+                parseInt(String(item.product_id)),
                 -item.quantity,
                 'sale',
-                invoice.id,
+                created.id,
                 'invoice',
-                parseFloat(item.unitPrice.toString()),
-                `Sale from Invoice #${invoice.invoiceNumber}`,
+                Number(item.unit_price),
+                `Sale from Invoice #${created.invoiceNumber}`,
                 req.user!.id,
                 tx
               );
             }
           }
-          await tx.update(invoices).set({ stockDeducted: true }).where(eq(invoices.id, invoice.id));
-        });
-      }
+          await tx.update(invoices)
+            .set({ stockDeducted: true })
+            .where(eq(invoices.id, created.id));
+        }
 
-      writeAuditLog({ actor: req.user!.id, actorName: req.user?.username || String(req.user!.id), targetId: String(invoice.id), targetType: 'invoice', action: 'CREATE', details: `Invoice #${invoice.invoiceNumber} created for ${customerName}${body.status === 'delivered' ? ' — stock deducted' : ''}` });
+        // Audit row inside the tx (mirrors PO create-update.ts:129).
+        // Replaces the previous fire-and-forget writeAuditLog so a
+        // rolled-back create no longer leaves a stranded audit row
+        // and a successful create is always accompanied by one.
+        await tx.insert(auditLog).values({
+          actor: req.user!.id,
+          actorName: req.user?.username || String(req.user!.id),
+          targetId: String(created.id),
+          targetType: 'invoice',
+          action: 'CREATE',
+          details: `Invoice #${created.invoiceNumber} created for ${customerName}${body.status === 'delivered' ? ' — stock deducted' : ''}`,
+        });
+
+        return created;
+      });
+
       res.status(201).json({ ...invoice, items: body.items || [] });
     } catch (error) {
       logger.error('Error creating invoice:', error);

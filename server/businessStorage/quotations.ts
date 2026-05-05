@@ -5,6 +5,7 @@ import {
   companySettings, invoices, invoiceLineItems,
   type InsertQuotation, type InsertInvoice
 } from "@shared/schema";
+import type { DbClient } from "../middleware";
 
 export async function getQuotations(params?: {
   page?: number; pageSize?: number; search?: string;
@@ -150,7 +151,19 @@ export async function deleteQuotation(id: number) {
   return deletedQuote;
 }
 
-export async function createInvoiceFromQuotation(quotationId: number, invoiceNumber: string, userId: number) {
+// Task #403 (F16): accepts an optional `tx` so the route can wrap the
+// whole conversion (header + items + tax treatment + quotation status
+// flip + downstream snapshot/audit-log writes) in a single
+// db.transaction. Pre-tx reads (quote, customer, company settings)
+// stay on the bare `db` — they are read-only snapshots used to
+// validate the request before any write happens. All writes go
+// through `dbClient` which is `tx` when supplied.
+export async function createInvoiceFromQuotation(
+  quotationId: number,
+  invoiceNumber: string,
+  userId: number,
+  tx?: DbClient,
+) {
   const quote = await getQuotationWithItems(quotationId);
   if (!quote) throw new Error(`Quotation with id ${quotationId} not found`);
   if (quote.status === 'converted') throw new Error(`Quotation ${quote.quoteNumber} has already been converted to an invoice`);
@@ -214,15 +227,17 @@ export async function createInvoiceFromQuotation(quotationId: number, invoiceNum
     currency: 'AED',
   };
 
-  const [invoice] = await db.insert(invoices).values(invoiceData).returning();
+  const dbClient: DbClient = tx ?? db;
+
+  const [invoice] = await dbClient.insert(invoices).values(invoiceData).returning();
   // taxTreatment isn't in InsertInvoice schema; set it via direct update
   // (mirrors POST /api/invoices). Authority is enforced above.
-  await db.update(invoices)
+  await dbClient.update(invoices)
     .set({ taxTreatment: resolved.taxTreatment })
     .where(eq(invoices.id, invoice.id));
 
   for (const item of resolved.items) {
-    await db.insert(invoiceLineItems).values({
+    await dbClient.insert(invoiceLineItems).values({
       invoiceId: invoice.id,
       productId: (item.product_id as number | null) ?? null,
       productCode: (item.product_code as string | null) ?? null,
@@ -233,7 +248,11 @@ export async function createInvoiceFromQuotation(quotationId: number, invoiceNum
     });
   }
 
-  await updateQuotation(quotationId, { status: 'converted' });
+  // Flip the quotation to "converted" through the same client so a
+  // tx rollback also un-converts the quotation.
+  await dbClient.update(quotations)
+    .set({ status: 'converted', updatedAt: new Date() })
+    .where(eq(quotations.id, quotationId));
 
   return { ...invoice, items: quote.items ?? [] };
 }
