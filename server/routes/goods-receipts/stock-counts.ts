@@ -103,6 +103,7 @@ export function registerStockCountRoutes(app: Express) {
             .select({ id: products.id, stockQuantity: products.stockQuantity })
             .from(products)
             .where(inArray(products.id, productIds))
+            .orderBy(products.id)
             .for('update');
 
           const stockMap = new Map(currentStocks.map(p => [p.id, p.stockQuantity ?? 0]));
