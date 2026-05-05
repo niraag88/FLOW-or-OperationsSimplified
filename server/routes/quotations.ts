@@ -1,5 +1,5 @@
 import type { Express } from "express";
-import { quotations, quotationItems, products, recycleBin, companySettings } from "@shared/schema";
+import { quotations, quotationItems, products, recycleBin, companySettings, auditLog } from "@shared/schema";
 import { insertQuotationSchema } from "@shared/schema";
 import { db } from "../db";
 import { eq } from "drizzle-orm";
@@ -60,13 +60,18 @@ export function registerQuotationRoutes(app: Express) {
       };
 
       const validatedData = insertQuotationSchema.parse(requestData);
-      const quotation = await businessStorage.createQuotation(validatedData);
+      const quoteCustomerName = req.body.customerName || `Customer ID ${req.body.customerId || 'unknown'}`;
 
-      if (req.body.items && Array.isArray(req.body.items) && req.body.items.length > 0) {
+      // Task #405 (F9): header insert + items loop + companySnapshot
+      // update + audit row all in one db.transaction so a partial
+      // failure cannot leave a half-built quotation behind.
+      const quotation = await db.transaction(async (tx) => {
+        const created = await businessStorage.createQuotation(validatedData, tx);
+
         for (const item of req.body.items) {
           if (item.product_id && Number(item.quantity) > 0) {
-            await db.insert(quotationItems).values({
-              quoteId: quotation.id,
+            await tx.insert(quotationItems).values({
+              quoteId: created.id,
               productId: parseInt(item.product_id),
               quantity: Number(item.quantity),
               unitPrice: item.unit_price.toString(),
@@ -76,14 +81,25 @@ export function registerQuotationRoutes(app: Express) {
             });
           }
         }
-      }
 
-      if (quoteCompanySnapshot) {
-        await db.update(quotations).set({ companySnapshot: quoteCompanySnapshot }).where(eq(quotations.id, quotation.id));
-      }
+        if (quoteCompanySnapshot) {
+          await tx.update(quotations)
+            .set({ companySnapshot: quoteCompanySnapshot })
+            .where(eq(quotations.id, created.id));
+        }
 
-      const quoteCustomerName = req.body.customerName || `Customer ID ${req.body.customerId || 'unknown'}`;
-      writeAuditLog({ actor: req.user!.id, actorName: req.user?.username || String(req.user!.id), targetId: String(quotation.id), targetType: 'quotation', action: 'CREATE', details: `Quotation #${quotation.quoteNumber} created for ${quoteCustomerName}` });
+        await tx.insert(auditLog).values({
+          actor: req.user!.id,
+          actorName: req.user?.username || String(req.user!.id),
+          targetId: String(created.id),
+          targetType: 'quotation',
+          action: 'CREATE',
+          details: `Quotation #${created.quoteNumber} created for ${quoteCustomerName}`,
+        });
+
+        return created;
+      });
+
       res.status(201).json(quotation);
     } catch (error) {
       logger.error('Error creating quotation:', error);
@@ -145,16 +161,29 @@ export function registerQuotationRoutes(app: Express) {
   app.patch('/api/quotations/:id/convert', requireAuth(['Admin', 'Manager', 'Staff']), async (req: AuthenticatedRequest, res) => {
     try {
       const id = parseInt(req.params.id);
-      const [existing] = await db.select({ id: quotations.id, status: quotations.status, quoteNumber: quotations.quoteNumber })
-        .from(quotations).where(eq(quotations.id, id));
-      if (!existing) return res.status(404).json({ error: 'Quotation not found' });
-      const ELIGIBLE = ['draft', 'sent', 'submitted', 'accepted'];
-      if (!ELIGIBLE.includes(existing.status)) {
-        return res.status(409).json({ error: `Quotation is already in status '${existing.status}' and cannot be converted` });
-      }
-      const updatedQuote = await businessStorage.updateQuotation(id, { status: 'converted' });
-      writeAuditLog({ actor: req.user!.id, actorName: req.user?.username || String(req.user!.id), targetId: String(id), targetType: 'quotation', action: 'UPDATE', details: `Quotation #${existing.quoteNumber} marked as converted (invoice created)` });
-      res.json(updatedQuote);
+      // Task #405 (F10): lock the row, validate the transition, write,
+      // and audit — all in one tx so concurrent transitions queue
+      // instead of racing on a stale snapshot.
+      const result = await db.transaction(async (tx) => {
+        const [existing] = await tx.select({ id: quotations.id, status: quotations.status, quoteNumber: quotations.quoteNumber })
+          .from(quotations).where(eq(quotations.id, id)).for('update');
+        if (!existing) return { status: 404 as const, body: { error: 'Quotation not found' } };
+        const ELIGIBLE = ['draft', 'sent', 'submitted', 'accepted'];
+        if (!ELIGIBLE.includes(existing.status)) {
+          return { status: 409 as const, body: { error: `Quotation is already in status '${existing.status}' and cannot be converted` } };
+        }
+        const updatedQuote = await businessStorage.updateQuotation(id, { status: 'converted' }, tx);
+        await tx.insert(auditLog).values({
+          actor: req.user!.id,
+          actorName: req.user?.username || String(req.user!.id),
+          targetId: String(id),
+          targetType: 'quotation',
+          action: 'UPDATE',
+          details: `Quotation #${existing.quoteNumber} marked as converted (invoice created)`,
+        });
+        return { status: 200 as const, body: updatedQuote };
+      });
+      res.status(result.status).json(result.body);
     } catch (error) {
       logger.error('Error converting quotation:', error);
       res.status(500).json({ error: 'Failed to convert quotation' });
@@ -176,32 +205,6 @@ export function registerQuotationRoutes(app: Express) {
         return res.status(400).json({ error: 'Invalid quotation ID' });
       }
 
-      // Enforce status transition rules
-      const [existing] = await db.select({ status: quotations.status }).from(quotations).where(eq(quotations.id, id));
-      if (!existing) return res.status(404).json({ error: 'Quotation not found' });
-      if (existing.status === 'cancelled') {
-        return res.status(400).json({ error: 'Cancelled quotations cannot be reactivated' });
-      }
-      if (existing.status === 'converted') {
-        return res.status(400).json({ error: 'Converted quotations cannot be modified' });
-      }
-      const newStatus = req.body.status;
-      if (newStatus && newStatus !== existing.status) {
-        // Allowed status transition map (one-way flow enforcement)
-        // 'sent' is treated as a legacy alias for 'submitted'
-        const ALLOWED_TRANSITIONS: Record<string, string[]> = {
-          draft:     ['submitted', 'sent', 'cancelled'],
-          sent:      ['submitted', 'accepted', 'rejected', 'cancelled'],
-          submitted: ['accepted', 'rejected', 'cancelled'],
-          accepted:  ['cancelled'],
-          rejected:  ['cancelled'],
-        };
-        const allowed = ALLOWED_TRANSITIONS[existing.status] ?? [];
-        if (!allowed.includes(newStatus)) {
-          return res.status(400).json({ error: `Cannot transition quotation from '${existing.status}' to '${newStatus}'` });
-        }
-      }
-
       const { companySnapshot: _ignoredQUOSnapshot, ...bodyWithoutSnapshot } = req.body;
       const processedData = {
         ...bodyWithoutSnapshot,
@@ -219,9 +222,47 @@ export function registerQuotationRoutes(app: Express) {
       }
 
       const validatedData = insertQuotationSchema.partial().parse(processedData);
-      const updatedQuote = await businessStorage.updateQuotation(id, validatedData);
-      writeAuditLog({ actor: req.user!.id, actorName: req.user?.username || String(req.user!.id), targetId: String(id), targetType: 'quotation', action: 'UPDATE', details: `Quotation #${updatedQuote.quoteNumber} updated (status: ${updatedQuote.status})` });
-      res.json(updatedQuote);
+      const newStatus = req.body.status;
+
+      // Task #405 (F10): lock the row, validate transition, write, and
+      // audit in one tx. Concurrent edits queue on the row lock instead
+      // of both passing the same pre-state check.
+      const ALLOWED_TRANSITIONS: Record<string, string[]> = {
+        draft:     ['submitted', 'sent', 'cancelled'],
+        sent:      ['submitted', 'accepted', 'rejected', 'cancelled'],
+        submitted: ['accepted', 'rejected', 'cancelled'],
+        accepted:  ['cancelled'],
+        rejected:  ['cancelled'],
+      };
+
+      const result = await db.transaction(async (tx) => {
+        const [existing] = await tx.select({ status: quotations.status })
+          .from(quotations).where(eq(quotations.id, id)).for('update');
+        if (!existing) return { status: 404 as const, body: { error: 'Quotation not found' } };
+        if (existing.status === 'cancelled') {
+          return { status: 400 as const, body: { error: 'Cancelled quotations cannot be reactivated' } };
+        }
+        if (existing.status === 'converted') {
+          return { status: 400 as const, body: { error: 'Converted quotations cannot be modified' } };
+        }
+        if (newStatus && newStatus !== existing.status) {
+          const allowed = ALLOWED_TRANSITIONS[existing.status] ?? [];
+          if (!allowed.includes(newStatus)) {
+            return { status: 400 as const, body: { error: `Cannot transition quotation from '${existing.status}' to '${newStatus}'` } };
+          }
+        }
+        const updatedQuote = await businessStorage.updateQuotation(id, validatedData, tx);
+        await tx.insert(auditLog).values({
+          actor: req.user!.id,
+          actorName: req.user?.username || String(req.user!.id),
+          targetId: String(id),
+          targetType: 'quotation',
+          action: 'UPDATE',
+          details: `Quotation #${updatedQuote.quoteNumber} updated (status: ${updatedQuote.status})`,
+        });
+        return { status: 200 as const, body: updatedQuote };
+      });
+      res.status(result.status).json(result.body);
     } catch (error) {
       logger.error('Error updating quotation:', error);
       res.status(500).json({ error: 'Failed to update quotation' });

@@ -129,13 +129,15 @@ export async function getQuotationWithItems(id: number) {
   return { ...quote, items };
 }
 
-export async function createQuotation(data: InsertQuotation) {
-  const [quote] = await db.insert(quotations).values(data).returning();
+export async function createQuotation(data: InsertQuotation, tx?: DbClient) {
+  const dbClient: DbClient = tx ?? db;
+  const [quote] = await dbClient.insert(quotations).values(data).returning();
   return quote;
 }
 
-export async function updateQuotation(id: number, data: Partial<InsertQuotation>) {
-  const [updatedQuote] = await db.update(quotations)
+export async function updateQuotation(id: number, data: Partial<InsertQuotation>, tx?: DbClient) {
+  const dbClient: DbClient = tx ?? db;
+  const [updatedQuote] = await dbClient.update(quotations)
     .set({ ...data, updatedAt: new Date() })
     .where(eq(quotations.id, id))
     .returning();
