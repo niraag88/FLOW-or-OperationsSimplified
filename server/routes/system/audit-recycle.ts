@@ -86,12 +86,19 @@ export function registerAuditRecycleRoutes(app: Express) {
   });
 
   app.post('/api/recycle-bin/:id/restore', requireAuth(['Admin', 'Manager']), async (req: AuthenticatedRequest, res) => {
+    const RACE_LOST = '__bin_race_lost__';
+    const UNKNOWN_TYPE = '__bin_unknown_type__';
     try {
       const id = parseInt(req.params.id);
 
-      const NOT_FOUND = '__bin_not_found__';
-      const UNKNOWN_TYPE = '__bin_unknown_type__';
-      type RestoreErr = Error & { sentinel?: string; documentType?: string };
+      // Pre-check (no lock) so a true 404 stays a 404. Anyone who
+      // gets past this point but then finds the row gone after
+      // acquiring FOR UPDATE lost the race to a concurrent restore
+      // and gets a clean 409.
+      const [exists] = await db.select({ id: recycleBin.id }).from(recycleBin).where(eq(recycleBin.id, id));
+      if (!exists) {
+        return res.status(404).json({ error: 'Recycle bin item not found' });
+      }
 
       const { invoices: invTable, deliveryOrders: doTable, quotations: quoteTable, purchaseOrders: poTable, invoiceLineItems: invItems, deliveryOrderItems: doItems, quotationItems: quoteItems, purchaseOrderItems: poItems } = await import('@shared/schema');
 
@@ -106,7 +113,9 @@ export function registerAuditRecycleRoutes(app: Express) {
           .where(eq(recycleBin.id, id))
           .for('update');
         if (!item) {
-          throw Object.assign(new Error(NOT_FOUND), { sentinel: NOT_FOUND });
+          // Row existed at pre-check; now it's gone. A concurrent
+          // restore committed first while we waited on the lock.
+          throw Object.assign(new Error(RACE_LOST), { sentinel: RACE_LOST });
         }
 
         if (!['Invoice', 'DeliveryOrder', 'Quotation', 'PurchaseOrder', 'Product', 'Brand', 'Supplier', 'Customer'].includes(item.documentType)) {
@@ -176,28 +185,23 @@ export function registerAuditRecycleRoutes(app: Express) {
           await tx.insert(customers).values({ ...customerData });
         }
         await tx.delete(recycleBin).where(eq(recycleBin.id, id));
-      }).catch((error: any) => {
-        const e = error as RestoreErr;
-        if (e?.sentinel === NOT_FOUND) {
-          throw Object.assign(new Error('not_found'), { httpStatus: 404, httpMessage: 'Recycle bin item not found' });
-        }
-        if (e?.sentinel === UNKNOWN_TYPE) {
-          throw Object.assign(new Error('unknown_type'), { httpStatus: 400, httpMessage: `Unknown document type: ${e.documentType}` });
-        }
-        throw error;
       });
 
       writeAuditLog({ actor: req.user!.id, actorName: req.user?.username || String(req.user!.id), targetId: String(id), targetType: 'recycle_bin', action: 'UPDATE', details: `Restored ${auditDocType} #${auditDocNumber} from recycle bin` });
       res.json({ success: true, message: `${auditDocNumber} has been restored successfully` });
-    } catch (error: any) {
-      if (error?.httpStatus) {
-        return res.status(error.httpStatus).json({ error: error.httpMessage });
+    } catch (error: unknown) {
+      const e = error as { sentinel?: string; documentType?: string; code?: string; constraint?: string; message?: string };
+      if (e?.sentinel === RACE_LOST) {
+        return res.status(409).json({ error: 'Recycle bin item is being restored by another request. Refresh to see the restored document.' });
+      }
+      if (e?.sentinel === UNKNOWN_TYPE) {
+        return res.status(400).json({ error: `Unknown document type: ${e.documentType}` });
       }
       logger.error('Error restoring document:', error);
-      if (error?.code === 'SKU_CONFLICT') {
-        return res.status(409).json({ error: error.message });
+      if (e?.code === 'SKU_CONFLICT') {
+        return res.status(409).json({ error: e.message });
       }
-      if (error?.code === '23505' && error?.constraint?.includes('sku')) {
+      if (e?.code === '23505' && e?.constraint?.includes('sku')) {
         return res.status(409).json({ error: `SKU conflict: a product with that SKU already exists.` });
       }
       res.status(500).json({ error: 'Failed to restore document' });
