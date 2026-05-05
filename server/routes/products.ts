@@ -7,6 +7,7 @@ import { db } from "../db";
 import { eq } from "drizzle-orm";
 import { businessStorage } from "../businessStorage";
 import { requireAuth, writeAuditLog, type AuthenticatedRequest } from "../middleware";
+import { isUniqueViolation } from "../utils/pgError";
 import { logger } from "../logger";
 
 export function registerProductRoutes(app: Express) {
@@ -262,8 +263,11 @@ export function registerProductRoutes(app: Express) {
                 createdProducts.push(product);
               });
             } catch (err) {
-              const code = (err as { code?: string } | null)?.code;
-              if (code === '23505') {
+              // Drizzle wraps pg errors as DrizzleQueryError, so walk the
+              // .cause chain via isUniqueViolation rather than reading
+              // err.code at the top level (which is undefined on wrapped
+              // errors and would let the duplicate fall through as a 500).
+              if (isUniqueViolation(err)) {
                 // Concurrent bulk import landed the same SKU between
                 // our pre-check and this insert — surface the same
                 // friendly message the pre-check would have produced.

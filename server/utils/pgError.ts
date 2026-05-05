@@ -19,3 +19,10 @@ export function isProductsStockNonNegativeViolation(err: unknown): boolean {
   const meta = extractPgErrorMeta(err);
   return meta.code === '23514' && meta.constraint === 'products_stock_quantity_non_negative_chk';
 }
+
+export function isUniqueViolation(err: unknown, constraintMatch?: (c: string) => boolean): boolean {
+  const meta = extractPgErrorMeta(err);
+  if (meta.code !== '23505') return false;
+  if (!constraintMatch) return true;
+  return typeof meta.constraint === 'string' && constraintMatch(meta.constraint);
+}
