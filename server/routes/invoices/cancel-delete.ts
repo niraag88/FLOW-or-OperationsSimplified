@@ -141,38 +141,62 @@ export function registerInvoiceCancelDeleteRoutes(app: Express) {
       if (isNaN(id)) return res.status(400).json({ error: 'Invalid ID' });
       const userEmail = req.user?.email || req.user?.username || 'unknown';
 
-      const [invoiceHeader] = await db.select().from(invoices).where(eq(invoices.id, id));
-      if (!invoiceHeader) {
-        return res.status(404).json({ error: 'Invoice not found' });
-      }
-      if (invoiceHeader.status === 'cancelled') {
-        return res.status(400).json({ error: 'Cancelled invoices cannot be deleted. The document is retained for audit purposes.' });
-      }
-      // Task #363 (RF-1): delivered invoices, and any invoice whose
-      // stock has been deducted, must go through PATCH .../cancel —
-      // the recycle-bin path doesn't reverse stock movements.
-      // stockDeducted is checked alongside status as defence-in-depth
-      // for any drifted row.
-      if (invoiceHeader.status === 'delivered' || invoiceHeader.stockDeducted) {
-        return res.status(400).json({ error: 'Delivered invoices have already produced stock movements. Use Cancel Invoice to reverse stock and retain the audit record — they cannot be moved to the recycle bin.' });
-      }
-      const lineItems = await db.select().from(invoiceLineItems).where(eq(invoiceLineItems.invoiceId, id));
+      const NOT_FOUND = '__inv_not_found__';
+      const ALREADY_CANCELLED = '__inv_already_cancelled__';
+      const STOCK_DEDUCTED = '__inv_stock_deducted__';
+      type DelErr = Error & { sentinel?: string };
 
-      await db.transaction(async (tx) => {
-        await tx.insert(recycleBin).values({
-          documentType: 'Invoice',
-          documentId: id.toString(),
-          documentNumber: invoiceHeader.invoiceNumber,
-          documentData: JSON.stringify({ header: invoiceHeader, items: lineItems }),
-          deletedBy: userEmail,
-          originalStatus: invoiceHeader.status,
-          canRestore: true,
+      let invoiceNumberForAudit = '';
+      try {
+        await db.transaction(async (tx) => {
+          // Lock the invoice row so a concurrent PATCH /cancel (which
+          // also takes FOR UPDATE) can't flip status under our feet.
+          const [invoiceHeader] = await tx.select().from(invoices)
+            .where(eq(invoices.id, id))
+            .for('update');
+          if (!invoiceHeader) {
+            throw Object.assign(new Error(NOT_FOUND), { sentinel: NOT_FOUND });
+          }
+          if (invoiceHeader.status === 'cancelled') {
+            throw Object.assign(new Error(ALREADY_CANCELLED), { sentinel: ALREADY_CANCELLED });
+          }
+          // Task #363 (RF-1): delivered invoices, and any invoice
+          // whose stock has been deducted, must go through PATCH
+          // .../cancel — the recycle-bin path doesn't reverse stock.
+          if (invoiceHeader.status === 'delivered' || invoiceHeader.stockDeducted) {
+            throw Object.assign(new Error(STOCK_DEDUCTED), { sentinel: STOCK_DEDUCTED });
+          }
+
+          const lineItems = await tx.select().from(invoiceLineItems).where(eq(invoiceLineItems.invoiceId, id));
+
+          await tx.insert(recycleBin).values({
+            documentType: 'Invoice',
+            documentId: id.toString(),
+            documentNumber: invoiceHeader.invoiceNumber,
+            documentData: JSON.stringify({ header: invoiceHeader, items: lineItems }),
+            deletedBy: userEmail,
+            originalStatus: invoiceHeader.status,
+            canRestore: true,
+          });
+          await tx.delete(invoiceLineItems).where(eq(invoiceLineItems.invoiceId, id));
+          await tx.delete(invoices).where(eq(invoices.id, id));
+          invoiceNumberForAudit = invoiceHeader.invoiceNumber;
         });
-        await tx.delete(invoiceLineItems).where(eq(invoiceLineItems.invoiceId, id));
-        await tx.delete(invoices).where(eq(invoices.id, id));
-      });
+      } catch (txError) {
+        const e = txError as DelErr;
+        if (e?.sentinel === NOT_FOUND) {
+          return res.status(404).json({ error: 'Invoice not found' });
+        }
+        if (e?.sentinel === ALREADY_CANCELLED) {
+          return res.status(400).json({ error: 'Cancelled invoices cannot be deleted. The document is retained for audit purposes.' });
+        }
+        if (e?.sentinel === STOCK_DEDUCTED) {
+          return res.status(400).json({ error: 'Delivered invoices have already produced stock movements. Use Cancel Invoice to reverse stock and retain the audit record — they cannot be moved to the recycle bin.' });
+        }
+        throw txError;
+      }
 
-      writeAuditLog({ actor: req.user!.id, actorName: req.user?.username || String(req.user!.id), targetId: String(id), targetType: 'invoice', action: 'DELETE', details: `Invoice #${invoiceHeader.invoiceNumber} moved to recycle bin` });
+      writeAuditLog({ actor: req.user!.id, actorName: req.user?.username || String(req.user!.id), targetId: String(id), targetType: 'invoice', action: 'DELETE', details: `Invoice #${invoiceNumberForAudit} moved to recycle bin` });
       res.json({ success: true });
     } catch (error) {
       logger.error('Error deleting invoice:', error);

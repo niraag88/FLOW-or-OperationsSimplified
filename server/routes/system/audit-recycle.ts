@@ -88,19 +88,35 @@ export function registerAuditRecycleRoutes(app: Express) {
   app.post('/api/recycle-bin/:id/restore', requireAuth(['Admin', 'Manager']), async (req: AuthenticatedRequest, res) => {
     try {
       const id = parseInt(req.params.id);
-      const [item] = await db.select().from(recycleBin).where(eq(recycleBin.id, id));
 
-      if (!item) return res.status(404).json({ error: 'Recycle bin item not found' });
-
-      const { header, items: lineItems = [] } = JSON.parse(item.documentData);
-
-      if (!['Invoice', 'DeliveryOrder', 'Quotation', 'PurchaseOrder', 'Product', 'Brand', 'Supplier', 'Customer'].includes(item.documentType)) {
-        return res.status(400).json({ error: `Unknown document type: ${item.documentType}` });
-      }
+      const NOT_FOUND = '__bin_not_found__';
+      const UNKNOWN_TYPE = '__bin_unknown_type__';
+      type RestoreErr = Error & { sentinel?: string; documentType?: string };
 
       const { invoices: invTable, deliveryOrders: doTable, quotations: quoteTable, purchaseOrders: poTable, invoiceLineItems: invItems, deliveryOrderItems: doItems, quotationItems: quoteItems, purchaseOrderItems: poItems } = await import('@shared/schema');
 
+      let auditDocType = '';
+      let auditDocNumber = '';
+
       await db.transaction(async (tx) => {
+        // Lock the bin row inside the tx so two simultaneous restore
+        // clicks for the same id can't both pass the existence check
+        // and both insert duplicate-numbered documents.
+        const [item] = await tx.select().from(recycleBin)
+          .where(eq(recycleBin.id, id))
+          .for('update');
+        if (!item) {
+          throw Object.assign(new Error(NOT_FOUND), { sentinel: NOT_FOUND });
+        }
+
+        if (!['Invoice', 'DeliveryOrder', 'Quotation', 'PurchaseOrder', 'Product', 'Brand', 'Supplier', 'Customer'].includes(item.documentType)) {
+          throw Object.assign(new Error(UNKNOWN_TYPE), { sentinel: UNKNOWN_TYPE, documentType: item.documentType });
+        }
+
+        const { header, items: lineItems = [] } = JSON.parse(item.documentData);
+        auditDocType = item.documentType;
+        auditDocNumber = item.documentNumber;
+
         if (item.documentType === 'Invoice') {
           const { id: _id, createdAt: _ca, ...headerData } = header;
           const [restored] = await tx.insert(invTable).values(headerData).returning();
@@ -160,11 +176,23 @@ export function registerAuditRecycleRoutes(app: Express) {
           await tx.insert(customers).values({ ...customerData });
         }
         await tx.delete(recycleBin).where(eq(recycleBin.id, id));
+      }).catch((error: any) => {
+        const e = error as RestoreErr;
+        if (e?.sentinel === NOT_FOUND) {
+          throw Object.assign(new Error('not_found'), { httpStatus: 404, httpMessage: 'Recycle bin item not found' });
+        }
+        if (e?.sentinel === UNKNOWN_TYPE) {
+          throw Object.assign(new Error('unknown_type'), { httpStatus: 400, httpMessage: `Unknown document type: ${e.documentType}` });
+        }
+        throw error;
       });
 
-      writeAuditLog({ actor: req.user!.id, actorName: req.user?.username || String(req.user!.id), targetId: String(id), targetType: 'recycle_bin', action: 'UPDATE', details: `Restored ${item.documentType} #${item.documentNumber} from recycle bin` });
-      res.json({ success: true, message: `${item.documentNumber} has been restored successfully` });
+      writeAuditLog({ actor: req.user!.id, actorName: req.user?.username || String(req.user!.id), targetId: String(id), targetType: 'recycle_bin', action: 'UPDATE', details: `Restored ${auditDocType} #${auditDocNumber} from recycle bin` });
+      res.json({ success: true, message: `${auditDocNumber} has been restored successfully` });
     } catch (error: any) {
+      if (error?.httpStatus) {
+        return res.status(error.httpStatus).json({ error: error.httpMessage });
+      }
       logger.error('Error restoring document:', error);
       if (error?.code === 'SKU_CONFLICT') {
         return res.status(409).json({ error: error.message });
