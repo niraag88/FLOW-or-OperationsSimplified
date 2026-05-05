@@ -87,15 +87,23 @@ export function registerStockCountRoutes(app: Express) {
 
         await tx.insert(stockCountItems).values(stockCountItemsData);
 
-        const productIds: number[] = validItems
+        const productIds: number[] = Array.from(new Set(validItems
           .filter(i => i.product_id)
-          .map(i => parseInt(i.product_id));
+          .map(i => parseInt(i.product_id))))
+          // Deterministic id-asc lock order keeps two concurrent
+          // counts that overlap on a product set from deadlocking.
+          .sort((a, b) => a - b);
 
         if (productIds.length > 0) {
+          // Lock the product rows so the delta is computed against
+          // the same stock value the UPDATE will land on; concurrent
+          // invoice-deliver / PO-receive will wait for this tx and
+          // the audit "was Y" claim stays truthful.
           const currentStocks = await tx
             .select({ id: products.id, stockQuantity: products.stockQuantity })
             .from(products)
-            .where(inArray(products.id, productIds));
+            .where(inArray(products.id, productIds))
+            .for('update');
 
           const stockMap = new Map(currentStocks.map(p => [p.id, p.stockQuantity ?? 0]));
 
