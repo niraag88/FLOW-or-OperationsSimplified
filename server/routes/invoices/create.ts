@@ -23,15 +23,8 @@ export function registerInvoiceCreateRoutes(app: Express) {
         db.select().from(companySettings).limit(1),
       ]);
 
-      // Task #403 (F16): one tx covers invoice header + items +
-      // taxTreatment + quotation status flip + companySnapshot update +
-      // audit-log row. A failure anywhere rolls all of it back so the
-      // database is never left with a half-converted quotation, an
-      // invoice with no items, an invoice that renders without
-      // company info, or a "converted" quotation whose invoice never
-      // landed. Audit row is written via tx.insert(auditLog) (mirrors
-      // the PO create-update tx in Task #366) so a successful create
-      // is always accompanied by its audit record.
+      // One tx covers conversion + snapshot + audit so a failure
+      // never leaves a "converted" quotation whose invoice didn't land.
       const invoice = await db.transaction(async (tx) => {
         const inv = await businessStorage.createInvoiceFromQuotation(
           parseInt(quotationId),
@@ -151,26 +144,16 @@ export function registerInvoiceCreateRoutes(app: Express) {
         scanKey: undefined,
       };
 
-      // Task #403 (F16): mirror the PO create-update pattern (Task
-      // #366). Header insert + taxTreatment update + line-items loop +
-      // companySnapshot update + (optional) delivered-stock deduction
-      // + audit-log row all run inside ONE db.transaction. Previously
-      // steps 1-4 ran on bare db calls; only the delivered-stock
-      // half had its own (nested) tx and the audit row was
-      // fire-and-forget. A failure mid-flight could leave a header
-      // with no items, an invoice with no companySnapshot, or a
-      // "delivered" header whose stock was never deducted, with
-      // nothing in the audit log to even prove the partial state
-      // happened. Now: every write rolls back together.
+      // Header + items + snapshot + delivered-stock + audit row all
+      // share one tx so a partial failure leaves no rows behind.
+      const insertPayload: typeof invoices.$inferInsert = {
+        ...invoiceData,
+        taxTreatment: resolved.taxTreatment,
+      };
       const invoice = await db.transaction(async (tx) => {
-        // Persist tax treatment in the same insert — the column is
-        // not part of InsertInvoice but is a valid column on the
-        // invoices table, so we cast through unknown to set it
-        // alongside the other header fields without a follow-up
-        // UPDATE.
         const [created] = await tx
           .insert(invoices)
-          .values({ ...invoiceData, taxTreatment: resolved.taxTreatment } as unknown as typeof invoices.$inferInsert)
+          .values(insertPayload)
           .returning();
 
         for (const item of resolved.items) {
@@ -193,11 +176,6 @@ export function registerInvoiceCreateRoutes(app: Express) {
         }
 
         if (body.status === 'delivered') {
-          // Stock deduction is folded into the same outer tx (was a
-          // separate nested db.transaction before #403). updateProductStock
-          // already accepts a tx so the UPDATE products.stock_quantity
-          // and the stock_movements INSERT it emits land atomically
-          // with the invoice writes above.
           for (const item of resolved.items) {
             if (item.product_id) {
               await updateProductStock(
@@ -218,10 +196,6 @@ export function registerInvoiceCreateRoutes(app: Express) {
             .where(eq(invoices.id, created.id));
         }
 
-        // Audit row inside the tx (mirrors PO create-update.ts:129).
-        // Replaces the previous fire-and-forget writeAuditLog so a
-        // rolled-back create no longer leaves a stranded audit row
-        // and a successful create is always accompanied by one.
         await tx.insert(auditLog).values({
           actor: req.user!.id,
           actorName: req.user?.username || String(req.user!.id),

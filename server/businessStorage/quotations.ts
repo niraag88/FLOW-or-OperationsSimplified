@@ -151,13 +151,8 @@ export async function deleteQuotation(id: number) {
   return deletedQuote;
 }
 
-// Task #403 (F16): accepts an optional `tx` so the route can wrap the
-// whole conversion (header + items + tax treatment + quotation status
-// flip + downstream snapshot/audit-log writes) in a single
-// db.transaction. Pre-tx reads (quote, customer, company settings)
-// stay on the bare `db` — they are read-only snapshots used to
-// validate the request before any write happens. All writes go
-// through `dbClient` which is `tx` when supplied.
+// Optional `tx` lets the caller wrap the conversion in a single
+// db.transaction. Pre-tx reads stay on `db`; all writes use `dbClient`.
 export async function createInvoiceFromQuotation(
   quotationId: number,
   invoiceNumber: string,
@@ -248,8 +243,6 @@ export async function createInvoiceFromQuotation(
     });
   }
 
-  // Flip the quotation to "converted" through the same client so a
-  // tx rollback also un-converts the quotation.
   await dbClient.update(quotations)
     .set({ status: 'converted', updatedAt: new Date() })
     .where(eq(quotations.id, quotationId));
