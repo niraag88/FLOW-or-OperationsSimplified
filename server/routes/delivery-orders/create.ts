@@ -1,8 +1,8 @@
 import type { Express } from "express";
-import { deliveryOrders, deliveryOrderItems } from "@shared/schema";
+import { deliveryOrders, deliveryOrderItems, auditLog } from "@shared/schema";
 import { db } from "../../db";
 import { businessStorage } from "../../businessStorage";
-import { requireAuth, writeAuditLog, updateProductStock, type AuthenticatedRequest } from "../../middleware";
+import { requireAuth, updateProductStock, type AuthenticatedRequest } from "../../middleware";
 import { resolveDocumentTotals, isTotalsError, resolveAuthoritativeTaxTreatment } from "../../utils/totals";
 import { logger } from "../../logger";
 
@@ -65,7 +65,11 @@ export function registerDeliveryOrderCreateRoutes(app: Express) {
       }
 
       const newStatus = body.status || 'draft';
-      const [doRecord] = await db.insert(deliveryOrders).values({
+
+      // Task #404: header insert + items loop + delivered-stock deductions
+      // + audit-log row are all one db.transaction so a partial failure
+      // cannot leave a half-built DO behind.
+      const headerPayload: typeof deliveryOrders.$inferInsert = {
         orderNumber: body.do_number || nextNumber,
         customerName,
         customerId: customerId || null,
@@ -83,43 +87,61 @@ export function registerDeliveryOrderCreateRoutes(app: Express) {
         taxTreatment: resolved.taxTreatment,
         showRemarks: body.show_remarks || false,
         companySnapshot: doCompanySnapshot,
-      }).returning();
+      };
 
-      const insertedItems: Array<{ productId: number | null; quantity: number }> = [];
-      for (const item of resolved.items) {
-        const productId = item.product_id ? parseInt(String(item.product_id)) : null;
-        await db.insert(deliveryOrderItems).values({
-          doId: doRecord.id,
-          productId,
-          brandId: item.brand_id ? parseInt(String(item.brand_id)) : null,
-          productCode: (item.product_code as string) || null,
-          description: (item.description as string) || (item.product_name as string) || '',
-          quantity: item.quantity,
-          unitPrice: item.unit_price.toFixed(2),
-          lineTotal: item.line_total.toFixed(2),
-        });
-        insertedItems.push({ productId, quantity: item.quantity });
-      }
+      const doRecord = await db.transaction(async (tx) => {
+        const [created] = await tx.insert(deliveryOrders).values(headerPayload).returning();
 
-      // Deduct stock if creating directly as delivered
-      if (newStatus === 'delivered') {
-        for (const item of insertedItems) {
-          if (item.productId) {
-            await updateProductStock(
-              item.productId,
-              -item.quantity,
-              'sale',
-              doRecord.id,
-              'delivery_order',
-              0,
-              `Stock deducted: DO #${doRecord.orderNumber} delivered`,
-              req.user!.id,
-            );
+        const insertedItems: Array<{ productId: number | null; quantity: number }> = [];
+        for (const item of resolved.items) {
+          const productId = item.product_id ? parseInt(String(item.product_id)) : null;
+          await tx.insert(deliveryOrderItems).values({
+            doId: created.id,
+            productId,
+            brandId: item.brand_id ? parseInt(String(item.brand_id)) : null,
+            productCode: (item.product_code as string) || null,
+            description: (item.description as string) || (item.product_name as string) || '',
+            quantity: item.quantity,
+            unitPrice: item.unit_price.toFixed(2),
+            lineTotal: item.line_total.toFixed(2),
+          });
+          insertedItems.push({ productId, quantity: item.quantity });
+        }
+
+        // Stock deduction for delivered DOs runs through the same tx so
+        // a failure rolls back the header, items, AND any earlier deductions.
+        if (newStatus === 'delivered') {
+          for (const item of insertedItems) {
+            if (item.productId) {
+              await updateProductStock(
+                item.productId,
+                -item.quantity,
+                'sale',
+                created.id,
+                'delivery_order',
+                0,
+                `Stock deducted: DO #${created.orderNumber} delivered`,
+                req.user!.id,
+                tx,
+              );
+            }
           }
         }
-      }
 
-      writeAuditLog({ actor: req.user!.id, actorName: req.user?.username || String(req.user!.id), targetId: String(doRecord.id), targetType: 'delivery_order', action: 'CREATE', details: `DO #${doRecord.orderNumber} created for ${customerName}${newStatus === 'delivered' ? ' — stock deducted' : ''}` });
+        // Audit row in-tx so a successful create always carries its
+        // audit record and a rolled-back create leaves none.
+        await tx.insert(auditLog).values({
+          actor: req.user!.id,
+          actorName: req.user?.username || String(req.user!.id),
+          targetId: String(created.id),
+          targetType: 'delivery_order',
+          action: 'CREATE',
+          details: `DO #${created.orderNumber} created for ${customerName}${newStatus === 'delivered' ? ' — stock deducted' : ''}`,
+        });
+
+        return created;
+      });
+
       res.status(201).json({ ...doRecord, do_number: doRecord.orderNumber, items: body.items || [] });
     } catch (error) {
       logger.error('Error creating delivery order:', error);
