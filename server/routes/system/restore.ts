@@ -12,12 +12,17 @@ import {
   type AuthenticatedRequest,
 } from "../../middleware";
 import { sendIfMissingConfirmation } from "../../typedConfirmation";
-import { RESTORE_PHRASE } from "../../../shared/destructiveActionPhrases";
+import { RESTORE_PHRASE, FORCE_RECONCILE_PHRASE } from "../../../shared/destructiveActionPhrases";
 import {
   withDestructiveDbLock,
   DestructiveDbOpInProgressError,
 } from "../../destructiveDbLock";
 import { logger } from "../../logger";
+import {
+  reconcileSchemaAfterRestore,
+  reconcileResultToRow,
+  type ReconcileResult,
+} from "../../schemaReconcile";
 
 export function registerRestoreRoutes(app: Express) {
   // ─── Restore Endpoints ────────────────────────────────────────────────────
@@ -34,10 +39,11 @@ export function registerRestoreRoutes(app: Express) {
    *      runs DROP SCHEMA public + CREATE SCHEMA public + the dump in ONE
    *      psql --single-transaction. Any failure rolls back; live data
    *      remains intact.
-   *   3. AFTER the restore, update the pre-created row with the final result.
-   *      Also best-effort write to public.audit_log (which is recreated from
-   *      the backup; if the backup is very old and lacks audit_log, this fails
-   *      silently — the ops record is already the definitive audit trail).
+   *   3. AFTER a successful restore, run schemaReconcile (Task #441) to
+   *      forward-port the just-restored data structure to whatever the
+   *      running app code expects. Result is captured in the same
+   *      restore_runs row.
+   *   4. Update the pre-created row with the final result.
    */
   async function runRestore(opts: {
     /** A readable .sql.gz stream OR a path to an existing .sql.gz file on disk. */
@@ -47,8 +53,10 @@ export function registerRestoreRoutes(app: Express) {
     sourceFilename?: string;
     res: import('express').Response;
     actorName: string;
+    /** Task #441: when true, schema reconcile may apply changes that drop columns/tables. */
+    acceptDataLoss?: boolean;
   }) {
-    const { sqlGzInput, triggeredBy, sourceBackupRunId, sourceFilename, res, actorName } = opts;
+    const { sqlGzInput, triggeredBy, sourceBackupRunId, sourceFilename, res, actorName, acceptDataLoss } = opts;
     const label = sourceFilename || (sourceBackupRunId ? `backup run #${sourceBackupRunId}` : 'unknown');
 
     // Task #368 (RF-5): take the shared destructive-DB-op lock BEFORE
@@ -101,8 +109,41 @@ export function registerRestoreRoutes(app: Express) {
 
     const finishedAt = new Date();
 
-    // Step 3: Update the pre-created ops record with the final outcome.
+    // Step 3 (Task #441): if the SQL restore succeeded, run schema reconciliation.
+    // We do this INSIDE the same destructive-DB lock, so no concurrent
+    // factory-reset/restore can run while reconcile is in flight. Reconcile
+    // never throws — it always returns a structured result we can persist.
+    let reconcile: ReconcileResult | null = null;
+    if (result.success) {
+      try {
+        reconcile = await reconcileSchemaAfterRestore({ acceptDataLoss });
+        logger.info(
+          `[restore] schema reconcile after ${label}: ${reconcile.status} ` +
+          `(applied=${reconcile.statementsApplied}, skipped=${reconcile.statementsSkipped})`
+        );
+      } catch (reconErr: any) {
+        // Defence in depth — reconcileSchemaAfterRestore itself catches
+        // errors, but any unexpected throw must not mark the whole
+        // restore as failed (the data IS restored at this point).
+        logger.error('[restore] schema reconcile threw unexpectedly:', reconErr);
+        reconcile = {
+          status: 'failed',
+          statementsApplied: 0,
+          statementsSkipped: 0,
+          warnings: [],
+          statements: [],
+          error: reconErr?.message || String(reconErr),
+          durationMs: 0,
+        };
+      }
+    }
+
+    // Step 4: Update the pre-created ops record with the final outcome.
     // The ops schema was untouched by the restore, so this always works.
+    const reconcileRow = reconcile
+      ? reconcileResultToRow(reconcile)
+      : { reconcileStatus: 'not_run' as const };
+
     if (preCreatedId !== null) {
       try {
         await db.update(restoreRuns)
@@ -111,6 +152,7 @@ export function registerRestoreRoutes(app: Express) {
             success: result.success,
             errorMessage: result.error ?? null,
             durationMs: result.durationMs ?? null,
+            ...reconcileRow,
           })
           .where(eq(restoreRuns.id, preCreatedId));
       } catch (updateErr) {
@@ -128,26 +170,44 @@ export function registerRestoreRoutes(app: Express) {
           success: result.success,
           errorMessage: result.error ?? null,
           durationMs: result.durationMs ?? null,
+          ...reconcileRow,
         });
       } catch (retryErr) {
         logger.error('Could not insert ops.restore_runs record after restore:', retryErr);
       }
     }
 
-    // Step 4 (best-effort): Write to public.audit_log in the now-restored DB.
+    // Step 5 (best-effort): Write to public.audit_log in the now-restored DB.
     try {
+      const reconcileSummary = reconcile
+        ? ` [schema reconcile: ${reconcile.status}, applied=${reconcile.statementsApplied}, skipped=${reconcile.statementsSkipped}]`
+        : '';
       writeAuditLog({
         actor: triggeredBy,
         actorName,
         targetId: 'restore',
         targetType: 'restore_run',
         action: 'CREATE',
-        details: `Database restore from ${label} ${result.success ? 'succeeded' : `failed: ${result.error}`} (durationMs: ${result.durationMs})`,
+        details:
+          `Database restore from ${label} ${result.success ? 'succeeded' : `failed: ${result.error}`} ` +
+          `(durationMs: ${result.durationMs})${reconcileSummary}`,
       });
     } catch (_) {}
 
     if (result.success) {
-      return res.json({ success: true, durationMs: result.durationMs });
+      return res.json({
+        success: true,
+        durationMs: result.durationMs,
+        reconcile: reconcile
+          ? {
+              status: reconcile.status,
+              statementsApplied: reconcile.statementsApplied,
+              statementsSkipped: reconcile.statementsSkipped,
+              warnings: reconcile.warnings,
+              error: reconcile.error,
+            }
+          : null,
+      });
     } else {
       return res.status(500).json({ success: false, error: result.error || 'Restore failed', durationMs: result.durationMs });
     }
@@ -185,6 +245,7 @@ export function registerRestoreRoutes(app: Express) {
       actorName: req.user?.username || req.user!.id,
       sourceBackupRunId: runId,
       sourceFilename: run.dbStorageKey.split('/').pop() || run.dbStorageKey,
+      acceptDataLoss: req.body?.acceptDataLoss === true,
       res,
     });
   });
@@ -211,9 +272,13 @@ export function registerRestoreRoutes(app: Express) {
     let hitSizeLimit = false;
     let sourceFilename = '';
     let confirmationField: string | undefined;
+    let acceptDataLossField = false;
 
     bb.on('field', (fieldname: string, value: string) => {
       if (fieldname === 'confirmation') confirmationField = value;
+      // Task #441: opt-in to applying schema changes that would drop
+      // columns/tables. String 'true' (form field semantics) only.
+      if (fieldname === 'acceptDataLoss' && value === 'true') acceptDataLossField = true;
     });
 
     // Resolves when the write stream finishes flushing to disk; rejects on error.
@@ -314,6 +379,7 @@ export function registerRestoreRoutes(app: Express) {
           triggeredBy,
           actorName,
           sourceFilename,
+          acceptDataLoss: acceptDataLossField,
           res,
         });
       } finally {
@@ -354,6 +420,13 @@ export function registerRestoreRoutes(app: Express) {
           errorMessage: restoreRuns.errorMessage,
           durationMs: restoreRuns.durationMs,
           backupDbFilename: backupRuns.dbFilename,
+          // Task #441 — schema reconcile audit fields
+          reconcileStatus: restoreRuns.reconcileStatus,
+          reconcileStatementsApplied: restoreRuns.reconcileStatementsApplied,
+          reconcileStatementsSkipped: restoreRuns.reconcileStatementsSkipped,
+          reconcileWarnings: restoreRuns.reconcileWarnings,
+          reconcileError: restoreRuns.reconcileError,
+          reconcileFinishedAt: restoreRuns.reconcileFinishedAt,
         })
         .from(restoreRuns)
         .leftJoin(backupRuns, eq(restoreRuns.sourceBackupRunId, backupRuns.id))
@@ -363,6 +436,76 @@ export function registerRestoreRoutes(app: Express) {
     } catch (error) {
       logger.error('Error fetching restore runs:', error);
       res.status(500).json({ error: 'Failed to fetch restore history' });
+    }
+  });
+
+  /**
+   * POST /api/ops/restore-runs/:id/force-reconcile  (Task #441)
+   *
+   * Re-runs the post-restore schema reconciliation against the live DB,
+   * applying changes even when drizzle-kit reports `hasDataLoss`. Used
+   * when a previous restore landed in `warnings_skipped` state because
+   * the diff included drops the admin had not opted-in to.
+   *
+   * Requires `confirmation: 'I ACCEPT DATA LOSS'` in the body so this
+   * cannot be triggered accidentally. Updates the latest restore_runs row
+   * (or the explicitly-targeted one) with the new reconcile outcome.
+   *
+   * Held under the shared destructive-DB lock so it cannot interleave
+   * with a concurrent restore or factory-reset.
+   */
+  app.post('/api/ops/restore-runs/:id/force-reconcile', requireAuth(['Admin']), async (req: AuthenticatedRequest, res) => {
+    if (req.body?.confirmation !== FORCE_RECONCILE_PHRASE) {
+      return res.status(400).json({
+        error: 'force_reconcile_confirmation_required',
+        message: `To force reconciliation with possible data loss, send confirmation = "${FORCE_RECONCILE_PHRASE}".`,
+      });
+    }
+
+    const runId = parseInt(req.params.id, 10);
+    if (isNaN(runId)) return res.status(400).json({ error: 'Invalid restore run ID' });
+
+    const [existing] = await db.select().from(restoreRuns).where(eq(restoreRuns.id, runId)).limit(1);
+    if (!existing) return res.status(404).json({ error: 'Restore run not found' });
+
+    try {
+      return await withDestructiveDbLock(async () => {
+        const reconcile = await reconcileSchemaAfterRestore({ acceptDataLoss: true });
+        const row = reconcileResultToRow(reconcile);
+        try {
+          await db.update(restoreRuns).set(row).where(eq(restoreRuns.id, runId));
+        } catch (updateErr) {
+          logger.error('Could not update restore_runs after force-reconcile:', updateErr);
+        }
+        try {
+          writeAuditLog({
+            actor: req.user!.id,
+            actorName: req.user?.username || req.user!.id,
+            targetId: String(runId),
+            targetType: 'restore_run',
+            action: 'UPDATE',
+            details:
+              `Force schema reconcile (accept data loss) on restore run #${runId}: ${reconcile.status} ` +
+              `(applied=${reconcile.statementsApplied}, skipped=${reconcile.statementsSkipped})`,
+          });
+        } catch (_) {}
+        return res.json({
+          success: reconcile.status === 'success' || reconcile.status === 'warnings_applied' || reconcile.status === 'no_changes',
+          reconcile: {
+            status: reconcile.status,
+            statementsApplied: reconcile.statementsApplied,
+            statementsSkipped: reconcile.statementsSkipped,
+            warnings: reconcile.warnings,
+            error: reconcile.error,
+          },
+        });
+      });
+    } catch (err) {
+      if (err instanceof DestructiveDbOpInProgressError) {
+        return res.status(409).json({ error: err.code, message: err.message });
+      }
+      logger.error('Force reconcile error:', err);
+      return res.status(500).json({ error: 'Force reconcile failed' });
     }
   });
 }

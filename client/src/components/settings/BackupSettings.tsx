@@ -4,14 +4,15 @@ import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Input } from "@/components/ui/input";
 import { Alert, AlertDescription } from "@/components/ui/alert";
-import { Database, Play, CheckCircle, XCircle, Loader2, Clock, Download, RotateCcw, Upload, AlertTriangle, History, ShieldAlert } from "lucide-react";
+import { Database, Play, CheckCircle, XCircle, Loader2, Clock, Download, RotateCcw, Upload, AlertTriangle, History, ShieldAlert, Wrench } from "lucide-react";
+import { Checkbox } from "@/components/ui/checkbox";
 import { useToast } from "@/hooks/use-toast";
 import { apiRequest } from "@/lib/queryClient";
 import { format } from "date-fns";
 import { useState, useRef } from "react";
 import ScheduledBackupCard from "./ScheduledBackupCard";
 import TypedConfirmDialog from "../common/TypedConfirmDialog";
-import { RESTORE_PHRASE } from "@shared/destructiveActionPhrases";
+import { RESTORE_PHRASE, FORCE_RECONCILE_PHRASE } from "@shared/destructiveActionPhrases";
 
 function formatBytes(bytes: any) {
   if (!bytes) return "—";
@@ -38,6 +39,50 @@ function StatusBadge({ success }: { success: boolean }) {
     : <Badge variant="destructive"><XCircle className="w-3 h-3 mr-1 inline" />Failed</Badge>;
 }
 
+// Task #441 — schema reconcile outcome badge for the restore history table.
+function ReconcileBadge({ row }: { row: any }) {
+  const status = row?.reconcileStatus as string | undefined;
+  if (!status || status === 'not_run') {
+    return <span className="text-xs text-gray-400">—</span>;
+  }
+  if (status === 'no_changes') {
+    return <Badge variant="outline" className="text-xs">In sync</Badge>;
+  }
+  if (status === 'success') {
+    return (
+      <Badge className="bg-emerald-100 text-emerald-800 border-emerald-200 text-xs">
+        <Wrench className="w-3 h-3 mr-1 inline" />
+        +{row.reconcileStatementsApplied || 0}
+      </Badge>
+    );
+  }
+  if (status === 'warnings_applied') {
+    return (
+      <Badge className="bg-amber-100 text-amber-800 border-amber-300 text-xs" title={row.reconcileWarnings || ''}>
+        <AlertTriangle className="w-3 h-3 mr-1 inline" />
+        Forced ({row.reconcileStatementsApplied || 0})
+      </Badge>
+    );
+  }
+  if (status === 'warnings_skipped') {
+    return (
+      <Badge className="bg-amber-100 text-amber-900 border-amber-300 text-xs" title={row.reconcileWarnings || ''}>
+        <AlertTriangle className="w-3 h-3 mr-1 inline" />
+        Skipped {row.reconcileStatementsSkipped || 0}
+      </Badge>
+    );
+  }
+  if (status === 'failed') {
+    return (
+      <Badge variant="destructive" className="text-xs" title={row.reconcileError || ''}>
+        <XCircle className="w-3 h-3 mr-1 inline" />
+        Failed
+      </Badge>
+    );
+  }
+  return <span className="text-xs text-gray-400">{status}</span>;
+}
+
 // Informational panel rendered as the `extra` slot of TypedConfirmDialog
 // for the emergency-restore flow. Never participates in the disable
 // predicate — the typed phrase is the sole safeguard.
@@ -59,6 +104,8 @@ interface RestoreConfirmExtraProps {
   backupPending: boolean;
   backupJustTaken: boolean;
   isPending: boolean;
+  acceptDataLoss: boolean;
+  onAcceptDataLossChange: (v: boolean) => void;
 }
 
 function RestoreConfirmExtra({
@@ -70,6 +117,8 @@ function RestoreConfirmExtra({
   backupPending,
   backupJustTaken,
   isPending,
+  acceptDataLoss,
+  onAcceptDataLossChange,
 }: RestoreConfirmExtraProps) {
   return (
     <div className="space-y-3 text-sm">
@@ -124,6 +173,28 @@ function RestoreConfirmExtra({
         </Button>
         <p className="text-xs text-gray-500 mt-1">Saves the current state before restore. Strongly recommended.</p>
       </div>
+
+      {/* Task #441 — schema reconcile notice + opt-in for data-loss changes */}
+      <div className="rounded-lg border border-blue-200 bg-blue-50 p-3 space-y-2">
+        <p className="text-xs font-medium uppercase tracking-wide text-blue-900 flex items-center gap-1">
+          <Wrench className="w-3 h-3" /> After-restore schema check
+        </p>
+        <p className="text-xs text-blue-800 leading-relaxed">
+          Once the data is restored, the system will automatically add back any columns or tables that have been added since this backup was taken — so you don't need to run any developer commands. Drops or renames are reported, never silently destroyed.
+        </p>
+        <label className="flex items-start gap-2 cursor-pointer pt-1">
+          <Checkbox
+            checked={acceptDataLoss}
+            onCheckedChange={(v) => onAcceptDataLossChange(v === true)}
+            disabled={isPending}
+            data-testid="checkbox-accept-data-loss"
+            className="mt-0.5"
+          />
+          <span className="text-xs text-blue-900">
+            <strong>I accept data loss for unsafe changes.</strong> Tick this only if you understand that columns/tables removed since this backup will be dropped from the restored data.
+          </span>
+        </label>
+      </div>
     </div>
   );
 }
@@ -141,6 +212,15 @@ export default function BackupSettings() {
   >(null);
   const [restoredSuccessfully, setRestoredSuccessfully] = useState(false);
   const [backupJustTaken, setBackupJustTaken] = useState(false);
+  // Task #441 — opt-in to applying schema changes that drop columns/tables
+  const [acceptDataLoss, setAcceptDataLoss] = useState(false);
+  // Captured from the most recent restore response so we can render a
+  // reconcile summary in the post-restore banner without re-querying.
+  const [lastReconcile, setLastReconcile] = useState<any>(null);
+  // Task #441 — typed-phrase consent dialog state for the force-reconcile
+  // path. Independent of the restore confirm dialog so admins must
+  // re-type the consent phrase even right after a restore.
+  const [forceReconcileTarget, setForceReconcileTarget] = useState<number | null>(null);
 
   // ── Data Fetching ──────────────────────────────────────────────────────────
 
@@ -178,14 +258,15 @@ export default function BackupSettings() {
 
   // Both restore mutations forward the typed phrase to the server.
   const restoreFromCloud = useMutation({
-    mutationFn: async ({ runId, confirmation }: { runId: number; confirmation: string }) => {
-      const res = await apiRequest("POST", `/api/ops/backup-runs/${runId}/restore`, { confirmation });
+    mutationFn: async ({ runId, confirmation, acceptDataLoss }: { runId: number; confirmation: string; acceptDataLoss: boolean }) => {
+      const res = await apiRequest("POST", `/api/ops/backup-runs/${runId}/restore`, { confirmation, acceptDataLoss });
       return res.json();
     },
     onSuccess: (data) => {
       queryClient.invalidateQueries({ queryKey: ["/api/ops/restore-runs"] });
       setRestoreModal(null);
       if (data.success) {
+        setLastReconcile(data.reconcile || null);
         setRestoredSuccessfully(true);
       } else {
         toast({ title: "Emergency restore failed", description: data.error || "An error occurred during restore.", variant: "destructive" });
@@ -199,11 +280,12 @@ export default function BackupSettings() {
   });
 
   const restoreFromUpload = useMutation({
-    mutationFn: async ({ file, confirmation }: { file: File; confirmation: string }) => {
+    mutationFn: async ({ file, confirmation, acceptDataLoss }: { file: File; confirmation: string; acceptDataLoss: boolean }) => {
       const formData = new FormData();
       // Append the confirmation field BEFORE the file so busboy
       // captures it before the file event fires.
       formData.append("confirmation", confirmation);
+      formData.append("acceptDataLoss", acceptDataLoss ? "true" : "false");
       formData.append("file", file);
       const res = await fetch("/api/ops/restore-upload", {
         method: "POST",
@@ -218,6 +300,7 @@ export default function BackupSettings() {
       queryClient.invalidateQueries({ queryKey: ["/api/ops/restore-runs"] });
       setRestoreModal(null);
       if (data.success) {
+        setLastReconcile(data.reconcile || null);
         setRestoredSuccessfully(true);
       } else {
         toast({ title: "Emergency restore failed", description: data.error || "An error occurred during restore.", variant: "destructive" });
@@ -227,6 +310,36 @@ export default function BackupSettings() {
       queryClient.invalidateQueries({ queryKey: ["/api/ops/restore-runs"] });
       setRestoreModal(null);
       toast({ title: "Emergency restore failed", description: err.message || "An error occurred during restore.", variant: "destructive" });
+    },
+  });
+
+  // Task #441 — re-run schema reconcile against the latest restore_runs row,
+  // applying changes even when drizzle-kit reports hasDataLoss. Used after a
+  // restore landed in `warnings_skipped` because the admin hadn't ticked
+  // "accept data loss" on the original restore.
+  const forceReconcile = useMutation({
+    // The phrase is sourced from the user-typed value in the
+    // TypedConfirmDialog, NOT hardcoded. The server independently
+    // verifies it matches FORCE_RECONCILE_PHRASE.
+    mutationFn: async ({ runId, confirmation }: { runId: number; confirmation: string }) => {
+      const res = await apiRequest("POST", `/api/ops/restore-runs/${runId}/force-reconcile`, {
+        confirmation,
+      });
+      return res.json();
+    },
+    onSuccess: (data) => {
+      queryClient.invalidateQueries({ queryKey: ["/api/ops/restore-runs"] });
+      setForceReconcileTarget(null);
+      if (data.success) {
+        setLastReconcile(data.reconcile || null);
+        toast({ title: "Schema reconciliation complete", description: `Applied ${data.reconcile?.statementsApplied || 0} change(s).` });
+      } else {
+        toast({ title: "Reconciliation failed", description: data.reconcile?.error || data.error || "Unknown error.", variant: "destructive" });
+      }
+    },
+    onError: (err: any) => {
+      setForceReconcileTarget(null);
+      toast({ title: "Reconciliation failed", description: err.message || "An error occurred.", variant: "destructive" });
     },
   });
 
@@ -259,6 +372,7 @@ export default function BackupSettings() {
 
   const handleRestoreClick = (run: any) => {
     setBackupJustTaken(false);
+    setAcceptDataLoss(false);
     setRestoreModal({
       type: "cloud",
       run,
@@ -271,19 +385,21 @@ export default function BackupSettings() {
     if (!file) return;
     e.target.value = "";
     setBackupJustTaken(false);
+    setAcceptDataLoss(false);
     setRestoreModal({ type: "upload", file, filename: file.name });
   };
 
   const handleModalClose = () => {
     setRestoreModal(null);
     setBackupJustTaken(false);
+    setAcceptDataLoss(false);
   };
 
   const handleRestoreConfirm = (typedPhrase: string) => {
     if (restoreModal?.type === "cloud") {
-      restoreFromCloud.mutate({ runId: restoreModal.run.id, confirmation: typedPhrase });
+      restoreFromCloud.mutate({ runId: restoreModal.run.id, confirmation: typedPhrase, acceptDataLoss });
     } else if (restoreModal?.type === "upload") {
-      restoreFromUpload.mutate({ file: restoreModal.file, confirmation: typedPhrase });
+      restoreFromUpload.mutate({ file: restoreModal.file, confirmation: typedPhrase, acceptDataLoss });
     }
   };
 
@@ -314,15 +430,91 @@ export default function BackupSettings() {
         <CardContent className="space-y-6">
 
           {/* Post-restore success banner */}
-          {restoredSuccessfully && (
-            <Alert className="border-emerald-300 bg-emerald-50">
-              <CheckCircle className="w-4 h-4 text-emerald-700" />
-              <AlertDescription className="text-emerald-800">
-                <strong>Emergency restore completed successfully.</strong> The database has been restored to the selected backup.
-                Please <button className="underline font-medium" onClick={() => window.location.href = "/login"}>log out and log back in</button> to continue working.
-              </AlertDescription>
-            </Alert>
-          )}
+          {restoredSuccessfully && (() => {
+            // Reconcile status drives the colour and copy of the banner.
+            const status = lastReconcile?.status as string | undefined;
+            const skipped = status === 'warnings_skipped';
+            const failed = status === 'failed';
+            const banner = skipped
+              ? "border-amber-300 bg-amber-50"
+              : failed
+                ? "border-red-300 bg-red-50"
+                : "border-emerald-300 bg-emerald-50";
+            const txt = skipped
+              ? "text-amber-900"
+              : failed
+                ? "text-red-900"
+                : "text-emerald-800";
+            const Icon = skipped || failed ? AlertTriangle : CheckCircle;
+            // The latest restore_runs row is the one we'd target with force-reconcile.
+            const latestRestoreId = restoreHistory[0]?.id as number | undefined;
+            return (
+              <Alert className={banner}>
+                <Icon className={`w-4 h-4 ${txt}`} />
+                <AlertDescription className={`${txt} space-y-2`}>
+                  <div>
+                    <strong>
+                      {skipped
+                        ? "Emergency restore completed with schema warnings."
+                        : failed
+                          ? "Emergency restore completed, but schema reconcile failed."
+                          : "Emergency restore completed successfully."}
+                    </strong>{" "}
+                    The database has been restored from the selected backup.
+                  </div>
+
+                  {lastReconcile && status === 'success' && lastReconcile.statementsApplied > 0 && (
+                    <div className="text-sm">
+                      Schema reconcile added back {lastReconcile.statementsApplied} change(s) introduced after this backup was taken.
+                    </div>
+                  )}
+                  {lastReconcile && status === 'no_changes' && (
+                    <div className="text-sm">Backup was already in sync with the running app — no schema reconciliation needed.</div>
+                  )}
+                  {lastReconcile && status === 'warnings_applied' && (
+                    <div className="text-sm">
+                      Schema reconcile applied {lastReconcile.statementsApplied} change(s), including some that drop columns/tables (consent given).
+                    </div>
+                  )}
+                  {lastReconcile && skipped && (
+                    <div className="text-sm space-y-2">
+                      <div>
+                        The system did not apply {lastReconcile.statementsSkipped} schema change(s) because they would drop columns or tables. Until reconciled, screens that rely on the new structure may show errors.
+                      </div>
+                      {Array.isArray(lastReconcile.warnings) && lastReconcile.warnings.length > 0 && (
+                        <ul className="list-disc list-inside text-xs space-y-0.5 max-h-40 overflow-auto rounded bg-amber-100/60 p-2">
+                          {lastReconcile.warnings.map((w: string, i: number) => <li key={i}>{w}</li>)}
+                        </ul>
+                      )}
+                      {latestRestoreId !== undefined && (
+                        <Button
+                          size="sm"
+                          variant="outline"
+                          className="border-amber-400 text-amber-900 hover:bg-amber-100"
+                          disabled={forceReconcile.isPending}
+                          onClick={() => setForceReconcileTarget(latestRestoreId)}
+                          data-testid="button-force-reconcile"
+                        >
+                          {forceReconcile.isPending ? (
+                            <><Loader2 className="w-3 h-3 mr-1 animate-spin" />Forcing reconcile…</>
+                          ) : (
+                            <><Wrench className="w-3 h-3 mr-1" />Apply changes anyway (accept data loss)</>
+                          )}
+                        </Button>
+                      )}
+                    </div>
+                  )}
+                  {lastReconcile && failed && (
+                    <div className="text-sm font-mono break-all">{lastReconcile.error || "Unknown error."}</div>
+                  )}
+
+                  <div className="pt-1">
+                    Please <button className="underline font-medium" onClick={() => window.location.href = "/login"}>log out and log back in</button> to continue working.
+                  </div>
+                </AlertDescription>
+              </Alert>
+            );
+          })()}
 
           {/* Last known backup status */}
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
@@ -492,6 +684,7 @@ export default function BackupSettings() {
                     <tr>
                       <th className="text-left px-3 py-2 text-xs font-medium text-gray-500">When</th>
                       <th className="text-left px-3 py-2 text-xs font-medium text-gray-500">Status</th>
+                      <th className="text-left px-3 py-2 text-xs font-medium text-gray-500">Schema</th>
                       <th className="text-left px-3 py-2 text-xs font-medium text-gray-500 hidden sm:table-cell">Source File</th>
                       <th className="text-left px-3 py-2 text-xs font-medium text-gray-500 hidden sm:table-cell">By</th>
                       <th className="text-left px-3 py-2 text-xs font-medium text-gray-500 hidden sm:table-cell">Duration</th>
@@ -502,6 +695,7 @@ export default function BackupSettings() {
                       <tr key={r.id} className="hover:bg-gray-50">
                         <td className="px-3 py-2 whitespace-nowrap text-gray-700">{formatDate(r.restoredAt)}</td>
                         <td className="px-3 py-2"><StatusBadge success={r.success} /></td>
+                        <td className="px-3 py-2"><ReconcileBadge row={r} /></td>
                         <td className="px-3 py-2 font-mono text-xs text-gray-500 hidden sm:table-cell truncate max-w-[200px]">
                           {r.sourceFilename || r.backupDbFilename?.split('/').pop() || (r.sourceBackupRunId ? `Backup run #${r.sourceBackupRunId}` : "—")}
                         </td>
@@ -557,6 +751,8 @@ export default function BackupSettings() {
               backupPending={runBackup.isPending}
               backupJustTaken={backupJustTaken}
               isPending={isRestoring}
+              acceptDataLoss={acceptDataLoss}
+              onAcceptDataLossChange={setAcceptDataLoss}
             />
           ) : null
         }
@@ -565,6 +761,42 @@ export default function BackupSettings() {
         isPending={isRestoring}
         inputTestId="input-emergency-restore-confirm"
         confirmTestId="button-emergency-restore-confirm"
+      />
+
+      {/*
+        Task #441 — typed-phrase consent dialog for forcing schema reconcile
+        with data-loss changes (drops/renames). Distinct from the restore
+        confirm dialog so the admin must re-type FORCE_RECONCILE_PHRASE
+        even when the previous restore just landed in 'warnings_skipped'.
+      */}
+      <TypedConfirmDialog
+        open={forceReconcileTarget !== null}
+        onClose={() => setForceReconcileTarget(null)}
+        onConfirm={(typed) => {
+          if (forceReconcileTarget !== null) {
+            forceReconcile.mutate({ runId: forceReconcileTarget, confirmation: typed });
+          }
+        }}
+        title="Force Schema Reconciliation — Accept Data Loss"
+        description={
+          <div className="rounded-lg bg-amber-50 border border-amber-200 p-3 text-amber-900 space-y-1">
+            <p className="font-semibold flex items-center gap-2">
+              <AlertTriangle className="w-4 h-4" />
+              Apply schema changes that drop columns or tables.
+            </p>
+            <ul className="list-disc list-inside space-y-0.5 text-amber-800 mt-1 text-xs">
+              <li>The previous restore left some schema changes unapplied because they would delete data.</li>
+              <li>Forcing the reconcile now will drop those columns/tables from the restored database.</li>
+              <li>Data inside those columns/tables will be permanently lost.</li>
+              <li>Take a fresh backup first if you might still need that data.</li>
+            </ul>
+          </div>
+        }
+        phrase={FORCE_RECONCILE_PHRASE}
+        confirmLabel="Force Reconciliation"
+        isPending={forceReconcile.isPending}
+        inputTestId="input-force-reconcile-confirm"
+        confirmTestId="button-force-reconcile-confirm"
       />
     </>
   );

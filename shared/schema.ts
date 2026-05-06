@@ -856,6 +856,29 @@ export const restoreRuns = opsSchema.table("restore_runs", {
   success: boolean("success"),                                  // null = pending / in-progress
   errorMessage: text("error_message"),
   durationMs: integer("duration_ms"),
+  // ── Task #441: post-restore schema reconciliation outcome ──────────────
+  // After a successful SQL restore we run drizzle-kit's pushSchema()
+  // programmatically to bring the just-restored data structure forward to
+  // whatever the running app code expects (e.g. add columns/tables that
+  // were introduced after this backup was taken). The result is recorded
+  // on the same row so the restore-runs UI can show a single, complete
+  // audit entry for what actually happened.
+  //   - 'not_run'           → restore failed or rollback happened
+  //   - 'no_changes'        → backup was already in sync with code
+  //   - 'success'           → all changes applied (additive)
+  //   - 'warnings_skipped'  → unsafe (data-loss) changes were detected and
+  //                            NOT applied; admin must re-trigger with
+  //                            acceptDataLoss=true to apply them
+  //   - 'warnings_applied'  → unsafe changes were applied with explicit consent
+  //   - 'failed'            → reconcile attempt errored; details in reconcileError
+  reconcileStatus: text("reconcile_status").$type<
+    'not_run' | 'no_changes' | 'success' | 'warnings_skipped' | 'warnings_applied' | 'failed'
+  >(),
+  reconcileStatementsApplied: integer("reconcile_statements_applied").default(0),
+  reconcileStatementsSkipped: integer("reconcile_statements_skipped").default(0),
+  reconcileWarnings: text("reconcile_warnings"),    // newline-separated human-readable list
+  reconcileError: text("reconcile_error"),
+  reconcileFinishedAt: timestamp("reconcile_finished_at"),
 });
 
 export const insertRestoreRunSchema = createInsertSchema(restoreRuns).omit({ id: true, restoredAt: true });

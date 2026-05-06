@@ -8,3 +8,7 @@ export const RECYCLE_BIN_PERMANENT_DELETE_PHRASE = 'PERMANENTLY DELETE';
 export const USER_DELETE_PHRASE = 'DELETE USER';
 export const RETENTION_PURGE_PHRASE = 'PURGE OLD DATA';
 export const RESTORE_PHRASE = 'EMERGENCY RESTORE';
+// Task #441 — additional consent required to apply schema changes that
+// would drop columns/tables (drizzle-kit's hasDataLoss path) when forcing
+// post-restore reconcile.
+export const FORCE_RECONCILE_PHRASE = 'I ACCEPT DATA LOSS';
