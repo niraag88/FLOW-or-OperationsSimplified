@@ -7,6 +7,16 @@ import { requireAuth, writeAuditLog, type AuthenticatedRequest } from "../middle
 import { logger } from "../logger";
 
 export function registerInventoryRoutes(app: Express) {
+  // Aggregate endpoint consumed by client/src/pages/Dashboard.tsx
+  // (queryKey ["/api/dashboard"]). Returns: products, purchaseOrders,
+  // customers, suppliers, goodsReceipts, companySettings, summary, lots.
+  // Invoices and delivery orders are deliberately fetched by the page
+  // via their dedicated list endpoints (/api/invoices, /api/delivery-orders)
+  // and are NOT shaped here. Task #431 (A-3) verified live that this
+  // endpoint returns the populated aggregate for Admin/Manager and the
+  // Task #429 role-stripped variant for Staff; cards on Dashboard.tsx
+  // (DashboardStats, LowStockAlert, RecentActivity, QuickActions)
+  // depend on this payload, so the route must not be removed.
   app.get('/api/dashboard', requireAuth(), async (req: AuthenticatedRequest, res) => {
     try {
       const dashboardData = await businessStorage.getDashboardData();
