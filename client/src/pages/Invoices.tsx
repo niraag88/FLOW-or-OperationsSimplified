@@ -163,15 +163,24 @@ export default function Invoices() {
     queryClient.invalidateQueries({ queryKey: ['/api/invoices'] });
   };
 
-  const handleInvoiceSaveSuccess = async () => {
+  const handleInvoiceSaveSuccess = async (saved?: { id?: number | string } | null) => {
     handleRefresh();
     if (sourceQuotationId) {
       const quotationId = sourceQuotationId;
       setSourceQuotationId(null);
+      // Task #420 (B5): the convert endpoint now requires the id of
+      // the invoice that was actually created from this quotation, so
+      // it can never silently mark a quote as 'converted' without a
+      // matching invoice. If we don't have an id (e.g. on edit-save
+      // where the quote was already converted), skip the call.
+      const invoiceId = saved?.id;
+      if (invoiceId === undefined || invoiceId === null) return;
       try {
         await fetch(`/api/quotations/${quotationId}/convert`, {
           method: 'PATCH',
           credentials: 'include',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ invoiceId }),
         });
       } catch {
         // non-critical: quotation conversion status is best-effort

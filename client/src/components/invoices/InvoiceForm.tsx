@@ -94,7 +94,7 @@ interface InvoiceFormProps {
   editingInvoice?: EditingInvoiceData | null;
   currentUser?: { email?: string; role?: string } | null;
   canOverride?: boolean;
-  onSuccess?: () => void;
+  onSuccess?: (saved?: { id?: number | string } | null) => void;
 }
 
 export default function InvoiceForm({ open, onClose, editingInvoice, currentUser, canOverride, onSuccess }: InvoiceFormProps) {
@@ -414,7 +414,7 @@ export default function InvoiceForm({ open, onClose, editingInvoice, currentUser
         });
       }
       
-      onSuccess?.();
+      onSuccess?.(result as { id?: number | string } | null);
       onClose();
     } catch (error: unknown) {
       console.error("Error saving invoice:", error);

@@ -1,5 +1,5 @@
 import type { Express } from "express";
-import { quotations, quotationItems, products, recycleBin, companySettings, auditLog } from "@shared/schema";
+import { quotations, quotationItems, products, recycleBin, companySettings, auditLog, invoices } from "@shared/schema";
 import { insertQuotationSchema } from "@shared/schema";
 import { db } from "../db";
 import { eq } from "drizzle-orm";
@@ -158,9 +158,31 @@ export function registerQuotationRoutes(app: Express) {
     }
   });
 
+  // Task #420 (B5): the convert endpoint must NEVER mark a quotation as
+  // 'converted' without proof of a corresponding invoice. Caller is
+  // required to supply the `invoiceId` of the invoice that was actually
+  // created from this quotation; we verify it exists before flipping
+  // status, and the audit message names the actual invoice number.
+  // Without this guard the endpoint used to lie in the audit log
+  // ("(invoice created)") and could orphan the quote in 'converted'
+  // state with nothing to point at.
   app.patch('/api/quotations/:id/convert', requireAuth(['Admin', 'Manager', 'Staff']), async (req: AuthenticatedRequest, res) => {
     try {
       const id = parseInt(req.params.id);
+      if (!Number.isFinite(id) || id <= 0) {
+        return res.status(400).json({ error: 'Invalid quotation ID' });
+      }
+      const rawInvoiceId = req.body?.invoiceId;
+      const invoiceId = typeof rawInvoiceId === 'number'
+        ? rawInvoiceId
+        : (typeof rawInvoiceId === 'string' && /^\d+$/.test(rawInvoiceId) ? parseInt(rawInvoiceId, 10) : NaN);
+      if (!Number.isFinite(invoiceId) || invoiceId <= 0) {
+        return res.status(400).json({
+          error: 'invoiceId_required',
+          message: 'invoiceId of the created invoice is required to mark a quotation as converted.',
+        });
+      }
+
       // Task #405 (F10): lock the row, validate the transition, write,
       // and audit — all in one tx so concurrent transitions queue
       // instead of racing on a stale snapshot.
@@ -172,6 +194,17 @@ export function registerQuotationRoutes(app: Express) {
         if (!ELIGIBLE.includes(existing.status)) {
           return { status: 409 as const, body: { error: `Quotation is already in status '${existing.status}' and cannot be converted` } };
         }
+
+        const [invoice] = await tx
+          .select({ id: invoices.id, invoiceNumber: invoices.invoiceNumber })
+          .from(invoices).where(eq(invoices.id, invoiceId));
+        if (!invoice) {
+          return { status: 400 as const, body: {
+            error: 'invoice_not_found',
+            message: `Cannot mark quotation as converted: invoice id ${invoiceId} does not exist.`,
+          } };
+        }
+
         const updatedQuote = await businessStorage.updateQuotation(id, { status: 'converted' }, tx);
         await tx.insert(auditLog).values({
           actor: req.user!.id,
@@ -179,7 +212,7 @@ export function registerQuotationRoutes(app: Express) {
           targetId: String(id),
           targetType: 'quotation',
           action: 'UPDATE',
-          details: `Quotation #${existing.quoteNumber} marked as converted (invoice created)`,
+          details: `Quotation #${existing.quoteNumber} marked as converted to Invoice #${invoice.invoiceNumber}`,
         });
         return { status: 200 as const, body: updatedQuote };
       });
