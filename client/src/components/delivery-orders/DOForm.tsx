@@ -283,7 +283,7 @@ export default function DOForm({ open, onClose, editingDO, currentUser, onSucces
     if (!item.product_id) return null;
     const product = products.find((p) => Number(p.id) === Number(item.product_id));
     if (!product) return null;
-    const available = Number((product as { stockQuantity?: number | string | null }).stockQuantity ?? 0);
+    const available = Number(product.stockQuantity ?? 0);
     if (!Number.isFinite(available)) return null;
     const qty = Number(item.quantity) || 0;
     if (qty > available) return { available };
