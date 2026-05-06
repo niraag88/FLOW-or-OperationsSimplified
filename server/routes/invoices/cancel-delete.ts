@@ -135,7 +135,7 @@ export function registerInvoiceCancelDeleteRoutes(app: Express) {
     }
   });
 
-  app.delete('/api/invoices/:id', requireAuth(['Admin', 'Manager']), async (req: AuthenticatedRequest, res) => {
+  app.delete('/api/invoices/:id', requireAuth(['Admin', 'Manager', 'Staff']), async (req: AuthenticatedRequest, res) => {
     try {
       const id = parseInt(req.params.id);
       if (isNaN(id)) return res.status(400).json({ error: 'Invalid ID' });

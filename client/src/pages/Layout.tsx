@@ -20,6 +20,7 @@ import {
   ChevronDown,
   Building2,
   Users2,
+  ShieldCheck,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import {
@@ -55,6 +56,9 @@ const navigationItems: any[] = [
         title: "Purchase Orders",
         url: createPageUrl("Purchase Orders"),
         icon: ShoppingCart,
+        // Server gates POs to Admin/Manager — hide from Staff sidebar entirely
+        // (Task #429).
+        requiredRoles: ['Admin', 'Manager'],
         preload: () => import("@/pages/PurchaseOrders"),
       },
       {
@@ -107,10 +111,28 @@ const navigationItems: any[] = [
         icon: Users2,
         adminOnly: true,
         preload: () => import("@/pages/UserManagement"),
+      },
+      {
+        // Server already exposes /api/audit-logs to Admin+Manager — surface
+        // a dedicated sidebar entry so Managers can actually find it
+        // without navigating to User Management (Task #429 M-02).
+        title: "Audit Log",
+        url: createPageUrl("Audit Log"),
+        icon: ShieldCheck,
+        requiredRoles: ['Admin', 'Manager'],
+        preload: () => import("@/pages/AuditLog"),
       }
     ]
   },
 ];
+
+// Centralized visibility check used by both desktop and mobile nav. An item
+// is visible if neither `adminOnly` nor `requiredRoles` excludes the role.
+const isItemVisibleToRole = (item: any, role?: string): boolean => {
+  if (item.adminOnly && role !== 'Admin') return false;
+  if (Array.isArray(item.requiredRoles) && !item.requiredRoles.includes(role)) return false;
+  return true;
+};
 
 
 interface LayoutProps {
@@ -219,7 +241,7 @@ export default function Layout({ children, currentPageName = "" }: LayoutProps) 
                         <Button
                           variant="ghost"
                           onMouseEnter={() => item.items
-                            .filter((sub: any) => !sub.adminOnly || currentUser?.role === 'Admin')
+                            .filter((sub: any) => isItemVisibleToRole(sub, currentUser?.role))
                             .forEach((sub: any) => sub.preload?.())}
                           className={`flex items-center gap-2 px-4 py-2 rounded-lg text-sm font-medium transition-all duration-200 ${
                             isActive
@@ -234,7 +256,7 @@ export default function Layout({ children, currentPageName = "" }: LayoutProps) 
                       </DropdownMenuTrigger>
                       <DropdownMenuContent align="start" className="w-48">
                         {item.items
-                          .filter((subItem: any) => !subItem.adminOnly || currentUser?.role === 'Admin')
+                          .filter((subItem: any) => isItemVisibleToRole(subItem, currentUser?.role))
                           .map((subItem: any) => (
                           <DropdownMenuItem key={subItem.title} asChild>
                             <Link
@@ -318,7 +340,7 @@ export default function Layout({ children, currentPageName = "" }: LayoutProps) 
                         <span className="truncate">{item.title}</span>
                       </div>
                       {item.items
-                        .filter((subItem: any) => !subItem.adminOnly || currentUser?.role === 'Admin')
+                        .filter((subItem: any) => isItemVisibleToRole(subItem, currentUser?.role))
                         .map((subItem: any) => {
                         const isActive = location.pathname.startsWith(subItem.url);
                         return (

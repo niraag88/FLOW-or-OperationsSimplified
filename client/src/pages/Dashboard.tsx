@@ -4,6 +4,7 @@ import DashboardStats from "../components/dashboard/DashboardStats";
 import RecentActivity from "../components/dashboard/RecentActivity";
 import LowStockAlert from "../components/dashboard/LowStockAlert";
 import QuickActions from "../components/dashboard/QuickActions";
+import { useAuth } from "@/hooks/useAuth";
 
 const STALE_5MIN = 5 * 60 * 1000;
 
@@ -14,6 +15,8 @@ function extractArray(value: any) {
 }
 
 export default function Dashboard() {
+  const { user } = useAuth();
+  const userRole = user?.role || '';
   // Primary dashboard query — fetches products, POs, customers, suppliers,
   // goodsReceipts, companySettings and pre-calculated payment summary in one call
   const { data: dashboardData, isLoading: dashLoading } = useQuery<any>({
@@ -68,7 +71,7 @@ export default function Dashboard() {
   return (
     <div className="space-y-8">
       {/* Stats Overview */}
-      <DashboardStats data={data} />
+      <DashboardStats data={data} userRole={userRole} />
 
       {/* Quick Actions + Low Stock */}
       <div className="grid grid-cols-1 xl:grid-cols-3 gap-8 items-stretch">

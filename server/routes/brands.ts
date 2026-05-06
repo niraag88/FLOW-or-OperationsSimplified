@@ -19,7 +19,7 @@ export function registerBrandRoutes(app: Express) {
     }
   });
 
-  app.post('/api/brands', requireAuth(['Admin', 'Manager']), async (req: AuthenticatedRequest, res) => {
+  app.post('/api/brands', requireAuth(['Admin', 'Manager', 'Staff']), async (req: AuthenticatedRequest, res) => {
     try {
       const validatedData = insertBrandSchema.parse(req.body);
       const brand = await businessStorage.createBrand(validatedData);
@@ -40,7 +40,7 @@ export function registerBrandRoutes(app: Express) {
     }
   });
 
-  app.put('/api/brands/:id', requireAuth(['Admin', 'Manager']), async (req: AuthenticatedRequest, res) => {
+  app.put('/api/brands/:id', requireAuth(['Admin', 'Manager', 'Staff']), async (req: AuthenticatedRequest, res) => {
     try {
       const brandId = parseInt(req.params.id);
       const validatedData = insertBrandSchema.partial().parse(req.body);
@@ -66,7 +66,7 @@ export function registerBrandRoutes(app: Express) {
     }
   });
 
-  app.delete('/api/brands/:id', requireAuth(['Admin', 'Manager']), async (req: AuthenticatedRequest, res) => {
+  app.delete('/api/brands/:id', requireAuth(['Admin', 'Manager', 'Staff']), async (req: AuthenticatedRequest, res) => {
     try {
       const brandId = parseInt(req.params.id);
       if (isNaN(brandId)) return res.status(400).json({ error: 'Invalid ID' });

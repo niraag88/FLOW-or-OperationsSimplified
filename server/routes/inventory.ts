@@ -10,6 +10,13 @@ export function registerInventoryRoutes(app: Express) {
   app.get('/api/dashboard', requireAuth(), async (req: AuthenticatedRequest, res) => {
     try {
       const dashboardData = await businessStorage.getDashboardData();
+      // Task #429: strip PO/GRN datasets from Staff dashboard responses so
+      // the data isn't exposed to a role that can't act on it. Suppliers
+      // are PO-adjacent context and aren't shown to Staff in the UI either.
+      if (req.user?.role === 'Staff') {
+        const { purchaseOrders: _po, goodsReceipts: _gr, suppliers: _sup, ...rest } = dashboardData as Record<string, unknown>;
+        return res.json({ ...rest, purchaseOrders: [], goodsReceipts: [], suppliers: [] });
+      }
       res.json(dashboardData);
     } catch (error) {
       logger.error('Error fetching dashboard data:', error);
@@ -20,6 +27,10 @@ export function registerInventoryRoutes(app: Express) {
   app.get('/api/dashboard/stats', requireAuth(), async (req: AuthenticatedRequest, res) => {
     try {
       const stats = await businessStorage.getDashboardStats();
+      if (req.user?.role === 'Staff') {
+        const { purchaseOrders: _po, ...rest } = stats as Record<string, unknown>;
+        return res.json({ ...rest, purchaseOrders: 0 });
+      }
       res.json(stats);
     } catch (error) {
       logger.error('Error fetching dashboard stats:', error);

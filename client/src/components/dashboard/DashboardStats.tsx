@@ -47,9 +47,14 @@ const computeChange = (items: any) => {
 
 interface DashboardStatsProps {
   data: Record<string, any>;
+  userRole?: string;
 }
 
-export default function DashboardStats({ data }: DashboardStatsProps) {
+export default function DashboardStats({ data, userRole }: DashboardStatsProps) {
+  // Staff aren't allowed near Purchase Orders or Goods Receipts. Strip the
+  // PO stat card and the PO Payment Status card from their dashboard
+  // entirely (Task #429).
+  const showPO = userRole === 'Admin' || userRole === 'Manager';
   const stats = [
     {
       title: "Products",
@@ -58,7 +63,7 @@ export default function DashboardStats({ data }: DashboardStatsProps) {
       color: "bg-blue-500",
       items: data.products
     },
-    {
+    showPO && {
       title: "Purchase Orders",
       value: data.purchaseOrders.length,
       icon: ShoppingCart,
@@ -79,7 +84,7 @@ export default function DashboardStats({ data }: DashboardStatsProps) {
       color: "bg-purple-500",
       items: data.invoices
     }
-  ].map((s: any) => ({ ...s, ...computeChange(s.items) }));
+  ].filter(Boolean).map((s: any) => ({ ...s, ...computeChange(s.items) }));
 
   const invoicePayment = (() => {
     const invoices = data.invoices || [];
@@ -133,7 +138,7 @@ export default function DashboardStats({ data }: DashboardStatsProps) {
       </div>
 
       {/* Payment Status Summary Row */}
-      <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+      <div className={`grid grid-cols-1 ${showPO ? 'md:grid-cols-2' : ''} gap-4`}>
         <Card className="border-0 shadow-md">
           <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
             <CardTitle className="text-sm font-medium text-gray-600 flex items-center gap-2">
@@ -157,28 +162,30 @@ export default function DashboardStats({ data }: DashboardStatsProps) {
           </CardContent>
         </Card>
 
-        <Card className="border-0 shadow-md">
-          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-sm font-medium text-gray-600 flex items-center gap-2">
-              <ShoppingCart className="w-4 h-4 text-emerald-500" />
-              Purchase Order Payment Status
-            </CardTitle>
-          </CardHeader>
-          <CardContent>
-            <div className="flex items-center gap-4">
-              <div className="flex items-center gap-2">
-                <Clock className="w-4 h-4 text-amber-500" />
-                <span className="text-lg font-bold text-amber-600">{poPayment.outstanding.toLocaleString()}</span>
-                <Badge className="bg-amber-100 text-amber-800 border border-amber-200 text-xs">OUTSTANDING</Badge>
+        {showPO && (
+          <Card className="border-0 shadow-md">
+            <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+              <CardTitle className="text-sm font-medium text-gray-600 flex items-center gap-2">
+                <ShoppingCart className="w-4 h-4 text-emerald-500" />
+                Purchase Order Payment Status
+              </CardTitle>
+            </CardHeader>
+            <CardContent>
+              <div className="flex items-center gap-4">
+                <div className="flex items-center gap-2">
+                  <Clock className="w-4 h-4 text-amber-500" />
+                  <span className="text-lg font-bold text-amber-600">{poPayment.outstanding.toLocaleString()}</span>
+                  <Badge className="bg-amber-100 text-amber-800 border border-amber-200 text-xs">OUTSTANDING</Badge>
+                </div>
+                <div className="flex items-center gap-2">
+                  <CheckCircle className="w-4 h-4 text-green-500" />
+                  <span className="text-lg font-bold text-green-600">{poPayment.paid.toLocaleString()}</span>
+                  <Badge className="bg-green-100 text-green-800 border border-green-200 text-xs">PAID</Badge>
+                </div>
               </div>
-              <div className="flex items-center gap-2">
-                <CheckCircle className="w-4 h-4 text-green-500" />
-                <span className="text-lg font-bold text-green-600">{poPayment.paid.toLocaleString()}</span>
-                <Badge className="bg-green-100 text-green-800 border border-green-200 text-xs">PAID</Badge>
-              </div>
-            </div>
-          </CardContent>
-        </Card>
+            </CardContent>
+          </Card>
+        )}
       </div>
     </div>
   );

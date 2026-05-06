@@ -44,7 +44,11 @@ export default function RecycleBinComponent() {
   const [selectedItems, setSelectedItems] = useState(new Set());
   const { toast } = useToast();
   const { user: currentUser } = useAuth();
+  // Restore + permanent-delete are Admin/Manager-only on the server
+  // (audit-recycle.ts). Hide both buttons for Staff and show a banner
+  // pointing them at a Manager (Task #429).
   const canPermanentlyDelete = ['Admin', 'Manager'].includes(currentUser?.role || '');
+  const canRestore = ['Admin', 'Manager'].includes(currentUser?.role || '');
 
   useEffect(() => {
     loadDeletedItems();
@@ -281,6 +285,22 @@ export default function RecycleBinComponent() {
         </div>
       </div>
 
+      {/* Read-only banner for Staff — they can see what's in the bin but
+          cannot restore or empty it (Task #429). */}
+      {!canRestore && !canPermanentlyDelete && (
+        <div className="bg-sky-50 border border-sky-200 rounded-lg p-4">
+          <div className="flex items-start gap-3">
+            <AlertTriangle className="w-5 h-5 text-sky-500 mt-0.5" />
+            <div>
+              <h4 className="font-medium text-sky-800">View-only access</h4>
+              <p className="text-sm text-sky-700 mt-1">
+                Only a Manager or Admin can restore or permanently delete records from the bin. Ask a Manager if you need a document restored.
+              </p>
+            </div>
+          </div>
+        </div>
+      )}
+
       {/* Search */}
       <div className="relative max-w-md">
         <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 w-4 h-4" />
@@ -348,7 +368,18 @@ export default function RecycleBinComponent() {
                       <TableCell className="font-medium">
                         <div className="flex items-center gap-2">
                           {getDocumentIcon(item.document_type)}
-                          {item.document_number}
+                          <div className="flex flex-col">
+                            <span>{item.document_number || `#${item.entity_id ?? item.id}`}</span>
+                            {/* Server-synthesized human label, e.g.
+                                "Invoice INV-1714 — Acme Trading LLC"
+                                (Task #429 A-5). Shown only when it adds info
+                                beyond the document number alone. */}
+                            {item.counterparty && (
+                              <span className="text-xs text-gray-500 truncate max-w-[260px]">
+                                {item.counterparty}
+                              </span>
+                            )}
+                          </div>
                         </div>
                       </TableCell>
                       <TableCell>
@@ -370,7 +401,7 @@ export default function RecycleBinComponent() {
                       </TableCell>
                       <TableCell>
                         <div className="flex items-center gap-2">
-                          {item.can_restore && (
+                          {item.can_restore && canRestore && (
                             <Button
                               size="sm"
                               variant="outline"
@@ -383,6 +414,9 @@ export default function RecycleBinComponent() {
                               <RotateCcw className="w-3 h-3 mr-1" />
                               Restore
                             </Button>
+                          )}
+                          {!canRestore && !canPermanentlyDelete && (
+                            <span className="text-xs text-gray-400">View only</span>
                           )}
                           {canPermanentlyDelete && (
                             <Button

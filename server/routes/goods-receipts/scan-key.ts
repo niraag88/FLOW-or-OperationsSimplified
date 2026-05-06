@@ -6,7 +6,7 @@ import { requireAuth, deleteStorageObjectSafely, type AuthenticatedRequest } fro
 import { logger } from "../../logger";
 
 export function registerGoodsReceiptScanKeyRoutes(app: Express) {
-  app.patch('/api/goods-receipts/:id/scan-key', requireAuth(['Admin', 'Manager', 'Staff']), async (req: AuthenticatedRequest, res) => {
+  app.patch('/api/goods-receipts/:id/scan-key', requireAuth(['Admin', 'Manager']), async (req: AuthenticatedRequest, res) => {
     try {
       const id = parseInt(req.params.id);
       if (isNaN(id)) return res.status(400).json({ error: 'Invalid ID' });
@@ -32,7 +32,7 @@ export function registerGoodsReceiptScanKeyRoutes(app: Express) {
     }
   });
 
-  app.delete('/api/goods-receipts/:id/scan-key/:slot', requireAuth(['Admin', 'Manager', 'Staff']), async (req: AuthenticatedRequest, res) => {
+  app.delete('/api/goods-receipts/:id/scan-key/:slot', requireAuth(['Admin', 'Manager']), async (req: AuthenticatedRequest, res) => {
     try {
       const id = parseInt(req.params.id);
       if (isNaN(id)) return res.status(400).json({ error: 'Invalid ID' });

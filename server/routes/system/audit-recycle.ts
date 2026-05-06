@@ -27,21 +27,52 @@ export function registerAuditRecycleRoutes(app: Express) {
   // written server-side from each action handler via writeAuditLog(), so the
   // log can never be forged through the HTTP layer (Task #319).
 
-  app.get('/api/recycle-bin', requireAuth(['Admin', 'Manager']), async (req: AuthenticatedRequest, res) => {
+  // Anyone authenticated can read the recycle bin so Staff can confirm the
+  // record they deleted landed safely. Restore + permanent-delete remain
+  // Admin/Manager-only below (Task #429).
+  app.get('/api/recycle-bin', requireAuth(), async (req: AuthenticatedRequest, res) => {
     try {
       const items = await db.select().from(recycleBin).orderBy(desc(recycleBin.deletedDate));
-      const mapped = items.map(item => ({
-        id: item.id,
-        document_type: item.documentType,
-        document_id: item.documentId,
-        document_number: item.documentNumber,
-        deleted_by: item.deletedBy,
-        deleted_date: item.deletedDate,
-        reason: item.reason,
-        original_status: item.originalStatus,
-        can_restore: item.canRestore,
-        created_at: item.createdAt,
-      }));
+      const mapped = items.map(item => {
+        // Task #429 (A-5): synthesize a human-readable label so the bin
+        // tells you what each row is at a glance, e.g.
+        // "Invoice INV-1714 — Acme Trading LLC". The document_data is a
+        // best-effort parse; never throw — just fall back to "<type> <number>".
+        let counterparty = '';
+        try {
+          const parsed = item.documentData ? JSON.parse(item.documentData) : null;
+          const header = parsed?.header || {};
+          counterparty =
+            header.customerName ||
+            header.customer_name ||
+            header.supplierName ||
+            header.supplier_name ||
+            header.brandName ||
+            header.name ||
+            '';
+        } catch {
+          counterparty = '';
+        }
+        const typeLabel = (item.documentType || '').replace(/([A-Z])/g, ' $1').trim();
+        const baseLabel = `${typeLabel} ${item.documentNumber || ''}`.trim();
+        const label = counterparty ? `${baseLabel} — ${counterparty}` : baseLabel;
+        return {
+          id: item.id,
+          document_type: item.documentType,
+          document_id: item.documentId,
+          document_number: item.documentNumber,
+          entity_type: item.documentType,
+          entity_id: item.documentId,
+          label,
+          counterparty: counterparty || null,
+          deleted_by: item.deletedBy,
+          deleted_date: item.deletedDate,
+          reason: item.reason,
+          original_status: item.originalStatus,
+          can_restore: item.canRestore,
+          created_at: item.createdAt,
+        };
+      });
       res.json(mapped);
     } catch (error) {
       logger.error('Error fetching recycle bin:', error);

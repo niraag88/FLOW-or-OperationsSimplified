@@ -7,7 +7,7 @@ import { requireAuth, type AuthenticatedRequest } from "../../middleware";
 import { logger } from "../../logger";
 
 export function registerPurchaseOrderDetailRoutes(app: Express) {
-  app.get('/api/purchase-orders/:id/detail', requireAuth(), async (req: AuthenticatedRequest, res) => {
+  app.get('/api/purchase-orders/:id/detail', requireAuth(['Admin', 'Manager']), async (req: AuthenticatedRequest, res) => {
     try {
       const poId = parseInt(req.params.id);
 
@@ -108,7 +108,7 @@ export function registerPurchaseOrderDetailRoutes(app: Express) {
     }
   });
 
-  app.get('/api/purchase-orders/:id/items', requireAuth(), async (req: AuthenticatedRequest, res) => {
+  app.get('/api/purchase-orders/:id/items', requireAuth(['Admin', 'Manager']), async (req: AuthenticatedRequest, res) => {
     try {
       const poId = parseInt(req.params.id);
 

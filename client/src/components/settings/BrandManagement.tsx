@@ -100,9 +100,15 @@ export default function BrandManagement() {
       loadBrands();
     } catch (error: any) {
       console.error("Error saving brand:", error);
+      // Surface a permission-aware message instead of the generic
+      // "Failed to save brand." when the server returned 403 (Task #429).
+      const msg = String(error?.message || '');
+      const isForbidden = /\b403\b|insufficient permissions/i.test(msg);
       toast({
-        title: "Error",
-        description: "Failed to save brand.",
+        title: isForbidden ? "You don't have permission" : "Error",
+        description: isForbidden
+          ? "You don't have permission to save brands. Ask a Manager."
+          : (msg || "Failed to save brand."),
         variant: "destructive",
       });
     }
@@ -158,9 +164,13 @@ export default function BrandManagement() {
       loadBrands();
     } catch (error: any) {
       console.error("Error deleting brand:", error);
+      const msg = String(error?.message || '');
+      const isForbidden = /\b403\b|insufficient permissions/i.test(msg);
       toast({
-        title: "Delete Failed",
-        description: "Failed to delete the brand. Please try again.",
+        title: isForbidden ? "You don't have permission" : "Delete Failed",
+        description: isForbidden
+          ? "You don't have permission to delete brands. Ask a Manager."
+          : (msg || "Failed to delete the brand. Please try again."),
         variant: "destructive",
       });
     } finally {

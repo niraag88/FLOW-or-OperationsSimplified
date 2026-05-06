@@ -25,7 +25,7 @@ export function registerPurchaseOrderListRoutes(app: Express) {
     }
   });
 
-  app.get('/api/purchase-orders/next-number', requireAuth(), async (req: AuthenticatedRequest, res) => {
+  app.get('/api/purchase-orders/next-number', requireAuth(['Admin', 'Manager']), async (req: AuthenticatedRequest, res) => {
     try {
       const nextNumber = await businessStorage.getNextPoNumber();
       res.json({ nextNumber });

@@ -30,7 +30,9 @@ class ApiEntity {
     });
     if (!response.ok) {
       const body = await response.json().catch(() => ({})) as EntityData;
-      throw new Error((body.error as string) || `Failed to create ${this.endpoint}`);
+      // Prefix status so callers can detect 403s and show a permission-aware
+      // toast (Task #429).
+      throw new Error(`${response.status}: ${(body.error as string) || `Failed to create ${this.endpoint}`}`);
     }
     return await response.json() as unknown;
   }
@@ -44,19 +46,19 @@ class ApiEntity {
     });
     if (!response.ok) {
       const body = await response.json().catch(() => ({})) as EntityData;
-      throw new Error((body.error as string) || `Failed to update ${this.endpoint}`);
+      throw new Error(`${response.status}: ${(body.error as string) || `Failed to update ${this.endpoint}`}`);
     }
     return await response.json() as unknown;
   }
 
   async delete(id: number | string): Promise<unknown> {
     const response = await fetch(`/api/${this.endpoint}/${id}`, {
+      credentials: 'include',
       method: 'DELETE',
-      credentials: 'include'
     });
     if (!response.ok) {
       const body = await response.json().catch(() => ({})) as EntityData;
-      throw new Error((body.error as string) || `Failed to delete ${this.endpoint}`);
+      throw new Error(`${response.status}: ${(body.error as string) || `Failed to delete ${this.endpoint}`}`);
     }
     return await response.json() as unknown;
   }

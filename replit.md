@@ -25,6 +25,8 @@ PostgreSQL, hosted on Neon Database, is managed via Drizzle ORM for type-safe in
 ## Authentication & Authorization
 The system uses session-based authentication with a PostgreSQL store and standard username/password. A demo mode is available via the Base44 SDK shim. Role-based authorization (Admin/Manager and Staff) controls access to write operations. Destructive admin actions require typed confirmation and employ advisory locks.
 
+**Role matrix (Task #429):** Staff can fully CRUD Quotations, Invoices, Delivery Orders, Customers, and Brands (including delete-to-recycle-bin). Purchase Orders, Goods Receipts, and Suppliers — including reads, scan-key uploads, and dashboard payload — are Admin/Manager-only. Recycle bin: anyone can read and delete-to-bin; only Admin/Manager can restore or permanently delete. Audit Log and Settings → Storage are Admin/Manager and Admin-only respectively. UI hides controls and offers permission-aware 403 toasts; the server is the source of truth.
+
 ## Project Structure
 A monorepo structure separates client, server, and shared code, using TypeScript path aliases. Backend files are organized into per-concern directories to maintain manageability and reduce file size, with public import surfaces preserved. Frontend components are similarly split into smaller, focused files, delegating rendering to sub-components while retaining top-level state management.
 

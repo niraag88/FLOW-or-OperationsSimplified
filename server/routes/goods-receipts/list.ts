@@ -3,10 +3,11 @@ import { goodsReceipts, goodsReceiptItems, purchaseOrders, products, suppliers }
 import { db } from "../../db";
 import { eq, desc, sql, inArray } from "drizzle-orm";
 import { requireAuth, type AuthenticatedRequest } from "../../middleware";
+// PO/GRN data is Admin/Manager-only per Task #429.
 import { logger } from "../../logger";
 
 export function registerGoodsReceiptListRoutes(app: Express) {
-  app.get('/api/goods-receipts', requireAuth(), async (req: AuthenticatedRequest, res) => {
+  app.get('/api/goods-receipts', requireAuth(['Admin', 'Manager']), async (req: AuthenticatedRequest, res) => {
     try {
       const poIdFilter = req.query.poId ? parseInt(req.query.poId as string) : null;
       const receipts = await db.select({

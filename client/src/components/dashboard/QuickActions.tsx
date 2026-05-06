@@ -4,16 +4,26 @@ import { Button } from "@/components/ui/button";
 import { Plus, Package, ShoppingCart, Truck, FileText, ClipboardList } from "lucide-react";
 import { Link } from "react-router-dom";
 import { createPageUrl } from "@/utils";
+import { useAuth } from "@/hooks/useAuth";
 
 export default function QuickActions() {
+  const { user } = useAuth();
+  const role = user?.role || '';
+  // Staff can't reach Purchase Orders (Admin/Manager-only on the server).
+  // Hide the quick action so it doesn't 403 on click (Task #429).
+  const canSeePO = role === 'Admin' || role === 'Manager';
+  // Inventory writes are Admin/Manager-only — Staff lands on a read-only
+  // view, so the "New Product" entry would just deceive them.
+  const canSeeNewProduct = role === 'Admin' || role === 'Manager';
+
   const actions = [
-    {
+    canSeeNewProduct && {
       title: "New Product",
       icon: Package,
       href: createPageUrl("Inventory"),
       color: "bg-blue-500 hover:bg-blue-600"
     },
-    {
+    canSeePO && {
       title: "New Purchase Order",
       icon: ShoppingCart,
       href: createPageUrl("Purchase Orders"),
@@ -37,7 +47,7 @@ export default function QuickActions() {
       href: createPageUrl("Delivery Orders"),
       color: "bg-amber-500 hover:bg-amber-600"
     }
-  ];
+  ].filter(Boolean) as Array<{ title: string; icon: any; href: string; color: string }>;
 
   return (
     <Card className="border-0 shadow-lg h-full flex flex-col">

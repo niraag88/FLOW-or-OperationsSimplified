@@ -47,8 +47,11 @@ export default function Inventory() {
   const [fxRates, setFxRates] = useState({ gbpToAed: 4.85, usdToAed: 3.6725, inrToAed: 0.044 });
 
   const { user: currentUser } = useAuth();
-  const canEdit = ['Admin', 'Manager', 'Staff'].includes(currentUser?.role || '');
-  const canDelete = ['Admin', 'Manager', 'Staff'].includes(currentUser?.role || '');
+  // Server gates POST/PUT/DELETE on /api/products to Admin/Manager. Staff
+  // would just see a 403 toast, so don't render the buttons for them
+  // (Task #429 — match server permissions).
+  const canEdit = ['Admin', 'Manager'].includes(currentUser?.role || '');
+  const canDelete = ['Admin', 'Manager'].includes(currentUser?.role || '');
 
   // Load filter options (brands + sizes) and company settings once on mount
   useEffect(() => {

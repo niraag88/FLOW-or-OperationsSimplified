@@ -241,7 +241,7 @@ export function registerQuotationRoutes(app: Express) {
     }
   });
 
-  app.put('/api/quotations/:id', requireAuth(['Admin', 'Manager']), async (req: AuthenticatedRequest, res) => {
+  app.put('/api/quotations/:id', requireAuth(['Admin', 'Manager', 'Staff']), async (req: AuthenticatedRequest, res) => {
     try {
       // Validate ID before any DB work — bare parseInt('abc') yields NaN
       // which then crashed inside the Drizzle query and surfaced as a 500
@@ -348,7 +348,7 @@ export function registerQuotationRoutes(app: Express) {
     }
   });
 
-  app.delete('/api/quotations/:id', requireAuth(['Admin', 'Manager']), async (req: AuthenticatedRequest, res) => {
+  app.delete('/api/quotations/:id', requireAuth(['Admin', 'Manager', 'Staff']), async (req: AuthenticatedRequest, res) => {
     try {
       const id = parseInt(req.params.id);
       const userEmail = req.user?.email || req.user?.username || 'unknown';

@@ -6,7 +6,7 @@ import { requireAuth, writeAuditLog, deleteStorageObjectSafely, type Authenticat
 import { logger } from "../../logger";
 
 export function registerPurchaseOrderScanKeyRoutes(app: Express) {
-  app.patch('/api/purchase-orders/:id/scan-key', requireAuth(['Admin', 'Manager', 'Staff']), async (req: AuthenticatedRequest, res) => {
+  app.patch('/api/purchase-orders/:id/scan-key', requireAuth(['Admin', 'Manager']), async (req: AuthenticatedRequest, res) => {
     try {
       const id = parseInt(req.params.id);
       const { scanKey } = req.body;
@@ -26,7 +26,7 @@ export function registerPurchaseOrderScanKeyRoutes(app: Express) {
     }
   });
 
-  app.delete('/api/purchase-orders/:id/scan-key', requireAuth(['Admin', 'Manager', 'Staff']), async (req: AuthenticatedRequest, res) => {
+  app.delete('/api/purchase-orders/:id/scan-key', requireAuth(['Admin', 'Manager']), async (req: AuthenticatedRequest, res) => {
     try {
       const id = parseInt(req.params.id);
       const [po] = await db.select().from(purchaseOrders).where(eq(purchaseOrders.id, id));

@@ -19,6 +19,10 @@ import InventorySettings from "../components/settings/InventorySettings";
 export default function Settings() {
   const [activeTab, setActiveTab] = useState("company");
   const { user: currentUser } = useAuth();
+  const isAdmin = currentUser?.role === 'Admin';
+  // Storage tab fires Admin-only fetches (latest-backup, retention, run-backups).
+  // Hiding the trigger and content for non-Admins prevents the noisy red toast
+  // every Manager/Staff used to see on Settings load (Task #429 M-01).
 
   return (
     <div className="space-y-4 sm:space-y-6">
@@ -33,7 +37,7 @@ export default function Settings() {
       <Tabs value={activeTab} onValueChange={setActiveTab} className="w-full">
         {/* Mobile: Scrollable horizontal tabs */}
         <div className="w-full overflow-x-auto">
-          <TabsList className="grid grid-cols-7 min-w-[600px] sm:min-w-0 sm:w-full">
+          <TabsList className={`grid ${isAdmin ? 'grid-cols-7' : 'grid-cols-6'} min-w-[600px] sm:min-w-0 sm:w-full`}>
             <TabsTrigger value="company" className="flex flex-col sm:flex-row items-center gap-1 sm:gap-2 text-xs sm:text-sm px-2 sm:px-3">
               <Building2 className="w-4 h-4" />
               <span className="hidden sm:inline">Company</span>
@@ -59,11 +63,13 @@ export default function Settings() {
               <span className="hidden sm:inline">Books</span>
               <span className="sm:hidden">Bk.</span>
             </TabsTrigger>
-            <TabsTrigger value="storage" className="flex flex-col sm:flex-row items-center gap-1 sm:gap-2 text-xs sm:text-sm px-2 sm:px-3">
-              <HardDrive className="w-4 h-4" />
-              <span className="hidden sm:inline">Storage</span>
-              <span className="sm:hidden">St.</span>
-            </TabsTrigger>
+            {isAdmin && (
+              <TabsTrigger value="storage" className="flex flex-col sm:flex-row items-center gap-1 sm:gap-2 text-xs sm:text-sm px-2 sm:px-3">
+                <HardDrive className="w-4 h-4" />
+                <span className="hidden sm:inline">Storage</span>
+                <span className="sm:hidden">St.</span>
+              </TabsTrigger>
+            )}
             <TabsTrigger value="recycle" className="flex flex-col sm:flex-row items-center gap-1 sm:gap-2 text-xs sm:text-sm px-2 sm:px-3">
               <FolderMinus className="w-4 h-4" />
               <span className="hidden sm:inline">Recycle Bin</span>
@@ -92,17 +98,15 @@ export default function Settings() {
           <BookClosingManager currentUser={currentUser} />
         </TabsContent>
 
-        <TabsContent value="storage" className="mt-4 sm:mt-6">
-          <div className="space-y-6">
-            <SettingsStorage />
-            {currentUser?.role === 'Admin' && (
-              <>
-                <BackupSettings />
-                <RetentionSettings currentUser={currentUser} />
-              </>
-            )}
-          </div>
-        </TabsContent>
+        {isAdmin && (
+          <TabsContent value="storage" className="mt-4 sm:mt-6">
+            <div className="space-y-6">
+              <SettingsStorage />
+              <BackupSettings />
+              <RetentionSettings currentUser={currentUser} />
+            </div>
+          </TabsContent>
+        )}
 
         <TabsContent value="recycle" className="mt-4 sm:mt-6">
           <RecycleBin />
