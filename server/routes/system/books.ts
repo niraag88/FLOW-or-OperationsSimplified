@@ -1,7 +1,7 @@
 import type { Express } from "express";
-import { financialYears, invoices, quotations, purchaseOrders, deliveryOrders } from "@shared/schema";
+import { financialYears, invoices, quotations, purchaseOrders, deliveryOrders, yearArchives } from "@shared/schema";
 import { db } from "../../db";
-import { eq, desc } from "drizzle-orm";
+import { eq, desc, sql } from "drizzle-orm";
 import ExcelJS from 'exceljs';
 import {
   requireAuth,
@@ -76,6 +76,30 @@ export function registerBooksRoutes(app: Express) {
       // status change — the financial-year state machine is the source
       // of truth, the archive is a best-effort backup artefact.
       let yearArchiveOutcome: any = null;
+
+      // Audit follow-up (post Task #427): reopening a previously-closed
+      // year MUST invalidate its sealed-year row so the rolling backup
+      // resumes covering that year's edits. `getClosedYears()` reads
+      // `ops.year_archives WHERE success=true`; without this update a
+      // reopened year stays excluded forever and any new edits to its
+      // scans live nowhere except the bucket itself until the year is
+      // re-closed (silent data-loss window). Setting success=false (vs
+      // deleting the row) preserves the audit trail of the original
+      // seal — a re-close will overwrite it via the existing upsert.
+      if (prior.status === 'Closed' && status === 'Open') {
+        try {
+          await db.execute(sql`
+            UPDATE ops.year_archives
+               SET success = false,
+                   error_message = 'Year reopened — seal invalidated; rolling backup resumes coverage until next close'
+             WHERE year = ${updated.year}
+               AND success = true
+          `);
+        } catch (reopenErr) {
+          logger.error(`Year-archive reopen-invalidate failed for year ${updated.year}:`, reopenErr);
+        }
+      }
+
       if (prior.status !== 'Closed' && status === 'Closed') {
         try {
           const sealResult = await sealYearArchive(updated.year, {

@@ -16,33 +16,41 @@ import { logger } from "../../logger";
 export function registerBackupRoutes(app: Express) {
   app.get('/api/ops/backup-status', requireAuth(['Admin']), async (req, res) => {
     try {
+      // Task #427 audit follow-up: report on the real artefact set.
+      // The legacy `backups/objects/` manifest prefix is no longer
+      // produced; we now list `backups/files/` (the rolling .tar.gz)
+      // and `backups/years/` (permanent year seals) and additionally
+      // surface the catalog row count from ops.year_archives so the
+      // admin sees both bucket and DB views of the year-archive set.
       const dbBackupsResult = await objectStorageClient.list({ prefix: 'backups/db/' });
-      const manifestBackupsResult = await objectStorageClient.list({ prefix: 'backups/objects/' });
+      const filesBackupsResult = await objectStorageClient.list({ prefix: 'backups/files/' });
+      const yearsBackupsResult = await objectStorageClient.list({ prefix: 'backups/years/' });
 
-      let latestDbBackup: any = null;
-      let latestManifestBackup: any = null;
+      const pickLatest = (r: any) => {
+        if (!r.ok || r.value.length === 0) return null;
+        const sorted = r.value.sort((a: any, b: any) =>
+          new Date(b.timeCreated || b.updated).getTime() - new Date(a.timeCreated || a.updated).getTime()
+        );
+        const obj = sorted[0];
+        return { filename: obj.name, size: obj.size || 0, timestamp: obj.timeCreated || obj.updated };
+      };
 
-      if (dbBackupsResult.ok && dbBackupsResult.value.length > 0) {
-        latestDbBackup = dbBackupsResult.value
-          .sort((a: any, b: any) => new Date(b.timeCreated || b.updated).getTime() - new Date(a.timeCreated || a.updated).getTime())[0];
-      }
-
-      if (manifestBackupsResult.ok && manifestBackupsResult.value.length > 0) {
-        latestManifestBackup = manifestBackupsResult.value
-          .sort((a: any, b: any) => new Date(b.timeCreated || b.updated).getTime() - new Date(a.timeCreated || a.updated).getTime())[0];
+      let yearArchiveCatalogCount = 0;
+      try {
+        const rows = await db.select().from(yearArchives).where(eq(yearArchives.success, true));
+        yearArchiveCatalogCount = rows.length;
+      } catch (catalogErr) {
+        logger.error('backup-status: failed to read ops.year_archives:', catalogErr);
       }
 
       res.json({
-        latestDbBackup: latestDbBackup ? {
-          filename: (latestDbBackup as any).name,
-          size: (latestDbBackup as any).size || 0,
-          timestamp: (latestDbBackup as any).timeCreated || (latestDbBackup as any).updated
-        } : null,
-        latestManifestBackup: latestManifestBackup ? {
-          filename: (latestManifestBackup as any).name,
-          size: (latestManifestBackup as any).size || 0,
-          timestamp: (latestManifestBackup as any).timeCreated || (latestManifestBackup as any).updated
-        } : null
+        latestDbBackup: pickLatest(dbBackupsResult),
+        latestFilesBackup: pickLatest(filesBackupsResult),
+        latestYearArchive: pickLatest(yearsBackupsResult),
+        yearArchiveCatalogCount,
+        // Kept for backward compat — old clients that read this field
+        // will see null and treat it as "no manifest", which is true.
+        latestManifestBackup: null,
       });
     } catch (error) {
       logger.error('Error getting backup status:', error);

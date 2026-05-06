@@ -414,6 +414,21 @@ export function registerRestoreRoutes(app: Express) {
         return;
       }
 
+      // Audit follow-up: validate the typed RESTORE_PHRASE BEFORE
+      // accepting the up-to-500 MB upload (parity with the DB-restore
+      // upload endpoint). Aborts the stream early so /tmp is never
+      // touched without a valid confirmation.
+      if (confirmationField !== RESTORE_PHRASE) {
+        fileStream.resume();
+        if (!res.headersSent) {
+          res.status(400).json({
+            error: 'restore_confirmation_required',
+            message: `Type "${RESTORE_PHRASE}" in the confirmation field before uploading.`,
+          });
+        }
+        return;
+      }
+
       sourceFilename = filename;
       tempPath = `${tmpdir()}/restore-files-upload-${crypto.randomUUID()}.tar.gz`;
       const ws = createWriteStream(tempPath);
@@ -560,6 +575,25 @@ export function registerRestoreRoutes(app: Express) {
       if (!filename.endsWith('.sql.gz')) {
         fileStream.resume();
         res.status(400).json({ error: 'File must be a .sql.gz gzip-compressed PostgreSQL dump' });
+        return;
+      }
+
+      // Audit follow-up: validate the typed RESTORE_PHRASE BEFORE
+      // accepting the up-to-500 MB upload. Well-formed multipart sends
+      // text fields ahead of the file part (the BackupSettings UI
+      // appends `confirmation` first), so by the time `on('file')`
+      // fires the `confirmation` field is already populated. If it is
+      // missing or wrong we abort the stream immediately and avoid
+      // touching the disk — closes the auth-gated DoS surface where
+      // an admin could fill /tmp by uploading without the phrase.
+      if (confirmationField !== RESTORE_PHRASE) {
+        fileStream.resume();
+        if (!res.headersSent) {
+          res.status(400).json({
+            error: 'restore_confirmation_required',
+            message: `Type "${RESTORE_PHRASE}" in the confirmation field before uploading.`,
+          });
+        }
         return;
       }
 
