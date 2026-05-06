@@ -18,6 +18,7 @@ import multer from "multer";
 import cookieParser from "cookie-parser";
 import { registerRoutes } from "./routes";
 import { initializeAdminUser } from "./adminInit";
+import { ensureSchemaPatches } from "./ensureSchema";
 import { setupVite, serveStatic, log } from "./vite";
 import { MAX_UPLOAD_ERROR_MESSAGE, startAuditSpoolReplayTimer, stopBackgroundJobs } from "./middleware";
 import { pool } from "./db";
@@ -45,6 +46,12 @@ app.use((req, res, next) => {
 
   next();
 });
+
+// Task #441 — apply idempotent boot-time schema patches BEFORE any
+// routes that read newly added columns (e.g. ops.restore_runs.reconcile_*)
+// can be hit. drizzle.config.ts is forbidden to edit and only covers the
+// public schema, so `npx drizzle-kit push` misses ops-schema additions.
+await ensureSchemaPatches();
 
 // Initialize admin user if needed
 await initializeAdminUser();

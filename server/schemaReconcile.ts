@@ -32,6 +32,23 @@ import * as schema from "@shared/schema";
 import { db } from "./db";
 import { logger } from "./logger";
 
+// drizzle-kit/api ships a CommonJS bundle that uses `require('fs')` at
+// module-load time — that fails in our pure-ESM tsx/Node setup the moment
+// it's statically imported. Loading it lazily inside the reconcile call
+// keeps server boot clean and only pays the cost when a restore actually
+// completes. The shape is captured locally for typing.
+type PushSchemaResult = {
+  hasDataLoss?: boolean;
+  warnings?: string[];
+  statementsToExecute?: string[];
+  apply: () => Promise<unknown>;
+};
+type PushSchemaFn = (
+  imports: Record<string, unknown>,
+  drizzleInstance: typeof db,
+  schemaFilters?: string[],
+) => Promise<PushSchemaResult>;
+
 export type ReconcileStatus =
   | 'no_changes'
   | 'success'
@@ -47,9 +64,55 @@ export interface ReconcileResult {
   warnings: string[];
   /** Statements that were considered (applied or skipped). */
   statements: string[];
-  /** Set when status === 'failed'. */
+  /**
+   * User-facing summary. ALWAYS plain-English; never a raw exception
+   * message. The raw error is preserved in `rawErrorForLogs` (server-only)
+   * and persisted on the restore_runs row for admin debugging via logs.
+   */
   error?: string;
+  /** Raw exception text — for server logs / persisted column only. */
+  rawErrorForLogs?: string;
   durationMs: number;
+}
+
+// drizzle-kit's published `pushSchema` signature pins its second
+// parameter to `PgDatabase<any, Record<string, never>, …>`, where the
+// generics force an EMPTY relational schema. Our app `db` is built via
+// `drizzle-orm/neon-serverless` with the FULL `@shared/schema` typed in
+// — at runtime they're both `PgDatabase` instances and pushSchema's own
+// implementation only uses the underlying SQL session, but TypeScript
+// can't unify the relational generics. The dynamic import below
+// returns the function pre-typed by our local `PushSchemaFn` shape, so
+// no call site has to fall back to `any`.
+async function loadPushSchema(): Promise<PushSchemaFn> {
+  const mod = (await import("drizzle-kit/api")) as unknown as { pushSchema: PushSchemaFn };
+  return mod.pushSchema;
+}
+
+/**
+ * Map a thrown exception (or apply()-failure) from drizzle-kit into a
+ * short, user-readable sentence. Raw text is preserved separately for
+ * server logs and the audit trail.
+ */
+function friendlyReconcileError(err: unknown): { friendly: string; raw: string } {
+  const raw = err instanceof Error ? err.message : String(err);
+  const lower = raw.toLowerCase();
+  if (lower.includes('permission denied')) {
+    return { friendly: 'Schema reconciliation could not run because the database user lacks permission to alter the schema.', raw };
+  }
+  if (lower.includes('connect') || lower.includes('econnrefused') || lower.includes('econnreset')) {
+    return { friendly: 'Schema reconciliation could not connect to the database. Try again, or check the database service status.', raw };
+  }
+  if (lower.includes('timeout')) {
+    return { friendly: 'Schema reconciliation timed out. The database may be busy — try again in a moment.', raw };
+  }
+  if (lower.includes('relation') && lower.includes('does not exist')) {
+    return { friendly: 'Schema reconciliation could not find an expected table. The backup may be from a much older or unrelated app version.', raw };
+  }
+  return {
+    friendly: 'Schema reconciliation could not be applied automatically. Check the server logs or restore history details for the technical reason.',
+    raw,
+  };
 }
 
 /**
@@ -66,12 +129,6 @@ export async function reconcileSchemaAfterRestore(
   const startedAt = Date.now();
 
   try {
-    // drizzle-kit exposes pushSchema() in its `api` entry point. We import
-    // dynamically so this dev-time toolkit isn't pulled into the regular
-    // hot path; it's only loaded when a restore actually completes.
-    // @ts-ignore — drizzle-kit/api has no published type entry in our setup
-    const { pushSchema } = await import("drizzle-kit/api");
-
     // Cover BOTH schemas the app owns:
     //   - public  (everything restored from backup)
     //   - ops     (restore_runs etc — preserved across restores; new
@@ -80,9 +137,10 @@ export async function reconcileSchemaAfterRestore(
     // The live `drizzle` schema (migration tracking) is intentionally NOT
     // reconciled — it's not modelled in shared/schema.ts and is owned by
     // drizzle-kit's CLI workflow.
+    const pushSchema = await loadPushSchema();
     const result = await pushSchema(
       schema as unknown as Record<string, unknown>,
-      db as any,
+      db,
       ["public", "ops"],
     );
 
@@ -114,16 +172,17 @@ export async function reconcileSchemaAfterRestore(
           statements,
           durationMs: Date.now() - startedAt,
         };
-      } catch (applyErr: any) {
-        const message = applyErr?.message ?? String(applyErr);
-        logger.error('[schemaReconcile] apply() failed:', message);
+      } catch (applyErr: unknown) {
+        const { friendly, raw } = friendlyReconcileError(applyErr);
+        logger.error('[schemaReconcile] apply() failed:', raw);
         return {
           status: 'failed',
           statementsApplied: 0,
           statementsSkipped: statements.length,
           warnings,
           statements,
-          error: message,
+          error: friendly,
+          rawErrorForLogs: raw,
           durationMs: Date.now() - startedAt,
         };
       }
@@ -151,29 +210,31 @@ export async function reconcileSchemaAfterRestore(
         statements,
         durationMs: Date.now() - startedAt,
       };
-    } catch (applyErr: any) {
-      const message = applyErr?.message ?? String(applyErr);
-      logger.error('[schemaReconcile] apply() (with data loss) failed:', message);
+    } catch (applyErr: unknown) {
+      const { friendly, raw } = friendlyReconcileError(applyErr);
+      logger.error('[schemaReconcile] apply() (with data loss) failed:', raw);
       return {
         status: 'failed',
         statementsApplied: 0,
         statementsSkipped: statements.length,
         warnings,
         statements,
-        error: message,
+        error: friendly,
+        rawErrorForLogs: raw,
         durationMs: Date.now() - startedAt,
       };
     }
-  } catch (err: any) {
-    const message = err?.message ?? String(err);
-    logger.error('[schemaReconcile] pushSchema() failed:', message);
+  } catch (err: unknown) {
+    const { friendly, raw } = friendlyReconcileError(err);
+    logger.error('[schemaReconcile] pushSchema() failed:', raw);
     return {
       status: 'failed',
       statementsApplied: 0,
       statementsSkipped: 0,
       warnings: [],
       statements: [],
-      error: message,
+      error: friendly,
+      rawErrorForLogs: raw,
       durationMs: Date.now() - startedAt,
     };
   }
@@ -184,6 +245,10 @@ export async function reconcileSchemaAfterRestore(
  * ops.restore_runs row. Keeps the persistence shape in one place so
  * both the auto post-restore path and the manual force-reconcile path
  * write the same columns.
+ *
+ * Note: the `reconcile_error` column is the user-facing friendly message.
+ * The raw exception text is only logged server-side via logger.error()
+ * so admin pages never expose raw stack traces.
  */
 export function reconcileResultToRow(r: ReconcileResult) {
   return {

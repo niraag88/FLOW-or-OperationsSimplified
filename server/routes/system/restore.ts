@@ -121,10 +121,13 @@ export function registerRestoreRoutes(app: Express) {
           `[restore] schema reconcile after ${label}: ${reconcile.status} ` +
           `(applied=${reconcile.statementsApplied}, skipped=${reconcile.statementsSkipped})`
         );
-      } catch (reconErr: any) {
+      } catch (reconErr: unknown) {
         // Defence in depth — reconcileSchemaAfterRestore itself catches
         // errors, but any unexpected throw must not mark the whole
-        // restore as failed (the data IS restored at this point).
+        // restore as failed (the data IS restored at this point). Raw
+        // exception text stays in server logs only; the persisted /
+        // API-returned `error` is always a friendly sentence so the
+        // restore-runs UI never exposes internals.
         logger.error('[restore] schema reconcile threw unexpectedly:', reconErr);
         reconcile = {
           status: 'failed',
@@ -132,7 +135,8 @@ export function registerRestoreRoutes(app: Express) {
           statementsSkipped: 0,
           warnings: [],
           statements: [],
-          error: reconErr?.message || String(reconErr),
+          error: 'Schema reconciliation could not be completed automatically. Check the server logs for the technical reason.',
+          rawErrorForLogs: reconErr instanceof Error ? reconErr.message : String(reconErr),
           durationMs: 0,
         };
       }
