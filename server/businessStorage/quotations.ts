@@ -164,6 +164,13 @@ export async function createInvoiceFromQuotation(
   const quote = await getQuotationWithItems(quotationId);
   if (!quote) throw new Error(`Quotation with id ${quotationId} not found`);
   if (quote.status === 'converted') throw new Error(`Quotation ${quote.quoteNumber} has already been converted to an invoice`);
+  // Task #420: keep the quotation status machine consistent across every
+  // conversion entry point. The eligible-source set mirrors the gate used
+  // by POST /api/invoices when source_quotation_id is provided.
+  const ELIGIBLE_SOURCE_STATUSES = ['draft', 'sent', 'submitted', 'accepted'];
+  if (!ELIGIBLE_SOURCE_STATUSES.includes(quote.status)) {
+    throw new Error(`Quotation ${quote.quoteNumber} is in status '${quote.status}' and cannot be converted`);
+  }
   if (!quote.customerId) throw new Error(`Quotation ${quote.quoteNumber} has no customer assigned`);
 
   // Same authoritative totals + VAT rules as POST /api/invoices.

@@ -220,11 +220,56 @@ test('atomic invoice+convert flow via source_quotation_id', async (t) => {
   assert.ok(convBody.createdInvoiceId && convBody.createdInvoiceId > 0,
     'convert wrapper must return the id of the invoice it created');
 
+  // ── Path C: ineligible source status (rejected/cancelled) is refused ──
+  // Both /convert and POST /api/invoices with source_quotation_id must
+  // refuse to flip a quotation that's not in an eligible source status,
+  // keeping the quotation status machine consistent across entry points.
+  const q3Res = await fetch(`${base}/api/quotations`, {
+    method: 'POST', headers: apiHeaders,
+    body: JSON.stringify({
+      customerId,
+      quoteDate: '2026-05-06', validUntil: '2026-06-06', status: 'draft',
+      items: [{ product_id: productId, quantity: 1, unit_price: '50', vat_rate: '0.05', line_total: '50' }],
+    }),
+  });
+  const quote3 = (await q3Res.json()) as { id: number; quoteNumber: string };
+  // Force the quote into a terminal status the machine treats as
+  // non-convertible. We bypass the API to set 'rejected' because the
+  // public update path enforces its own transitions; the point of this
+  // test is to prove conversion entry points refuse it regardless of
+  // how it got there.
+  await pool.query("UPDATE quotations SET status = 'rejected' WHERE id = $1", [quote3.id]);
+
+  const convRejected = await fetch(`${base}/api/quotations/${quote3.id}/convert`, {
+    method: 'PATCH', headers: apiHeaders,
+  });
+  assert.equal(convRejected.ok, false,
+    '/convert must refuse a rejected quotation');
+  assert.equal(convRejected.status, 409,
+    '/convert must return 409 for ineligible source status');
+
+  const postRejected = await fetch(`${base}/api/invoices`, {
+    method: 'POST', headers: apiHeaders,
+    body: JSON.stringify({
+      customer_id: customerId,
+      invoice_date: '2026-05-06', status: 'draft',
+      source_quotation_id: quote3.id,
+      items: [{ product_id: productId, quantity: 1, unit_price: 50 }],
+    }),
+  });
+  assert.equal(postRejected.ok, false,
+    'POST /api/invoices must refuse a rejected source quotation');
+  const { rows: q3Rows } = await pool.query<{ status: string }>(
+    'SELECT status FROM quotations WHERE id = $1', [quote3.id]
+  );
+  assert.equal(q3Rows[0]?.status, 'rejected',
+    'rejected quote must remain rejected after both refused attempts');
+
   // Cleanup
   await pool.query('DELETE FROM invoice_line_items WHERE invoice_id IN ($1, $2)', [invoice.id, convBody.createdInvoiceId]);
   await pool.query('DELETE FROM invoices WHERE id IN ($1, $2)', [invoice.id, convBody.createdInvoiceId]);
-  await pool.query('DELETE FROM quotation_items WHERE quote_id IN ($1, $2)', [quote.id, quote2.id]);
-  await pool.query('DELETE FROM quotations WHERE id IN ($1, $2)', [quote.id, quote2.id]);
+  await pool.query('DELETE FROM quotation_items WHERE quote_id IN ($1, $2, $3)', [quote.id, quote2.id, quote3.id]);
+  await pool.query('DELETE FROM quotations WHERE id IN ($1, $2, $3)', [quote.id, quote2.id, quote3.id]);
   await pool.query('DELETE FROM customers WHERE id = $1', [otherCust.id]);
 });
 

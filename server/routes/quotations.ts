@@ -227,6 +227,7 @@ export function registerQuotationRoutes(app: Express) {
       // createInvoiceFromQuotation throws plain Error for known cases.
       if (/not found/i.test(msg)) return res.status(404).json({ error: msg });
       if (/already been converted/i.test(msg)) return res.status(409).json({ error: msg });
+      if (/cannot be converted/i.test(msg)) return res.status(409).json({ error: msg });
       if (/no customer assigned/i.test(msg)) return res.status(400).json({ error: msg });
       logger.error('Error converting quotation:', error);
       return res.status(500).json({ error: 'Failed to convert quotation' });
