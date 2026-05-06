@@ -159,13 +159,16 @@ export function registerQuotationRoutes(app: Express) {
   });
 
   // Task #420 (B5): the convert endpoint must NEVER mark a quotation as
-  // 'converted' without proof of a corresponding invoice. Caller is
-  // required to supply the `invoiceId` of the invoice that was actually
-  // created from this quotation; we verify it exists before flipping
-  // status, and the audit message names the actual invoice number.
-  // Without this guard the endpoint used to lie in the audit log
-  // ("(invoice created)") and could orphan the quote in 'converted'
-  // state with nothing to point at.
+  // 'converted' without proof of a corresponding invoice that is
+  // actually linked to THIS quotation. Caller supplies `invoiceId`; we
+  // verify the invoice (a) exists, (b) belongs to the same customer,
+  // and (c) carries this quote's number in its `reference` field —
+  // which is exactly what both /api/invoices/from-quotation AND the
+  // UI's create-from-quote flow set. Existence-only would let a caller
+  // pair quote A with unrelated invoice B and produce a misleading
+  // audit trail. Without these guards the endpoint used to lie in the
+  // audit log ("(invoice created)") and could orphan the quote in
+  // 'converted' state with nothing to point at.
   app.patch('/api/quotations/:id/convert', requireAuth(['Admin', 'Manager', 'Staff']), async (req: AuthenticatedRequest, res) => {
     try {
       const id = parseInt(req.params.id);
@@ -187,8 +190,12 @@ export function registerQuotationRoutes(app: Express) {
       // and audit — all in one tx so concurrent transitions queue
       // instead of racing on a stale snapshot.
       const result = await db.transaction(async (tx) => {
-        const [existing] = await tx.select({ id: quotations.id, status: quotations.status, quoteNumber: quotations.quoteNumber })
-          .from(quotations).where(eq(quotations.id, id)).for('update');
+        const [existing] = await tx.select({
+          id: quotations.id,
+          status: quotations.status,
+          quoteNumber: quotations.quoteNumber,
+          customerId: quotations.customerId,
+        }).from(quotations).where(eq(quotations.id, id)).for('update');
         if (!existing) return { status: 404 as const, body: { error: 'Quotation not found' } };
         const ELIGIBLE = ['draft', 'sent', 'submitted', 'accepted'];
         if (!ELIGIBLE.includes(existing.status)) {
@@ -196,12 +203,33 @@ export function registerQuotationRoutes(app: Express) {
         }
 
         const [invoice] = await tx
-          .select({ id: invoices.id, invoiceNumber: invoices.invoiceNumber })
+          .select({
+            id: invoices.id,
+            invoiceNumber: invoices.invoiceNumber,
+            customerId: invoices.customerId,
+            reference: invoices.reference,
+          })
           .from(invoices).where(eq(invoices.id, invoiceId));
         if (!invoice) {
           return { status: 400 as const, body: {
             error: 'invoice_not_found',
             message: `Cannot mark quotation as converted: invoice id ${invoiceId} does not exist.`,
+          } };
+        }
+        // True linkage: the invoice must belong to the same customer
+        // AND carry this quote's number in its reference field. Both
+        // server-side conversion paths (POST /api/invoices/from-quotation
+        // and the UI's POST /api/invoices created-from-quote flow)
+        // populate `reference = quoteNumber` and `customerId = quote.customerId`.
+        const customerMatches = invoice.customerId != null
+          && existing.customerId != null
+          && invoice.customerId === existing.customerId;
+        const referenceMatches = (invoice.reference ?? '').trim() === existing.quoteNumber;
+        if (!customerMatches || !referenceMatches) {
+          return { status: 400 as const, body: {
+            error: 'invoice_not_linked',
+            message: `Invoice #${invoice.invoiceNumber} is not linked to Quotation #${existing.quoteNumber} `
+              + `(customer or reference does not match). Convert is only valid when the invoice was created from this quotation.`,
           } };
         }
 
