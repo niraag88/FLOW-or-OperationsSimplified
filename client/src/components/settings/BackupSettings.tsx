@@ -182,6 +182,9 @@ function RestoreConfirmExtra({
         <p className="text-xs text-blue-800 leading-relaxed">
           Once the data is restored, the system will automatically add back any columns or tables that have been added since this backup was taken — so you don't need to run any developer commands. Drops or renames are reported, never silently destroyed.
         </p>
+        <p className="text-[11px] italic text-blue-700 leading-relaxed">
+          Note: this is an <strong>after-the-fact</strong> reconciliation, not a preview. The system does not inspect the backup file's structure before you confirm — actual differences are detected and reported only once the restore has finished.
+        </p>
         <label className="flex items-start gap-2 cursor-pointer pt-1">
           <Checkbox
             checked={acceptDataLoss}

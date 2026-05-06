@@ -165,7 +165,7 @@ export function registerRestoreRoutes(app: Express) {
     } else {
       // Pre-create failed — insert a new complete record now.
       try {
-        await db.insert(restoreRuns).values({
+        const [retried] = await db.insert(restoreRuns).values({
           triggeredBy,
           triggeredByName: actorName,
           sourceBackupRunId: sourceBackupRunId ?? null,
@@ -175,7 +175,10 @@ export function registerRestoreRoutes(app: Express) {
           errorMessage: result.error ?? null,
           durationMs: result.durationMs ?? null,
           ...reconcileRow,
-        });
+        }).returning({ id: restoreRuns.id });
+        // So the restore response can still return a usable
+        // restoreRunId for the Force Reconciliation button.
+        preCreatedId = retried?.id ?? preCreatedId;
       } catch (retryErr) {
         logger.error('Could not insert ops.restore_runs record after restore:', retryErr);
       }
