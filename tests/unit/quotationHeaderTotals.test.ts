@@ -19,6 +19,21 @@ import { Pool } from 'pg';
 const base = process.env.TEST_BASE_URL || 'http://localhost:5000';
 const pool = new Pool({ connectionString: process.env.DATABASE_URL });
 
+// Skip the whole file when the live app/DB aren't reachable, so this
+// integration suite doesn't break local/CI unit-test runs that don't
+// boot the server.
+async function liveServicesAvailable(): Promise<boolean> {
+  if (!process.env.DATABASE_URL) return false;
+  try {
+    const r = await fetch(`${base}/api/health`, { method: 'GET' }).catch(() => null);
+    if (r && r.ok) return true;
+    // Fallback: any HTTP response (even 404) means the server is up.
+    const r2 = await fetch(base, { method: 'GET' }).catch(() => null);
+    return !!r2;
+  } catch { return false; }
+}
+const SHOULD_SKIP = !(await liveServicesAvailable());
+
 async function loginHeaders(): Promise<Record<string, string>> {
   const login = await fetch(`${base}/api/auth/login`, {
     method: 'POST', headers: { 'Content-Type': 'application/json' },
@@ -43,7 +58,7 @@ async function pickFixtures(headers: Record<string, string>): Promise<{ customer
   return { customerId, productId };
 }
 
-test('POST /api/quotations persists header totals derived from line items', async () => {
+test('POST /api/quotations persists header totals derived from line items', { skip: SHOULD_SKIP }, async () => {
   const H = await loginHeaders();
   const { customerId, productId } = await pickFixtures(H);
 
@@ -74,7 +89,7 @@ test('POST /api/quotations persists header totals derived from line items', asyn
   }
 });
 
-test('PUT /api/quotations/:id with new items recomputes header totals', async () => {
+test('PUT /api/quotations/:id with new items recomputes header totals', { skip: SHOULD_SKIP }, async () => {
   const H = await loginHeaders();
   const { customerId, productId } = await pickFixtures(H);
 

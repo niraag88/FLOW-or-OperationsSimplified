@@ -302,7 +302,7 @@ export function registerQuotationRoutes(app: Express) {
             return { status: 400 as const, body: { error: `Cannot transition quotation from '${existing.status}' to '${newStatus}'` } };
           }
         }
-        const updatedQuote = await businessStorage.updateQuotation(id, validatedData, tx);
+        let updatedQuote = await businessStorage.updateQuotation(id, validatedData, tx);
 
         // Task #421 (B4): if the caller supplied a fresh items array,
         // replace the line items in the same tx so header totals are
@@ -325,7 +325,11 @@ export function registerQuotationRoutes(app: Express) {
             }
           }
         }
-        await businessStorage.recomputeQuotationHeaderTotals(id, tx);
+        const totals = await businessStorage.recomputeQuotationHeaderTotals(id, tx);
+        // Merge so the PUT response body reflects the freshly persisted
+        // header totals (matches POST behavior — callers shouldn't have
+        // to refetch just to read the new subtotal/VAT/grand total).
+        updatedQuote = { ...updatedQuote, ...totals };
 
         await tx.insert(auditLog).values({
           actor: req.user!.id,
