@@ -163,51 +163,14 @@ export default function Invoices() {
     queryClient.invalidateQueries({ queryKey: ['/api/invoices'] });
   };
 
-  const handleInvoiceSaveSuccess = async (saved?: { id?: number | string } | null) => {
+  const handleInvoiceSaveSuccess = async (_saved?: { id?: number | string } | null) => {
     handleRefresh();
-    if (sourceQuotationId) {
-      const quotationId = sourceQuotationId;
-      setSourceQuotationId(null);
-      // Task #420 (B5): the convert endpoint now requires the id of
-      // the invoice that was actually created from this quotation, so
-      // it can never silently mark a quote as 'converted' without a
-      // matching invoice. If we don't have an id (e.g. on edit-save
-      // where the quote was already converted), skip the call.
-      const invoiceId = saved?.id;
-      if (invoiceId === undefined || invoiceId === null) return;
-      try {
-        const res = await fetch(`/api/quotations/${quotationId}/convert`, {
-          method: 'PATCH',
-          credentials: 'include',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ invoiceId }),
-        });
-        if (!res.ok) {
-          // Task #420 (B5): the invoice was saved but the server refused
-          // to mark the quotation as converted. Surface this so the user
-          // can fix the quotation status manually instead of discovering
-          // the mismatch later in reports.
-          let detail = '';
-          try {
-            const body = await res.json();
-            detail = body?.message || body?.error || '';
-          } catch { /* best-effort */ }
-          toast({
-            title: 'Invoice saved, but quotation not marked converted',
-            description: detail
-              ? `${detail} You can update the quotation status manually.`
-              : 'The server rejected the conversion. You can update the quotation status manually.',
-            variant: 'destructive',
-          });
-        }
-      } catch {
-        toast({
-          title: 'Invoice saved, but quotation not marked converted',
-          description: 'Network error while updating the quotation status. You can update it manually.',
-          variant: 'destructive',
-        });
-      }
-    }
+    // Task #420 (B5): no separate /convert call. When the form was
+    // pre-filled from a quotation, the invoice POST itself carries
+    // `source_quotation_id` and the server flips the quote to
+    // 'converted' atomically with creating the invoice (one tx, one
+    // outcome — no orphans possible).
+    setSourceQuotationId(null);
   };
 
   const handleNewInvoice = () => {
@@ -319,14 +282,6 @@ export default function Invoices() {
       const notes = document.remarks || document.notes || '';
       normalizedData.remarks = `Based on Quotation #${quotationNumber}${notes ? '\n' + notes : ''}`.trim();
 
-      // Task #420 (B5): the convert endpoint requires the resulting
-      // invoice's `reference` to equal the source quote number, so the
-      // server can prove the linkage before flipping status. The quote's
-      // own `reference` field (a customer PO ref) is preserved into
-      // remarks above and not lost.
-      if (quotationNumber && quotationNumber !== 'Unknown') {
-        normalizedData.reference = String(quotationNumber);
-      }
       
       // Handle quotation-specific items - map field names to what InvoiceForm expects
       const quotationItems = document.items || document.lineItems || [];
@@ -673,6 +628,7 @@ export default function Invoices() {
         currentUser={currentUser}
         canOverride={canOverride}
         onSuccess={handleInvoiceSaveSuccess}
+        sourceQuotationId={sourceQuotationId}
       />
       
       {/* Create from Existing Dialog */}

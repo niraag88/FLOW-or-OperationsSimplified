@@ -158,96 +158,78 @@ export function registerQuotationRoutes(app: Express) {
     }
   });
 
-  // Task #420 (B5): the convert endpoint must NEVER mark a quotation as
-  // 'converted' without proof of a corresponding invoice that is
-  // actually linked to THIS quotation. Caller supplies `invoiceId`; we
-  // verify the invoice (a) exists, (b) belongs to the same customer,
-  // and (c) carries this quote's number in its `reference` field —
-  // which is exactly what both /api/invoices/from-quotation AND the
-  // UI's create-from-quote flow set. Existence-only would let a caller
-  // pair quote A with unrelated invoice B and produce a misleading
-  // audit trail. Without these guards the endpoint used to lie in the
-  // audit log ("(invoice created)") and could orphan the quote in
-  // 'converted' state with nothing to point at.
+  // Task #420 (B5): /convert is a thin compatibility wrapper around the
+  // single canonical conversion flow — `createInvoiceFromQuotation`.
+  // This endpoint used to flip status without ever creating an invoice
+  // (and lied in the audit log). It now atomically:
+  //   1. creates the invoice (using quote items as-is), AND
+  //   2. flips the quote to 'converted', AND
+  //   3. writes a truthful audit entry,
+  // all in one transaction. Failures roll back together — no more
+  // orphaned 'converted' quotes.
   app.patch('/api/quotations/:id/convert', requireAuth(['Admin', 'Manager', 'Staff']), async (req: AuthenticatedRequest, res) => {
     try {
       const id = parseInt(req.params.id);
       if (!Number.isFinite(id) || id <= 0) {
         return res.status(400).json({ error: 'Invalid quotation ID' });
       }
-      const rawInvoiceId = req.body?.invoiceId;
-      const invoiceId = typeof rawInvoiceId === 'number'
-        ? rawInvoiceId
-        : (typeof rawInvoiceId === 'string' && /^\d+$/.test(rawInvoiceId) ? parseInt(rawInvoiceId, 10) : NaN);
-      if (!Number.isFinite(invoiceId) || invoiceId <= 0) {
-        return res.status(400).json({
-          error: 'invoiceId_required',
-          message: 'invoiceId of the created invoice is required to mark a quotation as converted.',
-        });
-      }
 
-      // Task #405 (F10): lock the row, validate the transition, write,
-      // and audit — all in one tx so concurrent transitions queue
-      // instead of racing on a stale snapshot.
+      const { companySettings } = await import('@shared/schema');
+      const [nextNumber, csRows] = await Promise.all([
+        businessStorage.generateInvoiceNumber(),
+        db.select().from(companySettings).limit(1),
+      ]);
+
       const result = await db.transaction(async (tx) => {
-        const [existing] = await tx.select({
-          id: quotations.id,
-          status: quotations.status,
-          quoteNumber: quotations.quoteNumber,
-          customerId: quotations.customerId,
-        }).from(quotations).where(eq(quotations.id, id)).for('update');
-        if (!existing) return { status: 404 as const, body: { error: 'Quotation not found' } };
-        const ELIGIBLE = ['draft', 'sent', 'submitted', 'accepted'];
-        if (!ELIGIBLE.includes(existing.status)) {
-          return { status: 409 as const, body: { error: `Quotation is already in status '${existing.status}' and cannot be converted` } };
+        // Use the same canonical path as POST /api/invoices/from-quotation.
+        // It creates the invoice, copies items, and sets the quote to
+        // 'converted' atomically. It throws if the quote is already
+        // converted or has no customer.
+        const inv = await businessStorage.createInvoiceFromQuotation(
+          id,
+          nextNumber,
+          parseInt(req.user!.id),
+          tx,
+        );
+
+        if (csRows[0]) {
+          const cs = csRows[0];
+          await tx.update(invoices).set({ companySnapshot: {
+            companyName: cs.companyName,
+            address: cs.address,
+            phone: cs.phone,
+            email: cs.email,
+            vatNumber: cs.vatNumber,
+            taxNumber: cs.taxNumber,
+            logo: cs.logo,
+          } }).where(eq(invoices.id, inv.id));
         }
 
-        const [invoice] = await tx
-          .select({
-            id: invoices.id,
-            invoiceNumber: invoices.invoiceNumber,
-            customerId: invoices.customerId,
-            reference: invoices.reference,
-          })
-          .from(invoices).where(eq(invoices.id, invoiceId));
-        if (!invoice) {
-          return { status: 400 as const, body: {
-            error: 'invoice_not_found',
-            message: `Cannot mark quotation as converted: invoice id ${invoiceId} does not exist.`,
-          } };
-        }
-        // True linkage: the invoice must belong to the same customer
-        // AND carry this quote's number in its reference field. Both
-        // server-side conversion paths (POST /api/invoices/from-quotation
-        // and the UI's POST /api/invoices created-from-quote flow)
-        // populate `reference = quoteNumber` and `customerId = quote.customerId`.
-        const customerMatches = invoice.customerId != null
-          && existing.customerId != null
-          && invoice.customerId === existing.customerId;
-        const referenceMatches = (invoice.reference ?? '').trim() === existing.quoteNumber;
-        if (!customerMatches || !referenceMatches) {
-          return { status: 400 as const, body: {
-            error: 'invoice_not_linked',
-            message: `Invoice #${invoice.invoiceNumber} is not linked to Quotation #${existing.quoteNumber} `
-              + `(customer or reference does not match). Convert is only valid when the invoice was created from this quotation.`,
-          } };
-        }
-
-        const updatedQuote = await businessStorage.updateQuotation(id, { status: 'converted' }, tx);
         await tx.insert(auditLog).values({
           actor: req.user!.id,
           actorName: req.user?.username || String(req.user!.id),
           targetId: String(id),
           targetType: 'quotation',
           action: 'UPDATE',
-          details: `Quotation #${existing.quoteNumber} marked as converted to Invoice #${invoice.invoiceNumber}`,
+          details: `Quotation marked as converted; created Invoice #${inv.invoiceNumber}`,
         });
-        return { status: 200 as const, body: updatedQuote };
+
+        return { invoiceId: inv.id, invoiceNumber: inv.invoiceNumber };
       });
-      res.status(result.status).json(result.body);
+
+      // Return the updated quotation so existing callers (which use the
+      // response body) keep working; include the new invoice id so the
+      // client can navigate to it.
+      const updated = await businessStorage.getQuotationById(id);
+      return res.status(200).json({ ...updated, createdInvoiceId: result.invoiceId, createdInvoiceNumber: result.invoiceNumber });
     } catch (error) {
+      const msg = error instanceof Error ? error.message : '';
+      // createInvoiceFromQuotation throws plain Error for known cases.
+      if (/not found/i.test(msg)) return res.status(404).json({ error: msg });
+      if (/already been converted/i.test(msg)) return res.status(409).json({ error: msg });
+      if (/no customer assigned/i.test(msg)) return res.status(400).json({ error: msg });
       logger.error('Error converting quotation:', error);
-      res.status(500).json({ error: 'Failed to convert quotation' });
+      return res.status(500).json({ error: 'Failed to convert quotation' });
     }
   });
 

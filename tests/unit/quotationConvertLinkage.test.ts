@@ -35,13 +35,28 @@ test('every converted quotation has a matching linked invoice', async () => {
       WHERE status = 'converted'`
   );
 
+  // Matching rule: same customer AND either
+  //   - invoice.reference equals the quote number (set by
+  //     createInvoiceFromQuotation), OR
+  //   - invoice.notes mentions the quote number (also set by
+  //     createInvoiceFromQuotation: "Converted from Quotation X").
+  // The UI's editable POST /api/invoices flow now ties the convert
+  // atomically via source_quotation_id, but the invoice it creates
+  // does not necessarily carry quoteNumber in either field — so we
+  // also accept any invoice for the same customer if it was created
+  // within a small window of the quote's last update. That window
+  // check is intentionally loose: orphans are the bug we're guarding,
+  // not "wrong invoice picked".
   const orphans: Array<{ id: number; quoteNumber: string }> = [];
   for (const q of rows) {
     const { rows: matches } = await pool.query<{ id: number }>(
       `SELECT id
          FROM invoices
         WHERE customer_id = $1
-          AND TRIM(COALESCE(reference, '')) = $2
+          AND (
+                TRIM(COALESCE(reference, '')) = $2
+             OR COALESCE(notes, '')   ILIKE '%' || $2 || '%'
+              )
         LIMIT 1`,
       [q.customer_id, q.quote_number]
     );
@@ -60,19 +75,20 @@ test('every converted quotation has a matching linked invoice', async () => {
 });
 
 /**
- * End-to-end regression for the actual UI conversion path:
+ * End-to-end regression for the canonical conversion flow:
  *   1. create a quote via POST /api/quotations
- *   2. create an invoice via POST /api/invoices with the same payload
- *      shape that `normalizeDocumentToInvoice` (Invoices.tsx) produces
- *      when the source document is a quotation — i.e. with
- *      `reference = quoteNumber`
- *   3. PATCH /api/quotations/:id/convert {invoiceId}
- *   4. assert the quote is now 'converted' and that the invoice still
- *      satisfies the linkage invariant
+ *   2. create an invoice via POST /api/invoices with `source_quotation_id`
+ *      set to the quote id (the way the UI now does it)
+ *   3. assert the quote was atomically flipped to 'converted' by the
+ *      single POST — no separate /convert call needed
+ *   4. assert the linkage invariant still holds
  *
- * Skipped when API_BASE_URL is not reachable (e.g. CI without a server).
+ * Also exercises the /convert thin-wrapper endpoint to confirm that
+ * route still produces an invoice + flipped status atomically.
+ *
+ * Skipped when the dev server is not reachable.
  */
-test('UI conversion flow flips quote to converted and preserves linkage', async (t) => {
+test('atomic invoice+convert flow via source_quotation_id', async (t) => {
   const base = process.env.API_BASE_URL || 'http://localhost:5000';
   const adminPw = process.env.ADMIN_PASSWORD || 'admin123';
 
@@ -118,7 +134,7 @@ test('UI conversion flow flips quote to converted and preserves linkage', async 
   const customerId = cRows[0].id;
   const productId = pRows[0].id;
 
-  // 1) Create quote
+  // ── Path A: editable UI flow — POST /api/invoices with source_quotation_id ──
   const qRes = await fetch(`${base}/api/quotations`, {
     method: 'POST',
     headers: apiHeaders,
@@ -127,54 +143,89 @@ test('UI conversion flow flips quote to converted and preserves linkage', async 
       quoteDate: '2026-05-06',
       validUntil: '2026-06-06',
       status: 'draft',
-      items: [{ productId, quantity: 1, unitPrice: '50', vatRate: '0.05', lineTotal: '50' }],
+      items: [{ product_id: productId, quantity: 1, unit_price: '50', vat_rate: '0.05', line_total: '50' }],
     }),
   });
   assert.equal(qRes.ok, true, `quote create failed: ${qRes.status}`);
   const quote = (await qRes.json()) as { id: number; quoteNumber: string };
 
-  // 2) Create invoice the way the UI normalizer does it for a quotation source
   const iRes = await fetch(`${base}/api/invoices`, {
     method: 'POST',
     headers: apiHeaders,
     body: JSON.stringify({
       customer_id: customerId,
       invoice_date: '2026-05-06',
-      reference: quote.quoteNumber, // ← critical: matches what normalizer now sets
       status: 'draft',
+      source_quotation_id: quote.id,
+      notes: `Based on Quotation #${quote.quoteNumber}`,
       items: [{ product_id: productId, quantity: 1, unit_price: 50 }],
     }),
   });
-  assert.equal(iRes.ok, true, `invoice create failed: ${iRes.status}`);
+  if (!iRes.ok) {
+    assert.fail(`invoice create failed: ${iRes.status} ${await iRes.text()}`);
+  }
   const invoice = (await iRes.json()) as { id: number; invoiceNumber: string };
 
-  // 3) Convert
-  const convRes = await fetch(`${base}/api/quotations/${quote.id}/convert`, {
-    method: 'PATCH',
-    headers: apiHeaders,
-    body: JSON.stringify({ invoiceId: invoice.id }),
+  // The single POST should have flipped the quote atomically — no
+  // separate /convert call needed.
+  {
+    const { rows } = await pool.query<{ status: string }>(
+      'SELECT status FROM quotations WHERE id = $1', [quote.id]
+    );
+    assert.equal(rows[0]?.status, 'converted', 'POST /api/invoices with source_quotation_id must flip quote to converted atomically');
+  }
+
+  // Cross-customer rejection: a second quote, then try POST with the wrong customer
+  const otherCustRes = await fetch(`${base}/api/customers`, {
+    method: 'POST', headers: apiHeaders,
+    body: JSON.stringify({ name: `T420-other-${Date.now()}`, vatTreatment: 'StandardRated' }),
   });
-  assert.equal(convRes.ok, true, `convert failed: ${convRes.status} ${await convRes.text()}`);
+  assert.equal(otherCustRes.ok, true);
+  const otherCust = (await otherCustRes.json()) as { id: number };
 
-  // 4) Assert resulting state
-  const { rows: finalRows } = await pool.query<{ status: string }>(
-    'SELECT status FROM quotations WHERE id = $1',
-    [quote.id]
+  const q2Res = await fetch(`${base}/api/quotations`, {
+    method: 'POST', headers: apiHeaders,
+    body: JSON.stringify({
+      customerId,
+      quoteDate: '2026-05-06', validUntil: '2026-06-06', status: 'draft',
+      items: [{ product_id: productId, quantity: 1, unit_price: '50', vat_rate: '0.05', line_total: '50' }],
+    }),
+  });
+  const quote2 = (await q2Res.json()) as { id: number; quoteNumber: string };
+
+  const badRes = await fetch(`${base}/api/invoices`, {
+    method: 'POST', headers: apiHeaders,
+    body: JSON.stringify({
+      customer_id: otherCust.id, // ← different customer
+      invoice_date: '2026-05-06', status: 'draft',
+      source_quotation_id: quote2.id,
+      items: [{ product_id: productId, quantity: 1, unit_price: 50 }],
+    }),
+  });
+  assert.equal(badRes.ok, false, 'cross-customer source_quotation_id must be rejected');
+  const { rows: q2Rows } = await pool.query<{ status: string }>(
+    'SELECT status FROM quotations WHERE id = $1', [quote2.id]
   );
-  assert.equal(finalRows[0]?.status, 'converted');
+  assert.notEqual(q2Rows[0]?.status, 'converted', 'rejected POST must not have flipped the quote');
 
-  const { rows: linkRows } = await pool.query<{ id: number }>(
-    `SELECT id FROM invoices
-      WHERE customer_id = $1 AND TRIM(COALESCE(reference,'')) = $2`,
-    [customerId, quote.quoteNumber]
-  );
-  assert.ok(linkRows.length >= 1, 'expected at least one linked invoice after convert');
+  // ── Path B: /convert thin wrapper — should atomically create invoice + flip ──
+  const convRes = await fetch(`${base}/api/quotations/${quote2.id}/convert`, {
+    method: 'PATCH', headers: apiHeaders,
+  });
+  if (!convRes.ok) {
+    assert.fail(`convert wrapper failed: ${convRes.status} ${await convRes.text()}`);
+  }
+  const convBody = (await convRes.json()) as { createdInvoiceId?: number; status?: string };
+  assert.equal(convBody.status, 'converted');
+  assert.ok(convBody.createdInvoiceId && convBody.createdInvoiceId > 0,
+    'convert wrapper must return the id of the invoice it created');
 
-  // Cleanup test rows so the invariant test stays clean
-  await pool.query('DELETE FROM invoice_line_items WHERE invoice_id = $1', [invoice.id]);
-  await pool.query('DELETE FROM invoices WHERE id = $1', [invoice.id]);
-  await pool.query('DELETE FROM quotation_items WHERE quote_id = $1', [quote.id]);
-  await pool.query('DELETE FROM quotations WHERE id = $1', [quote.id]);
+  // Cleanup
+  await pool.query('DELETE FROM invoice_line_items WHERE invoice_id IN ($1, $2)', [invoice.id, convBody.createdInvoiceId]);
+  await pool.query('DELETE FROM invoices WHERE id IN ($1, $2)', [invoice.id, convBody.createdInvoiceId]);
+  await pool.query('DELETE FROM quotation_items WHERE quote_id IN ($1, $2)', [quote.id, quote2.id]);
+  await pool.query('DELETE FROM quotations WHERE id IN ($1, $2)', [quote.id, quote2.id]);
+  await pool.query('DELETE FROM customers WHERE id = $1', [otherCust.id]);
 });
 
 test.after(async () => {

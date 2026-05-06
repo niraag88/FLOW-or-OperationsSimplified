@@ -1,5 +1,5 @@
 import type { Express } from "express";
-import { invoices, invoiceLineItems, auditLog, products } from "@shared/schema";
+import { invoices, invoiceLineItems, auditLog, products, quotations } from "@shared/schema";
 import { type InsertInvoice } from "@shared/schema";
 import { db } from "../../db";
 import { eq, inArray } from "drizzle-orm";
@@ -248,13 +248,52 @@ export function registerInvoiceCreateRoutes(app: Express) {
             .where(eq(invoices.id, created.id));
         }
 
+        // Task #420 (B5): when this invoice was created from a quotation
+        // via the UI's editable form, atomically mark the source quote
+        // as converted in the same transaction. Validates eligibility
+        // (status + customer match) so a caller cannot pair an invoice
+        // with an unrelated or terminal quote. This — together with
+        // /convert and /from-quotation routing through createInvoiceFromQuotation —
+        // means there is now exactly one canonical conversion outcome:
+        // an invoice exists for every 'converted' quote.
+        let convertedQuoteSummary: string | null = null;
+        const rawSrcQuoteId = body.source_quotation_id ?? body.sourceQuotationId;
+        if (rawSrcQuoteId !== undefined && rawSrcQuoteId !== null) {
+          const srcQuoteId = typeof rawSrcQuoteId === 'number'
+            ? rawSrcQuoteId
+            : (typeof rawSrcQuoteId === 'string' && /^\d+$/.test(rawSrcQuoteId) ? parseInt(rawSrcQuoteId, 10) : NaN);
+          if (!Number.isFinite(srcQuoteId) || srcQuoteId <= 0) {
+            throw new Error('Invalid source_quotation_id');
+          }
+          const [srcQuote] = await tx.select({
+            id: quotations.id,
+            status: quotations.status,
+            quoteNumber: quotations.quoteNumber,
+            customerId: quotations.customerId,
+          }).from(quotations).where(eq(quotations.id, srcQuoteId)).for('update');
+          if (!srcQuote) throw new Error(`Source quotation ${srcQuoteId} not found`);
+          const ELIGIBLE = ['draft', 'sent', 'submitted', 'accepted'];
+          if (!ELIGIBLE.includes(srcQuote.status)) {
+            throw new Error(`Source quotation ${srcQuote.quoteNumber} is in status '${srcQuote.status}' and cannot be converted`);
+          }
+          if (srcQuote.customerId !== customerId) {
+            throw new Error(`Source quotation ${srcQuote.quoteNumber} belongs to a different customer than this invoice`);
+          }
+          await tx.update(quotations)
+            .set({ status: 'converted', updatedAt: new Date() })
+            .where(eq(quotations.id, srcQuoteId));
+          convertedQuoteSummary = `${srcQuote.quoteNumber} (id=${srcQuoteId})`;
+        }
+
         await tx.insert(auditLog).values({
           actor: req.user!.id,
           actorName: req.user?.username || String(req.user!.id),
           targetId: String(created.id),
           targetType: 'invoice',
           action: 'CREATE',
-          details: `Invoice #${created.invoiceNumber} created for ${customerName}${body.status === 'delivered' ? ' — stock deducted' : ''}`,
+          details: `Invoice #${created.invoiceNumber} created for ${customerName}`
+            + (body.status === 'delivered' ? ' — stock deducted' : '')
+            + (convertedQuoteSummary ? ` — Quotation ${convertedQuoteSummary} marked as converted` : ''),
         });
 
         return created;

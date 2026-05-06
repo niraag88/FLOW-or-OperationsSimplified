@@ -95,9 +95,18 @@ interface InvoiceFormProps {
   currentUser?: { email?: string; role?: string } | null;
   canOverride?: boolean;
   onSuccess?: (saved?: { id?: number | string } | null) => void;
+  /**
+   * Task #420 (B5): when this form is being used to create an invoice
+   * from a quotation, pass the source quote id here. The id is sent in
+   * the POST /api/invoices body as `source_quotation_id` so the server
+   * can flip the quote to 'converted' atomically with creating the
+   * invoice — there's never a window where the invoice exists without
+   * the conversion (or vice versa).
+   */
+  sourceQuotationId?: number | null;
 }
 
-export default function InvoiceForm({ open, onClose, editingInvoice, currentUser, canOverride, onSuccess }: InvoiceFormProps) {
+export default function InvoiceForm({ open, onClose, editingInvoice, currentUser, canOverride, onSuccess, sourceQuotationId }: InvoiceFormProps) {
   const [loading, setLoading] = useState(false);
   const [customers, setCustomers] = useState<FormCustomer[]>([]);
   const [products, setProducts] = useState<FormProduct[]>([]);
@@ -390,7 +399,10 @@ export default function InvoiceForm({ open, onClose, editingInvoice, currentUser
           quantity: item.quantity || 0,
           unit_price: item.unit_price || 0,
           line_total: parseFloat((item.line_total || 0).toFixed(2))
-        }))
+        })),
+        // Only sent on create (server ignores it on update); triggers
+        // the atomic quote→converted transition described above.
+        ...(sourceQuotationId ? { source_quotation_id: sourceQuotationId } : {}),
       };
 
       let result;
