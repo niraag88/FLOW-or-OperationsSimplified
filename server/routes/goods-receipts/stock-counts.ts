@@ -55,6 +55,19 @@ export function registerStockCountRoutes(app: Express) {
         return res.status(400).json({ error: 'Items array is required and cannot be empty' });
       }
 
+      const negativeItems = items.filter(item => item.product_id && parseInt(item.quantity) < 0);
+      if (negativeItems.length > 0) {
+        logger.warn('Stock-count rejected: negative quantity', {
+          userId: req.user.id,
+          username: req.user.username,
+          negativeItems: negativeItems.map((i: any) => ({
+            product_id: i.product_id,
+            quantity: i.quantity,
+          })),
+        });
+        return res.status(400).json({ error: 'Quantity cannot be negative' });
+      }
+
       const validItems = items.filter(item => parseInt(item.quantity) >= 0 && item.product_id);
       if (validItems.length === 0) {
         return res.status(400).json({ error: 'At least one item with a valid product is required' });

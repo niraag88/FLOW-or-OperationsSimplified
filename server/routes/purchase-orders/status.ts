@@ -51,7 +51,12 @@ export function registerPurchaseOrderStatusRoutes(app: Express) {
           // 409: the target state is invalid given the current state.
           // Covers both manual misuse and the race-loser case where
           // a concurrent toggle flipped the from-state under us.
-          return res.status(409).json({ error: `Cannot transition from '${e.fromStatus}' to '${status}'` });
+          // Hint: this endpoint only handles submitted ↔ closed.
+          // The draft → submitted flip lives on PUT /api/purchase-orders/:id.
+          const hint = e.fromStatus === 'draft' && status === 'submitted'
+            ? ` Use PUT /api/purchase-orders/:id to flip a draft to submitted; this endpoint only handles submitted ↔ closed.`
+            : ` This endpoint only handles submitted ↔ closed transitions.`;
+          return res.status(409).json({ error: `Cannot transition from '${e.fromStatus}' to '${status}'.${hint}` });
         }
         throw txError;
       }
