@@ -8,7 +8,14 @@ import { Alert, AlertDescription } from '@/components/ui/alert';
 import { FileText, Search, AlertCircle } from 'lucide-react';
 import { format, isValid, parseISO } from 'date-fns';
 
-const KNOWN_ACTIONS = ['CREATE', 'UPDATE', 'DELETE', 'UPLOAD', 'REMOVE_FILE'] as const;
+const LEGACY_ACTIONS = ['CREATE', 'UPDATE', 'DELETE', 'UPLOAD', 'REMOVE_FILE', 'DEACTIVATE', 'FACTORY_RESET'] as const;
+const DOT_VERB_ACTIONS = [
+  'goods_receipt.scan_attached',
+  'goods_receipt.scan_removed',
+  'purchase_order.scan_attached',
+  'storage_object.deleted',
+] as const;
+const KNOWN_ACTIONS = [...LEGACY_ACTIONS, ...DOT_VERB_ACTIONS] as const;
 
 interface AuditLog {
   id: number;
@@ -27,6 +34,12 @@ const ACTION_COLORS: Record<string, string> = {
   DELETE: 'bg-red-100 text-red-800 dark:bg-red-900 dark:text-red-200',
   UPLOAD: 'bg-yellow-100 text-yellow-800 dark:bg-yellow-900 dark:text-yellow-200',
   REMOVE_FILE: 'bg-orange-100 text-orange-800 dark:bg-orange-900 dark:text-orange-200',
+  DEACTIVATE: 'bg-orange-100 text-orange-800 dark:bg-orange-900 dark:text-orange-200',
+  FACTORY_RESET: 'bg-red-100 text-red-800 dark:bg-red-900 dark:text-red-200',
+  'goods_receipt.scan_attached': 'bg-yellow-100 text-yellow-800 dark:bg-yellow-900 dark:text-yellow-200',
+  'goods_receipt.scan_removed': 'bg-orange-100 text-orange-800 dark:bg-orange-900 dark:text-orange-200',
+  'purchase_order.scan_attached': 'bg-yellow-100 text-yellow-800 dark:bg-yellow-900 dark:text-yellow-200',
+  'storage_object.deleted': 'bg-red-100 text-red-800 dark:bg-red-900 dark:text-red-200',
 };
 
 function formatLogDate(dateString: string) {

@@ -30,7 +30,7 @@ export function registerGoodsReceiptScanKeyRoutes(app: Express) {
         actorName: req.user?.username || String(req.user!.id),
         targetId: String(id),
         targetType: 'goods_receipt',
-        action: 'UPLOAD',
+        action: 'goods_receipt.scan_attached',
         details: `Scan attached to GRN #${updated.receiptNumber} (slot ${slotNum})`,
       });
       res.json(updated);
@@ -72,7 +72,7 @@ export function registerGoodsReceiptScanKeyRoutes(app: Express) {
         actorName: req.user?.username || String(req.user!.id),
         targetId: String(id),
         targetType: 'goods_receipt',
-        action: 'REMOVE_FILE',
+        action: 'goods_receipt.scan_removed',
         details: `Scan removed from GRN #${current.receiptNumber} (slot ${slotNum})`,
       });
       res.json(updated);

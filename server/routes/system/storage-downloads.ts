@@ -194,7 +194,7 @@ export function registerStorageDownloadRoutes(app: Express) {
         actorName: req.user?.username || String(req.user!.id),
         targetId: String(key),
         targetType: 'storage_object',
-        action: 'DELETE',
+        action: 'storage_object.deleted',
         details: `Storage object deleted: ${key}`,
       });
 

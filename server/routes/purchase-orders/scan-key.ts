@@ -19,6 +19,16 @@ export function registerPurchaseOrderScanKeyRoutes(app: Express) {
         .where(eq(purchaseOrders.id, id))
         .returning();
       if (!updated) return res.status(404).json({ error: 'Purchase order not found' });
+
+      writeAuditLog({
+        actor: req.user!.id,
+        actorName: req.user?.username || String(req.user!.id),
+        targetId: String(id),
+        targetType: 'purchase_order',
+        action: 'purchase_order.scan_attached',
+        details: `Supplier scan attached to Purchase Order #${updated.poNumber}`,
+      });
+
       res.json(updated);
     } catch (error) {
       logger.error('Error saving PO scan key:', error);
