@@ -7,6 +7,7 @@ import crypto from 'crypto';
 import {
   requireAuth,
   requireRole,
+  writeAuditLog,
   objectStorageClient,
   type AuthenticatedRequest,
 } from "../../middleware";
@@ -178,7 +179,7 @@ export function registerStorageDownloadRoutes(app: Express) {
     }
   });
 
-  app.delete('/api/storage/object', requireRole('Admin'), async (req, res) => {
+  app.delete('/api/storage/object', requireRole('Admin'), async (req: AuthenticatedRequest, res) => {
     try {
       const { key } = req.query;
       if (!key) return res.status(400).json({ error: 'Key parameter is required' });
@@ -187,6 +188,15 @@ export function registerStorageDownloadRoutes(app: Express) {
       if (!result.ok) throw new Error('Failed to delete object');
 
       await db.delete(storageObjects).where(eq(storageObjects.key, key as string));
+
+      writeAuditLog({
+        actor: req.user!.id,
+        actorName: req.user?.username || String(req.user!.id),
+        targetId: String(key),
+        targetType: 'storage_object',
+        action: 'DELETE',
+        details: `Storage object deleted: ${key}`,
+      });
 
       res.json({ success: true, message: 'Object deleted successfully' });
     } catch (error) {

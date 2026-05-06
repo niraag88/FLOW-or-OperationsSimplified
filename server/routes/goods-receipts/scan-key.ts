@@ -2,7 +2,7 @@ import type { Express } from "express";
 import { goodsReceipts, storageObjects } from "@shared/schema";
 import { db } from "../../db";
 import { eq } from "drizzle-orm";
-import { requireAuth, deleteStorageObjectSafely, type AuthenticatedRequest } from "../../middleware";
+import { requireAuth, writeAuditLog, deleteStorageObjectSafely, type AuthenticatedRequest } from "../../middleware";
 import { logger } from "../../logger";
 
 export function registerGoodsReceiptScanKeyRoutes(app: Express) {
@@ -25,6 +25,14 @@ export function registerGoodsReceiptScanKeyRoutes(app: Express) {
         .where(eq(goodsReceipts.id, id))
         .returning();
       if (!updated) return res.status(404).json({ error: 'Goods receipt not found' });
+      writeAuditLog({
+        actor: req.user!.id,
+        actorName: req.user?.username || String(req.user!.id),
+        targetId: String(id),
+        targetType: 'goods_receipt',
+        action: 'UPLOAD',
+        details: `Scan attached to GRN #${updated.receiptNumber} (slot ${slotNum})`,
+      });
       res.json(updated);
     } catch (error) {
       logger.error('Error saving GRN scan key:', error);
@@ -59,6 +67,14 @@ export function registerGoodsReceiptScanKeyRoutes(app: Express) {
         .set({ [colName]: null, updatedAt: new Date() })
         .where(eq(goodsReceipts.id, id))
         .returning();
+      writeAuditLog({
+        actor: req.user!.id,
+        actorName: req.user?.username || String(req.user!.id),
+        targetId: String(id),
+        targetType: 'goods_receipt',
+        action: 'REMOVE_FILE',
+        details: `Scan removed from GRN #${current.receiptNumber} (slot ${slotNum})`,
+      });
       res.json(updated);
     } catch (error) {
       logger.error('Error removing GRN scan key:', error);
