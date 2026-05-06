@@ -115,6 +115,7 @@ function PagesContent() {
           </ProtectedRoute>
         } />
         <Route path="/UserManagement" element={<Navigate to="/user-management" replace />} />
+        <Route path="/audit-log" element={<Navigate to="/user-management" replace />} />
         <Route path="/add-product" element={
           <ProtectedRoute>
             <Layout currentPageName="Add Product"><AddProduct /></Layout>
