@@ -217,6 +217,10 @@ export default function BackupSettings() {
   // Captured from the most recent restore response so we can render a
   // reconcile summary in the post-restore banner without re-querying.
   const [lastReconcile, setLastReconcile] = useState<any>(null);
+  // Task #441 (review fix) — capture the restore_runs row id returned by
+  // the restore endpoint so the Force Reconciliation button targets the
+  // correct row even before the restore-history query refetch lands.
+  const [lastRestoreRunId, setLastRestoreRunId] = useState<number | null>(null);
   // Task #441 — typed-phrase consent dialog state for the force-reconcile
   // path. Independent of the restore confirm dialog so admins must
   // re-type the consent phrase even right after a restore.
@@ -267,6 +271,7 @@ export default function BackupSettings() {
       setRestoreModal(null);
       if (data.success) {
         setLastReconcile(data.reconcile || null);
+        setLastRestoreRunId(typeof data.restoreRunId === 'number' ? data.restoreRunId : null);
         setRestoredSuccessfully(true);
       } else {
         toast({ title: "Emergency restore failed", description: data.error || "An error occurred during restore.", variant: "destructive" });
@@ -301,6 +306,7 @@ export default function BackupSettings() {
       setRestoreModal(null);
       if (data.success) {
         setLastReconcile(data.reconcile || null);
+        setLastRestoreRunId(typeof data.restoreRunId === 'number' ? data.restoreRunId : null);
         setRestoredSuccessfully(true);
       } else {
         toast({ title: "Emergency restore failed", description: data.error || "An error occurred during restore.", variant: "destructive" });
@@ -446,8 +452,11 @@ export default function BackupSettings() {
                 ? "text-red-900"
                 : "text-emerald-800";
             const Icon = skipped || failed ? AlertTriangle : CheckCircle;
-            // The latest restore_runs row is the one we'd target with force-reconcile.
-            const latestRestoreId = restoreHistory[0]?.id as number | undefined;
+            // Prefer the run id captured directly from the restore response
+            // (race-free); fall back to the latest history row when reopening
+            // settings after a refresh.
+            const latestRestoreId =
+              lastRestoreRunId ?? (restoreHistory[0]?.id as number | undefined);
             return (
               <Alert className={banner}>
                 <Icon className={`w-4 h-4 ${txt}`} />

@@ -202,6 +202,11 @@ export function registerRestoreRoutes(app: Express) {
       return res.json({
         success: true,
         durationMs: result.durationMs,
+        // Task #441 (review fix) — return the exact restore_runs row id
+        // we just wrote to, so the UI can target Force Reconciliation at
+        // that specific run instead of guessing via restoreHistory[0].id
+        // (which can be briefly stale right after restore).
+        restoreRunId: preCreatedId,
         reconcile: reconcile
           ? {
               status: reconcile.status,
