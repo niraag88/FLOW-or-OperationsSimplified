@@ -1,0 +1,17 @@
+You have to fix all the issues.
+- High-priority: yes, fix the media priority S01 purchase orders link shown in the sidebar to staff users but they get access denied when they click it. Obviously that's something we need to fix. I think it's dependent on what we need to check: how much of the purchase orders page and functionality is available to staff and then confirm how we want that to show or not show up.
+- S03: staff should be able to create a quotation and also convert it to an invoice. See quotation, invoices, delivery orders. All of it should be fully open to staff and everyone.
+- OK a recycle bin: staff and everybody can delete anything and it can land in the recycle bin. However to empty it from the recycle bin only a manager or an admin can do it. Staff cannot empty the recycle bin but they can delete and send into the recycle bin.
+- B1: no screen to add or edit suppliers. This is the third: why we don't have suppliers. We have brand. There is no such thing as supplier. I think we just refer to it as brand so there is no need to add a suppliers tab. We are referring to suppliers, brand itself, and we follow that structure as brand so I think B1 we don't need to do it.
+- Yes recycle bin should show everything as it was so this needs to be fixed.
+- Audit log issue M02 that needs to be fixed. Also have a look at audit logs. The audit logs need to audit everything so it does not need to audit the navigation as such and show up there. Anything created, changed, amended, anything like that, if it's just used to view then there's no need to log and show it but everything else needs to be. Let's say I turned an invoice to paid or I created a purchase order or I paid the purchase order or I generated a statement. Any action that is done in the system that needs to be logged and shown in the audit logs.
+- The one thing in audit logs that we need to look at is: okay, good, the audit logs also have a filter for users and then looking at it so that's perfect in one back up that needs to be fixed and low priority as well. All of them need to be fixed.
+- S02: brand creation should be allowed to staff as well so there shouldn't be an issue there.
+- A1: fine to fix.
+- A2: to fix as well.
+- A3: to fix as well.
+- N2: to fix as well.
+- N3: to fix as well.
+- Partial invoice payment: we don't need to do that for now.
+- Reports aggregator API: I think leave it be. However you can let me know as a recommended thing later.
+- You need to do the reports page A I walk through as well so that is an element of the test you need to do so remember that after you do apply all of these fixes then what we need to do is a reports page UI walk through so that will be last you.
