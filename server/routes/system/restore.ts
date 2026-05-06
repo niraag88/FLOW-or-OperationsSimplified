@@ -477,6 +477,19 @@ export function registerRestoreRoutes(app: Express) {
     const [existing] = await db.select().from(restoreRuns).where(eq(restoreRuns.id, runId)).limit(1);
     if (!existing) return res.status(404).json({ error: 'Restore run not found' });
 
+    // Task #441 (review fix) — tighten audit semantics: force-reconcile is
+    // only meaningful for runs that left the schema out of sync. Refusing
+    // unrelated targets prevents accidentally overwriting reconcile fields
+    // on a healthy historical row and confusing the audit trail.
+    const reconcileStatus = (existing as any).reconcileStatus as string | null | undefined;
+    const FORCE_ELIGIBLE = new Set(['warnings_skipped', 'failed']);
+    if (reconcileStatus && !FORCE_ELIGIBLE.has(reconcileStatus)) {
+      return res.status(409).json({
+        error: 'force_reconcile_not_eligible',
+        message: `Force reconciliation is only allowed for restore runs in "warnings_skipped" or "failed" state. This run is "${reconcileStatus}".`,
+      });
+    }
+
     try {
       return await withDestructiveDbLock(async () => {
         const reconcile = await reconcileSchemaAfterRestore({ acceptDataLoss: true });
