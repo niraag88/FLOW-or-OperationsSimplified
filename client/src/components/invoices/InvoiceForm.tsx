@@ -13,7 +13,7 @@ import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Switch } from "@/components/ui/switch";
-import { Plus, Trash2 } from "lucide-react";
+import { Plus, Trash2, AlertTriangle } from "lucide-react";
 import { Invoice as InvoiceEntity } from "@/api/entities";
 import { Product as ProductEntity } from "@/api/entities";
 import { Customer as CustomerEntity } from "@/api/entities";
@@ -78,6 +78,7 @@ interface FormProduct {
   unitPrice?: string | number | null;
   brandId?: number | null;
   isActive?: boolean;
+  stockQuantity?: number | string | null;
 }
 
 
@@ -341,6 +342,22 @@ export default function InvoiceForm({ open, onClose, editingInvoice, currentUser
   const getFilteredProducts = (brandId: string | number) => {
     if (!brandId) return [];
     return products.filter((product) => Number(product.brandId) === Number(brandId));
+  };
+
+  // Task #422 (B6): inline warning when the line quantity exceeds the
+  // product's current stock. The hard server-side check at process-sale
+  // still blocks delivery — this just surfaces the problem at draft time
+  // so the user isn't surprised later. Returns null when no warning is
+  // needed (no product picked, stock unknown, or quantity within stock).
+  const getStockWarning = (item: InvoiceItem): { available: number } | null => {
+    if (!item.product_id) return null;
+    const product = products.find((p) => Number(p.id) === Number(item.product_id));
+    if (!product) return null;
+    const available = Number(product.stockQuantity ?? 0);
+    if (!Number.isFinite(available)) return null;
+    const qty = Number(item.quantity) || 0;
+    if (qty > available) return { available };
+    return null;
   };
 
   const removeItem = (index: number) => {
@@ -618,6 +635,19 @@ export default function InvoiceForm({ open, onClose, editingInvoice, currentUser
                           disabled={!isCurrentlyEditable}
                           data-testid={`input-quantity-${index}`}
                         />
+                        {(() => {
+                          const w = getStockWarning(item);
+                          if (!w) return null;
+                          return (
+                            <p
+                              className="flex items-start gap-1 text-xs text-amber-700"
+                              data-testid={`text-stock-warning-${index}`}
+                            >
+                              <AlertTriangle className="w-3 h-3 mt-0.5 flex-shrink-0" />
+                              <span>Only {w.available} in stock — process-sale will fail.</span>
+                            </p>
+                          );
+                        })()}
                       </div>
 
                       <div className="space-y-2">
