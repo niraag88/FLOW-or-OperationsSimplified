@@ -1,21 +1,33 @@
 /**
- * Task #420 — invariant test for the quotation convert endpoint.
+ * Task #420 — integration tests for the quotation→invoice conversion
+ * flow. Despite living under tests/unit/ this file talks to a live
+ * Postgres (DATABASE_URL) and, for the e2e cases, a running app
+ * (TEST_BASE_URL or http://localhost:5000). It is skipped when those
+ * are unavailable.
  *
- * Any quotation that ever reaches status 'converted' MUST have at
- * least one corresponding invoice that:
- *   - belongs to the same customer, AND
- *   - references the quote by its quoteNumber.
+ * What we guard:
  *
- * This guards bug B5 from regressing: previously the convert endpoint
- * happily flipped status without any matching invoice and even wrote
- * an audit log claiming "(invoice created)". The endpoint now
- * requires `invoiceId`, verifies existence + customer + reference
- * linkage, and writes an honest audit message. This test asserts
- * the resulting database invariant from a black-box perspective.
+ * 1. DB invariant: every quotation in status 'converted' MUST have at
+ *    least one invoice that belongs to the same customer AND either
+ *    has reference == quoteNumber OR notes mentioning the quoteNumber.
+ *    This guards bug B5: previously /convert flipped status without
+ *    creating any invoice and wrote a misleading "(invoice created)"
+ *    audit row.
+ *
+ * 2. Conversion paths produce one canonical outcome:
+ *      Path A — POST /api/invoices with source_quotation_id flips the
+ *               source quote to 'converted' atomically in the same
+ *               transaction as the invoice insert. Cross-customer is
+ *               rejected and the quote stays unflipped.
+ *      Path B — PATCH /api/quotations/:id/convert is a thin wrapper
+ *               around createInvoiceFromQuotation: it creates the
+ *               invoice, copies items + companySnapshot, flips the
+ *               quote, and returns createdInvoiceId/Number.
+ *      Path C — both entry points refuse to convert a quote whose
+ *               status is outside the eligible set
+ *               (draft/sent/submitted/accepted) and leave it alone.
  *
  * Run with:  npx tsx --test tests/unit/quotationConvertLinkage.test.ts
- *
- * Requires DATABASE_URL to be set.
  */
 
 import { test } from 'node:test';
