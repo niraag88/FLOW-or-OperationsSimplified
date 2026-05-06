@@ -483,10 +483,10 @@ export function registerRestoreRoutes(app: Express) {
     // on a healthy historical row and confusing the audit trail.
     const reconcileStatus = existing.reconcileStatus;
     const FORCE_ELIGIBLE: ReadonlySet<string> = new Set(['warnings_skipped', 'failed']);
-    if (reconcileStatus && !FORCE_ELIGIBLE.has(reconcileStatus)) {
+    if (!reconcileStatus || !FORCE_ELIGIBLE.has(reconcileStatus)) {
       return res.status(409).json({
         error: 'force_reconcile_not_eligible',
-        message: `Force reconciliation is only allowed for restore runs in "warnings_skipped" or "failed" state. This run is "${reconcileStatus}".`,
+        message: `Force reconciliation is only allowed for restore runs in "warnings_skipped" or "failed" state. This run is "${reconcileStatus ?? 'unknown'}".`,
       });
     }
 
