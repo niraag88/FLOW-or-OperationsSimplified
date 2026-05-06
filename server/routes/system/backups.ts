@@ -227,7 +227,11 @@ export function registerBackupRoutes(app: Express) {
   app.get('/api/ops/year-archives', requireAuth(['Admin']), async (req: AuthenticatedRequest, res) => {
     try {
       const rows = await db.select().from(yearArchives).orderBy(desc(yearArchives.year));
-      res.json({ archives: rows });
+      // Task #444: return a bare array to match every other list
+      // endpoint in the ops surface. The previous { archives: rows }
+      // wrapping was the only inconsistency and confused both the e2e
+      // test agent and any thin external client.
+      res.json(rows);
     } catch (error) {
       logger.error('Error fetching year archives:', error);
       res.status(500).json({ error: 'Failed to fetch year archives' });

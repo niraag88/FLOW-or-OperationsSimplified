@@ -505,7 +505,12 @@ export default function BackupSettings() {
   };
 
   const isRestoring = restoreFromCloud.isPending || restoreFromUpload.isPending || restoreFilesFromUpload.isPending;
-  const yearArchives: any[] = yearArchivesData?.archives || [];
+  // Task #444: server now returns a bare array. Tolerate both the new
+  // and legacy `{archives:[…]}` shapes during a hot-reload window so a
+  // stale browser tab doesn't crash before it picks up the new client.
+  const yearArchives: any[] = Array.isArray(yearArchivesData)
+    ? yearArchivesData
+    : (yearArchivesData?.archives || []);
 
   const allRuns: any[] = runsData?.runs || [];
   const runs = allRuns.slice(0, 10);

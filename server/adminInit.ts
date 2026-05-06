@@ -22,7 +22,26 @@ export async function initializeAdminUser() {
       .limit(1);
 
     if (existingAdmin.length > 0) {
-      logger.info(`Admin user '${adminUsername}' already exists.`);
+      // Task #444: keep the stored bcrypt hash in sync with the
+      // ADMIN_PASSWORD environment variable. The original implementation
+      // only created the row on first boot — if the env value was later
+      // changed (e.g. in Secrets), the DB hash diverged and the admin
+      // could no longer log in (POST /api/auth/login → 401). Compare on
+      // every boot and re-hash when they no longer match.
+      const stored = existingAdmin[0];
+      const matches = await bcrypt.compare(adminPassword, stored.password);
+      if (!matches) {
+        const newHash = await bcrypt.hash(adminPassword, 12);
+        // Deliberately do NOT touch `active` here — re-syncing the
+        // password should not silently re-enable an admin that was
+        // explicitly disabled by another administrator.
+        await db.update(users)
+          .set({ password: newHash })
+          .where(eq(users.id, stored.id));
+        logger.info(`Admin user '${adminUsername}' password re-synced from environment.`);
+      } else {
+        logger.info(`Admin user '${adminUsername}' already exists.`);
+      }
       return;
     }
 
