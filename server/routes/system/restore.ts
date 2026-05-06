@@ -23,6 +23,7 @@ import {
   reconcileResultToRow,
   type ReconcileResult,
 } from "../../schemaReconcile";
+import { restoreRollingFiles } from "../../restoreRollingFiles";
 
 export function registerRestoreRoutes(app: Express) {
   // ─── Restore Endpoints ────────────────────────────────────────────────────
@@ -55,8 +56,16 @@ export function registerRestoreRoutes(app: Express) {
     actorName: string;
     /** Task #441: when true, schema reconcile may apply changes that drop columns/tables. */
     acceptDataLoss?: boolean;
+    /**
+     * Task #427: when present, after a successful DB restore (and
+     * reconcile) we ALSO replace the rolling-file set in object
+     * storage from the supplied tar.gz path. Closed-year sealed scans
+     * are never touched. The local tarball is deleted by the caller in
+     * its own try/finally — runRestore does not own the temp file.
+     */
+    fileRestore?: { tarGzPath: string; runId: string | number };
   }) {
-    const { sqlGzInput, triggeredBy, sourceBackupRunId, sourceFilename, res, actorName, acceptDataLoss } = opts;
+    const { sqlGzInput, triggeredBy, sourceBackupRunId, sourceFilename, res, actorName, acceptDataLoss, fileRestore } = opts;
     const label = sourceFilename || (sourceBackupRunId ? `backup run #${sourceBackupRunId}` : 'unknown');
 
     // Task #368 (RF-5): take the shared destructive-DB-op lock BEFORE
@@ -201,6 +210,45 @@ export function registerRestoreRoutes(app: Express) {
       });
     } catch (_) {}
 
+    // Step 6 (Task #427): if the DB restore succeeded AND a file
+    // archive was supplied, also restore the rolling-file set. We do
+    // this INSIDE the destructive-DB lock so backups can't snapshot a
+    // half-restored bucket. Failure here does NOT roll the DB back —
+    // the DB is already restored — but the snapshot prefix is left in
+    // place so an admin can recover.
+    let fileRestoreOutcome: { success: boolean; restoredCount?: number; error?: string; snapshotPrefix?: string; snapshotKept?: boolean; rolledBack?: boolean } | null = null;
+    if (result.success && fileRestore) {
+      try {
+        const out = await restoreRollingFiles(fileRestore.tarGzPath, fileRestore.runId);
+        fileRestoreOutcome = {
+          success: out.success,
+          restoredCount: out.restoredCount,
+          error: out.error,
+          snapshotPrefix: out.snapshotPrefix,
+          snapshotKept: out.snapshotKept,
+          rolledBack: out.rolledBack,
+        };
+        try {
+          writeAuditLog({
+            actor: triggeredBy,
+            actorName,
+            targetId: 'restore_files',
+            targetType: 'restore_run',
+            action: 'CREATE',
+            details: out.success
+              ? `File-archive restore from ${label}: ${out.restoredCount} object(s) re-uploaded`
+              : `File-archive restore from ${label} FAILED: ${out.error}; rollback ${out.rolledBack ? 'succeeded' : 'PARTIAL'}; snapshot at ${out.snapshotPrefix}`,
+          });
+        } catch (_) {}
+      } catch (frErr) {
+        logger.error('[restore] file-restore threw unexpectedly:', frErr);
+        fileRestoreOutcome = {
+          success: false,
+          error: frErr instanceof Error ? frErr.message : String(frErr),
+        };
+      }
+    }
+
     if (result.success) {
       return res.json({
         success: true,
@@ -219,6 +267,9 @@ export function registerRestoreRoutes(app: Express) {
               error: reconcile.error,
             }
           : null,
+        // Task #427: surface file-restore outcome so the UI can show
+        // "DB restored ✓ Files restored ✓" or warn on partial recovery.
+        fileRestore: fileRestoreOutcome,
       });
     } else {
       return res.status(500).json({ success: false, error: result.error || 'Restore failed', durationMs: result.durationMs });
@@ -250,16 +301,206 @@ export function registerRestoreRoutes(app: Express) {
       return res.status(404).json({ error: 'Backup file no longer exists in storage — it may have been deleted' });
     }
 
+    // Task #427 — if this run also has a file-bytes archive, stage it
+    // to a temp file BEFORE entering the destructive lock so a missing
+    // tarball (e.g. pruned from storage) fails fast instead of leaving
+    // the bucket in a partially-restored state. The temp file is
+    // cleaned up after runRestore returns.
+    let filesTempPath: string | null = null;
+    if (run.filesStorageKey && run.filesSuccess) {
+      try {
+        const filesExists = await objectStorageClient.exists(run.filesStorageKey);
+        if (filesExists.ok && filesExists.value) {
+          filesTempPath = `${tmpdir()}/restore-files-${crypto.randomUUID()}.tar.gz`;
+          await new Promise<void>((resolve, reject) => {
+            const ws = createWriteStream(filesTempPath!);
+            const fs = objectStorageClient.downloadAsStream(run.filesStorageKey!);
+            fs.on('error', reject);
+            ws.on('error', reject);
+            ws.on('finish', () => resolve());
+            fs.pipe(ws);
+          });
+        } else {
+          logger.warn(`[restore] backup run #${runId} has filesStorageKey=${run.filesStorageKey} but it no longer exists in storage — proceeding with DB-only restore`);
+        }
+      } catch (stageErr) {
+        logger.error(`[restore] failed to stage files archive for run #${runId}:`, stageErr);
+        if (filesTempPath) {
+          unlink(filesTempPath, () => {});
+          filesTempPath = null;
+        }
+      }
+    }
+
     const stream = objectStorageClient.downloadAsStream(run.dbStorageKey);
-    return runRestore({
-      sqlGzInput: stream,
-      triggeredBy: req.user!.id,
-      actorName: req.user?.username || req.user!.id,
-      sourceBackupRunId: runId,
-      sourceFilename: run.dbStorageKey.split('/').pop() || run.dbStorageKey,
-      acceptDataLoss: req.body?.acceptDataLoss === true,
-      res,
+    try {
+      return await runRestore({
+        sqlGzInput: stream,
+        triggeredBy: req.user!.id,
+        actorName: req.user?.username || req.user!.id,
+        sourceBackupRunId: runId,
+        sourceFilename: run.dbStorageKey.split('/').pop() || run.dbStorageKey,
+        acceptDataLoss: req.body?.acceptDataLoss === true,
+        fileRestore: filesTempPath ? { tarGzPath: filesTempPath, runId } : undefined,
+        res,
+      });
+    } finally {
+      if (filesTempPath) {
+        const p = filesTempPath;
+        unlink(p, (err) => {
+          if (err && (err as NodeJS.ErrnoException).code !== 'ENOENT') {
+            logger.error('Failed to delete temp files archive after restore:', err.message);
+          }
+        });
+      }
+    }
+  });
+
+  /**
+   * Task #427 — POST /api/ops/restore-files-upload
+   *
+   * Replaces the rolling-file set (logos + open-year scans) from an
+   * uploaded .tar.gz produced by archiveFiles. Closed-year sealed scans
+   * are never touched. Held under the same destructive-DB lock as the
+   * SQL restore so concurrent backups can't snapshot a half-restored
+   * bucket. Requires the same typed RESTORE_PHRASE confirmation.
+   */
+  app.post('/api/ops/restore-files-upload', requireAuth(['Admin']), async (req: AuthenticatedRequest, res) => {
+    const contentType = req.headers['content-type'] || '';
+    if (!contentType.includes('multipart/form-data')) {
+      return res.status(400).json({ error: 'Request must be multipart/form-data' });
+    }
+
+    // @ts-ignore
+    const Busboy = (await import('busboy')).default;
+    const bb = Busboy({ headers: req.headers, limits: { files: 1, fileSize: 500 * 1024 * 1024 } });
+
+    const triggeredBy = req.user!.id;
+    const actorName = req.user?.username || req.user!.id;
+
+    let fileHandled = false;
+    let tempPath: string | null = null;
+    let hitSizeLimit = false;
+    let sourceFilename = '';
+    let confirmationField: string | undefined;
+
+    bb.on('field', (fieldname: string, value: string) => {
+      if (fieldname === 'confirmation') confirmationField = value;
     });
+
+    let writePromise: Promise<void> = Promise.resolve();
+
+    const cleanupTemp = () => {
+      if (tempPath) {
+        const p = tempPath;
+        tempPath = null;
+        unlink(p, (err) => {
+          if (err && (err as NodeJS.ErrnoException).code !== 'ENOENT') {
+            logger.error('Failed to delete temp files-restore upload:', err.message);
+          }
+        });
+      }
+    };
+
+    bb.on('file', (fieldname: string, fileStream: import('stream').Readable, info: { filename: string }) => {
+      if (fieldname !== 'file') { fileStream.resume(); return; }
+      if (fileHandled) { fileStream.resume(); return; }
+      fileHandled = true;
+
+      const { filename } = info;
+      if (!filename.endsWith('.tar.gz') && !filename.endsWith('.tgz')) {
+        fileStream.resume();
+        res.status(400).json({ error: 'File must be a .tar.gz archive produced by the file backup' });
+        return;
+      }
+
+      sourceFilename = filename;
+      tempPath = `${tmpdir()}/restore-files-upload-${crypto.randomUUID()}.tar.gz`;
+      const ws = createWriteStream(tempPath);
+
+      fileStream.on('limit', () => { hitSizeLimit = true; fileStream.resume(); });
+      writePromise = new Promise<void>((resolve, reject) => {
+        fileStream.on('error', reject);
+        ws.on('error', reject);
+        ws.on('finish', resolve);
+      });
+      fileStream.pipe(ws);
+    });
+
+    bb.on('finish', async () => {
+      if (!fileHandled) {
+        if (!res.headersSent) res.status(400).json({ error: 'No file uploaded. Send a .tar.gz file as multipart field "file".' });
+        return;
+      }
+      if (res.headersSent) return;
+
+      try { await writePromise; } catch (err: any) {
+        logger.error('Error staging files upload to temp file:', err.message);
+        cleanupTemp();
+        if (!res.headersSent) res.status(500).json({ error: 'Failed to buffer uploaded file' });
+        return;
+      }
+
+      if (hitSizeLimit) {
+        cleanupTemp();
+        if (!res.headersSent) res.status(413).json({ error: 'File too large. Maximum size is 500 MB.' });
+        return;
+      }
+
+      if (!sendIfMissingConfirmation(
+        res,
+        { confirmation: confirmationField },
+        RESTORE_PHRASE,
+        'restore_confirmation_required',
+        'Restore files from uploaded archive',
+      )) {
+        cleanupTemp();
+        return;
+      }
+
+      try {
+        return await withDestructiveDbLock(async () => {
+          const out = await restoreRollingFiles(tempPath!, `upload-${Date.now()}`);
+          try {
+            writeAuditLog({
+              actor: triggeredBy,
+              actorName,
+              targetId: 'restore_files_upload',
+              targetType: 'restore_run',
+              action: 'CREATE',
+              details: out.success
+                ? `Files restored from upload "${sourceFilename}": ${out.restoredCount} object(s)`
+                : `Files restore from upload "${sourceFilename}" FAILED: ${out.error}; rollback ${out.rolledBack ? 'succeeded' : 'PARTIAL'}; snapshot at ${out.snapshotPrefix}`,
+            });
+          } catch (_) {}
+          if (out.success) {
+            return res.json({ success: true, restoredCount: out.restoredCount });
+          }
+          return res.status(500).json({
+            success: false,
+            error: out.error || 'File restore failed',
+            rolledBack: out.rolledBack,
+            snapshotPrefix: out.snapshotPrefix,
+          });
+        });
+      } catch (err) {
+        if (err instanceof DestructiveDbOpInProgressError) {
+          return res.status(409).json({ error: err.code, message: err.message });
+        }
+        logger.error('Files-upload restore error:', err);
+        return res.status(500).json({ error: 'Files restore failed' });
+      } finally {
+        cleanupTemp();
+      }
+    });
+
+    bb.on('error', (err: Error) => {
+      logger.error('Busboy parse error (files restore):', err);
+      cleanupTemp();
+      if (!res.headersSent) res.status(400).json({ error: 'Failed to parse multipart upload' });
+    });
+
+    req.pipe(bb);
   });
 
   // POST /api/ops/restore-upload — restore from an uploaded .sql.gz file.

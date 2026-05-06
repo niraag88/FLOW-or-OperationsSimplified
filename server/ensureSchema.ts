@@ -29,6 +29,34 @@ const STATEMENTS: string[] = [
      ADD COLUMN IF NOT EXISTS reconcile_warnings            text,
      ADD COLUMN IF NOT EXISTS reconcile_error               text,
      ADD COLUMN IF NOT EXISTS reconcile_finished_at         timestamp`,
+
+  // Task #427 — backup_runs file-archive columns.
+  // backup_runs lives in the public schema and IS covered by
+  // drizzle-kit push, but we patch here too as a belt-and-braces so
+  // existing deployed environments pick the columns up at first boot
+  // without a manual `npm run db:push` step.
+  `ALTER TABLE backup_runs
+     ADD COLUMN IF NOT EXISTS files_success       boolean,
+     ADD COLUMN IF NOT EXISTS files_filename      text,
+     ADD COLUMN IF NOT EXISTS files_storage_key   text,
+     ADD COLUMN IF NOT EXISTS files_size          bigint,
+     ADD COLUMN IF NOT EXISTS files_object_count  integer`,
+
+  // Task #427 — ops.year_archives catalog (in ops schema so it
+  // survives DROP SCHEMA public CASCADE on restore, just like
+  // restore_runs, and is not subject to rolling backup retention).
+  `CREATE TABLE IF NOT EXISTS ops.year_archives (
+     year             integer PRIMARY KEY,
+     sealed_at        timestamp NOT NULL DEFAULT now(),
+     sealed_by        varchar,
+     sealed_by_name   text,
+     storage_key      text,
+     filename         text,
+     file_size        bigint,
+     object_count     integer,
+     success          boolean NOT NULL DEFAULT false,
+     error_message    text
+   )`,
 ];
 
 export async function ensureSchemaPatches(): Promise<void> {

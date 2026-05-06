@@ -16,6 +16,7 @@ import { backupRuns, companySettings } from "@shared/schema";
 import { desc, eq } from "drizzle-orm";
 import { writeAuditLog, deleteStorageObjectSafely } from "./middleware";
 import { logger } from "./logger";
+import { getClosedYears } from "./sealYearArchive";
 
 export type BackupActor = {
   id: string | null;
@@ -32,6 +33,22 @@ export interface BackupRunResult {
     fileSize?: number;
     error?: string;
   };
+  /**
+   * Task #427: real file-bytes archive (replaces the old object
+   * manifest). The `manifestBackup` field is intentionally retained on
+   * the BackupRunResult shape only as a deprecated alias — see field
+   * below — to avoid breaking any external consumer that still reads
+   * it. New code should prefer `filesBackup`.
+   */
+  filesBackup: {
+    success: boolean;
+    filename?: string;
+    storageKey?: string;
+    fileSize?: number;
+    objectCount?: number;
+    error?: string;
+  };
+  /** @deprecated kept for backward compatibility — empty post-Task #427. */
   manifestBackup: {
     success: boolean;
     filename?: string;
@@ -54,24 +71,35 @@ export interface BackupRunResult {
 export async function runBackup(actor: BackupActor): Promise<BackupRunResult> {
   const startedAt = new Date();
   let dbResult: any = null;
-  let manifestResult: any = null;
+  let filesResult: any = null;
   let topError: string | undefined;
 
   try {
     // @ts-ignore - JS file
     const { uploadBackup } = await import("../scripts/uploadBackup.js");
     // @ts-ignore - JS file
-    const { writeManifest } = await import("../scripts/writeManifest.js");
+    const { archiveFiles } = await import("../scripts/archiveFiles.js");
 
-    [dbResult, manifestResult] = await Promise.all([uploadBackup(), writeManifest()]);
+    // Closed-year scans are sealed permanently in their own archives
+    // (see sealYearArchive.ts) — exclude them from rolling backups so
+    // the per-run archive stays bounded by current-year activity rather
+    // than growing forever. (Task #427 Q3.)
+    const closedYears = await getClosedYears();
+
+    [dbResult, filesResult] = await Promise.all([
+      uploadBackup(),
+      archiveFiles({ closedYears }),
+    ]);
   } catch (err) {
     topError = err instanceof Error ? err.message : String(err);
     logger.error("runBackup: backup pipeline threw:", err);
   }
 
-  const success = !!(dbResult?.success && manifestResult?.success);
+  const success = !!(dbResult?.success && filesResult?.success);
 
-  // Record run row (best-effort)
+  // Record run row (best-effort). manifest_* columns are written as
+  // explicit "no manifest produced" markers — Task #427 replaced the
+  // manifest with a real file archive recorded in the files_* columns.
   try {
     await db.insert(backupRuns).values({
       ranAt: startedAt,
@@ -83,15 +111,20 @@ export async function runBackup(actor: BackupActor): Promise<BackupRunResult> {
       dbFilename: dbResult?.filename || null,
       dbStorageKey: dbResult?.storageKey || null,
       dbFileSize: dbResult?.fileSize || null,
-      manifestSuccess: manifestResult?.success ?? false,
-      manifestFilename: manifestResult?.filename || null,
-      manifestStorageKey: manifestResult?.storageKey || null,
-      manifestTotalObjects: manifestResult?.totalObjects || null,
-      manifestTotalSizeBytes: manifestResult?.totalSize || null,
+      manifestSuccess: false,
+      manifestFilename: null,
+      manifestStorageKey: null,
+      manifestTotalObjects: null,
+      manifestTotalSizeBytes: null,
+      filesSuccess: filesResult?.success ?? false,
+      filesFilename: filesResult?.filename || null,
+      filesStorageKey: filesResult?.storageKey || null,
+      filesSize: filesResult?.fileSize || null,
+      filesObjectCount: filesResult?.objectCount ?? null,
       errorMessage:
         topError ||
         (!success
-          ? [dbResult?.error, manifestResult?.error].filter(Boolean).join("; ")
+          ? [dbResult?.error, filesResult?.error].filter(Boolean).join("; ")
           : null),
     });
   } catch (insertErr) {
@@ -130,13 +163,16 @@ export async function runBackup(actor: BackupActor): Promise<BackupRunResult> {
       fileSize: dbResult?.fileSize,
       error: dbResult?.error,
     },
+    filesBackup: {
+      success: filesResult?.success ?? false,
+      filename: filesResult?.filename,
+      storageKey: filesResult?.storageKey,
+      fileSize: filesResult?.fileSize,
+      objectCount: filesResult?.objectCount,
+      error: filesResult?.error,
+    },
     manifestBackup: {
-      success: manifestResult?.success ?? false,
-      filename: manifestResult?.filename,
-      storageKey: manifestResult?.storageKey,
-      totalObjects: manifestResult?.totalObjects,
-      totalSize: manifestResult?.totalSize,
-      error: manifestResult?.error,
+      success: false,
     },
     prunedCount,
     errorMessage: topError,
@@ -202,7 +238,12 @@ export async function pruneOldBackups(): Promise<number> {
  * without needing live backup_runs rows or live storage objects.
  */
 export async function tryDeleteBackupRowObjects(
-  row: { id: number; dbStorageKey: string | null; manifestStorageKey: string | null }
+  row: {
+    id: number;
+    dbStorageKey: string | null;
+    manifestStorageKey: string | null;
+    filesStorageKey?: string | null;
+  }
 ): Promise<{ allGone: boolean }> {
   let allGone = true;
 
@@ -221,6 +262,18 @@ export async function tryDeleteBackupRowObjects(
       allGone = false;
       logger.error(
         `pruneOldBackups: failed to delete manifest object ${row.manifestStorageKey}, retaining backup_runs row ${row.id} for retry: ${result.error}`
+      );
+    }
+  }
+  // Task #427 — file-bytes archive deletion (rolling files-* objects).
+  // Year-archives at backups/years/* are NEVER touched here; they are
+  // permanent and are managed exclusively via sealYearArchive.
+  if (row.filesStorageKey) {
+    const result = await deleteStorageObjectSafely(row.filesStorageKey);
+    if (!result.ok) {
+      allGone = false;
+      logger.error(
+        `pruneOldBackups: failed to delete files archive ${row.filesStorageKey}, retaining backup_runs row ${row.id} for retry: ${result.error}`
       );
     }
   }

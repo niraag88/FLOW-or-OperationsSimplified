@@ -826,6 +826,17 @@ export const backupRuns = pgTable("backup_runs", {
   manifestStorageKey: text("manifest_storage_key"),
   manifestTotalObjects: integer("manifest_total_objects"),
   manifestTotalSizeBytes: bigint("manifest_total_size_bytes", { mode: "number" }),
+  // Task #427 — real file-bytes archive of every uploaded scan + logo
+  // bundled as a single streaming tar.gz alongside the SQL dump. The
+  // manifest fields above are kept for historical rows but no longer
+  // written to by new backups (archiveFiles replaces writeManifest).
+  // Columns are added at boot via server/ensureSchema.ts so existing
+  // DBs upgrade without a manual migration step.
+  filesSuccess: boolean("files_success"),
+  filesFilename: text("files_filename"),
+  filesStorageKey: text("files_storage_key"),
+  filesSize: bigint("files_size", { mode: "number" }),
+  filesObjectCount: integer("files_object_count"),
   errorMessage: text("error_message"),
 });
 
@@ -884,6 +895,38 @@ export const restoreRuns = opsSchema.table("restore_runs", {
 export const insertRestoreRunSchema = createInsertSchema(restoreRuns).omit({ id: true, restoredAt: true });
 export type InsertRestoreRun = z.infer<typeof insertRestoreRunSchema>;
 export type RestoreRun = typeof restoreRuns.$inferSelect;
+
+// Task #427 — Sealed Year Archives.
+//
+// One row per closed accounting year that has had its files sealed into
+// a permanent tar.gz archive in object storage (`backups/years/...`).
+// Lives in the OPS schema so that:
+//   1. it survives DROP SCHEMA public CASCADE on a restore (the storage
+//      objects also survive, so the catalog and the actual archives stay
+//      in lockstep);
+//   2. the rolling 7-row backup retention does NOT touch it (year
+//      archives are forever).
+//
+// Re-closing a previously-reopened year overwrites the row + storage
+// object (the previous archive is replaced with a fresh one capturing
+// any post-reopen edits — see Task #427 plan, Q4).
+//
+// Table is created at boot via server/ensureSchema.ts because
+// drizzle.config.ts only covers the public schema.
+export const yearArchives = opsSchema.table("year_archives", {
+  year: integer("year").primaryKey(),
+  sealedAt: timestamp("sealed_at").defaultNow().notNull(),
+  sealedBy: varchar("sealed_by"),         // user id, no FK (public schema)
+  sealedByName: text("sealed_by_name"),   // denormalised for post-restore reads
+  storageKey: text("storage_key"),
+  filename: text("filename"),
+  fileSize: bigint("file_size", { mode: "number" }),
+  objectCount: integer("object_count"),
+  success: boolean("success").notNull().default(false),
+  errorMessage: text("error_message"),
+});
+
+export type YearArchive = typeof yearArchives.$inferSelect;
 
 // Financial Years (Books) table
 export const financialYears = pgTable("financial_years", {

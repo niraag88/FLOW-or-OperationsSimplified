@@ -4,7 +4,7 @@ import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Input } from "@/components/ui/input";
 import { Alert, AlertDescription } from "@/components/ui/alert";
-import { Database, Play, CheckCircle, XCircle, Loader2, Clock, Download, RotateCcw, Upload, AlertTriangle, History, ShieldAlert, Wrench } from "lucide-react";
+import { Database, Play, CheckCircle, XCircle, Loader2, Clock, Download, RotateCcw, Upload, AlertTriangle, History, ShieldAlert, Wrench, FileArchive, Lock } from "lucide-react";
 import { Checkbox } from "@/components/ui/checkbox";
 import { useToast } from "@/hooks/use-toast";
 import { apiRequest } from "@/lib/queryClient";
@@ -208,9 +208,15 @@ export default function BackupSettings() {
   const fileInputRef = useRef<HTMLInputElement>(null);
 
   const [downloadingId, setDownloadingId] = useState<number | null>(null);
+  // Task #427 — separate spinner state for the file-archive download
+  // button so it can run independently of the SQL-dump download.
+  const [downloadingFilesId, setDownloadingFilesId] = useState<number | null>(null);
+  const [downloadingYear, setDownloadingYear] = useState<number | null>(null);
+  const filesInputRef = useRef<HTMLInputElement>(null);
   const [restoreModal, setRestoreModal] = useState<
     | { type: "cloud"; run: BackupRunSummary; filename: string }
     | { type: "upload"; file: File; filename: string }
+    | { type: "upload-files"; file: File; filename: string }
     | null
   >(null);
   const [restoredSuccessfully, setRestoredSuccessfully] = useState(false);
@@ -241,6 +247,12 @@ export default function BackupSettings() {
     staleTime: 30 * 1000,
   });
 
+  // Task #427 — sealed year archives. One row per closed accounting year.
+  const { data: yearArchivesData, isLoading: yearArchivesLoading } = useQuery<any>({
+    queryKey: ["/api/ops/year-archives"],
+    staleTime: 60 * 1000,
+  });
+
   // ── Mutations ──────────────────────────────────────────────────────────────
 
   const runBackup = useMutation({
@@ -252,7 +264,7 @@ export default function BackupSettings() {
       queryClient.invalidateQueries({ queryKey: ["/api/ops/backup-runs"] });
       if (data.success) {
         setBackupJustTaken(true);
-        toast({ title: "Backup completed", description: "DB dump and object manifest saved successfully." });
+        toast({ title: "Backup completed", description: "Database dump and file archive saved successfully." });
       } else {
         toast({ title: "Backup partially failed", description: "Check the run history for details.", variant: "destructive" });
       }
@@ -284,6 +296,44 @@ export default function BackupSettings() {
       queryClient.invalidateQueries({ queryKey: ["/api/ops/restore-runs"] });
       setRestoreModal(null);
       toast({ title: "Emergency restore failed", description: err.message || "An error occurred during restore.", variant: "destructive" });
+    },
+  });
+
+  // Task #427 — restore the rolling-file set (logos + open-year scans)
+  // from an uploaded .tar.gz archive. Closed-year sealed scans are
+  // never touched. Uses the same RESTORE_PHRASE typed confirmation.
+  const restoreFilesFromUpload = useMutation({
+    mutationFn: async ({ file, confirmation }: { file: File; confirmation: string }) => {
+      const formData = new FormData();
+      formData.append("confirmation", confirmation);
+      formData.append("file", file);
+      const res = await fetch("/api/ops/restore-files-upload", {
+        method: "POST",
+        credentials: "include",
+        body: formData,
+      });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error || `Server returned ${res.status}`);
+      return data;
+    },
+    onSuccess: (data) => {
+      setRestoreModal(null);
+      if (data.success) {
+        toast({
+          title: "Files restored",
+          description: `${data.restoredCount ?? 0} file(s) re-uploaded from the archive. Closed-year scans were untouched.`,
+        });
+      } else {
+        toast({
+          title: "Files restore failed",
+          description: data.error || "An error occurred during file restore.",
+          variant: "destructive",
+        });
+      }
+    },
+    onError: (err: any) => {
+      setRestoreModal(null);
+      toast({ title: "Files restore failed", description: err.message || "An error occurred.", variant: "destructive" });
     },
   });
 
@@ -354,29 +404,69 @@ export default function BackupSettings() {
 
   // ── Handlers ───────────────────────────────────────────────────────────────
 
+  // Generic streaming download helper — used by SQL dump, file archive,
+  // and sealed-year archive download buttons. The browser triggers the
+  // save dialog via an <a download> click against an object URL.
+  const downloadBlob = async (url: string, filename: string) => {
+    const res = await fetch(url, { credentials: "include" });
+    if (!res.ok) {
+      const err = await res.json().catch(() => ({}));
+      throw new Error(err.error || `Server returned ${res.status}`);
+    }
+    const blob = await res.blob();
+    const objUrl = URL.createObjectURL(blob);
+    const a = document.createElement("a");
+    a.href = objUrl;
+    a.download = filename;
+    document.body.appendChild(a);
+    a.click();
+    a.remove();
+    URL.revokeObjectURL(objUrl);
+  };
+
   const handleDownload = async (run: any) => {
     setDownloadingId(run.id);
     try {
-      const res = await fetch(`/api/ops/backup-runs/${run.id}/download`, { credentials: "include" });
-      if (!res.ok) {
-        const err = await res.json().catch(() => ({}));
-        throw new Error(err.error || `Server returned ${res.status}`);
-      }
-      const blob = await res.blob();
-      const url = URL.createObjectURL(blob);
-      const a = document.createElement("a");
       const filename = run.dbStorageKey?.split("/").pop() || `backup-${run.id}.sql.gz`;
-      a.href = url;
-      a.download = filename;
-      document.body.appendChild(a);
-      a.click();
-      a.remove();
-      URL.revokeObjectURL(url);
+      await downloadBlob(`/api/ops/backup-runs/${run.id}/download`, filename);
     } catch (err: any) {
       toast({ title: "Download failed", description: err.message || "Could not download backup file.", variant: "destructive" });
     } finally {
       setDownloadingId(null);
     }
+  };
+
+  // Task #427 — download the file-bytes archive (tar.gz of every scan +
+  // logo) attached to a backup run.
+  const handleDownloadFiles = async (run: any) => {
+    setDownloadingFilesId(run.id);
+    try {
+      const filename = run.filesStorageKey?.split("/").pop() || `files-${run.id}.tar.gz`;
+      await downloadBlob(`/api/ops/backup-runs/${run.id}/download-files`, filename);
+    } catch (err: any) {
+      toast({ title: "Download failed", description: err.message || "Could not download files archive.", variant: "destructive" });
+    } finally {
+      setDownloadingFilesId(null);
+    }
+  };
+
+  // Task #427 — download a sealed year archive (permanent per-year file bundle).
+  const handleDownloadYear = async (year: number, filename: string | null) => {
+    setDownloadingYear(year);
+    try {
+      await downloadBlob(`/api/ops/year-archives/${year}/download`, filename || `year-${year}.tar.gz`);
+    } catch (err: any) {
+      toast({ title: "Download failed", description: err.message || "Could not download year archive.", variant: "destructive" });
+    } finally {
+      setDownloadingYear(null);
+    }
+  };
+
+  const handleFilesUploadSelected = (e: any) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    e.target.value = "";
+    setRestoreModal({ type: "upload-files", file, filename: file.name });
   };
 
   const handleRestoreClick = (run: any) => {
@@ -409,10 +499,13 @@ export default function BackupSettings() {
       restoreFromCloud.mutate({ runId: restoreModal.run.id, confirmation: typedPhrase, acceptDataLoss });
     } else if (restoreModal?.type === "upload") {
       restoreFromUpload.mutate({ file: restoreModal.file, confirmation: typedPhrase, acceptDataLoss });
+    } else if (restoreModal?.type === "upload-files") {
+      restoreFilesFromUpload.mutate({ file: restoreModal.file, confirmation: typedPhrase });
     }
   };
 
-  const isRestoring = restoreFromCloud.isPending || restoreFromUpload.isPending;
+  const isRestoring = restoreFromCloud.isPending || restoreFromUpload.isPending || restoreFilesFromUpload.isPending;
+  const yearArchives: any[] = yearArchivesData?.archives || [];
 
   const allRuns: any[] = runsData?.runs || [];
   const runs = allRuns.slice(0, 10);
@@ -545,21 +638,21 @@ export default function BackupSettings() {
               )}
             </div>
             <div className="rounded-lg border p-4 space-y-1">
-              <p className="text-xs font-medium text-gray-500 uppercase tracking-wide">Latest Object Manifest</p>
+              <p className="text-xs font-medium text-gray-500 uppercase tracking-wide">Latest File Archive</p>
               {latestRun ? (
                 <>
                   <div className="flex items-center gap-2">
-                    <StatusBadge success={latestRun.manifestSuccess} />
-                    <p className="text-sm font-mono truncate">{latestRun.manifestFilename?.split('/').pop() || "—"}</p>
+                    <StatusBadge success={latestRun.filesSuccess} />
+                    <p className="text-sm font-mono truncate">{latestRun.filesFilename?.split('/').pop() || "—"}</p>
                   </div>
                   <p className="text-xs text-gray-500">
                     {formatDate(latestRun.ranAt)}
-                    {latestRun.manifestTotalObjects != null ? ` · ${latestRun.manifestTotalObjects.toLocaleString()} objects` : ""}
-                    {latestRun.manifestTotalSizeBytes ? ` · ${formatBytes(latestRun.manifestTotalSizeBytes)}` : ""}
+                    {latestRun.filesObjectCount != null ? ` · ${latestRun.filesObjectCount.toLocaleString()} files` : ""}
+                    {latestRun.filesSize ? ` · ${formatBytes(latestRun.filesSize)}` : ""}
                   </p>
                 </>
               ) : (
-                <p className="text-sm text-gray-400">No manifests recorded yet</p>
+                <p className="text-sm text-gray-400">No file archives recorded yet</p>
               )}
             </div>
           </div>
@@ -578,7 +671,7 @@ export default function BackupSettings() {
                   <><Play className="w-4 h-4 mr-2" />Run Backup Now</>
                 )}
               </Button>
-              <p className="text-xs text-gray-500 mt-1">Creates a full PostgreSQL dump + object manifest.</p>
+              <p className="text-xs text-gray-500 mt-1">Creates a full database dump and a real archive of every uploaded scan and logo.</p>
             </div>
             <div>
               <Button
@@ -587,15 +680,33 @@ export default function BackupSettings() {
                 onClick={() => fileInputRef.current?.click()}
               >
                 <Upload className="w-4 h-4 mr-2" />
-                Upload & Emergency Restore
+                Upload &amp; Emergency Restore (database)
               </Button>
-              <p className="text-xs text-gray-500 mt-1">Last-resort: restore from a downloaded .sql.gz file.</p>
+              <p className="text-xs text-gray-500 mt-1">Last-resort: restore the database from a downloaded .sql.gz file.</p>
               <input
                 ref={fileInputRef}
                 type="file"
                 accept=".sql.gz"
                 className="hidden"
                 onChange={handleFileSelected}
+              />
+            </div>
+            <div>
+              <Button
+                variant="outline"
+                className="border-amber-300 text-amber-800 hover:bg-amber-50"
+                onClick={() => filesInputRef.current?.click()}
+              >
+                <FileArchive className="w-4 h-4 mr-2" />
+                Upload &amp; Restore Files
+              </Button>
+              <p className="text-xs text-gray-500 mt-1">Restore scans &amp; logos from a downloaded files .tar.gz. Closed-year scans are not touched.</p>
+              <input
+                ref={filesInputRef}
+                type="file"
+                accept=".tar.gz,.tgz,application/gzip"
+                className="hidden"
+                onChange={handleFilesUploadSelected}
               />
             </div>
           </div>
@@ -620,7 +731,7 @@ export default function BackupSettings() {
                       <th className="text-left px-3 py-2 text-xs font-medium text-gray-500">Status</th>
                       <th className="text-left px-3 py-2 text-xs font-medium text-gray-500 hidden sm:table-cell">DB File</th>
                       <th className="text-left px-3 py-2 text-xs font-medium text-gray-500 hidden sm:table-cell">DB Size</th>
-                      <th className="text-left px-3 py-2 text-xs font-medium text-gray-500 hidden sm:table-cell">Objects</th>
+                      <th className="text-left px-3 py-2 text-xs font-medium text-gray-500 hidden sm:table-cell">Files</th>
                       <th className="text-left px-3 py-2 text-xs font-medium text-gray-500">Actions</th>
                     </tr>
                   </thead>
@@ -636,36 +747,60 @@ export default function BackupSettings() {
                           {formatBytes(run.dbFileSize)}
                         </td>
                         <td className="px-3 py-2 text-gray-500 hidden sm:table-cell">
-                          {run.manifestTotalObjects != null ? run.manifestTotalObjects.toLocaleString() : "—"}
+                          {run.filesObjectCount != null ? (
+                            <span title={run.filesSize ? formatBytes(run.filesSize) : ""}>
+                              {run.filesObjectCount.toLocaleString()}
+                              {run.filesSize ? <span className="text-gray-400"> · {formatBytes(run.filesSize)}</span> : null}
+                            </span>
+                          ) : "—"}
                         </td>
                         <td className="px-3 py-2">
-                          {run.dbSuccess && run.dbStorageKey ? (
-                            <div className="flex items-center gap-1">
+                          <div className="flex flex-wrap items-center gap-1">
+                            {run.dbSuccess && run.dbStorageKey && (
                               <Button
                                 size="sm"
                                 variant="outline"
                                 onClick={() => handleDownload(run)}
                                 disabled={downloadingId === run.id}
                                 className="h-7 px-2 text-xs"
+                                title="Download database dump (.sql.gz)"
+                                data-testid={`button-download-db-${run.id}`}
                               >
                                 {downloadingId === run.id
                                   ? <Loader2 className="w-3 h-3 animate-spin" />
-                                  : <><Download className="w-3 h-3 mr-1" />Download</>
+                                  : <><Download className="w-3 h-3 mr-1" />DB</>
                                 }
                               </Button>
-                              {run.success && (
-                                <Button
-                                  size="sm"
-                                  variant="outline"
-                                  onClick={() => handleRestoreClick(run)}
-                                  disabled={isRestoring}
-                                  className="h-7 px-2 text-xs border-red-300 text-red-700 hover:bg-red-50"
-                                >
-                                  <RotateCcw className="w-3 h-3 mr-1" />Emergency Restore
-                                </Button>
-                              )}
-                            </div>
-                          ) : null}
+                            )}
+                            {run.filesSuccess && run.filesStorageKey && (
+                              <Button
+                                size="sm"
+                                variant="outline"
+                                onClick={() => handleDownloadFiles(run)}
+                                disabled={downloadingFilesId === run.id}
+                                className="h-7 px-2 text-xs"
+                                title="Download files archive (.tar.gz of scans + logos)"
+                                data-testid={`button-download-files-${run.id}`}
+                              >
+                                {downloadingFilesId === run.id
+                                  ? <Loader2 className="w-3 h-3 animate-spin" />
+                                  : <><FileArchive className="w-3 h-3 mr-1" />Files</>
+                                }
+                              </Button>
+                            )}
+                            {run.success && run.dbSuccess && run.dbStorageKey && (
+                              <Button
+                                size="sm"
+                                variant="outline"
+                                onClick={() => handleRestoreClick(run)}
+                                disabled={isRestoring}
+                                className="h-7 px-2 text-xs border-red-300 text-red-700 hover:bg-red-50"
+                                title={run.filesStorageKey ? "Restore database AND files from this backup" : "Restore database only (no file archive recorded)"}
+                              >
+                                <RotateCcw className="w-3 h-3 mr-1" />Restore
+                              </Button>
+                            )}
+                          </div>
                         </td>
                       </tr>
                     ))}
@@ -675,6 +810,74 @@ export default function BackupSettings() {
             )}
             {runs.length > 0 && (
               <p className="text-xs text-gray-400 mt-1">Showing last {runs.length} backup run{runs.length !== 1 ? "s" : ""}.</p>
+            )}
+          </div>
+
+          {/* Task #427 — sealed year archives (permanent per-year file bundles).
+              One row per closed accounting year. Re-closing a reopened year
+              overwrites the row + the storage object. Catalog lives in
+              ops.year_archives so it survives database restores. */}
+          <div>
+            <h3 className="text-sm font-semibold text-gray-700 mb-3 flex items-center gap-2">
+              <Lock className="w-4 h-4" /> Sealed Year Archives
+            </h3>
+            <p className="text-xs text-gray-500 mb-2">
+              When you close an accounting year, every scan from that year is bundled into a permanent archive that the rolling 7-day backup never touches.
+            </p>
+            {yearArchivesLoading ? (
+              <div className="flex items-center gap-2 text-sm text-gray-500"><Loader2 className="w-4 h-4 animate-spin" />Loading…</div>
+            ) : yearArchives.length === 0 ? (
+              <div className="border rounded-lg p-4 text-center text-sm text-gray-400">
+                No years have been sealed yet. Close a financial year in the Books page to create one.
+              </div>
+            ) : (
+              <div className="border rounded-lg overflow-hidden">
+                <table className="w-full text-sm">
+                  <thead className="bg-gray-50 border-b">
+                    <tr>
+                      <th className="text-left px-3 py-2 text-xs font-medium text-gray-500">Year</th>
+                      <th className="text-left px-3 py-2 text-xs font-medium text-gray-500">Status</th>
+                      <th className="text-left px-3 py-2 text-xs font-medium text-gray-500 hidden sm:table-cell">Sealed</th>
+                      <th className="text-left px-3 py-2 text-xs font-medium text-gray-500 hidden sm:table-cell">Files</th>
+                      <th className="text-left px-3 py-2 text-xs font-medium text-gray-500 hidden sm:table-cell">By</th>
+                      <th className="text-left px-3 py-2 text-xs font-medium text-gray-500">Actions</th>
+                    </tr>
+                  </thead>
+                  <tbody className="divide-y">
+                    {yearArchives.map((row: any) => (
+                      <tr key={row.year} className="hover:bg-gray-50">
+                        <td className="px-3 py-2 font-medium text-gray-700">{row.year}</td>
+                        <td className="px-3 py-2"><StatusBadge success={row.success} /></td>
+                        <td className="px-3 py-2 text-gray-500 hidden sm:table-cell">{formatDate(row.sealedAt)}</td>
+                        <td className="px-3 py-2 text-gray-500 hidden sm:table-cell">
+                          {row.objectCount != null ? row.objectCount.toLocaleString() : "—"}
+                          {row.fileSize ? <span className="text-gray-400"> · {formatBytes(row.fileSize)}</span> : null}
+                        </td>
+                        <td className="px-3 py-2 text-gray-500 hidden sm:table-cell">{row.sealedByName || "—"}</td>
+                        <td className="px-3 py-2">
+                          {row.success && row.storageKey ? (
+                            <Button
+                              size="sm"
+                              variant="outline"
+                              onClick={() => handleDownloadYear(row.year, row.filename)}
+                              disabled={downloadingYear === row.year}
+                              className="h-7 px-2 text-xs"
+                              data-testid={`button-download-year-${row.year}`}
+                            >
+                              {downloadingYear === row.year
+                                ? <Loader2 className="w-3 h-3 animate-spin" />
+                                : <><Download className="w-3 h-3 mr-1" />Download</>
+                              }
+                            </Button>
+                          ) : (
+                            <span className="text-xs text-red-600" title={row.errorMessage || ""}>{row.errorMessage ? "Seal failed" : "—"}</span>
+                          )}
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
             )}
           </div>
 
@@ -736,24 +939,39 @@ export default function BackupSettings() {
         open={!!restoreModal}
         onClose={handleModalClose}
         onConfirm={handleRestoreConfirm}
-        title="Emergency Restore — Disaster Recovery"
+        title={restoreModal?.type === "upload-files" ? "Restore Files from Archive" : "Emergency Restore — Disaster Recovery"}
         description={
-          <div className="rounded-lg bg-red-50 border border-red-200 p-3 text-red-800 space-y-1">
-            <p className="font-semibold flex items-center gap-2">
-              <ShieldAlert className="w-4 h-4" />
-              This is a last-resort disaster recovery operation.
-            </p>
-            <ul className="list-disc list-inside space-y-0.5 text-red-700 mt-1 text-xs">
-              <li>All current live data will be permanently replaced</li>
-              <li>Every invoice, product, customer, PO, DO, user and setting will be overwritten</li>
-              <li>All active users will be logged out and must log in again</li>
-              <li>This action cannot be undone</li>
-              <li>Only proceed if you are performing disaster recovery</li>
-            </ul>
-          </div>
+          restoreModal?.type === "upload-files" ? (
+            <div className="rounded-lg bg-amber-50 border border-amber-200 p-3 text-amber-900 space-y-1">
+              <p className="font-semibold flex items-center gap-2">
+                <FileArchive className="w-4 h-4" />
+                This will replace every uploaded scan and logo in storage.
+              </p>
+              <ul className="list-disc list-inside space-y-0.5 text-amber-800 mt-1 text-xs">
+                <li>All current scans for the open year(s) and all logos will be replaced by the archive's contents</li>
+                <li>Closed-year scans (sealed in their own permanent archives) are NOT touched</li>
+                <li>The current files are snapshotted before the restore so a failure can be rolled back automatically</li>
+                <li>This action cannot be undone once the restore completes successfully</li>
+              </ul>
+            </div>
+          ) : (
+            <div className="rounded-lg bg-red-50 border border-red-200 p-3 text-red-800 space-y-1">
+              <p className="font-semibold flex items-center gap-2">
+                <ShieldAlert className="w-4 h-4" />
+                This is a last-resort disaster recovery operation.
+              </p>
+              <ul className="list-disc list-inside space-y-0.5 text-red-700 mt-1 text-xs">
+                <li>All current live data will be permanently replaced</li>
+                <li>Every invoice, product, customer, PO, DO, user and setting will be overwritten</li>
+                <li>All active users will be logged out and must log in again</li>
+                <li>This action cannot be undone</li>
+                <li>Only proceed if you are performing disaster recovery</li>
+              </ul>
+            </div>
+          )
         }
         extra={
-          restoreModal ? (
+          restoreModal && restoreModal.type !== "upload-files" ? (
             <RestoreConfirmExtra
               filename={restoreModal.filename}
               run={restoreModal.type === "cloud" ? restoreModal.run : undefined}

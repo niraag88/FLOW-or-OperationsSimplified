@@ -9,6 +9,7 @@ import {
   type AuthenticatedRequest,
 } from "../../middleware";
 import { logger } from "../../logger";
+import { sealYearArchive } from "../../sealYearArchive";
 
 export function registerBooksRoutes(app: Express) {
   app.get('/api/books', requireAuth(), async (req, res) => {
@@ -54,13 +55,61 @@ export function registerBooksRoutes(app: Express) {
       if (!['Open', 'Closed'].includes(status)) {
         return res.status(400).json({ error: 'Status must be Open or Closed' });
       }
+      // Read the prior status so we know whether we crossed Open→Closed
+      // (that is what triggers the year-seal in Task #427). Re-saving an
+      // already-closed year does nothing extra; reopening then re-closing
+      // overwrites the previous seal.
+      const [prior] = await db.select().from(financialYears).where(eq(financialYears.id, id));
+      if (!prior) return res.status(404).json({ error: 'Financial year not found' });
+
       const [updated] = await db.update(financialYears)
         .set({ status })
         .where(eq(financialYears.id, id))
         .returning();
       if (!updated) return res.status(404).json({ error: 'Financial year not found' });
       writeAuditLog({ actor: req.user!.id, actorName: req.user!.username, targetId: String(id), targetType: 'financial_year', action: 'UPDATE', details: `Financial year ${updated.year} set to ${status}` });
-      res.json(updated);
+
+      // Task #427 — seal the year's scans into a permanent file archive
+      // when transitioning Open → Closed. Awaited synchronously so the
+      // admin sees the outcome in the response and the audit trail is
+      // coherent. A failure inside the seal does NOT roll back the
+      // status change — the financial-year state machine is the source
+      // of truth, the archive is a best-effort backup artefact.
+      let yearArchiveOutcome: any = null;
+      if (prior.status !== 'Closed' && status === 'Closed') {
+        try {
+          const sealResult = await sealYearArchive(updated.year, {
+            id: req.user!.id,
+            username: req.user?.username || String(req.user!.id),
+          });
+          yearArchiveOutcome = {
+            success: sealResult.success,
+            year: sealResult.year,
+            objectCount: sealResult.objectCount,
+            fileSize: sealResult.fileSize,
+            error: sealResult.error,
+          };
+          writeAuditLog({
+            actor: req.user!.id,
+            actorName: req.user!.username,
+            targetId: String(updated.year),
+            targetType: 'year_archive',
+            action: 'CREATE',
+            details: sealResult.success
+              ? `Year ${updated.year} sealed: ${sealResult.objectCount} files, ${sealResult.fileSize} bytes`
+              : `Year ${updated.year} seal FAILED: ${sealResult.error}`,
+          });
+        } catch (sealErr) {
+          logger.error(`Year-seal threw for year ${updated.year}:`, sealErr);
+          yearArchiveOutcome = {
+            success: false,
+            year: updated.year,
+            error: sealErr instanceof Error ? sealErr.message : String(sealErr),
+          };
+        }
+      }
+
+      res.json({ ...updated, yearArchive: yearArchiveOutcome });
     } catch (error) {
       logger.error('Error updating financial year:', error);
       res.status(500).json({ error: 'Failed to update financial year' });
