@@ -161,6 +161,25 @@ export async function createInvoiceFromQuotation(
   userId: number,
   tx?: DbClient,
 ) {
+  // Task #420: when running inside a transaction, take a row lock on
+  // the source quote BEFORE re-checking its status. Two concurrent
+  // /convert (or POST /api/invoices source_quotation_id) calls on the
+  // same quote would otherwise both pass the pre-checks against a
+  // stale read and create duplicate invoices. With FOR UPDATE the
+  // second caller blocks until the first commits, then sees
+  // status='converted' and is rejected by the gate below.
+  if (tx) {
+    const [locked] = await tx.select({
+      id: quotations.id,
+      status: quotations.status,
+      quoteNumber: quotations.quoteNumber,
+    }).from(quotations).where(eq(quotations.id, quotationId)).for('update');
+    if (!locked) throw new Error(`Quotation with id ${quotationId} not found`);
+    if (locked.status === 'converted') {
+      throw new Error(`Quotation ${locked.quoteNumber} has already been converted to an invoice`);
+    }
+  }
+
   const quote = await getQuotationWithItems(quotationId);
   if (!quote) throw new Error(`Quotation with id ${quotationId} not found`);
   if (quote.status === 'converted') throw new Error(`Quotation ${quote.quoteNumber} has already been converted to an invoice`);
