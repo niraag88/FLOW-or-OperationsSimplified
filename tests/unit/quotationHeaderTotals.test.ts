@@ -103,21 +103,30 @@ test('PUT /api/quotations/:id with new items recomputes header totals', { skip: 
   const quote = await res.json() as { id: number; quoteNumber: string };
 
   try {
+    // Mixed-VAT replacement on edit: 300 @ 5% + 100 @ 0%
+    //   subtotal = 400, vat = 15, grand = 415
     const put = await fetch(`${base}/api/quotations/${quote.id}`, {
       method: 'PUT', headers: H,
       body: JSON.stringify({
-        items: [{ product_id: productId, quantity: 3, unit_price: '100', vat_rate: '0.05', line_total: '300' }],
+        items: [
+          { product_id: productId, quantity: 3, unit_price: '100', vat_rate: '0.05', line_total: '300' },
+          { product_id: productId, quantity: 1, unit_price: '100', vat_rate: '0',    line_total: '100' },
+        ],
       }),
     });
     if (!put.ok) assert.fail(`PUT failed: ${put.status} ${await put.text()}`);
+    const putBody = await put.json() as { totalAmount?: string; vatAmount?: string; grandTotal?: string };
+    assert.equal(putBody.totalAmount, '400.00', 'PUT response must include recomputed subtotal');
+    assert.equal(putBody.vatAmount,   '15.00',  'PUT response must include recomputed VAT');
+    assert.equal(putBody.grandTotal,  '415.00', 'PUT response must include recomputed grand total');
 
     const { rows } = await pool.query<{ total_amount: string; vat_amount: string; grand_total: string }>(
       'SELECT total_amount, vat_amount, grand_total FROM quotations WHERE id = $1',
       [quote.id]
     );
-    assert.equal(rows[0]?.total_amount, '300.00');
+    assert.equal(rows[0]?.total_amount, '400.00');
     assert.equal(rows[0]?.vat_amount,   '15.00');
-    assert.equal(rows[0]?.grand_total,  '315.00');
+    assert.equal(rows[0]?.grand_total,  '415.00');
   } finally {
     await fetch(`${base}/api/quotations/${quote.id}`, { method: 'DELETE', headers: H });
   }
