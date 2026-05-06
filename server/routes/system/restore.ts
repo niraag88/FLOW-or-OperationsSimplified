@@ -481,8 +481,8 @@ export function registerRestoreRoutes(app: Express) {
     // only meaningful for runs that left the schema out of sync. Refusing
     // unrelated targets prevents accidentally overwriting reconcile fields
     // on a healthy historical row and confusing the audit trail.
-    const reconcileStatus = (existing as any).reconcileStatus as string | null | undefined;
-    const FORCE_ELIGIBLE = new Set(['warnings_skipped', 'failed']);
+    const reconcileStatus = existing.reconcileStatus;
+    const FORCE_ELIGIBLE: ReadonlySet<string> = new Set(['warnings_skipped', 'failed']);
     if (reconcileStatus && !FORCE_ELIGIBLE.has(reconcileStatus)) {
       return res.status(409).json({
         error: 'force_reconcile_not_eligible',
