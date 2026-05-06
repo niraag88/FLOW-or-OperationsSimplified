@@ -176,14 +176,36 @@ export default function Invoices() {
       const invoiceId = saved?.id;
       if (invoiceId === undefined || invoiceId === null) return;
       try {
-        await fetch(`/api/quotations/${quotationId}/convert`, {
+        const res = await fetch(`/api/quotations/${quotationId}/convert`, {
           method: 'PATCH',
           credentials: 'include',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({ invoiceId }),
         });
+        if (!res.ok) {
+          // Task #420 (B5): the invoice was saved but the server refused
+          // to mark the quotation as converted. Surface this so the user
+          // can fix the quotation status manually instead of discovering
+          // the mismatch later in reports.
+          let detail = '';
+          try {
+            const body = await res.json();
+            detail = body?.message || body?.error || '';
+          } catch { /* best-effort */ }
+          toast({
+            title: 'Invoice saved, but quotation not marked converted',
+            description: detail
+              ? `${detail} You can update the quotation status manually.`
+              : 'The server rejected the conversion. You can update the quotation status manually.',
+            variant: 'destructive',
+          });
+        }
       } catch {
-        // non-critical: quotation conversion status is best-effort
+        toast({
+          title: 'Invoice saved, but quotation not marked converted',
+          description: 'Network error while updating the quotation status. You can update it manually.',
+          variant: 'destructive',
+        });
       }
     }
   };
@@ -296,6 +318,15 @@ export default function Invoices() {
       const quotationNumber = document.quotation_number || document.quoteNumber || 'Unknown';
       const notes = document.remarks || document.notes || '';
       normalizedData.remarks = `Based on Quotation #${quotationNumber}${notes ? '\n' + notes : ''}`.trim();
+
+      // Task #420 (B5): the convert endpoint requires the resulting
+      // invoice's `reference` to equal the source quote number, so the
+      // server can prove the linkage before flipping status. The quote's
+      // own `reference` field (a customer PO ref) is preserved into
+      // remarks above and not lost.
+      if (quotationNumber && quotationNumber !== 'Unknown') {
+        normalizedData.reference = String(quotationNumber);
+      }
       
       // Handle quotation-specific items - map field names to what InvoiceForm expects
       const quotationItems = document.items || document.lineItems || [];
