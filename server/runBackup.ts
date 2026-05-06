@@ -59,6 +59,8 @@ export interface BackupRunResult {
   };
   prunedCount: number;
   errorMessage?: string;
+  /** Task #444 — id of the backup_runs row written for this run. */
+  backupRunId?: number;
 }
 
 /**
@@ -100,8 +102,9 @@ export async function runBackup(actor: BackupActor): Promise<BackupRunResult> {
   // Record run row (best-effort). manifest_* columns are written as
   // explicit "no manifest produced" markers — Task #427 replaced the
   // manifest with a real file archive recorded in the files_* columns.
+  let insertedRunId: number | undefined;
   try {
-    await db.insert(backupRuns).values({
+    const [inserted] = await db.insert(backupRuns).values({
       ranAt: startedAt,
       finishedAt: new Date(),
       triggeredBy: actor.id,
@@ -126,7 +129,8 @@ export async function runBackup(actor: BackupActor): Promise<BackupRunResult> {
         (!success
           ? [dbResult?.error, filesResult?.error].filter(Boolean).join("; ")
           : null),
-    });
+    }).returning({ id: backupRuns.id });
+    insertedRunId = inserted?.id;
   } catch (insertErr) {
     logger.error("runBackup: failed to insert backup_runs row:", insertErr);
   }
@@ -176,6 +180,7 @@ export async function runBackup(actor: BackupActor): Promise<BackupRunResult> {
     },
     prunedCount,
     errorMessage: topError,
+    backupRunId: insertedRunId,
   };
 }
 

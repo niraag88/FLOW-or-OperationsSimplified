@@ -102,14 +102,16 @@ function diff(a, b) {
     console.error('[round-trip] backup failed:', run.status, run.text);
     process.exit(1);
   }
-  // Look up the most recent backup_runs row id (the route returns the
-  // result object but not the id directly).
-  const runs = await s.req('GET', '/api/ops/backup-runs');
-  const latestSuccess = (runs.json?.runs || []).find(r => r.success);
-  if (!latestSuccess) { console.error('[round-trip] no successful backup row found'); process.exit(1); }
-  console.log(`[round-trip] backup run #${latestSuccess.id} succeeded (db=${latestSuccess.dbFileSize}B files=${latestSuccess.filesSize}B)`);
+  // Task #444: route now returns backupRunId so we restore EXACTLY the
+  // run we just created — no risk of racing another concurrent backup.
+  const runId = run.json?.backupRunId;
+  if (!runId) {
+    console.error('[round-trip] backup response missing backupRunId — server out of date?');
+    process.exit(1);
+  }
+  console.log(`[round-trip] backup run #${runId} succeeded (db=${run.json?.dbBackup?.fileSize}B files=${run.json?.filesBackup?.fileSize}B)`);
 
-  const restore = await s.req('POST', `/api/ops/backup-runs/${latestSuccess.id}/restore`, {
+  const restore = await s.req('POST', `/api/ops/backup-runs/${runId}/restore`, {
     confirmation: 'EMERGENCY RESTORE',
     acceptDataLoss: false,
   });

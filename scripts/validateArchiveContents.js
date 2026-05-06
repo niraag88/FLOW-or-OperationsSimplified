@@ -111,13 +111,14 @@ function listEntries(tarGzPath) {
     try {
       tmp = await downloadToTmp(sealed.key);
       const entries = await listEntries(tmp.path);
-      const wrongYear = entries.filter(k => {
-        const m = k.match(/^([^/]+)\/(\d{4})\//);
-        return !m || parseInt(m[2], 10) !== sealed.year;
-      });
-      const ok = entries.length === sealed.objs && wrongYear.length === 0;
-      console.log(`[validate]   entries=${entries.length} wrong-year=${wrongYear.length} → ${ok ? 'PASS' : 'FAIL'}`);
-      if (wrongYear.length) console.log('[validate]   wrong-year sample:', wrongYear.slice(0, 5));
+      // Use the production allowlist in onlyYear mode — exactly the
+      // same predicate archiveFiles.js used to BUILD the seal. This
+      // catches any path that wouldn't have been allowed in the seal
+      // (wrong scope, wrong year, backups/* prefix, root files, etc).
+      const disallowed = entries.filter(k => !shouldInclude(k, new Set(), sealed.year));
+      const ok = entries.length === sealed.objs && disallowed.length === 0;
+      console.log(`[validate]   entries=${entries.length} disallowed=${disallowed.length} → ${ok ? 'PASS' : 'FAIL'}`);
+      if (disallowed.length) console.log('[validate]   disallowed sample:', disallowed.slice(0, 5));
       if (!ok) pass = false;
     } finally {
       if (tmp) await unlink(tmp.path).catch(() => {});
