@@ -135,6 +135,45 @@ export async function createQuotation(data: InsertQuotation, tx?: DbClient) {
   return quote;
 }
 
+// Task #421 (B4): aggregate header totals from the quotation_items rows
+// and persist them on the quotations row. Mirrors how PO / Invoice / DO
+// keep their list-column totals in sync with their lines. Returns the
+// computed totals so callers can avoid an extra read if they need them.
+//
+// Source of truth is the line items table:
+//   subtotal     = sum(line_total)
+//   vat_amount   = sum(line_total * vat_rate)
+//   grand_total  = subtotal + vat_amount
+//
+// Per-line vat_rate is used (not the customer's treatment) because the
+// items table is the authoritative record of what was quoted; mixed-VAT
+// quotes therefore round-trip exactly. A quote with no surviving items
+// is reset to all-zero so cancelled/empty quotes don't display stale
+// numbers.
+export async function recomputeQuotationHeaderTotals(
+  quoteId: number,
+  tx?: DbClient,
+): Promise<{ totalAmount: string; vatAmount: string; grandTotal: string }> {
+  const dbClient: DbClient = tx ?? db;
+  const [agg] = await dbClient.select({
+    subtotal: sql<string>`COALESCE(SUM(${quotationItems.lineTotal}), 0)::numeric(12,2)`,
+    vat: sql<string>`COALESCE(SUM(${quotationItems.lineTotal} * ${quotationItems.vatRate}), 0)::numeric(12,2)`,
+  }).from(quotationItems).where(eq(quotationItems.quoteId, quoteId));
+
+  const subtotalNum = Number(agg?.subtotal ?? 0);
+  const vatNum = Number(agg?.vat ?? 0);
+  const grandNum = subtotalNum + vatNum;
+  const totalAmount = subtotalNum.toFixed(2);
+  const vatAmount = vatNum.toFixed(2);
+  const grandTotal = grandNum.toFixed(2);
+
+  await dbClient.update(quotations)
+    .set({ totalAmount, vatAmount, grandTotal, updatedAt: new Date() })
+    .where(eq(quotations.id, quoteId));
+
+  return { totalAmount, vatAmount, grandTotal };
+}
+
 export async function updateQuotation(id: number, data: Partial<InsertQuotation>, tx?: DbClient) {
   const dbClient: DbClient = tx ?? db;
   const [updatedQuote] = await dbClient.update(quotations)

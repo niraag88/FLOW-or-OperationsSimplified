@@ -88,6 +88,13 @@ export function registerQuotationRoutes(app: Express) {
             .where(eq(quotations.id, created.id));
         }
 
+        // Task #421 (B4): aggregate header totals from the just-inserted
+        // line items so the Quotations list column shows the correct
+        // subtotal / VAT / total immediately on creation instead of
+        // AED 0.00. Merge the result into the created row so the POST
+        // response body is consistent with what the list will show.
+        const totals = await businessStorage.recomputeQuotationHeaderTotals(created.id, tx);
+
         await tx.insert(auditLog).values({
           actor: req.user!.id,
           actorName: req.user?.username || String(req.user!.id),
@@ -97,7 +104,7 @@ export function registerQuotationRoutes(app: Express) {
           details: `Quotation #${created.quoteNumber} created for ${quoteCustomerName}`,
         });
 
-        return created;
+        return { ...created, ...totals };
       });
 
       res.status(201).json(quotation);
@@ -296,6 +303,30 @@ export function registerQuotationRoutes(app: Express) {
           }
         }
         const updatedQuote = await businessStorage.updateQuotation(id, validatedData, tx);
+
+        // Task #421 (B4): if the caller supplied a fresh items array,
+        // replace the line items in the same tx so header totals are
+        // recomputed against the new lines. An omitted items key is a
+        // legitimate header-only edit; we still recompute totals after
+        // it in case a previous save left the header at zero.
+        if (Array.isArray(req.body.items)) {
+          await tx.delete(quotationItems).where(eq(quotationItems.quoteId, id));
+          for (const item of req.body.items) {
+            if (item.product_id && Number(item.quantity) > 0) {
+              await tx.insert(quotationItems).values({
+                quoteId: id,
+                productId: parseInt(item.product_id),
+                quantity: Number(item.quantity),
+                unitPrice: item.unit_price.toString(),
+                discount: item.discount ? item.discount.toString() : "0.00",
+                vatRate: item.vat_rate ? item.vat_rate.toString() : "0.05",
+                lineTotal: item.line_total.toString(),
+              });
+            }
+          }
+        }
+        await businessStorage.recomputeQuotationHeaderTotals(id, tx);
+
         await tx.insert(auditLog).values({
           actor: req.user!.id,
           actorName: req.user?.username || String(req.user!.id),
