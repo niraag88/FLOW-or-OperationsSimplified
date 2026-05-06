@@ -20,7 +20,6 @@ import {
   ChevronDown,
   Building2,
   Users2,
-  ShieldCheck,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import {
@@ -111,16 +110,6 @@ const navigationItems: any[] = [
         icon: Users2,
         adminOnly: true,
         preload: () => import("@/pages/UserManagement"),
-      },
-      {
-        // Server already exposes /api/audit-logs to Admin+Manager — surface
-        // a dedicated sidebar entry so Managers can actually find it
-        // without navigating to User Management (Task #429 M-02).
-        title: "Audit Log",
-        url: createPageUrl("Audit Log"),
-        icon: ShieldCheck,
-        requiredRoles: ['Admin', 'Manager'],
-        preload: () => import("@/pages/AuditLog"),
       }
     ]
   },

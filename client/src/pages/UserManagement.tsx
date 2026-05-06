@@ -65,7 +65,7 @@ export default function UserManagement() {
   const queryClient = useQueryClient();
   const { toast } = useToast();
   const isAdmin = hasRole(['Admin']);
-  const canViewLogs = hasRole(['Admin', 'Manager']);
+  const canViewLogs = isAdmin;
   const [activeTab, setActiveTab] = useState('users');
   const [isCreateDialogOpen, setIsCreateDialogOpen] = useState(false);
   const [editingUser, setEditingUser] = useState<User | null>(null);
@@ -90,7 +90,7 @@ export default function UserManagement() {
         <Alert className="max-w-md">
           <Shield className="h-4 w-4" />
           <AlertDescription>
-            Access denied. Manager or Admin privileges required.
+            Access denied. Admin privileges required.
           </AlertDescription>
         </Alert>
       </div>

@@ -26,7 +26,6 @@ const GoodsReceipts = lazy(() => import("@/pages/GoodsReceipts"));
 const Print = lazy(() => import("@/pages/Print"));
 const Quotations = lazy(() => import("@/pages/Quotations"));
 const UserManagement = lazy(() => import("@/pages/UserManagement"));
-const AuditLog = lazy(() => import("@/pages/AuditLog"));
 const POPrintView = lazy(() => import("@/components/purchase-orders/POPrintView"));
 const QuotationPrintView = lazy(() => import("@/components/quotations/QuotationPrintView"));
 const QuotationsListPrintView = lazy(() => import("@/components/quotations/QuotationsListPrintView"));
@@ -111,7 +110,7 @@ function PagesContent() {
           </ProtectedRoute>
         } />
         <Route path="/user-management" element={
-          <ProtectedRoute requiredRoles={['Admin', 'Manager']}>
+          <ProtectedRoute requiredRoles={['Admin']}>
             <Layout currentPageName="User Management"><UserManagement /></Layout>
           </ProtectedRoute>
         } />
@@ -141,11 +140,6 @@ function PagesContent() {
         <Route path="/goods-receipts" element={
           <ProtectedRoute requiredRoles={['Admin', 'Manager']}>
             <Layout currentPageName="Goods Receipts"><GoodsReceipts /></Layout>
-          </ProtectedRoute>
-        } />
-        <Route path="/audit-log" element={
-          <ProtectedRoute requiredRoles={['Admin', 'Manager']}>
-            <Layout currentPageName="Audit Log"><AuditLog /></Layout>
           </ProtectedRoute>
         } />
         <Route path="/print" element={
