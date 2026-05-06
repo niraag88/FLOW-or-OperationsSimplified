@@ -13,6 +13,7 @@ const DOT_VERB_ACTIONS = [
   'goods_receipt.scan_attached',
   'goods_receipt.scan_removed',
   'purchase_order.scan_attached',
+  'purchase_order.scan_removed',
   'storage_object.deleted',
 ] as const;
 const KNOWN_ACTIONS = [...LEGACY_ACTIONS, ...DOT_VERB_ACTIONS] as const;
@@ -39,6 +40,7 @@ const ACTION_COLORS: Record<string, string> = {
   'goods_receipt.scan_attached': 'bg-yellow-100 text-yellow-800 dark:bg-yellow-900 dark:text-yellow-200',
   'goods_receipt.scan_removed': 'bg-orange-100 text-orange-800 dark:bg-orange-900 dark:text-orange-200',
   'purchase_order.scan_attached': 'bg-yellow-100 text-yellow-800 dark:bg-yellow-900 dark:text-yellow-200',
+  'purchase_order.scan_removed': 'bg-orange-100 text-orange-800 dark:bg-orange-900 dark:text-orange-200',
   'storage_object.deleted': 'bg-red-100 text-red-800 dark:bg-red-900 dark:text-red-200',
 };
 

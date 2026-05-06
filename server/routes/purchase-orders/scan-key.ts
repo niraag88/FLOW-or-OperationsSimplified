@@ -64,7 +64,7 @@ export function registerPurchaseOrderScanKeyRoutes(app: Express) {
         actorName: req.user?.username || String(req.user!.id),
         targetId: String(id),
         targetType: 'purchase_order',
-        action: 'REMOVE_FILE',
+        action: 'purchase_order.scan_removed',
         details: `Document removed from Purchase Order #${po.poNumber}`,
       });
 
